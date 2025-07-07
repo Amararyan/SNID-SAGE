@@ -1,0 +1,166 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snid-sage"
+version = "1.0.0"
+description = "SNID SAGE - SuperNova IDentification with Spectrum Analysis and Guided Enhancement"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Fiorenzo Stoppa", email = "fiorenzo.stoppa@physics.ox.ac.uk"}
+]
+maintainers = [
+    {name = "Fiorenzo Stoppa", email = "fiorenzo.stoppa@physics.ox.ac.uk"}
+]
+keywords = ["astronomy", "supernova", "spectrum", "analysis", "snid", "machine-learning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Natural Language :: English",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20.0",
+    "scipy>=1.7.0",
+    "matplotlib>=3.5.0",
+    "astropy>=5.0.0",
+    "scikit-learn>=1.0.0",
+    "requests>=2.25.0",
+    "beautifulsoup4>=4.9.0",
+    "ttkbootstrap>=1.10.0",
+    "pyspeckit>=1.0.0",
+    "h5py>=3.0.0",
+    "pandas>=1.3.0",
+    "seaborn>=0.11.0",
+    "pillow>=8.0.0",
+    "radio-beam>=0.3.0",
+    "casa-formats-io>=0.2.0",
+    "psutil>=5.8.0"
+]
+
+[project.optional-dependencies]
+astro = [
+    "astroquery>=0.4.0",
+]
+llm = [
+    "llama-cpp-python>=0.2.0; platform_system != 'Windows'",
+    "llama-cpp-python-cuda>=0.2.0; platform_system == 'Windows'",
+    "openai>=1.0.0",
+]
+gui = [
+    "pillow>=8.0.0",
+]
+dev = [
+    "pytest>=6.0.0",
+    "pytest-cov>=2.10.0",
+    "black>=21.0.0",
+    "flake8>=3.8.0",
+    "mypy>=0.800",
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "twine>=4.0.0",
+    "build>=0.8.0",
+]
+all = [
+    "astroquery>=0.4.0",
+    "llama-cpp-python>=0.2.0; platform_system != 'Windows'",
+    "llama-cpp-python-cuda>=0.2.0; platform_system == 'Windows'",
+    "openai>=1.0.0",
+    "pillow>=8.0.0",
+    "pytest>=6.0.0",
+    "pytest-cov>=2.10.0",
+    "black>=21.0.0",
+    "flake8>=3.8.0",
+    "mypy>=0.800",
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "twine>=4.0.0",
+    "build>=0.8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/FiorenSt/SNID-SAGE"
+Documentation = "https://fiorenst.github.io/SNID-SAGE"
+Repository = "https://github.com/FiorenSt/SNID-SAGE.git"
+"Bug Reports" = "https://github.com/FiorenSt/SNID-SAGE/issues"
+"Download" = "https://github.com/FiorenSt/SNID-SAGE/archive/refs/heads/main.zip"
+
+[project.scripts]
+snid = "interfaces.cli.main:main"
+snid-gui = "interfaces.gui.sage_gui:main"
+snid-sage = "interfaces.gui.sage_gui:main"
+snid-template = "interfaces.cli.template:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "docs*", "temp_test_results*", "snid_test_output*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.md", "*.yml", "*.yaml"]
+"templates" = ["*.hdf5", "*.json"]
+"data" = ["*.fits", "*.dat", "*.txt", "*.ascii"]
+"images" = ["*.png", "*.jpg", "*.ico", "*.icns"]
+"custom_templates" = ["*.md"]
+
+# Development tools configuration
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | venv
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+] 
