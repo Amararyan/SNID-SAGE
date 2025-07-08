@@ -381,26 +381,38 @@ class CrossPlatformWindowManager:
                 _LOGGER.debug("✅ Window icon already set, skipping")
                 return True
             
-            # Find icons directory - try multiple potential locations
-            current_dir = Path(__file__).parent
-            
-            # Try different potential project roots
-            possible_roots = [
-                current_dir.parent.parent.parent.parent,  # From snid_sage/interfaces/gui/utils/
-                current_dir.parent.parent.parent,         # Fallback
-                Path.cwd(),                               # Current working directory
-            ]
-            
-            icons_dir = None
-            for root in possible_roots:
-                test_icons_dir = root / 'images'
-                if test_icons_dir.exists():
-                    icons_dir = test_icons_dir
-                    break
-            
-            if not icons_dir:
-                _LOGGER.warning("⚠️ Images directory not found")
-                return False
+            # Find icons directory using the same approach as templates
+            try:
+                from snid_sage.shared.utils.simple_template_finder import find_images_directory
+                icons_dir = find_images_directory()
+                
+                if not icons_dir:
+                    _LOGGER.warning("⚠️ Images directory not found")
+                    return False
+                    
+                # Convert to string for compatibility
+                icons_dir = str(icons_dir)
+            except ImportError:
+                # Fallback to old method if import fails
+                current_dir = Path(__file__).parent
+                
+                # Try different potential project roots
+                possible_roots = [
+                    current_dir.parent.parent.parent.parent,  # From snid_sage/interfaces/gui/utils/
+                    current_dir.parent.parent.parent,         # Fallback
+                    Path.cwd(),                               # Current working directory
+                ]
+                
+                icons_dir = None
+                for root in possible_roots:
+                    test_icons_dir = root / 'images'
+                    if test_icons_dir.exists():
+                        icons_dir = str(test_icons_dir)
+                        break
+                
+                if not icons_dir:
+                    _LOGGER.warning("⚠️ Images directory not found")
+                    return False
             
             icon_path = cls.get_platform_icon_path(icon_name, str(icons_dir))
             

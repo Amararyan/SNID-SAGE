@@ -236,6 +236,141 @@ def get_templates_directory() -> Optional[Path]:
     return find_templates_directory()
 
 
+def find_images_directory() -> Optional[Path]:
+    """
+    Find the images directory for both GitHub installations and installed packages.
+    
+    For GitHub installations, images are in the 'images' directory at the project root.
+    For installed packages, images are included in the package data.
+    
+    Returns:
+        Path to images directory if found, None otherwise
+    """
+    # Strategy 1: Check if we're in an installed package using importlib.resources
+    try:
+        import importlib.resources as pkg_resources
+        
+        # For Python 3.9+ with improved traversable API
+        if hasattr(pkg_resources, 'files'):
+            try:
+                # Try to access the images directory within the installed package
+                images_package = pkg_resources.files('snid_sage') / 'images'
+                if images_package.exists():
+                    # Convert to Path and validate
+                    images_dir = Path(str(images_package))
+                    if _validate_images_directory(images_dir):
+                        logger.info(f"✅ Found images in installed package (files API): {images_dir}")
+                        return images_dir
+            except Exception as e:
+                logger.debug(f"Files API with snid_sage images failed: {e}")
+                
+    except ImportError:
+        logger.debug("importlib.resources not available")
+    
+    # Strategy 2: Check site-packages for installed package
+    try:
+        # Look for snid-sage in site-packages
+        for path in sys.path:
+            if 'site-packages' in path:
+                site_packages = Path(path)
+                
+                # Check for different possible installation names
+                for pkg_name in ['snid_sage', 'snid-sage', 'SNID_SAGE']:
+                    pkg_dir = site_packages / pkg_name
+                    if pkg_dir.exists():
+                        images_dir = pkg_dir / 'images'
+                        if _validate_images_directory(images_dir):
+                            logger.info(f"✅ Found images in site-packages: {images_dir}")
+                            return images_dir
+    except Exception as e:
+        logger.debug(f"Site-packages search for images failed: {e}")
+    
+    # Strategy 3: Check current working directory
+    cwd = Path.cwd()
+    images_dir = cwd / 'images'
+    if _validate_images_directory(images_dir):
+        logger.info(f"✅ Found images in current directory: {images_dir}")
+        return images_dir
+    
+    # Strategy 4: Check relative to snid_sage package in current directory
+    cwd = Path.cwd()
+    images_dir = cwd / 'snid_sage' / 'images'
+    if _validate_images_directory(images_dir):
+        logger.info(f"✅ Found images in current directory snid_sage package: {images_dir}")
+        return images_dir
+    
+    # Strategy 5: Find project root by looking for key files
+    current = Path(__file__).resolve().parent
+    for _ in range(10):  # Limit search depth
+        # Look for project markers
+        if any((current / marker).exists() for marker in ['pyproject.toml', 'setup.py', 'README.md']):
+            # Check for snid_sage package structure first
+            images_dir = current / 'snid_sage' / 'images'
+            if _validate_images_directory(images_dir):
+                logger.info(f"✅ Found images in project snid_sage package: {images_dir}")
+                return images_dir
+            # Fallback to root images directory
+            images_dir = current / 'images'
+            if _validate_images_directory(images_dir):
+                logger.info(f"✅ Found images relative to project root: {images_dir}")
+                return images_dir
+        current = current.parent
+        if current == current.parent:  # Reached filesystem root
+            break
+    
+    # Strategy 6: Check relative to module location (go up directories)
+    current = Path(__file__).resolve().parent
+    for _ in range(10):
+        # Check for snid_sage package structure
+        images_dir = current / 'snid_sage' / 'images'
+        if _validate_images_directory(images_dir):
+            logger.info(f"✅ Found images in snid_sage package relative to module: {images_dir}")
+            return images_dir
+        # Check for images directory
+        images_dir = current / 'images'
+        if _validate_images_directory(images_dir):
+            logger.info(f"✅ Found images relative to module: {images_dir}")
+            return images_dir
+        current = current.parent
+        if current == current.parent:
+            break
+    
+    logger.warning("No valid images directory found")
+    return None
+
+
+def _validate_images_directory(images_dir: Path) -> bool:
+    """
+    Validate that a directory contains valid image files.
+    
+    Args:
+        images_dir: Path to check
+        
+    Returns:
+        True if directory contains valid images
+    """
+    try:
+        if not images_dir.exists() or not images_dir.is_dir():
+            return False
+        
+        # Check for common image files
+        image_extensions = ['*.png', '*.ico', '*.icns', '*.jpg', '*.jpeg']
+        image_files = []
+        for ext in image_extensions:
+            image_files.extend(list(images_dir.glob(ext)))
+        
+        if image_files:
+            logger.debug(f"Found {len(image_files)} image files in {images_dir}")
+            return True
+        
+        logger.debug(f"No image files found in {images_dir}")
+        return False
+        
+    except Exception as e:
+        logger.debug(f"Error validating images directory {images_dir}: {e}")
+        return False
+
+
 if __name__ == "__main__":
     logger.info("SNID Simple Template Directory Finder")
     logger.info("=" * 50)

@@ -113,32 +113,35 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     # Set epilog with examples
     parser.epilog = """
 Examples:
-  # Basic identification with standard outputs
+  # Basic identification with auto-discovered templates
+  snid identify spectrum.txt --output-dir results/
+  
+  # Basic identification with explicit templates directory
   snid identify spectrum.txt templates/ --output-dir results/
   
   # With Savitzky-Golay smoothing (11-pixel window, 3rd order polynomial)
-  snid identify spectrum.txt templates/ --output-dir results/ --savgol-window 11 --savgol-order 3
+  snid identify spectrum.txt --output-dir results/ --savgol-window 11 --savgol-order 3
   
   # With wavelength-based Savitzky-Golay smoothing (5 Angstrom FWHM)
-  snid identify spectrum.txt templates/ --output-dir results/ --savgol-fwhm 5.0 --savgol-order 3
+  snid identify spectrum.txt --output-dir results/ --savgol-fwhm 5.0 --savgol-order 3
   
   # Minimal mode - main result file only, no additional outputs
-  snid identify spectrum.txt templates/ --output-dir results/ --minimal
+  snid identify spectrum.txt --output-dir results/ --minimal
   
   # Complete mode - all outputs + comprehensive GUI-style plots
-  snid identify spectrum.txt templates/ --output-dir results/ --complete
+  snid identify spectrum.txt --output-dir results/ --complete
   
   # Force specific redshift (skips redshift search)
-  snid identify spectrum.txt templates/ --forced-redshift 0.05 --output-dir results/
+  snid identify spectrum.txt --forced-redshift 0.05 --output-dir results/
   
   # Use only specific templates with complete analysis
-  snid identify spectrum.txt templates/ --template-filter sn1994I sn2004aw sn2007gr --complete --output-dir results/
+  snid identify spectrum.txt --template-filter sn1994I sn2004aw sn2007gr --complete --output-dir results/
   
   # Filter by supernova type with comprehensive outputs
-  snid identify spectrum.txt templates/ --type-filter Ia IIn --complete --output-dir results/
+  snid identify spectrum.txt --type-filter Ia IIn --complete --output-dir results/
   
   # Age filtering with full analysis
-  snid identify spectrum.txt templates/ --age-min 0 --age-max 20 --complete --output-dir results/
+  snid identify spectrum.txt --age-min 0 --age-max 20 --complete --output-dir results/
     """
     # Required arguments
     parser.add_argument(
@@ -147,7 +150,8 @@ Examples:
     )
     parser.add_argument(
         "templates_dir", 
-        help="Path to directory containing template spectra"
+        nargs="?",  # Make optional
+        help="Path to directory containing template spectra (optional - auto-discovers if not provided)"
     )
     
     # Processing modes (mutually exclusive)
@@ -665,12 +669,12 @@ def _save_spectrum_outputs(
 
 
 
-def _validate_and_fix_templates_dir(templates_dir: str) -> str:
+def _validate_and_fix_templates_dir(templates_dir: Optional[str]) -> str:
     """
     Validate templates directory and auto-correct if needed.
     
     Args:
-        templates_dir: Path to templates directory
+        templates_dir: Path to templates directory (None to auto-discover)
         
     Returns:
         Valid templates directory path
@@ -678,6 +682,18 @@ def _validate_and_fix_templates_dir(templates_dir: str) -> str:
     Raises:
         FileNotFoundError: If no valid templates directory can be found
     """
+    # If no templates directory provided, auto-discover
+    if templates_dir is None:
+        try:
+            from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
+            auto_found_dir = find_templates_directory_or_raise()
+            print(f"✅ Auto-discovered templates at: {auto_found_dir}")
+            return str(auto_found_dir)
+        except (ImportError, FileNotFoundError):
+            raise FileNotFoundError(
+                "Could not auto-discover templates directory. Please provide templates_dir explicitly."
+            )
+    
     # Check if provided directory exists and is valid
     if os.path.exists(templates_dir):
         return templates_dir
