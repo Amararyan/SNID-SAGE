@@ -27,34 +27,6 @@ pip install . --verbose
 python scripts/generate_platform_icons.py
 python scripts/setup_all_platform_icons.py
 ```
-
-## 🎯 **Key Features**
-
-### **🖥️ Modern GUI Interface** *(Primary Interface)*
-- **Intuitive workflow** with step-by-step analysis guidance
-- **Interactive spectrum plotting** with zoom, pan, and measurement tools
-- **Real-time preprocessing** with continuum fitting and noise reduction
-- **Advanced line detection** with interactive emission/absorption line analysis
-- **AI-powered analysis dialog** with 15+ state-of-the-art models (GPT-4, Claude, Gemini)
-- **Results visualization** with publication-ready plots and summaries
-- **Dark/light theme support** with accessibility features
-- **Cross-platform compatibility** (Windows, macOS, Linux)
-
-### **💻 Command Line Interface** *(For Automation & Batch Processing)*
-- **Batch processing** of multiple spectra with progress tracking
-- **Template management** with HDF5-optimized storage
-- **Custom redshift ranges** and analysis parameters
-- **Automated reporting** with configurable output formats
-- **Integration with existing workflows** via Python API
-
-### **🔬 Advanced Analysis Capabilities**
-- **10 main supernova types** with **53 detailed subtypes** classification
-- **High-performance FFT cross-correlation** with template matching
-- **GMM clustering** with type-specific optimizations
-- **Wind velocity analysis** with P Cygni profile fitting
-- **FWHM analysis** with multiple fitting methods
-- **Memory-efficient processing** for large datasets
-
 ## 🎮 **Getting Started**
 
 ### **Launch the GUI** *(Recommended for most users)*
@@ -115,9 +87,10 @@ If you use SNID SAGE in your research, please cite:
 
 ```bibtex
 @software{snid_sage_2025,
-  title={SNID SAGE: Advanced Supernova Spectral Analysis with AI Enhancement},
-  author={Your Name},
-  year={2025},
+  title={SNID-SAGE: A Modern Framework for Interactive Supernova
+Classification and Spectral Analysis},
+  author={F. Stoppa},
+  year={In Prep, 2025},
   url={https://github.com/FiorenSt/SNID-SAGE}
 }
 ```
