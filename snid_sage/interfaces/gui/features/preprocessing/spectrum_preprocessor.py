@@ -25,7 +25,7 @@ from snid_sage.snid.preprocessing import (
 )
 from snid_sage.snid.io import read_spectrum
 
-# Import constants from snid_sage.snid.py
+# snid_sage.snid.py
 from snid_sage.snid.snid import NW, MINW, MAXW
 
 # ===== Logging Setup =====

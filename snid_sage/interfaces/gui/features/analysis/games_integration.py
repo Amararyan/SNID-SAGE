@@ -192,7 +192,7 @@ class GamesIntegration:
     def _start_positioned_game(self, game_name, game_function_name):
         """Start a game and position its window next to the progress window"""
         try:
-            from snid import games
+            from snid_sage.snid import games
             
             # Get the game function
             game_func = getattr(games, game_function_name)
@@ -208,7 +208,7 @@ class GamesIntegration:
                 try:
                     # Enlarge game window size (e.g., 1024x768) before starting
                     try:
-                        # Monkey-patch the size constants in snid.games
+                        # snid_sage.snid.games
                         games.DEBRIS_WIDTH = max(getattr(games, 'DEBRIS_WIDTH', 800), 1024)
                         games.DEBRIS_HEIGHT = max(getattr(games, 'DEBRIS_HEIGHT', 600), 768)
                     except Exception:

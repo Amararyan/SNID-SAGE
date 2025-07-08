@@ -5,7 +5,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 
 
-# Savitzky-Golay filtering functions moved to snid.preprocessing
+# snid_sage.snid.preprocessing
 # Import wrapper for backward compatibility
 def apply_savgol_filter(wave, flux, window_length=11, polyorder=3):
     """

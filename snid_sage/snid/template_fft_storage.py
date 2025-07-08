@@ -38,7 +38,7 @@ try:
     from snid_sage.shared.utils.logging import get_logger
     _LOG = get_logger('snid.template_fft_storage')
 except ImportError:
-    _LOG = logging.getLogger('snid.template_fft_storage')
+    _LOG = logging.getLogger('snid_sage.snid.template_fft_storage')
 
 @dataclass
 class TemplateEntry:

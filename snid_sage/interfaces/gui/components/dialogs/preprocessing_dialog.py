@@ -1612,7 +1612,7 @@ class PreprocessingDialog:
                         # No continuum fitting applied, use the current flux as is
                         reconstructed_flux = log_flux.copy()
                     
-                    # Use the EXACT same method as standard SNID preprocessing (from snid_sage.snid.py line ~260)
+                    # snid_sage.snid.py line ~260)
                     nonzero_mask = (reconstructed_flux > 0)
                     if np.any(nonzero_mask):
                         left_edge_filtered = np.argmax(nonzero_mask)

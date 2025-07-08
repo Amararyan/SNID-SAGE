@@ -13,7 +13,7 @@ try:
     from snid_sage.shared.utils.logging import get_logger
     _LOG = get_logger('snid.optimization')
 except ImportError:
-    _LOG = logging.getLogger('snid.optimization')
+    _LOG = logging.getLogger('snid_sage.snid.optimization')
 
 
 def is_optimization_available() -> bool:

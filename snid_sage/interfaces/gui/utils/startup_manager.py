@@ -66,7 +66,7 @@ class StartupManager:
             
             # Initialize games integration if available
             try:
-                from snid import games
+                from snid_sage.snid import games
                 if hasattr(games, 'show_game_menu'):
                     from snid_sage.interfaces.gui.features.analysis.games_integration import GamesIntegration
                     self.gui.games_integration = GamesIntegration(self.gui)

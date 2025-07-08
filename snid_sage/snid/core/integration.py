@@ -17,7 +17,7 @@ try:
     from snid_sage.shared.utils.logging import get_logger
     _LOG = get_logger('snid.integration')
 except ImportError:
-    _LOG = logging.getLogger('snid.integration')
+    _LOG = logging.getLogger('snid_sage.snid.integration')
 
 # Global unified storage instance
 _GLOBAL_STORAGE: Optional['TemplateFFTStorage'] = None

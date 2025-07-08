@@ -84,7 +84,7 @@ class SummaryPlotter:
             template_flux_flat = current_match['spectra']['flat']['flux']
             
             # DON'T filter templates - they are already properly trimmed by SNID analysis
-            # Templates are trimmed to log_wave[left_edge:right_edge+1] in snid.py
+            # snid_sage.snid.py
             # Filtering them again with input spectrum edges cuts them incorrectly
             # template_wave_flux, template_flux_flux = self.gui._filter_nonzero_spectrum(
             #     template_wave_flux, template_flux_flux, self.gui.snid_results.processed_spectrum

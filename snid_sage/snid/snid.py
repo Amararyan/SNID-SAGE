@@ -11,6 +11,7 @@ and includes GMM clustering for outlier rejection and comprehensive statistical 
 
 from __future__ import annotations
 import time, logging
+import warnings
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Callable
 import math  # Added for batch processing
@@ -475,7 +476,9 @@ def _process_template_peaks(
             
             # Calculate prominence of the refined peak (second-pass)
             try:
-                prom_vals = peak_prominences(Rz_peak, [peak_idx])[0]
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', message='some peaks have a prominence of 0')
+                    prom_vals = peak_prominences(Rz_peak, [peak_idx])[0]
                 refined_prominence = float(prom_vals[0]) if len(prom_vals) > 0 else 0.0
             except Exception:
                 refined_prominence = 0.0

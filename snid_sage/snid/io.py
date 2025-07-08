@@ -21,7 +21,7 @@ try:
     from snid_sage.shared.utils.logging import get_logger
     _LOG = get_logger('snid.io')
 except ImportError:
-    _LOG = logging.getLogger('snid.io')
+    _LOG = logging.getLogger('snid_sage.snid.io')
 
 
 def read_spectrum(filename: str, apodize: bool = False) -> Tuple[np.ndarray, np.ndarray]:
@@ -710,7 +710,7 @@ def write_result(result: Any, filename: str) -> None:
     except Exception as e:
         # Fallback to legacy format if unified formatter fails
         import logging
-        logging.getLogger('snid.io').warning(f"Unified formatter failed, using legacy format: {e}")
+        logging.getLogger('snid_sage.snid.io').warning(f"Unified formatter failed, using legacy format: {e}")
         write_detailed_result(result, filename)
 
 

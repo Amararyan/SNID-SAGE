@@ -44,7 +44,7 @@ class BatchTemplateManager:
         self._optimization_used = False
         
         # Initialize logging
-        self._log = logging.getLogger('snid.batch.template_manager')
+        self._log = logging.getLogger('snid_sage.snid.batch.template_manager')
     
     def _validate_and_fix_templates_dir(self, templates_dir: str) -> str:
         """
@@ -345,7 +345,7 @@ def _run_optimized_snid_analysis(
             # Temporarily suppress optimization and clustering warnings during individual spectrum processing
             import logging
             snid_integration_logger = logging.getLogger('snid_sage.snid.integration')
-            snid_clustering_logger = logging.getLogger('snid.cosmological_clustering')
+            snid_clustering_logger = logging.getLogger('snid_sage.snid.cosmological_clustering')
             snid_pipeline_logger = logging.getLogger('snid_sage.snid.pipeline')
             
             original_levels = {
@@ -656,7 +656,7 @@ def _save_spectrum_outputs(
                         plt.close(fig)  # Prevent memory leak
                         
                     except Exception as e:
-                        logging.getLogger('snid.batch').debug(f"3D GMM clustering plot failed: {e}")
+                        logging.getLogger('snid_sage.snid.batch').debug(f"3D GMM clustering plot failed: {e}")
                 
                 # 2. Redshift vs Age plot (cluster-aware)
                 try:
@@ -665,7 +665,7 @@ def _save_spectrum_outputs(
                     fig = plot_redshift_age(result, save_path=str(redshift_age_file))
                     plt.close(fig)  # Prevent memory leak
                 except Exception as e:
-                    logging.getLogger('snid.batch').debug(f"Redshift-age plot failed: {e}")
+                    logging.getLogger('snid_sage.snid.batch').debug(f"Redshift-age plot failed: {e}")
                 
                 # 3. Cluster-aware subtype proportions (GUI-style)
                 try:
@@ -678,7 +678,7 @@ def _save_spectrum_outputs(
                     )
                     plt.close(fig)  # Prevent memory leak
                 except Exception as e:
-                    logging.getLogger('snid.batch').debug(f"Cluster subtype plot failed: {e}")
+                    logging.getLogger('snid_sage.snid.batch').debug(f"Cluster subtype plot failed: {e}")
                 
                 # 5. Flux spectrum plot (best match) - same as GUI
                 if plot_matches:
@@ -688,7 +688,7 @@ def _save_spectrum_outputs(
                         fig = plot_flux_comparison(plot_matches[0], result, save_path=str(flux_file))
                         plt.close(fig)  # Prevent memory leak
                     except Exception as e:
-                        logging.getLogger('snid.batch').debug(f"Flux spectrum plot failed: {e}")
+                        logging.getLogger('snid_sage.snid.batch').debug(f"Flux spectrum plot failed: {e}")
                     
                     # 6. Flattened spectrum plot (best match) - same as GUI
                     try:
@@ -697,7 +697,7 @@ def _save_spectrum_outputs(
                         fig = plot_flat_comparison(plot_matches[0], result, save_path=str(flat_file))
                         plt.close(fig)  # Prevent memory leak
                     except Exception as e:
-                        logging.getLogger('snid.batch').debug(f"Flattened spectrum plot failed: {e}")
+                        logging.getLogger('snid_sage.snid.batch').debug(f"Flattened spectrum plot failed: {e}")
                 
                 # Save correlation function data files
                 if hasattr(result, 'best_matches') and result.best_matches:
@@ -723,7 +723,7 @@ def _save_spectrum_outputs(
                             # Template spectra data
                             write_template_spectra_data(match, i, str(output_dir), spectrum_name)
                         except Exception as e:
-                            logging.getLogger('snid.batch').warning(f"Failed to save template {i} data: {e}")
+                            logging.getLogger('snid_sage.snid.batch').warning(f"Failed to save template {i} data: {e}")
                 
         elif not args.minimal:
             # Default mode: save main outputs only
@@ -732,7 +732,7 @@ def _save_spectrum_outputs(
             write_result(result, str(output_file))
             
     except Exception as e:
-        logging.getLogger('snid.batch').warning(f"Failed to save outputs: {e}")
+        logging.getLogger('snid_sage.snid.batch').warning(f"Failed to save outputs: {e}")
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1075,9 +1075,9 @@ def main(args: argparse.Namespace) -> int:
         if not args.verbose:
             import logging
             # Suppress the most verbose loggers that users don't need to see
-            logging.getLogger('snid.pipeline').setLevel(logging.WARNING)
             logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
-            logging.getLogger('snid.optimization_integration').setLevel(logging.WARNING)
+            logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
+            logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
             logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
         
         # Suppress matplotlib warnings (tight layout warnings)

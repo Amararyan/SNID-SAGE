@@ -576,7 +576,7 @@ def _save_spectrum_outputs(
                         
                     except Exception as e:
                         import logging
-                        logging.getLogger('snid.identify').debug(f"3D GMM clustering plot failed: {e}")
+                        logging.getLogger('snid_sage.snid.identify').debug(f"3D GMM clustering plot failed: {e}")
                 
                 # 2. Redshift vs Age plot (cluster-aware)
                 try:
@@ -586,7 +586,7 @@ def _save_spectrum_outputs(
                     plt.close(fig)  # Prevent memory leak
                 except Exception as e:
                     import logging
-                    logging.getLogger('snid.identify').debug(f"Redshift-age plot failed: {e}")
+                    logging.getLogger('snid_sage.snid.identify').debug(f"Redshift-age plot failed: {e}")
                 
                 # 3. Cluster-aware subtype proportions (GUI-style)
                 try:
@@ -600,7 +600,7 @@ def _save_spectrum_outputs(
                     plt.close(fig)  # Prevent memory leak
                 except Exception as e:
                     import logging
-                    logging.getLogger('snid.identify').debug(f"Cluster subtype plot failed: {e}")
+                    logging.getLogger('snid_sage.snid.identify').debug(f"Cluster subtype plot failed: {e}")
                 
                 # 4. Flux spectrum plot (best match) - same as GUI
                 if plot_matches:
@@ -611,7 +611,7 @@ def _save_spectrum_outputs(
                         plt.close(fig)  # Prevent memory leak
                     except Exception as e:
                         import logging
-                        logging.getLogger('snid.identify').debug(f"Flux spectrum plot failed: {e}")
+                        logging.getLogger('snid_sage.snid.identify').debug(f"Flux spectrum plot failed: {e}")
                     
                     # 5. Flattened spectrum plot (best match) - same as GUI
                     try:
@@ -621,7 +621,7 @@ def _save_spectrum_outputs(
                         plt.close(fig)  # Prevent memory leak
                     except Exception as e:
                         import logging
-                        logging.getLogger('snid.identify').debug(f"Flattened spectrum plot failed: {e}")
+                        logging.getLogger('snid_sage.snid.identify').debug(f"Flattened spectrum plot failed: {e}")
                 
                 # Save correlation function data files
                 if hasattr(result, 'best_matches') and result.best_matches:
@@ -648,7 +648,7 @@ def _save_spectrum_outputs(
                             write_template_spectra_data(match, i, str(output_dir), spectrum_name)
                         except Exception as e:
                             import logging
-                            logging.getLogger('snid.identify').warning(f"Failed to save template {i} data: {e}")
+                            logging.getLogger('snid_sage.snid.identify').warning(f"Failed to save template {i} data: {e}")
                 
         else:
             # Default mode: save main outputs only
@@ -659,7 +659,7 @@ def _save_spectrum_outputs(
             
     except Exception as e:
         import logging
-        logging.getLogger('snid.identify').warning(f"Failed to save outputs: {e}")
+        logging.getLogger('snid_sage.snid.identify').warning(f"Failed to save outputs: {e}")
 
 
 
@@ -726,9 +726,9 @@ def main(args: argparse.Namespace) -> int:
         if not args.verbose:
             import logging
             # Suppress the most verbose loggers that users don't need to see
-            logging.getLogger('snid.pipeline').setLevel(logging.WARNING)
             logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
-            logging.getLogger('snid.optimization_integration').setLevel(logging.WARNING)
+            logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
+            logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
             logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
         
         if args.verbose:

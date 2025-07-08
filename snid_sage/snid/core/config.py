@@ -17,7 +17,7 @@ try:
     from snid_sage.shared.utils.logging import get_logger
     _LOG = get_logger('snid.config')
 except ImportError:
-    _LOG = logging.getLogger('snid.config')
+    _LOG = logging.getLogger('snid_sage.snid.config')
 
 
 @dataclass

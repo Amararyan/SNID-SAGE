@@ -14,7 +14,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
-from snid import __version__
+from snid_sage.snid import __version__
 from snid_sage.snid.io import (
     read_spectrum, create_template_library, add_template, 
     remove_template, get_template_info, merge_template_libraries,

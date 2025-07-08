@@ -1430,7 +1430,7 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
             template_flux = match['spectra']['flux']['flux']
             
             # DON'T filter templates - they are already properly trimmed by SNID analysis
-            # Templates are trimmed to log_wave[left_edge:right_edge+1] in snid.py
+            # snid_sage.snid.py
             # Filtering them again with input spectrum edges cuts them incorrectly
             
             # No redshift transformation needed - wavelengths are already on same grid as input
@@ -1640,7 +1640,7 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
             template_flux = match['spectra']['flat']['flux']
             
             # DON'T filter templates - they are already properly trimmed by SNID analysis
-            # Templates are trimmed to log_wave[left_edge:right_edge+1] in snid.py
+            # snid_sage.snid.py
             # Filtering them again with input spectrum edges cuts them incorrectly
             
             ax.plot(
@@ -1659,7 +1659,7 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
             # Ensure it has the same length as the input flat flux
             if len(template_flux_proc) == len(input_wave):
                 # DON'T filter templates - they are already properly trimmed by SNID analysis
-                # Templates are trimmed to log_wave[left_edge:right_edge+1] in snid.py
+                # snid_sage.snid.py
                 # Filtering them again with input spectrum edges cuts them incorrectly
                 
                 ax.plot(
