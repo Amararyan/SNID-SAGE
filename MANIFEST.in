@@ -43,11 +43,7 @@ recursive-exclude build *
 recursive-exclude dist *
 
 # Exclude large data directories for TestPyPI
-recursive-exclude Analysis/results/validation *
-recursive-exclude Analysis/clustering_analysis_results *
 recursive-exclude results *
-recursive-exclude Analysis/results *
-recursive-exclude Analysis/__pycache__ *
 recursive-exclude site *
 
 # Exclude individual template files (too many for TestPyPI)

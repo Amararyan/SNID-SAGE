@@ -162,11 +162,11 @@ space_debris_highscore.txt
 
 # ===== ANALYSIS & VALIDATION RESULTS =====
 # Large analysis result directories
-Analysis/results/validation/
-Analysis/clustering_analysis_results/
-Analysis/*.png
-Analysis/*.csv
-Analysis/*.json
+# Analysis/results/validation/
+# Analysis/clustering_analysis_results/
+# Analysis/*.png
+# Analysis/*.csv
+# Analysis/*.json
 
 # SNID output directories (generated during analysis)
 **/snid_output_*/
@@ -318,8 +318,6 @@ statistics_*
 
 # ===== PROJECT FOLDERS TO IGNORE =====
 .vscode/
-/Analysis/
-!/interfaces/gui/components/analysis/
 examples/
 spectral_lines/
 
