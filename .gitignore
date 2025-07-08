@@ -318,7 +318,8 @@ statistics_*
 
 # ===== PROJECT FOLDERS TO IGNORE =====
 .vscode/
-Analysis/
+/Analysis/
+!/interfaces/gui/components/analysis/
 examples/
 spectral_lines/
 
