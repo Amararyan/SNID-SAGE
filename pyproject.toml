@@ -101,11 +101,20 @@ include-package-data = true
 exclude = ["tests*", "docs*", "temp_test_results*", "snid_test_output*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.txt", "*.md", "*.yml", "*.yaml"]
-"templates" = ["*.hdf5", "*.json"]
-"data" = ["*.fits", "*.dat", "*.txt", "*.ascii"]
-"images" = ["*.png", "*.jpg", "*.ico", "*.icns"]
-"custom_templates" = ["*.md"]
+"*" = [
+    "*.txt", "*.md", "*.yml", "*.yaml",
+    "templates/*.hdf5", 
+    "templates/*.json",
+    "data/*.fits", 
+    "data/*.dat", 
+    "data/*.txt", 
+    "data/*.ascii",
+    "images/*.png", 
+    "images/*.jpg", 
+    "images/*.ico", 
+    "images/*.icns",
+    "custom_templates/*.md"
+]
 
 # Development tools configuration
 [tool.black]

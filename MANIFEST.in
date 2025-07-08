@@ -13,6 +13,7 @@ include DIRECTORY_SCHEMA.md
 # Templates: only hdf5 files and json, exclude Individual_templates folder
 include templates/*.hdf5
 include templates/*.json
+recursive-include templates *.hdf5 *.json
 recursive-include data *.fits *.dat *.txt *.ascii
 recursive-include images *.png *.ico
 # recursive-include docs *.md *.rst *.txt
