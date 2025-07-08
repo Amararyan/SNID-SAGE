@@ -6,6 +6,13 @@
 
 **SNID-SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is a comprehensive spectrum analysis suite featuring an intuitive GUI and powerful cross-correlation techniques, enhanced with modern LLM-powered analysis capabilities.
 
+---
+
+![SNID SAGE GUI](images/Screenshot.png)
+*SNID SAGE main GUI: intuitive workflow, interactive plotting, and advanced analysis tools.*
+
+---
+
 ## 🚀 **Quick Installation**
 
 ```bash
@@ -41,10 +48,10 @@ python run_snid_gui.py
 ### **Use the CLI** *(For batch processing and automation)*
 ```bash
 # Single spectrum analysis
-snid identify data/sn2003jo.dat --output-dir results/
+snid identify data/sn2003jo.dat templates/ --output-dir results/
 
 # Batch processing
-snid batch "data/*.dat" --output-dir results/ --quick
+snid batch "data/*.dat" templates/ --output-dir results/ --quick
 
 # Template management
 snid-template list -v
