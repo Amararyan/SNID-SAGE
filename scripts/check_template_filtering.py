@@ -20,7 +20,7 @@ from typing import Dict, List, Any
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from snid.io import read_template
+from snid_sage.snid.io import read_template
 
 def check_template_index():
     """Check the template index for templates with -999.0 age."""

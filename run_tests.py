@@ -83,19 +83,19 @@ def main():
         if not args.quick:
             # Test output directory fix specifically
             results["Output Directory Fix"] = run_command(
-                f"python snid/snid_test.py \"{test_spectrum}\" --templates \"{templates_dir}\" --test-output-fix",
+                f"python snid_sage/snid/snid_test.py \"{test_spectrum}\" --templates \"{templates_dir}\" --test-output-fix",
                 "Output Directory Fix Validation"
             )
             
             # Test basic analysis
             results["Basic Analysis"] = run_command(
-                f"python snid/snid_test.py \"{test_spectrum}\" --templates \"{templates_dir}\" --output --save-plots --verbose",
+                f"python snid_sage/snid/snid_test.py \"{test_spectrum}\" --templates \"{templates_dir}\" --output --save-plots --verbose",
                 "Basic SNID Analysis with Outputs"
             )
         else:
             # Quick test - just imports and help
             results["Core Import"] = run_command(
-                "python -c \"from snid.snid import run_snid; print('Core import successful')\"",
+                "python -c \"from snid_sage.snid.snid import run_snid; print('Core import successful')\"",
                 "Core SNID Import Test"
             )
     
@@ -105,17 +105,17 @@ def main():
     print("="*40)
     
     results["CLI Import"] = run_command(
-        "python -c \"from interfaces.cli.main import main; print('CLI import successful')\"",
+        "python -c \"from snid_sage.interfaces.cli.main import main; print('CLI import successful')\"",
         "CLI Import Test"
     )
     
     results["GUI Import"] = run_command(
-        "python -c \"from interfaces.gui.sage_gui import main; print('GUI import successful')\"",
+        "python -c \"from snid_sage.interfaces.gui.sage_gui import main; print('GUI import successful')\"",
         "GUI Import Test"
     )
     
     results["Shared Import"] = run_command(
-        "python -c \"from shared.constants import physical; from shared.types import spectrum_types; print('Shared imports successful')\"",
+        "python -c \"from snid_sage.shared.constants import physical; from snid_sage.shared.types import spectrum_types; print('Shared imports successful')\"",
         "Shared Components Import Test"
     )
 

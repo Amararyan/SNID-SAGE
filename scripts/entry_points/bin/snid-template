@@ -9,7 +9,7 @@ import os
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, project_root)
 
-from snid.template_manager import main
+from snid_sage.snid.template_manager import main
 
 if __name__ == "__main__":
     sys.exit(main()) 

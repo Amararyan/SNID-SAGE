@@ -31,7 +31,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from snid.template_fft_storage import create_unified_storage
+from snid_sage.snid.template_fft_storage import create_unified_storage
 
 def setup_logging():
     """Setup logging for the build process."""

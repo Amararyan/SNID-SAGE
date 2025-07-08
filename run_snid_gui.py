@@ -71,7 +71,7 @@ Environment Variables:
     
     # Import logging configuration to add standard arguments
     try:
-        from shared.utils.logging.config import add_logging_arguments
+        from snid_sage.shared.utils.logging import add_logging_arguments
         add_logging_arguments(parser)
     except ImportError:
         # Fallback to basic arguments if logging system not available
@@ -330,8 +330,8 @@ class FastGUILauncher:
             # Configure logging first
             self.update_progress("⚙️ Configuring logging...", "▓▓▓▓░░░░░░ Setting up logging system...")
             try:
-                from shared.utils.logging.config import configure_from_args
-                from shared.utils.logging import get_logger
+                from snid_sage.shared.utils.logging import configure_from_args
+                from snid_sage.shared.utils.logging import get_logger
                 
                 configure_from_args(self.args, gui_mode=True)
                 self.logger = get_logger('gui.launcher')
@@ -370,7 +370,7 @@ class FastGUILauncher:
             
             # Load SNID core components
             self.update_progress("🔬 Loading SNID engine...", "▓▓▓▓▓▓▓▓▓░ Loading SNID analysis engine...")
-            from snid.snid import run_snid, preprocess_spectrum, run_snid_analysis
+            from snid_sage.snid.snid import run_snid, preprocess_spectrum, run_snid_analysis
             self.log("SNID core loaded")
             
             # Now we can safely create the real GUI
@@ -402,7 +402,7 @@ class FastGUILauncher:
             
             modules_to_check = [
                 'tkinter', 'matplotlib', 'numpy', 
-                'snid.snid', 'interfaces.gui.sage_gui'
+                'snid_sage.snid.snid', 'snid_sage.interfaces.gui.sage_gui'
             ]
             
             missing_deps = []
@@ -435,7 +435,7 @@ class FastGUILauncher:
             current_geometry = self.root.geometry()
             
             # Import and create the real GUI
-            from interfaces.gui.sage_gui import ModernSNIDSageGUI
+            from snid_sage.interfaces.gui.sage_gui import ModernSNIDSageGUI
             
             # Clear loading screen
             for widget in self.root.winfo_children():

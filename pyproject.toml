@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snid-sage"
-version = "1.0.0"
+version = "1.2.0"
 description = "SNID SAGE - SuperNova IDentification with Spectrum Analysis and Guided Enhancement"
 readme = "README.md"
 license = {text = "MIT"}
@@ -89,20 +89,39 @@ Repository = "https://github.com/FiorenSt/SNID-SAGE.git"
 "Download" = "https://github.com/FiorenSt/SNID-SAGE/archive/refs/heads/main.zip"
 
 [project.scripts]
-snid = "interfaces.cli.main:main"
-snid-gui = "interfaces.gui.sage_gui:main"
-snid-sage = "interfaces.gui.sage_gui:main"
-snid-template = "interfaces.cli.template:main"
+snid = "snid_sage.interfaces.cli.main:main"
+snid-gui = "snid_sage.interfaces.gui.sage_gui:main"
+snid-sage = "snid_sage.interfaces.gui.sage_gui:main"
+snid-template = "snid_sage.interfaces.cli.template:main"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-exclude = ["tests*", "docs*", "temp_test_results*", "snid_test_output*"]
+include = ["snid_sage*"]
+exclude = [
+    "tests*", 
+    "docs*", 
+    "temp_test_results*", 
+    "snid_test_output*",
+    "venv*",
+    "build*",
+    "dist*",
+    ".venv*",
+    "__pycache__*",
+    "*.pyc",
+    "*.pyo",
+    "*.pyd",
+    ".pytest_cache*",
+    ".mypy_cache*",
+    ".coverage*",
+    "htmlcov*",
+    ".tox*",
+    ".eggs*"
+]
 
 [tool.setuptools.package-data]
-"*" = [
-    "*.txt", "*.md", "*.yml", "*.yaml",
+"snid_sage" = [
     "templates/*.hdf5", 
     "templates/*.json",
     "data/*.fits", 

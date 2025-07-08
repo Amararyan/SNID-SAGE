@@ -12,7 +12,7 @@ Usage:
 """
 
 import sys
-from interfaces.cli.main import main
+from snid_sage.interfaces.cli.main import main
 
 if __name__ == "__main__":
     sys.exit(main()) 

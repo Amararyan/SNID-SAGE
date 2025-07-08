@@ -264,13 +264,13 @@ class TestCrossPlatformCompatibility(unittest.TestCase):
     def test_games_window_focus(self):
         """Test games window focus management"""
         try:
-            from snid.games import CrossPlatformGameFocus
+            from snid_sage.snid.games import CrossPlatformGameFocus
             
             # Should not raise an exception
             CrossPlatformGameFocus.bring_to_foreground()
             
             # Test backward compatibility
-            from snid.games import bring_to_foreground
+            from snid_sage.snid.games import bring_to_foreground
             bring_to_foreground()
             
         except ImportError:

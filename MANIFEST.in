@@ -9,20 +9,17 @@ include pyproject.toml
 include BUILD_CHECKLIST.md
 include DIRECTORY_SCHEMA.md
 
+# Include the main snid_sage package
+recursive-include snid_sage *.py
+
 # Include package data (essential only)
 # Templates: only hdf5 files and json, exclude Individual_templates folder
-include templates/*.hdf5
-include templates/*.json
-recursive-include templates *.hdf5 *.json
-recursive-include data *.fits *.dat *.txt *.ascii
-recursive-include images *.png *.ico
-# recursive-include docs *.md *.rst *.txt
-recursive-include custom_templates *.md
+recursive-include snid_sage/templates *.hdf5 *.json
+recursive-include snid_sage/data *.fits *.dat *.txt *.ascii
+recursive-include snid_sage/images *.png *.ico
+recursive-include snid_sage/custom_templates *.md
 
-# Include all Python packages
-recursive-include snid *.py
-recursive-include interfaces *.py
-recursive-include shared *.py
+# Include scripts
 recursive-include scripts *.py
 
 # Include configuration files
@@ -48,7 +45,7 @@ recursive-exclude results *
 recursive-exclude site *
 
 # Exclude individual template files (too many for TestPyPI)
-recursive-exclude templates/Individual_templates *
+recursive-exclude snid_sage/templates/Individual_templates *
 
 # Exclude OS files
 global-exclude .DS_Store

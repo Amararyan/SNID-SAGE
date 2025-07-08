@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import cm
 
-from snid.io import read_template
+from snid_sage.snid.io import read_template
 
 __all__ = ["main"]
 
