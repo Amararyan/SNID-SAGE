@@ -38,6 +38,9 @@ from snid_sage.interfaces.gui.utils.universal_window_manager import get_window_m
 # Import unified theme manager with workflow support
 from snid_sage.interfaces.gui.utils.unified_theme_manager import UnifiedThemeManager
 
+# Import platform configuration
+from snid_sage.shared.utils.config.platform_config import get_platform_config
+
 # Import new components
 from snid_sage.interfaces.gui.components.plots import SpectrumPlotter, SummaryPlotter, InteractiveTools
 from snid_sage.interfaces.gui.components.dialogs import MaskManagerDialog, AISummaryDialog, SNIDAnalysisDialog
@@ -130,6 +133,9 @@ class ModernSNIDSageGUI:
         self.startup_manager = StartupManager(self)
         self.view_controller = ViewController(self)
         self.dialog_controller = DialogController(self)
+        
+        # Initialize platform configuration
+        self.platform_config = get_platform_config()
         
         # Initialize unified theme manager first - critical for subsequent components
         self.theme_manager = UnifiedThemeManager(self.master)

@@ -8,6 +8,7 @@ Centralized theme management system that consolidates all theming functionality:
 - Button color management
 - Dark/light mode synchronization
 - Dialog window theming
+- Platform-specific styling
 
 This replaces the fragmented theme systems with a single, coordinated approach.
 """
@@ -26,6 +27,14 @@ try:
     _LOGGER = get_logger('gui.unified_theme')
 except ImportError:
     _LOGGER = logging.getLogger('gui.unified_theme')
+
+# Import platform configuration
+try:
+    from snid_sage.shared.utils.config.platform_config import get_platform_config
+    _PLATFORM_CONFIG = get_platform_config()
+except ImportError:
+    _PLATFORM_CONFIG = None
+    _LOGGER.warning("Platform configuration not available - using default styling")
 
 
 class ThemeMode(Enum):
@@ -68,16 +77,40 @@ class UnifiedThemeManager:
         # Flag to disable theme application during dialog creation
         self._theme_application_enabled = True
         
+        # Platform-specific configuration
+        self.platform_config = _PLATFORM_CONFIG
+        self.gui_config = self.platform_config.get_gui_config() if self.platform_config else {}
+        self.styling_config = self.platform_config.get_styling_config() if self.platform_config else {}
+        
+        # Apply platform-specific fixes
+        if self.platform_config:
+            self.platform_config.apply_platform_fixes()
+        
         # Import matplotlib here to avoid issues during testing
         try:
             global plt
             import matplotlib.pyplot as plt
             self.matplotlib_available = True
+            
+            # Set platform-specific matplotlib backend
+            if self.platform_config:
+                backend = self.platform_config.get_dependency_config().get('matplotlib_backend', 'TkAgg')
+                try:
+                    plt.switch_backend(backend)
+                except:
+                    plt.switch_backend('TkAgg')  # Fallback
         except ImportError:
             self.matplotlib_available = False
         
-        # Define light theme palette only
-        self.theme_colors = {
+        # Define platform-aware theme palette
+        self.theme_colors = self._get_platform_theme_colors()
+        
+        _LOGGER.info("🎨 Unified Theme Manager initialized")
+    
+    def _get_platform_theme_colors(self) -> Dict[str, str]:
+        """Get platform-specific theme colors"""
+        # Base theme colors (Windows-style)
+        base_colors = {
             # Backgrounds
             'bg_primary': '#f8fafc',      # Main background
             'bg_secondary': '#ffffff',    # Cards, dialogs
@@ -126,7 +159,41 @@ class UnifiedThemeManager:
             'plot_line_accent': '#8b5cf6',
         }
         
-        _LOGGER.info("🎨 Unified Theme Manager initialized")
+        # Apply platform-specific adjustments
+        if self.platform_config and self.platform_config.is_macos:
+            # macOS-specific color adjustments for native appearance
+            base_colors.update({
+                'bg_primary': '#f5f5f5',      # Slightly warmer background
+                'bg_secondary': '#ffffff',    # Pure white for cards
+                'bg_tertiary': '#ececec',     # Subtle backgrounds
+                'border': '#d1d1d1',          # Softer borders
+                'hover': '#e8e8e8',           # Native hover color
+                'active': '#d4d4d4',          # Native active color
+                'focus': '#007aff',           # macOS system blue
+                'accent_primary': '#007aff',  # macOS system blue
+                
+                # Adjust button colors for macOS
+                'btn_primary': '#007aff',     # macOS system blue
+                'btn_primary_hover': '#0056b3',
+                'btn_success': '#28a745',     # macOS green
+                'btn_success_hover': '#1e7e34',
+                'btn_warning': '#ffc107',     # macOS orange
+                'btn_warning_hover': '#e0a800',
+                'btn_danger': '#dc3545',      # macOS red
+                'btn_danger_hover': '#c82333',
+                'btn_info': '#17a2b8',        # macOS teal
+                'btn_info_hover': '#138496',
+            })
+        elif self.platform_config and self.platform_config.is_linux:
+            # Linux-specific color adjustments
+            base_colors.update({
+                'bg_primary': '#f6f6f6',      # GTK-style background
+                'border': '#c0c0c0',          # GTK-style borders
+                'focus': '#4a90e2',           # GTK-style focus
+                'accent_primary': '#4a90e2',  # GTK-style accent
+            })
+        
+        return base_colors
     
     def get_current_colors(self) -> Dict[str, str]:
         """Get current theme color palette - always light mode"""
@@ -219,15 +286,42 @@ class UnifiedThemeManager:
             pass
     
     def _theme_frame(self, widget: tk.Frame, colors: Dict[str, str]):
-        """Theme Frame widgets"""
-        widget.configure(bg=colors['bg_primary'])
+        """Theme Frame widgets with platform-specific styling"""
+        config = {'bg': colors['bg_primary']}
+        
+        # Apply platform-specific frame styling
+        if self.platform_config and self.platform_config.is_macos:
+            # macOS frames have no borders and use system background
+            config.update({
+                'relief': 'flat',
+                'borderwidth': 0,
+                'highlightthickness': 0,
+            })
+        elif self.platform_config and self.platform_config.is_windows:
+            # Windows frames can have subtle borders
+            config.update({
+                'relief': 'flat',
+                'borderwidth': 0,
+            })
+        
+        widget.configure(**config)
     
     def _theme_label(self, widget: tk.Label, colors: Dict[str, str]):
-        """Theme Label widgets"""
-        widget.configure(
-            bg=colors['bg_primary'],
-            fg=colors['text_primary']
-        )
+        """Theme Label widgets with platform-specific styling"""
+        config = {
+            'bg': colors['bg_primary'],
+            'fg': colors['text_primary']
+        }
+        
+        # Apply platform-specific label styling
+        if self.platform_config and self.platform_config.is_macos:
+            # macOS labels should blend with background
+            config.update({
+                'relief': 'flat',
+                'borderwidth': 0,
+            })
+        
+        widget.configure(**config)
     
     def _theme_button(self, widget: tk.Button, colors: Dict[str, str]):
         """Button theming DISABLED - workflow system manages all button colors"""
@@ -267,24 +361,65 @@ class UnifiedThemeManager:
         return ButtonType.NEUTRAL
     
     def _theme_entry(self, widget: tk.Entry, colors: Dict[str, str]):
-        """Theme Entry widgets"""
-        widget.configure(
-            bg=colors['bg_secondary'],
-            fg=colors['text_primary'],
-            insertbackground=colors['text_primary'],
-            highlightbackground=colors['border'],
-            highlightcolor=colors['focus']
-        )
+        """Theme Entry widgets with platform-specific styling"""
+        config = {
+            'bg': colors['bg_secondary'],
+            'fg': colors['text_primary'],
+            'insertbackground': colors['text_primary'],
+            'highlightbackground': colors['border'],
+            'highlightcolor': colors['focus']
+        }
+        
+        # Apply platform-specific entry styling
+        if self.platform_config and self.platform_config.is_macos:
+            # macOS entries have rounded corners and focus rings
+            config.update({
+                'relief': 'solid',
+                'borderwidth': 1,
+                'highlightthickness': 2,
+                'selectbackground': colors['focus'],
+                'selectforeground': colors['text_on_accent'],
+            })
+        elif self.platform_config and self.platform_config.is_windows:
+            # Windows entries have flat appearance
+            config.update({
+                'relief': 'solid',
+                'borderwidth': 1,
+                'highlightthickness': 1,
+            })
+        
+        widget.configure(**config)
     
     def _theme_text(self, widget: tk.Text, colors: Dict[str, str]):
-        """Theme Text widgets"""
-        widget.configure(
-            bg=colors['bg_secondary'],
-            fg=colors['text_primary'],
-            insertbackground=colors['text_primary'],
-            highlightbackground=colors['border'],
-            highlightcolor=colors['focus']
-        )
+        """Theme Text widgets with platform-specific styling"""
+        config = {
+            'bg': colors['bg_secondary'],
+            'fg': colors['text_primary'],
+            'insertbackground': colors['text_primary'],
+            'highlightbackground': colors['border'],
+            'highlightcolor': colors['focus']
+        }
+        
+        # Apply platform-specific text styling
+        if self.platform_config and self.platform_config.is_macos:
+            # macOS text widgets have native scrollbars and focus rings
+            config.update({
+                'relief': 'solid',
+                'borderwidth': 1,
+                'highlightthickness': 2,
+                'selectbackground': colors['focus'],
+                'selectforeground': colors['text_on_accent'],
+                'wrap': 'word',
+            })
+        elif self.platform_config and self.platform_config.is_windows:
+            # Windows text widgets have standard appearance
+            config.update({
+                'relief': 'solid',
+                'borderwidth': 1,
+                'highlightthickness': 1,
+            })
+        
+        widget.configure(**config)
     
     def _theme_listbox(self, widget: tk.Listbox, colors: Dict[str, str]):
         """Theme Listbox widgets"""
