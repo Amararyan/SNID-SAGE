@@ -60,8 +60,6 @@ jobs:
   deploy:
     needs: test-before-deploy
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     
     steps:
     - name: Checkout code
@@ -97,16 +95,19 @@ jobs:
     
     - name: Deploy to Test PyPI
       if: github.event.inputs.test_pypi == 'true'
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        verbose: true
+      run: |
+        python -m twine upload --repository testpypi dist/*
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
     
     - name: Deploy to PyPI
       if: github.event.inputs.test_pypi != 'true'
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        verbose: true
+      run: |
+        python -m twine upload dist/*
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
     
     - name: Create GitHub Release
       if: github.event.inputs.test_pypi != 'true' && startsWith(github.ref, 'refs/tags/')
