@@ -1,10 +1,10 @@
-# 🌟 SNID SAGE - Advanced Supernova Spectral Analysis
+# SNID SAGE - Advanced Supernova Spectral Analysis
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-**SNID-SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is a comprehensive spectrum analysis suite featuring an intuitive GUI and powerful cross-correlation techniques, enhanced with modern LLM-powered analysis capabilities.
+**SNID SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is a comprehensive spectrum analysis suite featuring an intuitive GUI and powerful cross-correlation techniques, enhanced with modern LLM-powered analysis capabilities.
 
 ---
 
@@ -13,103 +13,128 @@
 
 ---
 
-## 🚀 **Quick Installation**
+## Quick Installation
 
+### Install from TestPyPI (Recommended)
+
+```bash
+pip install -i https://test.pypi.org/simple/ snid-sage==1.2.1
+```
+
+### Virtual Environment Setup
+
+#### Using venv
+```bash
+# Create virtual environment
+python -m venv snid_env
+
+# Activate environment
+# Windows:
+snid_env\Scripts\activate
+# macOS/Linux:
+source snid_env/bin/activate
+
+# Install SNID SAGE
+pip install -i https://test.pypi.org/simple/ snid-sage==1.2.1
+```
+
+#### Using conda
+```bash
+# Create conda environment
+conda create -n snid_sage python=3.10
+conda activate snid_sage
+
+# Install SNID SAGE
+pip install -i https://test.pypi.org/simple/ snid-sage==1.2.1
+```
+
+### Install from Source (Development)
 ```bash
 # Clone the repository
 git clone https://github.com/FiorenSt/SNID-SAGE.git
 cd SNID-SAGE
 
-# Create and activate virtual environment
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
+# Install in development mode
+pip install -e .
 
-# Install the package
-pip install . --verbose
-
-# Optional: Set up custom icons for better system integration
-python scripts/generate_platform_icons.py
-python scripts/setup_all_platform_icons.py
+# Optional: Install all features
+pip install -e ".[all]"
 ```
-## 🎮 **Getting Started**
 
-### **Launch the GUI** *(Recommended for most users)*
+## Getting Started
+
+### Launch the GUI (Recommended)
 ```bash
 # Using installed entry point
+snid-gui
+# or
 snid-sage
-
-# Or run directly from source
-python run_snid_gui.py
 ```
 
-### **Use the CLI** *(For batch processing and automation)*
+### Use the CLI (For automation)
 ```bash
 # Single spectrum analysis
-snid identify data/sn2003jo.dat templates/ --output-dir results/
+snid identify data/sn2003jo.dat --output-dir results/
 
 # Batch processing
-snid batch "data/*.dat" templates/ --output-dir results/ --quick
+snid batch "data/*.dat" templates/ --output-dir results/
 
 # Template management
-snid-template list -v
+snid template list
 ```
 
-### **Python API** *(For developers and custom workflows)*
+### Python API (For developers)
 ```python
-from snid import SNID
-from interfaces.llm.analysis.llm_utils import SNIDLLMAnalyzer
+from snid_sage.snid import run_snid
+from snid_sage.interfaces.llm import LLMIntegration
 
 # Traditional analysis
-snid = SNID()
-results = snid.identify_spectrum('data/sn2003jo.dat')
+results = run_snid('data/sn2003jo.dat', templates_dir='templates/')
 
-# AI-enhanced analysis
-analyzer = SNIDLLMAnalyzer()
-ai_summary = analyzer.analyze_results(results, analysis_type='comprehensive')
+# AI-enhanced analysis (requires API key)
+llm = LLMIntegration()
+ai_summary = llm.analyze_results(results)
 ```
 
-## 📚 **Documentation & Support**
+## Documentation & Support
 
-- **[📖 Complete Documentation](docs/)** - Comprehensive guides and tutorials
-- **[🎯 Quick Start Guide](docs/quickstart/first-analysis.md)** - Your first analysis in 5 minutes
-- **[🖥️ GUI Manual](docs/gui/interface-overview.md)** - Complete interface guide
-- **[💻 CLI Reference](docs/cli/command-reference.md)** - All commands and options
-- **[🤖 AI Integration](docs/ai/overview.md)** - Setting up AI analysis
-- **[🐛 Troubleshooting](docs/reference/troubleshooting.md)** - Common issues and solutions
-- **[❓ FAQ](docs/reference/faq.md)** - Frequently asked questions
+- **[Complete Documentation](docs/)** - Comprehensive guides and tutorials
+- **[Quick Start Guide](docs/quickstart/first-analysis.md)** - Your first analysis in 5 minutes
+- **[GUI Manual](docs/gui/interface-overview.md)** - Complete interface guide
+- **[CLI Reference](docs/cli/command-reference.md)** - All commands and options
+- **[AI Integration](docs/ai/overview.md)** - Setting up AI analysis
+- **[Troubleshooting](docs/reference/troubleshooting.md)** - Common issues and solutions
+- **[FAQ](docs/reference/faq.md)** - Frequently asked questions
 
-## 🗂️ **Supported Data Formats**
+## Supported Data Formats
 
 - **FITS files** (.fits, .fit)
 - **ASCII tables** (.dat, .txt, .ascii)
 - **Space-separated values** with flexible column detection
 - **Custom formats** with configurable parsers
 
-## 🏆 **Research & Citation**
+## Research & Citation
 
 If you use SNID SAGE in your research, please cite:
 
 ```bibtex
 @software{snid_sage_2025,
-  title={SNID-SAGE: A Modern Framework for Interactive Supernova
-Classification and Spectral Analysis},
+  title={SNID SAGE: A Modern Framework for Interactive Supernova
+         Classification and Spectral Analysis},
   author={F. Stoppa},
   year={In Prep, 2025},
   url={https://github.com/FiorenSt/SNID-SAGE}
 }
 ```
 
-## 🤝 **Community & Support**
+## Community & Support
 
-- **[🐛 Report Bug](https://github.com/FiorenSt/SNID-SAGE/issues)** - Found a bug?
-- **[✨ Request Feature](https://github.com/FiorenSt/SNID-SAGE/issues)** - Want a new feature?
-- **[💬 Discussions](https://github.com/FiorenSt/SNID-SAGE/discussions)** - Questions and community chat
-- **[📧 Email Support](mailto:fiorenzo.stoppa@physics.ox.ac.uk)** - Direct contact
+- **[Report Bug](https://github.com/FiorenSt/SNID-SAGE/issues)** - Found a bug?
+- **[Request Feature](https://github.com/FiorenSt/SNID-SAGE/issues)** - Want a new feature?
+- **[Discussions](https://github.com/FiorenSt/SNID-SAGE/discussions)** - Questions and community chat
+- **[Email Support](mailto:fiorenzo.stoppa@physics.ox.ac.uk)** - Direct contact
 
-## 📄 **License**
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -117,8 +142,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ for the astronomical community**
+**Made with care for the astronomical community**
 
-[📖 Documentation](docs/) • [🐛 Report Bug](https://github.com/FiorenSt/SNID-SAGE/issues) • [✨ Request Feature](https://github.com/FiorenSt/SNID-SAGE/issues) • [💬 Discussions](https://github.com/FiorenSt/SNID-SAGE/discussions)
+[Documentation](docs/) • [Report Bug](https://github.com/FiorenSt/SNID-SAGE/issues) • [Request Feature](https://github.com/FiorenSt/SNID-SAGE/issues) • [Discussions](https://github.com/FiorenSt/SNID-SAGE/discussions)
 
 </div>
