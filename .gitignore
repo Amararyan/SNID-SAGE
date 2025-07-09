@@ -125,6 +125,10 @@ site/
 docs/ai/
 docs/cli/
 docs/tutorials/
+docs/reference/
+docs/gui/
+docs/dev/
+docs/data/
 
 # ===== JUPYTER NOTEBOOKS =====
 .ipynb_checkpoints
@@ -322,7 +326,8 @@ examples/
 spectral_lines/
 
 # ===== MARKDOWN FILES TO IGNORE =====
-# Ignore all markdown files except main readmes
+# Ignore all markdown files except main readmes and docs root files
 *.md
 !README.md
-!README_BETA_TESTING.md 
+!README_BETA_TESTING.md
+!docs/*.md 
