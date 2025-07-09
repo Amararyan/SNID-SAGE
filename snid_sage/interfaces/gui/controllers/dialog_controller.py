@@ -31,6 +31,14 @@ class DialogController:
         self.gui = gui_instance
         self.open_dialogs = {}  # Track open dialogs
     
+    def _get_version(self):
+        """Get the current version of SNID SAGE"""
+        try:
+            from snid_sage import __version__
+            return __version__
+        except ImportError:
+            return "unknown"
+    
     def open_preprocessing_dialog(self):
         """Open preprocessing dialog - create and show the step-by-step wizard"""
         try:
@@ -342,7 +350,7 @@ class DialogController:
         """Show about dialog"""
         try:
             about_text = (
-                "SNID SAGE v1.0.0\n"
+                f"SNID SAGE v{self._get_version()}\n"
                 "Modern GUI Interface\n\n"
                 "SuperNova IDentification Spectral Analysis GUI Environment\n\n"
                 "Developed by Fiorenzo Stoppa\n"

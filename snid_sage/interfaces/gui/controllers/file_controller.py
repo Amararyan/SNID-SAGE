@@ -44,6 +44,14 @@ class FileController:
         self.recent_files = []
         self.max_recent_files = 10
     
+    def _get_version(self):
+        """Get the current version of SNID SAGE"""
+        try:
+            from snid_sage import __version__
+            return __version__
+        except ImportError:
+            return "unknown"
+    
     def browse_file(self):
         """Browse for a spectrum file"""
         try:
@@ -656,7 +664,7 @@ class FileController:
                 self.gui.clear_redshift_status()
             
             # Update window title
-            self.gui.master.title(f"SNID SAGE v1.0.0 - {os.path.basename(filename)}")
+            self.gui.master.title(f"SNID SAGE v{self._get_version()} - {os.path.basename(filename)}")
             
         except Exception as e:
             _LOGGER.warning(f"⚠️ Error updating file status: {e}")

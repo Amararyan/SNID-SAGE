@@ -22,6 +22,12 @@ import snid_sage.interfaces.cli.template as template_module
 import snid_sage.interfaces.cli.batch as batch_module
 import snid_sage.interfaces.cli.config as config_module
 
+# Import version
+try:
+    from snid_sage import __version__
+except ImportError:
+    __version__ = "unknown"
+
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the main argument parser."""
@@ -34,7 +40,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version", 
         action="version", 
-        version="SNID SAGE v1.0.0"
+        version=f"SNID SAGE v{__version__}"
     )
     
     # Create subcommands

@@ -15,7 +15,15 @@
 
 ## Quick Installation
 
-### Option 1: Virtual Environment (Recommended)
+### Option 1: Install from PyPI (Recommended)
+
+The easiest way to install SNID SAGE is directly from PyPI:
+
+```bash
+pip install snid-sage
+```
+
+### Option 2: Virtual Environment (Recommended for Development)
 
 We recommend using a virtual environment to avoid conflicts with other Python packages. This ensures a clean, isolated installation.
 
@@ -31,7 +39,7 @@ snid_env\Scripts\activate
 source snid_env/bin/activate
 
 # Install SNID SAGE
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+pip install snid-sage
 ```
 
 #### Using conda
@@ -41,18 +49,21 @@ conda create -n snid_sage python=3.10
 conda activate snid_sage
 
 # Install SNID SAGE
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+pip install snid-sage
 ```
 
-### Option 2: Global Installation
+### Option 3: Development Installation
 
-You can install SNID SAGE globally if you prefer not to activate a virtual environment each time. However, this approach:
-- Uses only updated, compatible packages
-- May conflict with other Python packages
-- Is generally considered riskier for system stability
+For development or testing the latest features:
 
 ```bash
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+# Install from Test PyPI (development versions)
+pip install -i https://test.pypi.org/simple/ snid-sage
+
+# Or install from source
+git clone https://github.com/FiorenSt/SNID-SAGE.git
+cd SNID-SAGE
+pip install -e .
 ```
 
 **Note:** If you choose global installation, we recommend using `pip install --user` to install in your user directory rather than system-wide.

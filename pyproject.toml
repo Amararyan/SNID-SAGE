@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snid-sage"
-version = "1.2.3"
+dynamic = ["version"]
 description = "SNID SAGE - SuperNova IDentification with Spectrum Analysis and Guided Enhancement"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Fiorenzo Stoppa", email = "fiorenzo.stoppa@physics.ox.ac.uk"}
 ]
@@ -18,7 +18,6 @@ keywords = ["astronomy", "supernova", "spectrum", "analysis", "snid", "machine-l
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -151,6 +150,11 @@ exclude = [
     "images/*.icns",
     "custom_templates/*.md"
 ]
+
+[tool.setuptools_scm]
+write_to = "snid_sage/_version.py"
+version_scheme = "python-simplified-semver"
+local_scheme = "no-local-version"
 
 # Development tools configuration
 [tool.black]
