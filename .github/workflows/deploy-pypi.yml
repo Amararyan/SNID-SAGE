@@ -60,8 +60,6 @@ jobs:
   deploy:
     needs: test-before-deploy
     runs-on: ubuntu-latest
-    environment: 
-      name: ${{ github.event.inputs.test_pypi == 'true' && 'test-pypi' || 'pypi' }}
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     
@@ -144,4 +142,4 @@ jobs:
         echo "🎉 SNID SAGE successfully deployed to PyPI!"
         echo "📦 Package: snid-sage"
         echo "🏷️ Version: ${{ github.ref_name }}"
-        echo "📋 Install command: pip install snid-sage" 
+        echo "📋 Install command: pip install snid-sage"
