@@ -12,6 +12,10 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: write  # Required for creating releases
+  id-token: write  # Required for PyPI trusted publishing (if used)
+
 jobs:
   test-before-deploy:
     runs-on: ubuntu-latest
@@ -111,12 +115,10 @@ jobs:
     
     - name: Create GitHub Release
       if: github.event.inputs.test_pypi != 'true' && startsWith(github.ref, 'refs/tags/')
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ github.ref_name }}
-        release_name: SNID SAGE ${{ github.ref_name }}
+        name: SNID SAGE ${{ github.ref_name }}
         body: |
           ## SNID SAGE ${{ github.ref_name }}
           
@@ -132,6 +134,7 @@ jobs:
           **Full Changelog**: https://github.com/FiorenSt/SNID-SAGE/compare/v0.0.1...${{ github.ref_name }}
         draft: false
         prerelease: false
+        generate_release_notes: true
 
   notify-success:
     needs: deploy

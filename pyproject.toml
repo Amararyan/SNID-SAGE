@@ -153,8 +153,9 @@ exclude = [
 
 [tool.setuptools_scm]
 write_to = "snid_sage/_version.py"
-version_scheme = "python-simplified-semver"
+version_scheme = "release-branch-semver"
 local_scheme = "no-local-version"
+fallback_version = "0.0.0"
 
 # Development tools configuration
 [tool.black]
