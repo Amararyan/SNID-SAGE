@@ -78,9 +78,9 @@ jobs:
         # Upgrade pip
         python -m pip install --upgrade pip
         
-        # Install from Test PyPI
-        echo "📦 Installing snid-sage from Test PyPI..."
-        python -m pip install -i https://test.pypi.org/simple/ snid-sage
+        # Install from Test PyPI (specific version)
+        echo "📦 Installing snid-sage==1.2.3 from Test PyPI..."
+        python -m pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
         
         # Test basic import
         echo "✅ Testing basic import..."
@@ -102,9 +102,9 @@ jobs:
         # Install pip in conda environment
         conda install -c conda-forge pip
         
-        # Install from Test PyPI
-        echo "📦 Installing snid-sage from Test PyPI..."
-        pip install -i https://test.pypi.org/simple/ snid-sage
+        # Install from Test PyPI (specific version)
+        echo "📦 Installing snid-sage==1.2.3 from Test PyPI..."
+        pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
         
         # Test basic import
         echo "✅ Testing basic import..."
