@@ -171,23 +171,57 @@ class LayoutUtils:
             # Logo removed – no left section. Ensure downstream attributes exist.
             gui_instance.logo_label = None
             
-            # Center - Status section
+            # Center - Status section with info button
             center_section = tk.Frame(content, bg=gui_instance.theme_manager.get_color('bg_secondary'))
             center_section.pack(fill='x', expand=True)
             
-            # Status box with border
-            status_box = tk.Frame(center_section, bg=gui_instance.theme_manager.get_color('bg_tertiary'), 
+            # Container for info button and status bar
+            status_container = tk.Frame(center_section, bg=gui_instance.theme_manager.get_color('bg_secondary'))
+            status_container.pack(fill='x', expand=True)
+            
+            # Info button (left side) - fixed square size with larger icon
+            # Create a wrapper frame with fixed pixel dimensions for precise control
+            info_frame = tk.Frame(status_container, width=36, height=36, 
+                                bg=gui_instance.theme_manager.get_color('bg_secondary'))
+            info_frame.pack(side='left', padx=(0, 10))
+            info_frame.pack_propagate(False)  # Prevent frame from resizing to fit contents
+            
+            info_btn = create_cross_platform_button(
+                info_frame,
+                text="ℹ",
+                font=('Segoe UI', 24, 'bold'),  # Large font for the icon
+                bg=gui_instance.theme_manager.get_color('accent_primary'),
+                fg='white',
+                relief='raised',
+                bd=1,
+                padx=0,  # No internal padding - frame controls size
+                pady=0,  # No internal padding - frame controls size
+                cursor='hand2',
+                command=lambda: gui_instance._show_shortcuts_dialog() if hasattr(gui_instance, '_show_shortcuts_dialog') else None
+            )
+            # Position the button precisely within the frame to control icon placement
+            # x=0, y=0 would be top-left, y=5 pushes the icon down 5 pixels
+            info_btn.place(x=-2, y=-5, width=40, height=40)
+            
+            # Store reference to info button
+            gui_instance.info_btn = info_btn
+            
+            # Add tooltip for info button
+            LayoutUtils._add_tooltip(gui_instance, info_btn, "Show keyboard shortcuts and hotkeys")
+            
+            # Status box with border (takes remaining space)
+            status_box = tk.Frame(status_container, bg=gui_instance.theme_manager.get_color('bg_tertiary'), 
                                  highlightbackground=gui_instance.theme_manager.get_color('border'),
                                  highlightthickness=1, relief='solid', bd=1)
-            status_box.pack(expand=True, fill='x', pady=2)
+            status_box.pack(side='left', expand=True, fill='both')
             
             # Status content
             status_content = tk.Frame(status_box, bg=gui_instance.theme_manager.get_color('bg_tertiary'))
-            status_content.pack(fill='both', expand=True, padx=10, pady=5)
+            status_content.pack(fill='both', expand=True, padx=10, pady=1)
             
             # Status label
             gui_instance.header_status_label = tk.Label(status_content, text="🚀 Ready - Load a spectrum to begin analysis",
-                                                       font=('Segoe UI', 12, 'normal'),
+                                                       font=('Segoe UI', 11, 'normal'),
                                                        bg=gui_instance.theme_manager.get_color('bg_tertiary'),
                                                        fg=gui_instance.theme_manager.get_color('text_primary'),
                                                        anchor='center')

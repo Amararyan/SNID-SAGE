@@ -12,6 +12,7 @@ Available dialogs:
 - AISummaryDialog: LLM-generated analysis summaries
 - ResultsDialog: Analysis results viewing
 - SettingsDialog: GUI settings and preferences
+- ShortcutsDialog: Keyboard shortcuts and hotkeys reference
 - ManualRedshiftDialog: Manual galaxy redshift determination
 - MultiStepEmissionAnalysisDialog: Multi-step supernova emission line analysis tool
 """
@@ -23,6 +24,7 @@ from .mask_manager_dialog import MaskManagerDialog
 from .enhanced_ai_assistant_dialog import EnhancedAIAssistantDialog, AISummaryDialog
 from .results_dialog import ResultsDialog
 from .settings_dialog import GUISettingsDialog, show_gui_settings_dialog
+from .shortcuts_dialog import ShortcutsDialog
 from .manual_redshift_dialog import ManualRedshiftDialog, show_manual_redshift_dialog
 from .multi_step_emission_dialog import MultiStepEmissionAnalysisDialog, show_multi_step_emission_dialog
 from .snid_analysis_dialog import SNIDAnalysisDialog, show_snid_analysis_dialog
@@ -38,6 +40,7 @@ __all__ = [
     'ResultsDialog',
     'GUISettingsDialog',
     'show_gui_settings_dialog',
+    'ShortcutsDialog',
     'ManualRedshiftDialog',
     'show_manual_redshift_dialog',
     'MultiStepEmissionAnalysisDialog',

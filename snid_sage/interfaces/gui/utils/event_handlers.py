@@ -59,12 +59,23 @@ class EventHandlers:
             if hasattr(self.gui, 'switch_mode'):
                 self.gui.master.bind("<space>", lambda event: self.gui.switch_mode())
             
+            # Reset functionality - OS aware
+            if hasattr(self.gui, 'reset_gui_to_initial_state'):
+                import platform
+                if platform.system() == "Darwin":  # macOS
+                    self.gui.master.bind("<Command-r>", lambda event: self.gui.reset_gui_to_initial_state())
+                    self.gui.master.bind("<Command-R>", lambda event: self.gui.reset_gui_to_initial_state())
+                else:  # Windows/Linux
+                    self.gui.master.bind("<Control-r>", lambda event: self.gui.reset_gui_to_initial_state())
+                    self.gui.master.bind("<Control-R>", lambda event: self.gui.reset_gui_to_initial_state())
+            
             _LOGGER.info("✅ Keyboard shortcuts setup complete")
             _LOGGER.info("   📄 Ctrl+O: Open file")
             _LOGGER.info("   ⚙️ Ctrl+Shift+O: SNID Configuration")
             _LOGGER.info("   ▶️ F5: Run analysis only")
             _LOGGER.info("   🚀 Ctrl+Enter (Cmd+Enter on Mac): Quick preprocessing + analysis (combined workflow)")
             _LOGGER.info("   🔧 F6: Preprocessing")
+            _LOGGER.info("   🔄 Ctrl+R (Cmd+R on Mac): Reset to initial state")
             _LOGGER.info("   🔄 Space: Switch mode (if available)")
             _LOGGER.info("   📊 ← → : Navigate templates (when results available)")
             _LOGGER.info("   🔄 ↑ ↓ : Cycle views (Flux/Flat)")

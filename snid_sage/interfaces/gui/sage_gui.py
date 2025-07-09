@@ -1213,6 +1213,21 @@ class ModernSNIDSageGUI:
             messagebox.showerror("Settings Error", 
                                f"Error opening settings dialog:\n\n{str(e)}")
     
+    def _show_shortcuts_dialog(self):
+        """Show the keyboard shortcuts dialog"""
+        try:
+            from snid_sage.interfaces.gui.components.dialogs.shortcuts_dialog import ShortcutsDialog
+            shortcuts_dialog = ShortcutsDialog(self.master, self.theme_manager)
+            shortcuts_dialog.show()
+            
+            if self.logger:
+                self.logger.info("✅ Shortcuts dialog opened")
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error opening shortcuts dialog: {e}")
+            messagebox.showerror("Shortcuts Error", 
+                               f"Error opening shortcuts dialog:\n\n{str(e)}")
+    
     def _on_theme_changed(self, theme_name):
         """Handle theme changes - simplified for light mode only"""
         try:
