@@ -5,7 +5,7 @@ SNID SAGE - Modern GUI Interface with Toggle Controls
 Comprehensive graphical user interface for SNID SAGE that combines modern design
 with toggle switches and advanced features including LLM integration, line detection, and more.
 
-Developed by Fiorenzo Stoppa for SNID SAGE v1.0.0
+Developed by Fiorenzo Stoppa for SNID SAGE
 Based on the original Fortran SNID by Stéphane Blondin & John L. Tonry
 """
 
@@ -106,7 +106,13 @@ class ModernSNIDSageGUI:
     def __init__(self, master):
         """Initialize the Modern SNID SAGE GUI"""
         self.master = master
-        self.master.title("SNID SAGE v1.0.0 - Modern Interface")
+        # Import version dynamically
+        try:
+            from snid_sage import __version__
+        except ImportError:
+            __version__ = "unknown"
+        
+        self.master.title(f"SNID SAGE v{__version__} - Modern Interface")
         
         # Initialize recursion protection flag for view style changes
         self._programmatic_view_change = False
