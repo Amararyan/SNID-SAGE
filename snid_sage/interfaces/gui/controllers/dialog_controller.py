@@ -93,6 +93,29 @@ class DialogController:
             _LOGGER.error(f"❌ Error applying preprocessing results: {e}")
             messagebox.showerror("Error", f"Failed to apply preprocessing results: {e}")
     
+    def open_preprocessing_selection(self):
+        """Open preprocessing selection dialog to choose between quick and advanced preprocessing"""
+        try:
+            # Check if a spectrum is loaded
+            if not hasattr(self.gui, 'file_path') or not self.gui.file_path:
+                messagebox.showwarning("No Spectrum", "Please load a spectrum file first.")
+                return
+            
+            # Import the preprocessing selection dialog
+            from snid_sage.interfaces.gui.components.dialogs.preprocessing_selection_dialog import PreprocessingSelectionDialog
+            
+            # Create and show the preprocessing selection dialog
+            dialog = PreprocessingSelectionDialog(self.gui)
+            dialog.show()
+            
+            _LOGGER.info("🔧 Preprocessing selection dialog opened successfully")
+                
+        except Exception as e:
+            _LOGGER.error(f"❌ Error opening preprocessing selection dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Error", f"Could not open preprocessing selection dialog: {e}")
+
     def manage_masks(self):
         """Open mask manager dialog"""
         try:
