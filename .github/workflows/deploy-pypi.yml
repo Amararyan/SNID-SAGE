@@ -130,7 +130,7 @@ jobs:
           - See commit history for detailed changes
           
           ### Full Changelog
-          **Full Changelog**: https://github.com/FiorenSt/SNID-SAGE/compare/v1.2.3...${{ github.ref_name }}
+          **Full Changelog**: https://github.com/FiorenSt/SNID-SAGE/compare/v0.0.1...${{ github.ref_name }}
         draft: false
         prerelease: false
 
