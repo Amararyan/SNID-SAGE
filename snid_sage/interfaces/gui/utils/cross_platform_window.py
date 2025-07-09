@@ -73,7 +73,8 @@ class CrossPlatformWindowManager:
             'minimize': 'Ctrl+M',
             'copy': 'Ctrl+C',
             'paste': 'Ctrl+V',
-            'select_all': 'Ctrl+A'
+            'select_all': 'Ctrl+A',
+            'quick_workflow': 'Control-Return'
         },
         MACOS: {
             'fullscreen': 'Cmd+Ctrl+F',
@@ -83,7 +84,8 @@ class CrossPlatformWindowManager:
             'minimize': 'Cmd+M',
             'copy': 'Cmd+C',
             'paste': 'Cmd+V',
-            'select_all': 'Cmd+A'
+            'select_all': 'Cmd+A',
+            'quick_workflow': 'Command-Return'
         },
         LINUX: {
             'fullscreen': 'F11',
@@ -93,7 +95,8 @@ class CrossPlatformWindowManager:
             'minimize': 'Ctrl+M',
             'copy': 'Ctrl+C',
             'paste': 'Ctrl+V',
-            'select_all': 'Ctrl+A'
+            'select_all': 'Ctrl+A',
+            'quick_workflow': 'Control-Return'
         }
     }
     

@@ -40,6 +40,15 @@ class EventHandlers:
             if hasattr(self.gui, 'open_preprocessing_dialog'):
                 self.gui.master.bind("<F6>", lambda event: self.gui.open_preprocessing_dialog())
             
+            # Combined workflow - Quick preprocessing + analysis
+            if hasattr(self.gui, 'run_quick_preprocessing_and_analysis'):
+                # Use cross-platform shortcut system
+                from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+                shortcuts = CrossPlatformWindowManager.get_keyboard_shortcuts()
+                if 'quick_workflow' in shortcuts:
+                    self.gui.master.bind(f"<{shortcuts['quick_workflow']}>", 
+                                       lambda event: self.gui.run_quick_preprocessing_and_analysis())
+            
             # Theme toggle
             # Dark mode toggle removed - light mode only
             
@@ -53,8 +62,8 @@ class EventHandlers:
             _LOGGER.info("✅ Keyboard shortcuts setup complete")
             _LOGGER.info("   📄 Ctrl+O: Open file")
             _LOGGER.info("   ⚙️ Ctrl+Shift+O: SNID Configuration")
-            _LOGGER.info("   🎨 Ctrl+D: Toggle dark mode")
-            _LOGGER.info("   ▶️ F5: Run analysis")
+            _LOGGER.info("   ▶️ F5: Run analysis only")
+            _LOGGER.info("   🚀 Ctrl+Enter (Cmd+Enter on Mac): Quick preprocessing + analysis (combined workflow)")
             _LOGGER.info("   🔧 F6: Preprocessing")
             _LOGGER.info("   🔄 Space: Switch mode (if available)")
             _LOGGER.info("   📊 ← → : Navigate templates (when results available)")

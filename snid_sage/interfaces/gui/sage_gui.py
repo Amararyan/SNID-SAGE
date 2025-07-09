@@ -474,14 +474,70 @@ class ModernSNIDSageGUI:
             return None
     
     def open_preprocessing_selection(self):
-        """Open preprocessing selection dialog"""
+        """Open preprocessing selection dialog - delegate to dialog controller"""
+        if hasattr(self, 'dialog_controller'):
+            self.dialog_controller.open_preprocessing_selection()
+        else:
+            messagebox.showerror("Error", "Dialog controller not initialized.")
+
+    def run_quick_preprocessing_and_analysis(self):
+        """
+        Run quick preprocessing followed by quick analysis in one go.
+        
+        This is a convenience method that combines both operations for a streamlined workflow.
+        Perfect for users who want to quickly process and analyze their spectrum with default settings.
+        
+        Keyboard shortcut: Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac)
+        """
+        if not self.file_path:
+            messagebox.showwarning("No Spectrum", "Please load a spectrum file first.")
+            return
+        
         try:
-            from snid_sage.interfaces.gui.components.dialogs.preprocessing_selection_dialog import PreprocessingSelectionDialog
-            dialog = PreprocessingSelectionDialog(self)
-            dialog.show()
+            # Update header status to show we're starting the combined workflow
+            self.update_header_status("🚀 Starting quick preprocessing + analysis workflow...")
+            
+            # Step 1: Run quick preprocessing (silent version to avoid duplicate status messages)
+            if hasattr(self, 'preprocessing_controller'):
+                self.preprocessing_controller.run_quick_snid_preprocessing_silent()
+                
+                # Wait a brief moment for preprocessing to complete and update states
+                self.master.update_idletasks()
+                
+                # Check if preprocessing was successful by verifying we have processed spectrum
+                if hasattr(self, 'processed_spectrum') and self.processed_spectrum is not None:
+                    # Step 2: Run quick analysis with default settings
+                    self.update_header_status("✅ Preprocessing complete - now running SNID analysis...")
+                    
+                    # Brief delay to ensure UI updates are visible
+                    self.master.after(500, self._run_analysis_after_preprocessing)
+                else:
+                    self.update_header_status("❌ Preprocessing failed - analysis cannot proceed")
+                    messagebox.showerror("Workflow Error", 
+                                       "Quick preprocessing failed. Cannot proceed with analysis.\n"
+                                       "Please check your spectrum file and try preprocessing manually.")
+            else:
+                messagebox.showerror("Error", "Preprocessing controller not initialized.")
+                
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to open preprocessing selection: {e}")
+            error_msg = f"Combined preprocessing + analysis workflow failed: {str(e)}"
+            self.update_header_status(f"❌ {error_msg}")
+            messagebox.showerror("Workflow Error", error_msg)
     
+    def _run_analysis_after_preprocessing(self):
+        """Helper method to run analysis after preprocessing is complete"""
+        try:
+            if hasattr(self, 'analysis_controller'):
+                # Run the analysis
+                self.analysis_controller.run_snid_analysis_only()
+                self.update_header_status("🎉 Combined workflow complete - preprocessing + analysis finished!")
+            else:
+                messagebox.showerror("Error", "Analysis controller not initialized.")
+        except Exception as e:
+            error_msg = f"Analysis phase failed: {str(e)}"
+            self.update_header_status(f"❌ {error_msg}")
+            messagebox.showerror("Analysis Error", error_msg)
+
     # Line detection methods - delegate to line detection controller
     def auto_detect_and_compare_lines(self):
         """Auto-detect spectral lines - delegate to line detection controller"""
