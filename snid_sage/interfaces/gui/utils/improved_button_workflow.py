@@ -186,24 +186,73 @@ class ImprovedButtonWorkflow:
         return current_index >= required_index
     
     def _set_button_state(self, button: tk.Button, enabled: bool, color: str):
-        """Set button state and appearance"""
+        """Set button state and appearance with macOS compatibility"""
         try:
-            # Only update colours and cursor; preserve border/relief/highlight settings
-            button.configure(
-                state=('normal' if enabled else 'disabled'),
-                bg=color,
-                fg=self._get_text_color(color),
-                activebackground=self._darken_color(color),
-                activeforeground=self._get_text_color(color),
-                disabledforeground=self._get_disabled_text_color(),
-                cursor=('hand2' if enabled else 'arrow'),
-                # Preserve raised appearance regardless of state transitions
-                relief='raised',
-                bd=2
-            )
+            # Get platform info to handle macOS differently
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            
+            # Base configuration for all platforms
+            base_config = {
+                'state': ('normal' if enabled else 'disabled'),
+                'fg': self._get_text_color(color),
+                'disabledforeground': self._get_disabled_text_color(),
+                'cursor': ('hand2' if enabled else 'arrow'),
+                'relief': 'raised',
+                'bd': 2
+            }
+            
+            if platform_config and platform_config.is_macos:
+                # macOS-specific button styling to override system appearance
+                macos_config = {
+                    **base_config,
+                    # On macOS, use highlightbackground for the button color
+                    'highlightbackground': color,
+                    'highlightcolor': color,
+                    'highlightthickness': 0,
+                    # Force background color even on macOS
+                    'bg': color,
+                    # Active colors for when button is pressed
+                    'activebackground': self._darken_color(color),
+                    'activeforeground': self._get_text_color(color),
+                    # Override system appearance
+                    'borderwidth': 2,
+                    'relief': 'raised',
+                    # Force button to not use system appearance
+                    'compound': 'none',
+                }
+                button.configure(**macos_config)
+                
+                # Additional macOS-specific workaround: set the background after configuration
+                try:
+                    button.configure(background=color)
+                    # Force update
+                    button.update_idletasks()
+                except:
+                    pass
+                    
+            else:
+                # Windows/Linux configuration (original approach)
+                windows_config = {
+                    **base_config,
+                    'bg': color,
+                    'activebackground': self._darken_color(color),
+                    'activeforeground': self._get_text_color(color),
+                }
+                button.configure(**windows_config)
             
         except Exception as e:
             _LOGGER.error(f"Error setting button state: {e}")
+            # Fallback: try basic configuration
+            try:
+                button.configure(
+                    state=('normal' if enabled else 'disabled'),
+                    bg=color,
+                    fg=self._get_text_color(color),
+                    cursor=('hand2' if enabled else 'arrow')
+                )
+            except:
+                pass
     
     def _darken_color(self, hex_color: str) -> str:
         """Darken a hex color for hover effect"""
@@ -256,17 +305,46 @@ class ImprovedButtonWorkflow:
 # Convenience functions for integration
 def create_workflow_button(parent, text, font, command, button_name, workflow_system):
     """Create a button that's automatically registered with the workflow system"""
-    button = tk.Button(
-        parent,
-        text=text,
-        font=font,
-        command=command,
-        relief='raised',  # Raised but with thinner, lighter border
-        bd=2,
-        pady=10,
-        highlightbackground=ButtonColors.DARK_BORDER,
-        highlightcolor=ButtonColors.DARK_BORDER
-    )
+    # Get platform info for macOS-specific handling
+    try:
+        from snid_sage.shared.utils.config.platform_config import get_platform_config
+        platform_config = get_platform_config()
+        is_macos = platform_config and platform_config.is_macos
+    except:
+        is_macos = False
+    
+    if is_macos:
+        # macOS-specific button creation
+        button = tk.Button(
+            parent,
+            text=text,
+            font=font,
+            command=command,
+            relief='raised',
+            bd=2,
+            pady=10,
+            # Use highlightbackground for macOS color control
+            highlightbackground=ButtonColors.LIGHT_GREY,
+            highlightcolor=ButtonColors.LIGHT_GREY,
+            highlightthickness=0,
+            # Override system appearance
+            bg=ButtonColors.LIGHT_GREY,
+            borderwidth=2,
+            compound='none',
+        )
+    else:
+        # Windows/Linux button creation (original)
+        button = tk.Button(
+            parent,
+            text=text,
+            font=font,
+            command=command,
+            relief='raised',
+            bd=2,
+            pady=10,
+            highlightbackground=ButtonColors.DARK_BORDER,
+            highlightcolor=ButtonColors.DARK_BORDER
+        )
     
     # Register with workflow system
     workflow_system.register_button(button_name, button)

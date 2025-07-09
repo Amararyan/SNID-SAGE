@@ -118,27 +118,36 @@ class ToggleControlsComponent:
         return canvas
     
     def create_segmented_control(self, parent, options, variable):
-        """Create a segmented control (multiple choice toggle)
+        """Create a segmented control with multiple options
         
         Args:
             parent: Parent widget
             options (list): List of option strings
-            variable: Tkinter StringVar for selected option
+            variable: Tkinter StringVar
             
         Returns:
             tk.Frame: Container frame for the segmented control
         """
+        from snid_sage.interfaces.gui.utils.layout_utils import create_cross_platform_button
+        
         container = tk.Frame(parent, bg=self.theme_manager.get_color('bg_secondary'))
         container.pack(fill='x', pady=5)
         
         # Create buttons for each option
         buttons = []
         for i, option in enumerate(options):
-            btn = tk.Button(container, text=option,
-                           font=('Segoe UI', 10, 'normal'),
-                           relief='flat', bd=0, padx=15, pady=5,
-                           cursor='hand2',
-                           command=lambda opt=option: self._select_option(variable, opt, buttons))
+            # Use cross-platform button creation for better macOS support
+            btn = create_cross_platform_button(
+                container, 
+                text=option,
+                font=('Segoe UI', 10, 'normal'),
+                relief='flat', 
+                bd=0, 
+                padx=15, 
+                pady=5,
+                cursor='hand2',
+                command=lambda opt=option: self._select_option(variable, opt, buttons)
+            )
             btn.pack(side='left', padx=(0, 1) if i < len(options)-1 else 0)
             buttons.append(btn)
         
@@ -147,11 +156,19 @@ class ToggleControlsComponent:
             selected = variable.get()
             for i, btn in enumerate(buttons):
                 if options[i] == selected:
-                    btn.config(bg=self.theme_manager.get_color('accent_primary'),
-                              fg='white')
+                    bg_color = self.theme_manager.get_color('accent_primary')
+                    fg_color = 'white'
                 else:
-                    btn.config(bg=self.theme_manager.get_color('bg_tertiary'),
-                              fg=self.theme_manager.get_color('text_primary'))
+                    bg_color = self.theme_manager.get_color('bg_tertiary')
+                    fg_color = self.theme_manager.get_color('text_primary')
+                
+                # Apply colors with macOS compatibility
+                btn.config(bg=bg_color, fg=fg_color)
+                # For macOS, also set highlightbackground
+                try:
+                    btn.config(highlightbackground=bg_color)
+                except:
+                    pass
         
         # Initial update
         update_buttons()
@@ -202,6 +219,8 @@ class ToggleControlsComponent:
         Returns:
             tk.Button: The chip button
         """
+        from snid_sage.interfaces.gui.utils.layout_utils import create_cross_platform_button
+        
         def toggle_chip():
             variable.set(not variable.get())
             update_chip_style()
@@ -209,16 +228,32 @@ class ToggleControlsComponent:
         def update_chip_style():
             is_selected = variable.get()
             if is_selected:
-                chip.config(bg=self.theme_manager.get_color('accent_primary'),
-                           fg='white')
+                bg_color = self.theme_manager.get_color('accent_primary')
+                fg_color = 'white'
             else:
-                chip.config(bg=self.theme_manager.get_color('bg_tertiary'),
-                           fg=self.theme_manager.get_color('text_primary'))
+                bg_color = self.theme_manager.get_color('bg_tertiary')
+                fg_color = self.theme_manager.get_color('text_primary')
+            
+            # Apply colors with macOS compatibility
+            chip.config(bg=bg_color, fg=fg_color)
+            # For macOS, also set highlightbackground
+            try:
+                chip.config(highlightbackground=bg_color)
+            except:
+                pass
         
-        chip = tk.Button(parent, text=label,
-                        font=('Segoe UI', 9, 'normal'),
-                        relief='flat', bd=0, padx=10, pady=3,
-                        cursor='hand2', command=toggle_chip)
+        # Use cross-platform button creation for better macOS support
+        chip = create_cross_platform_button(
+            parent, 
+            text=label,
+            font=('Segoe UI', 9, 'normal'),
+            relief='flat', 
+            bd=0, 
+            padx=10, 
+            pady=3,
+            cursor='hand2', 
+            command=toggle_chip
+        )
         chip.pack(side='left', padx=(0, 5))
         
         # Initial style

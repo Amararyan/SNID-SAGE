@@ -167,6 +167,35 @@ class PlatformConfig:
             except:
                 pass
             
+            # Configure Tkinter for better button color control on macOS
+            try:
+                # Set Tkinter-specific macOS options for better custom styling
+                root = tk._default_root
+                if root is None:
+                    # Create a temporary root to access Tkinter settings
+                    root = tk.Tk()
+                    root.withdraw()
+                    temp_root = True
+                else:
+                    temp_root = False
+                
+                # Configure macOS-specific Tkinter options
+                try:
+                    # Enable custom button colors by disabling native appearance
+                    root.call('tk', 'scaling', 1.0)
+                    # Force Tkinter to use custom colors instead of system colors
+                    root.option_add('*Button.highlightBackground', '#ffffff', 'startupFile')
+                    root.option_add('*Button.background', '#ffffff', 'startupFile')
+                    root.option_add('*Button.activeBackground', '#e0e0e0', 'startupFile')
+                except:
+                    pass
+                
+                if temp_root:
+                    root.destroy()
+                    
+            except Exception as e:
+                _LOGGER.debug(f"Could not apply Tkinter macOS configuration: {e}")
+            
             # Configure matplotlib for macOS
             try:
                 import matplotlib

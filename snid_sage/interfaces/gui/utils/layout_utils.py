@@ -23,24 +23,91 @@ BUTTON_COLORS = {
     'border': "#555555"
 }
 
+def create_cross_platform_button(parent, text, command=None, **kwargs):
+    """
+    Create a button that works properly on all platforms, especially macOS.
+    
+    This function handles the macOS Tkinter button color issue by using
+    highlightbackground and other workarounds.
+    
+    Args:
+        parent: Parent widget
+        text: Button text
+        command: Button command callback
+        **kwargs: Additional button configuration options
+        
+    Returns:
+        Configured tk.Button widget
+    """
+    # Get platform info for macOS-specific handling
+    try:
+        from snid_sage.shared.utils.config.platform_config import get_platform_config
+        platform_config = get_platform_config()
+        is_macos = platform_config and platform_config.is_macos
+    except:
+        is_macos = False
+    
+    # Extract color-related kwargs
+    bg_color = kwargs.pop('bg', 'white')
+    fg_color = kwargs.pop('fg', 'black')
+    
+    # Base configuration
+    base_config = {
+        'text': text,
+        'command': command,
+        'relief': kwargs.pop('relief', 'raised'),
+        'bd': kwargs.pop('bd', 2),
+        'cursor': kwargs.pop('cursor', 'hand2'),
+        **kwargs  # Include any other kwargs
+    }
+    
+    if is_macos:
+        # macOS-specific button configuration
+        macos_config = {
+            **base_config,
+            'bg': bg_color,
+            'fg': fg_color,
+            # Use highlightbackground for macOS color control
+            'highlightbackground': bg_color,
+            'highlightcolor': bg_color,
+            'highlightthickness': 0,
+            # Override system appearance
+            'borderwidth': base_config['bd'],
+            'compound': 'none',
+        }
+        button = tk.Button(parent, **macos_config)
+        
+        # Additional macOS workaround: force background color
+        try:
+            button.configure(background=bg_color)
+        except:
+            pass
+    else:
+        # Windows/Linux configuration
+        windows_config = {
+            **base_config,
+            'bg': bg_color,
+            'fg': fg_color,
+        }
+        button = tk.Button(parent, **windows_config)
+    
+    return button
+
 def _create_workflow_button(parent, text, font, command, button_name, gui_instance):
     """Create a button that's managed by the workflow system"""
     
-    # Create raised relief button for "stick out" effect
-    button = tk.Button(
+    # Create button using cross-platform function
+    button = create_cross_platform_button(
         parent,
         text=text,
         font=font,
-        relief='raised',  # Raised but with thinner, lighter border
+        command=command,
+        bg=BUTTON_COLORS['disabled'],
+        fg='black',
+        relief='raised',
         bd=2,
         pady=10,
         cursor='hand2',
-        bg=BUTTON_COLORS['disabled'],
-        fg='black',
-        highlightbackground=BUTTON_COLORS['border'],
-        highlightcolor=BUTTON_COLORS['border'],
-        highlightthickness=1,
-        command=command,
         state='disabled'
     )
     
@@ -169,29 +236,37 @@ class LayoutUtils:
             settings_frame.pack(fill='x', side='bottom', padx=10, pady=(0, 10))
             
             # Settings button
-            gui_instance.settings_btn = _create_workflow_button(
+            gui_instance.settings_btn = create_cross_platform_button(
                 settings_frame, 
                 text="⚙️ Settings",
                 font=('Segoe UI', 10, 'bold'),
                 command=lambda: gui_instance._open_settings_dialog() if hasattr(gui_instance, '_open_settings_dialog') else None,
-                button_name='settings_btn',
-                gui_instance=gui_instance
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
+                cursor='hand2'
             )
-            gui_instance.settings_btn.config(pady=6, relief='raised', bd=2)
             gui_instance.settings_btn.pack(side='left', fill='both', expand=True, padx=(0, 2))
             LayoutUtils._add_tooltip(gui_instance, gui_instance.settings_btn, 
                                    "Open GUI settings dialog\nConfigure fonts, themes, display options")
             
             # Reset button
-            gui_instance.reset_btn = _create_workflow_button(
+            gui_instance.reset_btn = create_cross_platform_button(
                 settings_frame, 
                 text="🔄 Reset",
                 font=('Segoe UI', 10, 'bold'),
                 command=lambda: gui_instance.reset_gui_to_initial_state() if hasattr(gui_instance, 'reset_gui_to_initial_state') else None,
-                button_name='reset_btn',
-                gui_instance=gui_instance
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
+                cursor='hand2'
             )
-            gui_instance.reset_btn.config(pady=6, relief='raised', bd=2)
             gui_instance.reset_btn.pack(side='left', fill='both', expand=True, padx=(2, 0))
             LayoutUtils._add_tooltip(gui_instance, gui_instance.reset_btn, 
                                     "Reset GUI to initial state\nClears all data, plots, and analysis results\nKeeps theme and settings unchanged")
@@ -230,25 +305,34 @@ class LayoutUtils:
             nav_frame.pack(side='left')
             
             # Left arrow
-            gui_instance.prev_btn = tk.Button(nav_frame, text='◀',
-                                            bg=gui_instance.theme_manager.get_color('bg_tertiary'), 
-                                            fg=gui_instance.theme_manager.get_color('text_secondary'),
-                                            font=('Segoe UI', 12, 'bold'),
-                                            relief='raised', bd=2, padx=8, pady=4, cursor='hand2',
-                                            command=gui_instance.prev_template, state='disabled',
-                                            width=3, height=1)
+            gui_instance.prev_btn = create_cross_platform_button(
+                nav_frame,
+                text='◀',
+                font=('Segoe UI', 12, 'bold'),
+                bg=gui_instance.theme_manager.get_color('bg_tertiary'), 
+                fg=gui_instance.theme_manager.get_color('text_secondary'),
+                relief='raised',
+                bd=2,
+                padx=8,
+                pady=4,
+                cursor='hand2',
+                command=gui_instance.prev_template,
+                state='disabled',
+                width=3,
+                height=1
+            )
             gui_instance.prev_btn.pack(side='left', padx=(0, 2))
             
             # Up/Down buttons in center
             center_nav = tk.Frame(nav_frame, bg=gui_instance.theme_manager.get_color('bg_secondary'))
             center_nav.pack(side='left', padx=2)
             
-            gui_instance.up_btn = tk.Button(
+            gui_instance.up_btn = create_cross_platform_button(
                 center_nav,
                 text='▲',
+                font=('Segoe UI', 10, 'bold'),
                 bg=gui_instance.theme_manager.get_color('bg_tertiary'),
                 fg=gui_instance.theme_manager.get_color('text_secondary'),
-                font=('Segoe UI', 10, 'bold'),
                 relief='raised',
                 bd=2,
                 padx=6,
@@ -262,12 +346,12 @@ class LayoutUtils:
             )
             gui_instance.up_btn.pack()
             
-            gui_instance.down_btn = tk.Button(
+            gui_instance.down_btn = create_cross_platform_button(
                 center_nav,
                 text='▼',
+                font=('Segoe UI', 10, 'bold'),
                 bg=gui_instance.theme_manager.get_color('bg_tertiary'),
                 fg=gui_instance.theme_manager.get_color('text_secondary'),
-                font=('Segoe UI', 10, 'bold'),
                 relief='raised',
                 bd=2,
                 padx=6,
@@ -282,13 +366,22 @@ class LayoutUtils:
             gui_instance.down_btn.pack()
             
             # Right arrow
-            gui_instance.next_btn = tk.Button(nav_frame, text='▶',
-                                            bg=gui_instance.theme_manager.get_color('bg_tertiary'), 
-                                            fg=gui_instance.theme_manager.get_color('text_secondary'),
-                                            font=('Segoe UI', 12, 'bold'),
-                                            relief='raised', bd=2, padx=8, pady=4, cursor='hand2',
-                                            command=gui_instance.next_template, state='disabled',
-                                            width=3, height=1)
+            gui_instance.next_btn = create_cross_platform_button(
+                nav_frame,
+                text='▶',
+                font=('Segoe UI', 12, 'bold'),
+                bg=gui_instance.theme_manager.get_color('bg_tertiary'), 
+                fg=gui_instance.theme_manager.get_color('text_secondary'),
+                relief='raised',
+                bd=2,
+                padx=8,
+                pady=4,
+                cursor='hand2',
+                command=gui_instance.next_template,
+                state='disabled',
+                width=3,
+                height=1
+            )
             gui_instance.next_btn.pack(side='left', padx=(2, 0))
             
             # View style segmented control (center) - now includes Correlation
@@ -318,13 +411,16 @@ class LayoutUtils:
             analysis_buttons_frame.pack(side='right', padx=(0, 10))
             
             # Analysis Results button with same size as Flux/Flat
-            gui_instance.cluster_summary_btn = tk.Button(
+            gui_instance.cluster_summary_btn = create_cross_platform_button(
                 analysis_buttons_frame,
                 text="📋 Results",
                 font=('Segoe UI', 12, 'bold'),
                 bg=gui_instance.theme_manager.get_color('button_bg'),
-                fg=gui_instance.theme_manager.get_color('text_primary'),
-                relief='raised', bd=2, padx=12, pady=6,
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.show_cluster_summary() if hasattr(gui_instance, 'show_cluster_summary') else None,
                 state='disabled'
             )
@@ -332,13 +428,16 @@ class LayoutUtils:
             LayoutUtils._add_tooltip(gui_instance, gui_instance.cluster_summary_btn, "Comprehensive analysis results summary\nShows classification, redshift, age estimates, and template details")
             
             # GMM clustering button with same size as Flux/Flat
-            gui_instance.gmm_btn = tk.Button(
+            gui_instance.gmm_btn = create_cross_platform_button(
                 analysis_buttons_frame,
                 text="🔮 GMM",
                 font=('Segoe UI', 12, 'bold'),
                 bg=gui_instance.theme_manager.get_color('button_bg'),
-                fg=gui_instance.theme_manager.get_color('text_primary'),
-                relief='raised', bd=2, padx=12, pady=6,
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.plot_gmm_clustering() if hasattr(gui_instance, 'plot_gmm_clustering') else None,
                 state='disabled'
             )
@@ -346,13 +445,16 @@ class LayoutUtils:
             LayoutUtils._add_tooltip(gui_instance, gui_instance.gmm_btn, "Type-specific GMM clustering with 3D visualization\nRedshift vs Type vs RLAP")
             
             # Redshift vs age button with same size as Flux/Flat
-            gui_instance.redshift_age_btn = tk.Button(
+            gui_instance.redshift_age_btn = create_cross_platform_button(
                 analysis_buttons_frame,
                 text="📈 z vs Age",
                 font=('Segoe UI', 12, 'bold'),
                 bg=gui_instance.theme_manager.get_color('button_bg'),
-                fg=gui_instance.theme_manager.get_color('text_primary'),
-                relief='raised', bd=2, padx=12, pady=6,
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.plot_redshift_age() if hasattr(gui_instance, 'plot_redshift_age') else None,
                 state='disabled'
             )
@@ -360,13 +462,16 @@ class LayoutUtils:
             LayoutUtils._add_tooltip(gui_instance, gui_instance.redshift_age_btn, "Redshift vs Age distribution analysis")
             
             # Subtype proportions button with same size as Flux/Flat
-            gui_instance.subtype_proportions_btn = tk.Button(
+            gui_instance.subtype_proportions_btn = create_cross_platform_button(
                 analysis_buttons_frame,
                 text="🥧 Subtypes",
                 font=('Segoe UI', 12, 'bold'),
                 bg=gui_instance.theme_manager.get_color('button_bg'),
-                fg=gui_instance.theme_manager.get_color('text_primary'),
-                relief='raised', bd=2, padx=12, pady=6,
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.plot_subtype_proportions() if hasattr(gui_instance, 'plot_subtype_proportions') else None,
                 state='disabled'
             )
@@ -423,13 +528,18 @@ class LayoutUtils:
             analysis_frame.pack(fill='x', padx=8)
             
             # Analysis results button
-            gui_instance.cluster_summary_btn = _create_workflow_button(
+            gui_instance.cluster_summary_btn = create_cross_platform_button(
                 analysis_frame, 
                 text="📋 Analysis Results",
                 font=('Segoe UI', 12, 'bold'),
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.show_cluster_summary() if hasattr(gui_instance, 'show_cluster_summary') else None,
-                button_name='cluster_summary_btn',
-                gui_instance=gui_instance
+                state='disabled'
             )
             # Override pady for right panel buttons (keep raised relief)
             gui_instance.cluster_summary_btn.config(pady=8, relief='raised', bd=2)
@@ -437,13 +547,18 @@ class LayoutUtils:
             LayoutUtils._add_tooltip(gui_instance, gui_instance.cluster_summary_btn, "Comprehensive analysis results summary\nShows classification, redshift, age estimates, and template details")
             
             # GMM clustering button
-            gui_instance.gmm_btn = _create_workflow_button(
+            gui_instance.gmm_btn = create_cross_platform_button(
                 analysis_frame, 
                 text="🔮 GMM Clustering",
                 font=('Segoe UI', 12, 'bold'),
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.plot_gmm_clustering() if hasattr(gui_instance, 'plot_gmm_clustering') else None,
-                button_name='gmm_btn',
-                gui_instance=gui_instance
+                state='disabled'
             )
             # Override pady for right panel buttons (keep raised relief)
             gui_instance.gmm_btn.config(pady=8, relief='raised', bd=2)
@@ -451,13 +566,18 @@ class LayoutUtils:
             LayoutUtils._add_tooltip(gui_instance, gui_instance.gmm_btn, "Type-specific GMM clustering with 3D visualization\nRedshift vs Type vs RLAP")
             
             # Redshift vs age button
-            gui_instance.redshift_age_btn = _create_workflow_button(
+            gui_instance.redshift_age_btn = create_cross_platform_button(
                 analysis_frame, 
                 text="📈 Redshift vs Age",
                 font=('Segoe UI', 12, 'bold'),
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.plot_redshift_age() if hasattr(gui_instance, 'plot_redshift_age') else None,
-                button_name='redshift_age_btn',
-                gui_instance=gui_instance
+                state='disabled'
             )
             # Override pady for right panel buttons (keep raised relief)
             gui_instance.redshift_age_btn.config(pady=8, relief='raised', bd=2)
@@ -465,13 +585,18 @@ class LayoutUtils:
             LayoutUtils._add_tooltip(gui_instance, gui_instance.redshift_age_btn, "Redshift vs Age distribution analysis")
             
             # Subtype proportions button
-            gui_instance.subtype_proportions_btn = _create_workflow_button(
+            gui_instance.subtype_proportions_btn = create_cross_platform_button(
                 analysis_frame, 
                 text="🥧 Subtype Proportions",
                 font=('Segoe UI', 12, 'bold'),
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
                 command=lambda: gui_instance.plot_subtype_proportions() if hasattr(gui_instance, 'plot_subtype_proportions') else None,
-                button_name='subtype_proportions_btn',
-                gui_instance=gui_instance
+                state='disabled'
             )
             # Override pady for right panel buttons (keep raised relief)
             gui_instance.subtype_proportions_btn.config(pady=8, relief='raised', bd=2)
@@ -495,13 +620,18 @@ class LayoutUtils:
             settings_frame.pack(fill='x', side='bottom', padx=8, pady=(0, 10))
             
             # Settings button
-            gui_instance.settings_btn = _create_workflow_button(
+            gui_instance.settings_btn = create_cross_platform_button(
                 settings_frame, 
                 text="⚙️ Settings",
                 font=('Segoe UI', 10, 'bold'),
                 command=lambda: gui_instance._open_settings_dialog() if hasattr(gui_instance, '_open_settings_dialog') else None,
-                button_name='settings_btn',
-                gui_instance=gui_instance
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
+                cursor='hand2'
             )
             # Override pady for settings buttons (keep raised relief)
             gui_instance.settings_btn.config(pady=6, relief='raised', bd=2)
@@ -510,13 +640,18 @@ class LayoutUtils:
                                    "Open GUI settings dialog\nConfigure fonts, themes, display options")
             
             # Reset button
-            gui_instance.reset_btn = _create_workflow_button(
+            gui_instance.reset_btn = create_cross_platform_button(
                 settings_frame, 
                 text="🔄 Reset",
                 font=('Segoe UI', 10, 'bold'),
                 command=lambda: gui_instance.reset_gui_to_initial_state() if hasattr(gui_instance, 'reset_gui_to_initial_state') else None,
-                button_name='reset_btn',
-                gui_instance=gui_instance
+                bg=gui_instance.theme_manager.get_color('button_bg'),
+                fg='white',
+                relief='raised',
+                bd=2,
+                padx=12,
+                pady=6,
+                cursor='hand2'
             )
             # Override pady for settings buttons (keep raised relief)
             gui_instance.reset_btn.config(pady=6, relief='raised', bd=2)
@@ -540,13 +675,18 @@ class LayoutUtils:
         load_frame.pack(fill='x', pady=(0, 6))
         
         # File selection button - Always enabled, always grey
-        gui_instance.load_btn = _create_workflow_button(
+        gui_instance.load_btn = create_cross_platform_button(
             load_frame, 
             text="📁 Load Spectrum File",
             font=('Segoe UI', 14, 'bold'),
             command=lambda: gui_instance.file_controller.browse_file() if hasattr(gui_instance, 'file_controller') else None,
-            button_name='load_btn',
-            gui_instance=gui_instance
+            bg=gui_instance.theme_manager.get_color('button_bg'),
+            fg='white',
+            relief='raised',
+            bd=2,
+            padx=20,
+            pady=8,
+            cursor='hand2'
         )
         gui_instance.load_btn.config(pady=14)
         gui_instance.load_btn.pack(fill='x', pady=(0, 6))
@@ -574,13 +714,18 @@ class LayoutUtils:
         galaxy_row.pack(fill='x', pady=(0, 0))  # Keep container flush; button controls spacing
         
         # Combined Redshift Selection button
-        gui_instance.redshift_selection_btn = _create_workflow_button(
+        gui_instance.redshift_selection_btn = create_cross_platform_button(
             galaxy_row, 
             text="🌌 Redshift Selection",
             font=('Segoe UI', 14, 'bold'),
             command=gui_instance.open_redshift_selection,
-            button_name='redshift_selection_btn',
-            gui_instance=gui_instance
+            bg=gui_instance.theme_manager.get_color('button_bg'),
+            fg='white',
+            relief='raised',
+            bd=2,
+            padx=20,
+            pady=8,
+            cursor='hand2'
         )
         gui_instance.redshift_selection_btn.config(pady=14)
         gui_instance.redshift_selection_btn.pack(fill='x', pady=(0, 6), expand=True)
@@ -614,13 +759,18 @@ class LayoutUtils:
         preprocess_frame.pack(fill='x', pady=(6, 6))
         
         # Single Preprocessing button
-        gui_instance.preprocess_btn = _create_workflow_button(
+        gui_instance.preprocess_btn = create_cross_platform_button(
             preprocess_frame, 
             text="🔧 Preprocess Spectrum",
             font=('Segoe UI', 14, 'bold'),
             command=gui_instance.open_preprocessing_selection,
-            button_name='preprocess_btn',
-            gui_instance=gui_instance
+            bg=gui_instance.theme_manager.get_color('button_bg'),
+            fg='white',
+            relief='raised',
+            bd=2,
+            padx=20,
+            pady=8,
+            cursor='hand2'
         )
         gui_instance.preprocess_btn.config(pady=14)
         gui_instance.preprocess_btn.pack(fill='x', pady=(0, 6))
@@ -653,13 +803,18 @@ class LayoutUtils:
     def _create_configuration_section(gui_instance, parent):
         """Create configuration section - now combined with analysis"""
         # Single Analysis button - no header, pushed higher
-        gui_instance.analysis_btn = _create_workflow_button(
+        gui_instance.analysis_btn = create_cross_platform_button(
             parent, 
             text="🚀 Run Analysis",
             font=('Segoe UI', 14, 'bold'),
             command=gui_instance.open_snid_analysis_dialog,
-            button_name='analysis_btn',
-            gui_instance=gui_instance
+            bg=gui_instance.theme_manager.get_color('button_bg'),
+            fg='white',
+            relief='raised',
+            bd=2,
+            padx=20,
+            pady=8,
+            cursor='hand2'
         )
         gui_instance.analysis_btn.config(pady=14)
         gui_instance.analysis_btn.pack(fill='x', pady=(0, 6))
@@ -701,13 +856,18 @@ class LayoutUtils:
     def _create_emission_line_section(gui_instance, parent):
         """Create emission line overlay section"""
         # Emission line overlay button – uniform spacing like other workflow buttons
-        gui_instance.emission_line_overlay_btn = _create_workflow_button(
+        gui_instance.emission_line_overlay_btn = create_cross_platform_button(
             parent, 
             text="🔬 SN Emission Line Analysis",
             font=('Segoe UI', 14, 'bold'),
             command=gui_instance.open_emission_line_overlay,
-            button_name='emission_line_overlay_btn',
-            gui_instance=gui_instance
+            bg=gui_instance.theme_manager.get_color('button_bg'),
+            fg='white',
+            relief='raised',
+            bd=2,
+            padx=20,
+            pady=8,
+            cursor='hand2'
         )
         gui_instance.emission_line_overlay_btn.config(pady=14)
         gui_instance.emission_line_overlay_btn.pack(fill='x', pady=(0, 6))
@@ -730,13 +890,18 @@ class LayoutUtils:
         chat_frame.pack(fill='x', pady=(6, 6))
         
         # Enhanced AI assistant button (enabled after analysis completes)
-        gui_instance.ai_assistant_btn = _create_workflow_button(
+        gui_instance.ai_assistant_btn = create_cross_platform_button(
             chat_frame,
             text="🤖 AI Assistant",
             font=('Segoe UI', 14, 'bold'),
             command=lambda: gui_instance._show_enhanced_ai_assistant() if hasattr(gui_instance, '_show_enhanced_ai_assistant') else None,
-            button_name='ai_assistant_btn',
-            gui_instance=gui_instance
+            bg=gui_instance.theme_manager.get_color('button_bg'),
+            fg='white',
+            relief='raised',
+            bd=2,
+            padx=20,
+            pady=8,
+            cursor='hand2'
         )
         gui_instance.ai_assistant_btn.config(pady=14)
         gui_instance.ai_assistant_btn.pack(fill='x', pady=(0, 6))
@@ -883,6 +1048,14 @@ class ToggleUtils:
         container = tk.Frame(parent, bg=gui_instance.theme_manager.get_color('bg_secondary'))
         container.pack(side='left', padx=(10, 0))
         
+        # Get platform info for macOS-specific handling
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            is_macos = platform_config and platform_config.is_macos
+        except:
+            is_macos = False
+        
         buttons = []
         
         for i, option in enumerate(options):
@@ -895,14 +1068,30 @@ class ToggleUtils:
                 bg_color = gui_instance.theme_manager.get_color('bg_secondary')  # White/neutral
                 fg_color = gui_instance.theme_manager.get_color('text_secondary')
             
-            btn = tk.Button(container, text=option,
-                           bg=bg_color, fg=fg_color,
-                           font=('Segoe UI', 12, 'normal'),
-                           relief='raised', bd=2, padx=20, pady=8,
-                           highlightbackground=BUTTON_COLORS['border'],
-                           highlightcolor=BUTTON_COLORS['border'],
-                           highlightthickness=1,
-                           cursor='hand2')
+            if is_macos:
+                # macOS-specific button creation for segmented control
+                btn = tk.Button(container, text=option,
+                               bg=bg_color, fg=fg_color,
+                               font=('Segoe UI', 12, 'normal'),
+                               relief='raised', bd=2, padx=20, pady=8,
+                               # Use highlightbackground for macOS color control
+                               highlightbackground=bg_color,
+                               highlightcolor=bg_color,
+                               highlightthickness=0,
+                               # Override system appearance
+                               borderwidth=2,
+                               compound='none',
+                               cursor='hand2')
+            else:
+                # Windows/Linux button creation (original)
+                btn = tk.Button(container, text=option,
+                               bg=bg_color, fg=fg_color,
+                               font=('Segoe UI', 12, 'normal'),
+                               relief='raised', bd=2, padx=20, pady=8,
+                               highlightbackground=BUTTON_COLORS['border'],
+                               highlightcolor=BUTTON_COLORS['border'],
+                               highlightthickness=1,
+                               cursor='hand2')
             
             # Mark as workflow-managed so global theme re-application skips them
             btn._workflow_managed = True
@@ -915,13 +1104,40 @@ class ToggleUtils:
                     variable.set(option_text)
                     _LOGGER.info(f"📊 After setting: view_style = {variable.get()}")
                     
-                    # Update all buttons
+                    # Update all buttons with platform-specific handling
                     for j, button in enumerate(buttons):
                         if options[j] == option_text:
-                            button.configure(bg=gui_instance.theme_manager.get_color('accent_primary'), fg='white', relief='raised', bd=2)
+                            if is_macos:
+                                button.configure(
+                                    bg=gui_instance.theme_manager.get_color('accent_primary'), 
+                                    fg='white', 
+                                    relief='raised', 
+                                    bd=2,
+                                    highlightbackground=gui_instance.theme_manager.get_color('accent_primary')
+                                )
+                            else:
+                                button.configure(
+                                    bg=gui_instance.theme_manager.get_color('accent_primary'), 
+                                    fg='white', 
+                                    relief='raised', 
+                                    bd=2
+                                )
                         else:
-                            button.configure(bg=gui_instance.theme_manager.get_color('bg_secondary'),
-                                           fg=gui_instance.theme_manager.get_color('text_secondary'), relief='raised', bd=2)
+                            if is_macos:
+                                button.configure(
+                                    bg=gui_instance.theme_manager.get_color('bg_secondary'),
+                                    fg=gui_instance.theme_manager.get_color('text_secondary'), 
+                                    relief='raised', 
+                                    bd=2,
+                                    highlightbackground=gui_instance.theme_manager.get_color('bg_secondary')
+                                )
+                            else:
+                                button.configure(
+                                    bg=gui_instance.theme_manager.get_color('bg_secondary'),
+                                    fg=gui_instance.theme_manager.get_color('text_secondary'), 
+                                    relief='raised', 
+                                    bd=2
+                                )
                     
                     # Call the view style change handler
                     if hasattr(gui_instance, '_on_view_style_change'):
@@ -949,10 +1165,37 @@ class ToggleUtils:
                 
                 for j, button in enumerate(buttons):
                     if options[j] == current_value:
-                        button.configure(bg=gui_instance.theme_manager.get_color('accent_primary'), fg='white', relief='raised', bd=2)
+                        if is_macos:
+                            button.configure(
+                                bg=gui_instance.theme_manager.get_color('accent_primary'), 
+                                fg='white', 
+                                relief='raised', 
+                                bd=2,
+                                highlightbackground=gui_instance.theme_manager.get_color('accent_primary')
+                            )
+                        else:
+                            button.configure(
+                                bg=gui_instance.theme_manager.get_color('accent_primary'), 
+                                fg='white', 
+                                relief='raised', 
+                                bd=2
+                            )
                     else:
-                        button.configure(bg=gui_instance.theme_manager.get_color('bg_secondary'),
-                                       fg=gui_instance.theme_manager.get_color('text_secondary'), relief='raised', bd=2)
+                        if is_macos:
+                            button.configure(
+                                bg=gui_instance.theme_manager.get_color('bg_secondary'),
+                                fg=gui_instance.theme_manager.get_color('text_secondary'), 
+                                relief='raised', 
+                                bd=2,
+                                highlightbackground=gui_instance.theme_manager.get_color('bg_secondary')
+                            )
+                        else:
+                            button.configure(
+                                bg=gui_instance.theme_manager.get_color('bg_secondary'),
+                                fg=gui_instance.theme_manager.get_color('text_secondary'), 
+                                relief='raised', 
+                                bd=2
+                            )
                 
                 _LOGGER.debug(f"✅ Segmented control buttons updated for: {current_value}")
                 
