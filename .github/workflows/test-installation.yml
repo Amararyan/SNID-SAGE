@@ -1,13 +1,14 @@
 name: Test Package Installation
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-  release:
-    types: [ published ]
-  workflow_dispatch:  # Allows manual triggering
+  # DISABLED - Using test-pypi-only.yml instead
+  # This workflow is disabled and will not run
+  workflow_dispatch:
+    inputs:
+      disabled:
+        description: 'This workflow is disabled'
+        required: true
+        default: 'disabled'
 
 jobs:
   test-installation:
