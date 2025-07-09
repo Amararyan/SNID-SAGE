@@ -8,8 +8,68 @@ from tkinter import messagebox, ttk, simpledialog
 from scipy.signal import find_peaks, savgol_filter, find_peaks_cwt
 from scipy.optimize import curve_fit, least_squares
 from .spectrum_utils import plot_spectrum
-import pyspeckit
 import warnings
+
+def gaussian_function(x, amplitude, center, sigma):
+    """Gaussian function for curve fitting"""
+    return amplitude * np.exp(-(x - center)**2 / (2 * sigma**2))
+
+def fit_gaussian_line(wavelength, flux, center_guess, amplitude_guess, sigma_guess=2.0):
+    """
+    Fit a Gaussian profile to spectral line data using scipy
+    
+    Parameters
+    ----------
+    wavelength : array
+        Wavelength array
+    flux : array
+        Flux array 
+    center_guess : float
+        Initial guess for line center
+    amplitude_guess : float
+        Initial guess for amplitude
+    sigma_guess : float
+        Initial guess for sigma (width)
+        
+    Returns
+    -------
+    dict or None
+        Dictionary with fit parameters or None if fit failed
+    """
+    try:
+        # Initial parameter guesses
+        initial_guess = [amplitude_guess, center_guess, sigma_guess]
+        
+        # Set reasonable bounds
+        amplitude_bounds = (0, amplitude_guess * 5)
+        center_bounds = (center_guess - 5, center_guess + 5)
+        sigma_bounds = (0.5, 8.0)
+        
+        bounds = ([amplitude_bounds[0], center_bounds[0], sigma_bounds[0]], 
+                 [amplitude_bounds[1], center_bounds[1], sigma_bounds[1]])
+        
+        # Perform curve fit
+        popt, pcov = curve_fit(gaussian_function, wavelength, flux, 
+                              p0=initial_guess, bounds=bounds, maxfev=1000)
+        
+        # Extract parameters
+        amplitude, center, sigma = popt
+        
+        # Calculate uncertainties from covariance matrix
+        param_errors = np.sqrt(np.diag(pcov))
+        center_err = param_errors[1] if len(param_errors) > 1 else None
+        
+        return {
+            'amplitude': amplitude,
+            'center': center,
+            'sigma': sigma,
+            'center_error': center_err,
+            'fwhm': sigma * 2.355  # Convert sigma to FWHM
+        }
+        
+    except Exception as e:
+        # Fit failed
+        return None
 
 def toggle_obs_lines(self):
     """Toggle display of observed spectral lines."""
@@ -70,7 +130,7 @@ def configure_line_detection(self):
     if not hasattr(self, 'line_detection_params'):
         self.line_detection_params = {
             'smoothing_window': 5,
-            'noise_factor': 1.5,  # Lower default for PySpecKit to detect more lines
+            'noise_factor': 1.5,  # Default sensitivity for line detection
             'use_smoothing': True,
             'solid_match_threshold': 150,
             'weak_match_threshold': 300,
@@ -203,7 +263,7 @@ def configure_line_detection(self):
 
 def detect_and_fit_lines(wavelength, flux, min_width=1, max_width=10, min_snr=2.0, max_fit_window=20, smoothing_window=5, use_smoothing=True):
     """
-    Detect spectral lines using PySpecKit's line fitter.
+    Detect spectral lines using scipy-based peak detection and Gaussian fitting.
     
     Parameters
     ----------
@@ -229,8 +289,6 @@ def detect_and_fit_lines(wavelength, flux, min_width=1, max_width=10, min_snr=2.
     list
         List of dictionaries containing line information
     """
-    # Silence some PySpecKit warnings that aren't relevant for our use case
-    warnings.filterwarnings('ignore', category=UserWarning, module='pyspeckit')
     
     # First determine if we're working with flattened data (centered around 0 or 1)
     flux_mean = np.mean(flux)
@@ -248,9 +306,7 @@ def detect_and_fit_lines(wavelength, flux, min_width=1, max_width=10, min_snr=2.
     else:
         flux_smooth = flux.copy()
     
-    # Create PySpecKit spectrum object
-    xarr = pyspeckit.units.SpectroscopicAxis(wavelength, unit='angstrom')
-    data = pyspeckit.Spectrum(data=flux_smooth, xarr=xarr, header={})
+    # Note: PySpecKit has been replaced with scipy-based fitting for better compatibility
     
     # Estimate noise level using median absolute deviation (more robust than std)
     flux_median = np.median(flux_smooth)
@@ -292,45 +348,31 @@ def detect_and_fit_lines(wavelength, flux, min_width=1, max_width=10, min_snr=2.
             baseline = np.percentile(peak_flux, 10)
             peak_flux_adj = peak_flux - baseline
             
-            # Use PySpecKit for fitting
+            # Use scipy-based Gaussian fitting
             try:
-                spec = pyspeckit.Spectrum(xarr=peak_wl, data=peak_flux_adj, header={})
-                
                 # Estimate the amplitude, mean and width for Gaussian fitting
                 amp_guess = peak_flux_adj[peak_idx - min_idx]
                 cen_guess = wavelength[peak_idx]
-                width_guess = 2.0  # Initial width guess in wavelength units
+                sigma_guess = 2.0 / 2.355  # Convert FWHM guess to sigma
                 
-                # Prepare guesses
-                guesses = [amp_guess, cen_guess, width_guess]
-                
-                # Perform fit
-                spec.specfit(guesses=guesses, fittype='gaussian', 
-                            quiet=True, limitedmax=[True,True,True], 
-                            limitedmin=[True,True,True],
-                            minpars=[0, cen_guess-5, 0.5],
-                            maxpars=[amp_guess*5, cen_guess+5, 8.0])
+                # Perform Gaussian fit
+                fit_result = fit_gaussian_line(peak_wl, peak_flux_adj, cen_guess, amp_guess, sigma_guess)
                 
                 # Extract fit results
-                if spec.specfit.modelpars is not None and len(spec.specfit.modelpars) >= 3:
-                    amp, cen, width = spec.specfit.modelpars
+                if fit_result is not None:
+                    amp = fit_result['amplitude']
+                    cen = fit_result['center']
+                    sigma = fit_result['sigma']
+                    cen_err = fit_result['center_error']
                     
                     # Less stringent amplitude threshold to include more lines
                     if amp > noise_level * 0.8:
-                        # Get uncertainty if available
-                        cen_err = None
-                        if hasattr(spec.specfit, 'modelerrs') and spec.specfit.modelerrs is not None:
-                            try:
-                                cen_err = spec.specfit.modelerrs[1]
-                            except:
-                                pass
-                        
                         all_lines.append({
                             'wavelength': cen,
                             'uncertainty': cen_err,
                             'type': 'emission',
                             'amplitude': amp,
-                            'sigma': width/2.355,  # Convert FWHM to sigma
+                            'sigma': sigma,
                             'snr': amp / noise_level if noise_level > 0 else None
                         })
             except Exception as e:
@@ -379,45 +421,31 @@ def detect_and_fit_lines(wavelength, flux, min_width=1, max_width=10, min_snr=2.
             baseline = np.percentile(trough_flux, 90)
             trough_flux_adj = -(trough_flux - baseline)  # Make it positive for fitting
             
-            # Use PySpecKit for fitting
+            # Use scipy-based Gaussian fitting
             try:
-                spec = pyspeckit.Spectrum(xarr=trough_wl, data=trough_flux_adj, header={})
-                
                 # Estimate the amplitude, mean and width for Gaussian fitting
                 amp_guess = trough_flux_adj[trough_idx - min_idx]
                 cen_guess = wavelength[trough_idx]
-                width_guess = 2.0  # Initial width guess in wavelength units
+                sigma_guess = 2.0 / 2.355  # Convert FWHM guess to sigma
                 
-                # Prepare guesses
-                guesses = [amp_guess, cen_guess, width_guess]
-                
-                # Perform fit
-                spec.specfit(guesses=guesses, fittype='gaussian', 
-                            quiet=True, limitedmax=[True,True,True], 
-                            limitedmin=[True,True,True],
-                            minpars=[0, cen_guess-5, 0.5],
-                            maxpars=[amp_guess*5, cen_guess+5, 8.0])
+                # Perform Gaussian fit
+                fit_result = fit_gaussian_line(trough_wl, trough_flux_adj, cen_guess, amp_guess, sigma_guess)
                 
                 # Extract fit results
-                if spec.specfit.modelpars is not None and len(spec.specfit.modelpars) >= 3:
-                    amp, cen, width = spec.specfit.modelpars
+                if fit_result is not None:
+                    amp = fit_result['amplitude']
+                    cen = fit_result['center']
+                    sigma = fit_result['sigma']
+                    cen_err = fit_result['center_error']
                     
                     # Less stringent amplitude threshold to include more lines
                     if amp > noise_level * 0.8:
-                        # Get uncertainty if available
-                        cen_err = None
-                        if hasattr(spec.specfit, 'modelerrs') and spec.specfit.modelerrs is not None:
-                            try:
-                                cen_err = spec.specfit.modelerrs[1]
-                            except:
-                                pass
-                        
                         all_lines.append({
                             'wavelength': cen,
                             'uncertainty': cen_err,
                             'type': 'absorption',
                             'amplitude': amp,
-                            'sigma': width/2.355,  # Convert FWHM to sigma
+                            'sigma': sigma,
                             'snr': amp / noise_level if noise_level > 0 else None
                         })
             except Exception as e:
@@ -475,7 +503,7 @@ def auto_detect_and_compare_lines(self):
     tmpl_data = tmpl.copy()
     
     # Tell the user we're working
-    self.status_label.config(text="Detecting spectral lines with PySpecKit...")
+    self.status_label.config(text="Detecting spectral lines with scipy...")
     self.master.update()  # Force update to show status
     
     try:
@@ -739,7 +767,7 @@ def auto_detect_and_compare_lines(self):
             'matches': matches,
             'template_info': template_info,
             'template_z': template_z,
-            'method': 'pyspeckit',
+            'method': 'scipy',
             'is_flat': self.view_mode == 'flat'
         }
         
@@ -772,7 +800,7 @@ def auto_detect_and_compare_lines(self):
         )
         
         # Update status
-        self.status_label.config(text=f"Detected and analyzed spectral lines with PySpecKit")
+        self.status_label.config(text=f"Detected and analyzed spectral lines with scipy")
     
     except Exception as e:
         messagebox.showerror("Detection Error", f"Error detecting lines: {str(e)}")
@@ -1112,7 +1140,7 @@ def _draw_line_comparisons(self):
         self.ax.plot([], [], color='cyan', linestyle=':', label='Unmatched Absorption (Template)', alpha=0.6)
     
     # Add a note about the detection method and spectrum type
-    method_text = f"Method: PySpecKit | Mode: {'Flattened' if is_flat else 'Flux'}"
+    method_text = f"Method: scipy | Mode: {'Flattened' if is_flat else 'Flux'}"
     
     # Create theme-aware bbox if theme manager is available
     bbox_props = dict(facecolor='white', alpha=0.7)

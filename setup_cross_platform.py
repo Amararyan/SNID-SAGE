@@ -114,7 +114,7 @@ class CrossPlatformSetup:
             'scikit-learn>=1.3.0',
             'requests>=2.25.0',
             'ttkbootstrap>=1.10.0',
-            'pyspeckit>=1.0.0',
+
             'h5py>=3.0.0',
             'pandas>=1.3.0',
             'pillow>=8.0.0',
@@ -244,7 +244,7 @@ class CrossPlatformSetup:
             'sklearn',
             'requests',
             'ttkbootstrap',
-            'pyspeckit',
+
             'h5py',
             'pandas',
             'PIL',

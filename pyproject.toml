@@ -58,9 +58,6 @@ dependencies = [
     # GUI libraries - with better platform handling
     "ttkbootstrap>=1.10.0",
     
-    # Spectroscopy - more flexible
-    "pyspeckit>=0.1.20",  # More flexible version constraint
-    
     # Platform-specific dependencies for Mac
     "tkinter-tooltip>=2.0.0; sys_platform == 'darwin'",
 ]
