@@ -121,6 +121,10 @@ class ModernSNIDSageGUI:
         # Setup window properties using the new event handler
         WindowEventHandlers.setup_window_properties(self.master)
         
+        # Apply comprehensive Mac improvements globally
+        from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+        CrossPlatformWindowManager.integrate_mac_improvements_globally(self.master)
+        
         # Initialize unified systems first
         self.font_manager = get_font_manager()
         self.plot_manager = get_plot_manager()

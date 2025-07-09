@@ -358,8 +358,18 @@ class ResultsDialog:
         context_menu.add_separator()
         context_menu.add_command(label="Export Selected", command=lambda: self._export_selected_template(tree))
         
+        # Use the new cross-platform event binding system
+        from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+        
+        # Set up cross-platform right-click handling
+        CrossPlatformWindowManager.setup_mac_event_bindings(
+            tree, 
+            right_click_callback=on_right_click
+        )
+        
+        # Fallback bindings for non-Mac platforms
         tree.bind("<Button-3>", on_right_click)  # Windows/Linux
-        tree.bind("<Button-2>", on_right_click)  # macOS
+        tree.bind("<Button-2>", on_right_click)  # macOS fallback
     
     def _create_type_distribution(self, parent):
         """Create type distribution display"""

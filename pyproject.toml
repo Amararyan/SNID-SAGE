@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snid-sage"
-version = "1.2.2"
+version = "1.2.3"
 description = "SNID SAGE - SuperNova IDentification with Spectrum Analysis and Guided Enhancement"
 readme = "README.md"
 license = {text = "MIT"}
@@ -32,34 +32,36 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    # Core numerical libraries with modern versions
-    "numpy>=1.20.0",
-    "scipy>=1.11.0",
-    "matplotlib>=3.5.0",
+    # Core numerical libraries - relaxed constraints for better compatibility
+    "numpy>=1.19.0",  # Lower minimum for better compatibility
+    "scipy>=1.7.0",   # Lower minimum for better compatibility
     
-    # Astronomy libraries
-    "astropy>=5.0.0",
+    # Data handling - install early for other packages to use
+    "h5py>=2.10.0",   # Lower minimum and install early
+    "pandas>=1.1.0",  # Lower minimum for better compatibility
     
-    # Machine learning
-    "scikit-learn>=1.3.0",
+    # Core plotting - relaxed constraints
+    "matplotlib>=3.3.0",  # Lower minimum for better compatibility
+    
+    # Astronomy libraries - relaxed constraints
+    "astropy>=4.0.0",     # Lower minimum for better compatibility
+    
+    # Machine learning - more flexible
+    "scikit-learn>=1.0.0",  # Lower minimum for better compatibility
     
     # Networking
     "requests>=2.25.0",
     
-    # GUI libraries - with platform-specific handling
-    "ttkbootstrap>=1.10.0",
-    
-    # Spectroscopy
-    "pyspeckit>=1.0.0",
-    
-    # Data handling
-    "h5py>=3.0.0",
-    "pandas>=1.3.0",
-    
-    # Image processing
+    # Image processing - early install
     "pillow>=8.0.0",
     
-    # Platform-specific dependencies
+    # GUI libraries - with better platform handling
+    "ttkbootstrap>=1.10.0",
+    
+    # Spectroscopy - more flexible
+    "pyspeckit>=0.1.20",  # More flexible version constraint
+    
+    # Platform-specific dependencies for Mac
     "tkinter-tooltip>=2.0.0; sys_platform == 'darwin'",
 ]
 

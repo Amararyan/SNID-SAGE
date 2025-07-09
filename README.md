@@ -31,7 +31,7 @@ snid_env\Scripts\activate
 source snid_env/bin/activate
 
 # Install SNID SAGE
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.2
+pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
 ```
 
 #### Using conda
@@ -41,7 +41,7 @@ conda create -n snid_sage python=3.10
 conda activate snid_sage
 
 # Install SNID SAGE
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.2
+pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
 ```
 
 ### Option 2: Global Installation
@@ -52,7 +52,7 @@ You can install SNID SAGE globally if you prefer not to activate a virtual envir
 - Is generally considered riskier for system stability
 
 ```bash
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.2
+pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
 ```
 
 **Note:** If you choose global installation, we recommend using `pip install --user` to install in your user directory rather than system-wide.

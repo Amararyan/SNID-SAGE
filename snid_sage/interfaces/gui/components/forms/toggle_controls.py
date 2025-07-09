@@ -101,8 +101,13 @@ class ToggleControlsComponent:
             if callback:
                 callback(variable.get())
         
-        # Bind click event
-        canvas.bind("<Button-1>", toggle_state)
+        # Bind click event with Mac-specific improvements
+        from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+        CrossPlatformWindowManager.setup_mac_event_bindings(
+            canvas, 
+            click_callback=toggle_state
+        )
+        canvas.bind("<Button-1>", toggle_state)  # Fallback for all platforms
         
         # Initial state
         update_toggle()
@@ -304,8 +309,17 @@ class ToggleControlsComponent:
             update_checkbox()
         
         # Bind click events
-        checkbox_canvas.bind("<Button-1>", toggle_checkbox)
-        label.bind("<Button-1>", toggle_checkbox)
+        # Improved click handling for Mac
+        CrossPlatformWindowManager.setup_mac_event_bindings(
+            checkbox_canvas, 
+            click_callback=toggle_checkbox
+        )
+        CrossPlatformWindowManager.setup_mac_event_bindings(
+            label, 
+            click_callback=toggle_checkbox
+        )
+        checkbox_canvas.bind("<Button-1>", toggle_checkbox)  # Fallback
+        label.bind("<Button-1>", toggle_checkbox)  # Fallback
         
         # Initial state
         update_checkbox()
@@ -395,8 +409,17 @@ class ToggleControlsComponent:
             variable.set(text)
         
         # Bind click events
-        radio_canvas.bind("<Button-1>", select_radio)
-        label.bind("<Button-1>", select_radio)
+        # Improved click handling for Mac
+        CrossPlatformWindowManager.setup_mac_event_bindings(
+            radio_canvas, 
+            click_callback=select_radio
+        )
+        CrossPlatformWindowManager.setup_mac_event_bindings(
+            label, 
+            click_callback=select_radio
+        )
+        radio_canvas.bind("<Button-1>", select_radio)  # Fallback
+        label.bind("<Button-1>", select_radio)  # Fallback
         
         # Initial state
         update_radio()
