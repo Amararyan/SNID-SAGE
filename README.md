@@ -15,15 +15,11 @@
 
 ## Quick Installation
 
-### Install from TestPyPI (Recommended)
+### Option 1: Virtual Environment (Recommended)
 
-```bash
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.1
-```
+We recommend using a virtual environment to avoid conflicts with other Python packages. This ensures a clean, isolated installation.
 
-### Virtual Environment Setup
-
-#### Using venv
+#### Using venv (Python's built-in virtual environment)
 ```bash
 # Create virtual environment
 python -m venv snid_env
@@ -48,18 +44,20 @@ conda activate snid_sage
 pip install -i https://test.pypi.org/simple/ snid-sage==1.2.1
 ```
 
-### Install from Source (Development)
+### Option 2: Global Installation
+
+You can install SNID SAGE globally if you prefer not to activate a virtual environment each time. However, this approach:
+- Uses only updated, compatible packages
+- May conflict with other Python packages
+- Is generally considered riskier for system stability
+
 ```bash
-# Clone the repository
-git clone https://github.com/FiorenSt/SNID-SAGE.git
-cd SNID-SAGE
-
-# Install in development mode
-pip install -e .
-
-# Optional: Install all features
-pip install -e ".[all]"
+pip install -i https://test.pypi.org/simple/ snid-sage==1.2.1
 ```
+
+**Note:** If you choose global installation, we recommend using `pip install --user` to install in your user directory rather than system-wide.
+
+
 
 ## Getting Started
 
@@ -83,18 +81,7 @@ snid batch "data/*.dat" templates/ --output-dir results/
 snid template list
 ```
 
-### Python API (For developers)
-```python
-from snid_sage.snid import run_snid
-from snid_sage.interfaces.llm import LLMIntegration
 
-# Traditional analysis
-results = run_snid('data/sn2003jo.dat', templates_dir='templates/')
-
-# AI-enhanced analysis (requires API key)
-llm = LLMIntegration()
-ai_summary = llm.analyze_results(results)
-```
 
 ## Documentation & Support
 
