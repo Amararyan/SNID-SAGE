@@ -369,7 +369,7 @@ class PlotController:
                                                  getattr(self.gui, 'theme_manager', None))
                         self.gui.ax.grid(True, alpha=0.3)
                         # Place legend in upper right for consistency
-                        self.gui.ax.legend(loc='upper right')
+                        self._safe_add_legend(self.gui.ax, loc='upper right')
                         
                         # Refresh canvas
                         if hasattr(self.gui, 'canvas'):
@@ -400,7 +400,7 @@ class PlotController:
                                              getattr(self.gui, 'theme_manager', None))
                     self.gui.ax.grid(True, alpha=0.3)
                     # Place legend in upper right for consistency
-                    self.gui.ax.legend(loc='upper right')
+                    self._safe_add_legend(self.gui.ax, loc='upper right')
                 else:
                     _LOGGER.debug("No original spectrum data available on startup (expected)")
                     self._show_no_data_message("Original spectrum data is invalid")
@@ -436,6 +436,26 @@ class PlotController:
                                fontsize=12, color='red')
         except Exception as e:
             _LOGGER.error(f"Error showing error message: {e}")
+
+    def _safe_add_legend(self, ax, loc='upper right'):
+        """Safely add legend only if there are labeled artists (prevents matplotlib warnings)."""
+        try:
+            if ax is None:
+                return
+            if hasattr(ax, 'get_legend_handles_labels'):
+                handles, labels = ax.get_legend_handles_labels()
+                valid_handles = []
+                valid_labels = []
+                for handle, label in zip(handles, labels):
+                    if label and not label.startswith('_'):
+                        valid_handles.append(handle)
+                        valid_labels.append(label)
+                if valid_handles and valid_labels:
+                    ax.legend(valid_handles, valid_labels, loc=loc)
+                # If no valid labels, don't add legend (prevents warning)
+        except Exception as e:
+            _LOGGER.debug(f"Error adding legend: {e}")
+            # Silently fail to avoid disrupting the main functionality
     
     def plot_flat_view(self):
         """Plot flattened view"""
@@ -509,7 +529,7 @@ class PlotController:
                                                  getattr(self.gui, 'theme_manager', None))
                         self.gui.ax.grid(True, alpha=0.3)
                         # Place legend in upper right for consistency
-                        self.gui.ax.legend(loc='upper right')
+                        self._safe_add_legend(self.gui.ax, loc='upper right')
                         
                         _LOGGER.debug("Flattened view plotted successfully")
                     else:
@@ -579,7 +599,7 @@ class PlotController:
                                          getattr(self.gui, 'theme_manager', None))
                 self.gui.ax.grid(True, alpha=0.3)
                 # Place legend in upper right for consistency
-                self.gui.ax.legend(loc='upper right')
+                self._safe_add_legend(self.gui.ax, loc='upper right')
                 
                 self._apply_plot_theme()
                 if hasattr(self.gui, 'canvas'):
