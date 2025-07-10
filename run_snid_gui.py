@@ -117,7 +117,6 @@ class FastGUILauncher:
         self.debug = args.debug
         self.root = None
         self.app = None
-        self.logo_image = None
         self.logger = None
         
         # Track loading progress
@@ -125,46 +124,16 @@ class FastGUILauncher:
         self.background_loading_done = False
         
         # Progress bar tracking
-        self.total_steps = 6  # Number of distinct loading phases we update for
+        self.total_steps = 7  # Number of distinct loading phases we update for (including version check)
         self.progress_index = 0  # Current completed step count
+        
+        # Version checking
+        self.version_check_result = None
         
     def log(self, message):
         """Log message if verbose mode enabled"""
         if self.verbose:
             print(f"🚀 {message}")
-    
-    def load_logo_image(self):
-        """Load the SNID SAGE logo for the loading screen"""
-        try:
-            # Try to load the main logo
-            logo_paths = [
-                "images/icon.png",
-                "images/light.png", 
-                "images/dark.png",
-                "images/icon_dark.png"
-            ]
-            
-            for logo_path in logo_paths:
-                if Path(logo_path).exists():
-                    try:
-                        from PIL import Image, ImageTk
-                        # Load and resize image for loading screen
-                        img = Image.open(logo_path)
-                        # Resize to a smaller footprint so the splash screen stays compact
-                        img = img.resize((160, 160), Image.Resampling.LANCZOS)
-                        self.logo_image = ImageTk.PhotoImage(img)
-                        self.log(f"Loaded logo from {logo_path}")
-                        return
-                    except ImportError:
-                        # PIL not available, continue without logo
-                        self.log("PIL not available, using text logo")
-                        return
-                    except Exception as e:
-                        self.log(f"Error loading logo from {logo_path}: {e}")
-                        continue
-                        
-        except Exception as e:
-            self.log(f"Error in logo loading: {e}")
     
     def show_minimal_gui(self):
         """Show minimal GUI window immediately with proper DPI setup"""
@@ -183,27 +152,10 @@ class FastGUILauncher:
         self.root.geometry("900x600")
         self.root.minsize(800, 550)
         
-        # Try to set window icon
-        try:
-            icon_path = Path("images/icon.ico")
-            if icon_path.exists():
-                self.root.iconbitmap(str(icon_path))
-            else:
-                # Try PNG icon
-                png_icon_path = Path("images/icon.png")
-                if png_icon_path.exists():
-                    from PIL import Image, ImageTk
-                    img = Image.open(png_icon_path)
-                    img = img.resize((32, 32), Image.Resampling.LANCZOS)
-                    icon = ImageTk.PhotoImage(img)
-                    self.root.iconphoto(True, icon)
-        except Exception as e:
-            self.log(f"Could not set window icon: {e}")
+        # OPTIMIZATION: Defer icon loading to after window is shown
+        # Window icon is not critical for immediate appearance
         
-        # Load logo for display
-        self.load_logo_image()
-        
-        # Create loading screen with better styling
+        # Create loading screen with better styling FIRST
         loading_frame = tk.Frame(self.root, bg='#1e1e1e')
         loading_frame.pack(fill='both', expand=True, padx=40, pady=40)
         
@@ -211,11 +163,28 @@ class FastGUILauncher:
         spacer_logo = tk.Frame(loading_frame, height=60, bg='#1e1e1e')
         spacer_logo.pack()
         
+        # OPTIMIZATION: Use system fonts or fall back gracefully
+        try:
+            title_font = ('Segoe UI', 32, 'bold')
+            subtitle_font = ('Segoe UI', 14)
+            status_font = ('Segoe UI', 11)
+            version_font = ('Segoe UI', 12)
+            progress_font = ("Consolas", 12)
+            tip_font = ('Segoe UI', 9)
+        except:
+            # Fallback to default system fonts if Segoe UI not available
+            title_font = ('Arial', 32, 'bold')
+            subtitle_font = ('Arial', 14)
+            status_font = ('Arial', 11)
+            version_font = ('Arial', 12)
+            progress_font = ("Courier", 12)
+            tip_font = ('Arial', 9)
+        
         # Re-introduce writing (title, version, subtitle)
         title_label = tk.Label(
             loading_frame,
             text="SNID-SAGE",
-            font=('Segoe UI', 32, 'bold'),
+            font=title_font,
             fg='#ffffff',
             bg='#1e1e1e'
         )
@@ -224,7 +193,7 @@ class FastGUILauncher:
         version_label = tk.Label(
             loading_frame,
             text="v1.0.0",
-            font=('Segoe UI', 12),
+            font=version_font,
             fg='#888888',
             bg='#1e1e1e'
         )
@@ -233,7 +202,7 @@ class FastGUILauncher:
         subtitle_label = tk.Label(
             loading_frame,
             text="SuperNova IDentification – Spectral Analysis with Guided Expertise",
-            font=('Segoe UI', 14),
+            font=subtitle_font,
             fg='#cccccc',
             bg='#1e1e1e'
         )
@@ -243,7 +212,7 @@ class FastGUILauncher:
         self.status_label = tk.Label(
             loading_frame,
             text="🚀 Initializing...",
-            font=('Segoe UI', 11),
+            font=status_font,
             fg='#4CAF50',
             bg='#1e1e1e',
             anchor='center'
@@ -256,7 +225,7 @@ class FastGUILauncher:
         self.progress_bar_label = tk.Label(
             loading_frame,
             text="░" * self._bar_length,
-            font=("Consolas", 12),
+            font=progress_font,
             fg="#4CAF50",
             bg="#1e1e1e",
         )
@@ -269,7 +238,7 @@ class FastGUILauncher:
         tip_label = tk.Label(
             loading_frame,
             text="🔬 Preparing spectrum analysis tools...",
-            font=('Segoe UI', 9),
+            font=tip_font,
             fg='#888888',
             bg='#1e1e1e'
         )
@@ -304,7 +273,29 @@ class FastGUILauncher:
         window_time = time.time() - start_time
         self.log(f"Minimal GUI window created in {window_time:.3f}s")
         
+        # OPTIMIZATION: Defer non-critical operations to after window is shown
+        self.root.after(50, self._setup_window_icon_deferred)
+        
         return self.root
+    
+    def _setup_window_icon_deferred(self):
+        """Set up window icon after the window is already visible"""
+        try:
+            icon_path = Path("images/icon.ico")
+            if icon_path.exists():
+                self.root.iconbitmap(str(icon_path))
+            else:
+                # Try PNG icon
+                png_icon_path = Path("images/icon.png")
+                if png_icon_path.exists():
+                    from PIL import Image, ImageTk
+                    img = Image.open(png_icon_path)
+                    img = img.resize((32, 32), Image.Resampling.LANCZOS)
+                    icon = ImageTk.PhotoImage(img)
+                    self.root.iconphoto(True, icon)
+            self.log("Window icon set successfully")
+        except Exception as e:
+            self.log(f"Could not set window icon: {e}")
     
     def update_progress(self, status, progress_text):
         """Update loading progress"""
@@ -338,6 +329,10 @@ class FastGUILauncher:
                 self.log("Logging configured")
             except ImportError:
                 self.log("Logging system not available (using fallback)")
+            
+            # Check for updates (async, won't block loading)
+            self.update_progress("🔄 Checking for updates...", "▓▓▓▓▓░░░░░ Checking latest version...")
+            self.start_version_check()
             
             # Load matplotlib
             self.update_progress("📊 Loading matplotlib...", "▓▓▓▓▓▓░░░░ Loading plotting libraries...")
@@ -393,6 +388,63 @@ class FastGUILauncher:
             # Show error dialog
             self.root.after(100, lambda: messagebox.showerror("Loading Error", 
                 f"Error loading SNID components:\n{e}\n\nTry restarting or check installation."))
+    
+    def start_version_check(self):
+        """Start asynchronous version checking"""
+        try:
+            from snid_sage.shared.utils.version_checker import VersionChecker
+            
+            checker = VersionChecker(timeout=3.0)  # Quick timeout for startup
+            checker.check_for_updates_async(self.on_version_check_complete)
+            self.log("Version check started asynchronously")
+            
+        except ImportError:
+            self.log("Version checker not available")
+        except Exception as e:
+            self.log(f"Error starting version check: {e}")
+    
+    def on_version_check_complete(self, version_info):
+        """Called when version check completes"""
+        try:
+            self.version_check_result = version_info
+            
+            if version_info.get('update_available', False):
+                current = version_info['current_version']
+                latest = version_info['latest_version']
+                self.log(f"Update available: {current} -> {latest}")
+                
+                # Schedule showing update dialog after GUI is ready
+                if self.root:
+                    self.root.after(2000, lambda: self.show_update_dialog(version_info))
+            elif version_info.get('error'):
+                self.log(f"Version check error: {version_info['error']}")
+            else:
+                self.log("Version is up to date")
+                
+        except Exception as e:
+            self.log(f"Error processing version check result: {e}")
+    
+    def show_update_dialog(self, version_info):
+        """Show update notification dialog"""
+        try:
+            from snid_sage.shared.utils.version_checker import format_update_message
+            
+            message = format_update_message(version_info)
+            
+            # Create a simple info dialog
+            result = messagebox.askyesno(
+                "Update Available",
+                f"{message}\n\nWould you like to open the upgrade instructions?",
+                icon='info'
+            )
+            
+            if result:
+                # Open documentation or PyPI page
+                import webbrowser
+                webbrowser.open("https://pypi.org/project/snid-sage/")
+                
+        except Exception as e:
+            self.log(f"Error showing update dialog: {e}")
     
     def check_dependencies_fast(self):
         """Lightweight dependency check without heavy imports"""
@@ -474,6 +526,15 @@ class FastGUILauncher:
         
         # Step 2: Show minimal GUI immediately
         root = self.show_minimal_gui()
+        
+        # PERFORMANCE CHECK: Ensure window appeared quickly
+        window_time = time.time() - start_time
+        if window_time > 2.0:  # If window took more than 2 seconds
+            self.log(f"⚠️ Window appearance took {window_time:.3f}s (slower than expected)")
+        elif window_time < 0.5:  # Very fast
+            self.log(f"🚀 Window appeared in {window_time:.3f}s (excellent)")
+        else:  # Normal range
+            self.log(f"✅ Window appeared in {window_time:.3f}s (good)")
         
         # Step 3: Start background loading
         loading_thread = threading.Thread(target=self.load_components_background, daemon=True)

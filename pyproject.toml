@@ -53,9 +53,18 @@ dependencies = [
     
     # Image processing - early install
     "pillow>=8.0.0",
-    
+
+    # Games and multimedia support – required for the built-in mini-games and sound handling
+    "pygame>=2.3.0",
+
+    # Fallback Tk bindings for environments where the standard tkinter bundle is absent (e.g. many minimal Linux distributions)
+    "tk>=0.1.0",
+
     # GUI libraries - with better platform handling
     "ttkbootstrap>=1.10.0",
+    
+    # Version checking
+    "packaging>=20.0",
     
     # Platform-specific dependencies for Mac
     "tkinter-tooltip>=2.0.0; sys_platform == 'darwin'",
@@ -106,8 +115,8 @@ Repository = "https://github.com/FiorenSt/SNID-SAGE.git"
 
 [project.scripts]
 snid = "snid_sage.interfaces.cli.main:main"
-snid-gui = "snid_sage.interfaces.gui.sage_gui:main"
-snid-sage = "snid_sage.interfaces.gui.sage_gui:main"
+snid-gui = "snid_sage.interfaces.gui.launcher:main"
+snid-sage = "snid_sage.interfaces.gui.launcher:main"
 snid-template = "snid_sage.interfaces.cli.template:main"
 
 [tool.setuptools]

@@ -39,17 +39,40 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
     Returns:
         Configured tk.Button widget
     """
-    # Get platform info for macOS-specific handling
+    # Get platform info for platform-specific handling
     try:
         from snid_sage.shared.utils.config.platform_config import get_platform_config
         platform_config = get_platform_config()
         is_macos = platform_config and platform_config.is_macos
+        is_linux = platform_config and platform_config.is_linux
     except:
         is_macos = False
+        is_linux = False
     
     # Extract color-related kwargs
     bg_color = kwargs.pop('bg', 'white')
     fg_color = kwargs.pop('fg', 'black')
+    
+    # Linux-specific adjustments to prevent text cutting
+    if is_linux:
+        # Reduce font size for Linux to prevent text overflow
+        if 'font' in kwargs:
+            font_tuple = kwargs['font']
+            if isinstance(font_tuple, tuple) and len(font_tuple) >= 2:
+                # Reduce font size by 1-2 points for Linux
+                font_size = max(10, font_tuple[1] - 1)  # Minimum 10px
+                kwargs['font'] = (font_tuple[0], font_size, font_tuple[2] if len(font_tuple) > 2 else 'normal')
+        
+        # Increase padding for Linux buttons
+        if 'padx' not in kwargs:
+            kwargs['padx'] = 15  # Default 15px horizontal padding for Linux
+        else:
+            kwargs['padx'] = max(kwargs['padx'], 15)  # Ensure minimum 15px
+            
+        if 'pady' not in kwargs:
+            kwargs['pady'] = 10  # Default 10px vertical padding for Linux
+        else:
+            kwargs['pady'] = max(kwargs['pady'], 10)  # Ensure minimum 10px
     
     # Base configuration
     base_config = {
@@ -708,11 +731,20 @@ class LayoutUtils:
         load_frame = tk.Frame(parent, bg=gui_instance.theme_manager.get_color('bg_secondary'))
         load_frame.pack(fill='x', pady=(0, 6))
         
+        # Get platform-specific font size for Linux
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            is_linux = platform_config and platform_config.is_linux
+            button_font_size = 13 if is_linux else 14  # Smaller font for Linux
+        except:
+            button_font_size = 14
+        
         # File selection button - Always enabled, always grey
         gui_instance.load_btn = create_cross_platform_button(
             load_frame, 
             text="📁 Load Spectrum File",
-            font=('Segoe UI', 14, 'bold'),
+            font=('Segoe UI', button_font_size, 'bold'),
             command=lambda: gui_instance.file_controller.browse_file() if hasattr(gui_instance, 'file_controller') else None,
             bg=gui_instance.theme_manager.get_color('button_bg'),
             fg='white',
@@ -743,6 +775,15 @@ class LayoutUtils:
         galaxy_frame = tk.Frame(parent, bg=gui_instance.theme_manager.get_color('bg_secondary'))
         galaxy_frame.pack(fill='x', pady=(6, 6))
         
+        # Get platform-specific font size for Linux
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            is_linux = platform_config and platform_config.is_linux
+            button_font_size = 13 if is_linux else 14  # Smaller font for Linux
+        except:
+            button_font_size = 14
+        
         # Galaxy analysis buttons row
         galaxy_row = tk.Frame(galaxy_frame, bg=gui_instance.theme_manager.get_color('bg_secondary'))
         galaxy_row.pack(fill='x', pady=(0, 0))  # Keep container flush; button controls spacing
@@ -751,7 +792,7 @@ class LayoutUtils:
         gui_instance.redshift_selection_btn = create_cross_platform_button(
             galaxy_row, 
             text="🌌 Redshift Selection",
-            font=('Segoe UI', 14, 'bold'),
+            font=('Segoe UI', button_font_size, 'bold'),
             command=gui_instance.open_redshift_selection,
             bg=gui_instance.theme_manager.get_color('button_bg'),
             fg='white',
@@ -792,11 +833,20 @@ class LayoutUtils:
         preprocess_frame = tk.Frame(parent, bg=gui_instance.theme_manager.get_color('bg_secondary'))
         preprocess_frame.pack(fill='x', pady=(6, 6))
         
+        # Get platform-specific font size for Linux
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            is_linux = platform_config and platform_config.is_linux
+            button_font_size = 13 if is_linux else 14  # Smaller font for Linux
+        except:
+            button_font_size = 14
+        
         # Single Preprocessing button
         gui_instance.preprocess_btn = create_cross_platform_button(
             preprocess_frame, 
             text="🔧 Preprocess Spectrum",
-            font=('Segoe UI', 14, 'bold'),
+            font=('Segoe UI', button_font_size, 'bold'),
             command=gui_instance.open_preprocessing_selection,
             bg=gui_instance.theme_manager.get_color('button_bg'),
             fg='white',
@@ -836,11 +886,20 @@ class LayoutUtils:
     @staticmethod
     def _create_configuration_section(gui_instance, parent):
         """Create configuration section - now combined with analysis"""
+        # Get platform-specific font size for Linux
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            is_linux = platform_config and platform_config.is_linux
+            button_font_size = 13 if is_linux else 14  # Smaller font for Linux
+        except:
+            button_font_size = 14
+        
         # Single Analysis button - no header, pushed higher
         gui_instance.analysis_btn = create_cross_platform_button(
             parent, 
             text="🚀 Run Analysis",
-            font=('Segoe UI', 14, 'bold'),
+            font=('Segoe UI', button_font_size, 'bold'),
             command=gui_instance.open_snid_analysis_dialog,
             bg=gui_instance.theme_manager.get_color('button_bg'),
             fg='white',
@@ -889,11 +948,20 @@ class LayoutUtils:
     @staticmethod
     def _create_emission_line_section(gui_instance, parent):
         """Create emission line overlay section"""
+        # Get platform-specific font size for Linux
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            is_linux = platform_config and platform_config.is_linux
+            button_font_size = 13 if is_linux else 14  # Smaller font for Linux
+        except:
+            button_font_size = 14
+        
         # Emission line overlay button – uniform spacing like other workflow buttons
         gui_instance.emission_line_overlay_btn = create_cross_platform_button(
             parent, 
             text="🔬 SN Emission Line Analysis",
-            font=('Segoe UI', 14, 'bold'),
+            font=('Segoe UI', button_font_size, 'bold'),
             command=gui_instance.open_emission_line_overlay,
             bg=gui_instance.theme_manager.get_color('button_bg'),
             fg='white',
@@ -919,6 +987,15 @@ class LayoutUtils:
     @staticmethod
     def _create_chat_section(gui_instance, parent):
         """Create chat with AI section"""
+        # Get platform-specific font size for Linux
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            is_linux = platform_config and platform_config.is_linux
+            button_font_size = 13 if is_linux else 14  # Smaller font for Linux
+        except:
+            button_font_size = 14
+        
         # Uniform spacing for chat section
         chat_frame = tk.Frame(parent, bg=gui_instance.theme_manager.get_color('bg_secondary'))
         chat_frame.pack(fill='x', pady=(6, 6))
@@ -927,7 +1004,7 @@ class LayoutUtils:
         gui_instance.ai_assistant_btn = create_cross_platform_button(
             chat_frame,
             text="🤖 AI Assistant",
-            font=('Segoe UI', 14, 'bold'),
+            font=('Segoe UI', button_font_size, 'bold'),
             command=lambda: gui_instance._show_enhanced_ai_assistant() if hasattr(gui_instance, '_show_enhanced_ai_assistant') else None,
             bg=gui_instance.theme_manager.get_color('button_bg'),
             fg='white',

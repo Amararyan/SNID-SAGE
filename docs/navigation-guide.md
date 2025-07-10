@@ -21,7 +21,7 @@ A comprehensive guide to navigating the SNID SAGE documentation, organized from 
 ### Power Users & Developers
 1. **[CLI Reference](cli/command-reference.md)** → Complete command documentation
 2. **[Batch Processing](cli/batch-processing.md)** → Automated workflows
-3. **[API Reference](dev/api-reference.md)** → Programming interface
+3. **[API Reference (Programming)](reference/api-reference.md)** → Programming interface
 4. **[Custom Templates](data/custom-templates.md)** → Creating templates
 5. **[Contributing Guide](dev/contributing.md)** → Development guidelines
 
@@ -95,7 +95,7 @@ SNID SAGE Documentation
 **Documentation Flow:**
 1. [CLI Reference](cli/command-reference.md)
 2. [Batch Processing](cli/batch-processing.md) → [Optimization](cli/batch-optimization.md)
-3. [API Reference](dev/api-reference.md)
+3. [API Reference (Programming)](reference/api-reference.md)
 4. [Advanced Workflows](tutorials/advanced-workflows.md)
 5. [Custom Templates](data/custom-templates.md)
 6. [Contributing](dev/contributing.md)
@@ -105,7 +105,7 @@ SNID SAGE Documentation
 ### Data Management
 - **Input**: [Supported Formats](data/supported-formats.md) → [Data Preparation](data/data-preparation.md)
 - **Templates**: [Template Library](data/template-library.md) → [Custom Templates](data/custom-templates.md)
-- **Output**: [Results Format](dev/api-reference.md#results) → [Export Options](cli/command-reference.md#output-files)
+- **Output**: [Results Format](reference/api-reference.md#results) → [Export Options](cli/command-reference.md#output-files)
 
 ### Analysis Techniques
 - **Basic**: [First Analysis](quickstart/first-analysis.md) → [Basic Tutorial](tutorials/basic-analysis.md)
@@ -133,7 +133,7 @@ SNID SAGE Documentation
 
 ### Understanding SNID Algorithm
 1. **Theory**: [SNID Overview](index.md) → [Cross-Correlation](tutorials/advanced-analysis.md#correlation)
-2. **Implementation**: [API Reference](dev/api-reference.md) → [Source Code](dev/contributing.md)
+2. **Implementation**: [API Reference (Programming)](reference/api-reference.md) → [Source Code](dev/contributing.md)
 3. **Optimization**: [Performance Guide](reference/performance-tuning.md)
 
 ### Supernova Classification
@@ -145,14 +145,14 @@ SNID SAGE Documentation
 1. **CLI**: [Command Reference](cli/command-reference.md)
 2. **Batch**: [Batch Processing](cli/batch-processing.md)
 3. **Scripts**: [Advanced Workflows](tutorials/advanced-workflows.md)
-4. **API**: [Programming Interface](dev/api-reference.md)
+4. **API**: [Programming Interface](reference/api-reference.md)
 
 ## Reference Quick Links
 
 ### Commands & Functions
 - **CLI Commands**: [identify](cli/command-reference.md#identify) | [batch](cli/command-reference.md#batch) | [template](cli/command-reference.md#template) | [config](cli/command-reference.md#config)
-- **Core Functions**: [run_snid](dev/api-reference.md#run_snid) | [preprocess_spectrum](dev/api-reference.md#preprocess) | [run_snid_analysis](dev/api-reference.md#analysis)
-- **I/O Functions**: [read_spectrum](dev/api-reference.md#io) | [load_templates](dev/api-reference.md#templates) | [write_result](dev/api-reference.md#output)
+- **Core Functions**: [run_snid](reference/api-reference.md#run_snid) | [preprocess_spectrum](reference/api-reference.md#preprocess) | [run_snid_analysis](reference/api-reference.md#analysis)
+- **I/O Functions**: [read_spectrum](reference/api-reference.md#io) | [load_templates](reference/api-reference.md#templates) | [write_result](reference/api-reference.md#output)
 
 ### Configuration Options
 - **Analysis**: [Parameters](tutorials/configuration-guide.md#analysis) | [Templates](tutorials/configuration-guide.md#templates)
@@ -190,7 +190,7 @@ SNID SAGE Documentation
 
 #### Automate workflows
 - Batch analysis: [Batch Processing](cli/batch-processing.md)
-- Custom scripts: [API Usage](dev/api-reference.md)
+- Custom scripts: [API Usage](reference/api-reference.md)
 - Pipeline integration: [Advanced Workflows](tutorials/advanced-workflows.md)
 
 #### Contribute or extend
@@ -211,7 +211,7 @@ SNID SAGE Documentation
 6. **[Tutorials](tutorials/)** - Step-by-step guides
 
 ### Technical Reference (Deep Details)
-7. **[API Documentation](dev/api-reference.md)** - Programming
+7. **[API Documentation](reference/api-reference.md)** - Programming
 8. **[Data Formats](data/supported-formats.md)** - File specifications
 9. **[Template System](data/template-library.md)** - Template details
 

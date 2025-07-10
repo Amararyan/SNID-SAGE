@@ -32,6 +32,12 @@ try:
 except ImportError:
     HAS_TEMPLATE_SUPPORT = False
 
+# Import template finder for robust path discovery
+try:
+    from snid_sage.shared.utils.simple_template_finder import find_templates_directory as _find_templates_directory
+except ImportError:
+    _find_templates_directory = None
+
 
 class ModernSNIDOptionsDialog:
     """
@@ -910,6 +916,24 @@ class TemplateSelectionDialog:
                     templates_dir = template_dir
                     break
         
+        # After basic discovery, ensure the directory really contains template files
+        if templates_dir and os.path.exists(templates_dir):
+            # Validate presence of template files (.hdf5 or .lnw)
+            has_templates = any(fname.endswith(('.hdf5', '.lnw')) for fname in os.listdir(templates_dir))
+            if not has_templates:
+                _LOGGER.debug(f"Path {templates_dir} exists but contains no template files. Looking elsewhere…")
+                templates_dir = None
+
+        if (not templates_dir or not os.path.exists(templates_dir)) and _find_templates_directory is not None:
+            try:
+                discovered_dir = _find_templates_directory()
+                if discovered_dir and os.path.exists(discovered_dir):
+                    templates_dir = str(discovered_dir)
+                    _LOGGER.info(f"✅ Using fallback templates directory: {templates_dir}")
+            except Exception as _e:
+                _LOGGER.debug(f"Template finder fallback failed: {_e}")
+
+        # Final guard – bail if we still have nothing usable
         if not templates_dir or not os.path.exists(templates_dir):
             return
             
@@ -1051,6 +1075,47 @@ class TemplateSelectionDialog:
         self.available_listbox.pack(side='left', fill='both', expand=True)
         left_scrollbar.pack(side='right', fill='y')
         
+        # Selected templates (right)
+        right_frame = tk.Frame(lists_frame, bg='#f8fafc')
+        right_frame.pack(side='right', fill='both', expand=True, padx=(10, 0))
+        
+        self.right_label = tk.Label(right_frame, text="✅ Selected Templates (0)",
+                                   font=('Segoe UI', 12, 'bold'),
+                                   bg='#f8fafc', fg='#1e293b')
+        self.right_label.pack(anchor='w')
+        
+        # Selected listbox with scrollbar
+        right_list_frame = tk.Frame(right_frame, bg='#f8fafc')
+        right_list_frame.pack(fill='both', expand=True, pady=(5, 0))
+        
+        self.selected_listbox = tk.Listbox(right_list_frame, font=('Segoe UI', 10),
+                                         relief='solid', bd=1, selectmode='extended')
+        right_scrollbar = tk.Scrollbar(right_list_frame, orient='vertical')
+        self.selected_listbox.config(yscrollcommand=right_scrollbar.set)
+        right_scrollbar.config(command=self.selected_listbox.yview)
+        
+        self.selected_listbox.pack(side='left', fill='both', expand=True)
+        right_scrollbar.pack(side='right', fill='y')
+
+        # ---------------------------
+        # 🌟 Increase font sizes for readability
+        # ---------------------------
+        larger_label_font = ('Segoe UI', 14, 'bold')
+        medium_font = ('Segoe UI', 12)
+        listbox_font = ('Segoe UI', 12)
+
+        search_label.config(font=larger_label_font)
+        mode_label.config(font=larger_label_font)
+        left_label.config(font=larger_label_font)
+        self.right_label.config(font=larger_label_font)
+
+        search_entry.config(font=medium_font)
+        mode_option.config(font=('Segoe UI', 13))
+
+        self.available_listbox.config(font=listbox_font)
+        self.selected_listbox.config(font=listbox_font)
+        # ---------------------------
+        
         # Control buttons (center)
         button_frame = tk.Frame(lists_frame, bg='#f8fafc', width=120)
         button_frame.pack(side='left', fill='y', padx=10)
@@ -1087,28 +1152,6 @@ class TemplateSelectionDialog:
                                   relief='raised', bd=2, padx=15, pady=8,
                                   cursor='hand2', command=self._remove_all)
         remove_all_btn.pack(pady=5)
-        
-        # Selected templates (right)
-        right_frame = tk.Frame(lists_frame, bg='#f8fafc')
-        right_frame.pack(side='right', fill='both', expand=True, padx=(10, 0))
-        
-        self.right_label = tk.Label(right_frame, text="✅ Selected Templates (0)",
-                                   font=('Segoe UI', 12, 'bold'),
-                                   bg='#f8fafc', fg='#1e293b')
-        self.right_label.pack(anchor='w')
-        
-        # Selected listbox with scrollbar
-        right_list_frame = tk.Frame(right_frame, bg='#f8fafc')
-        right_list_frame.pack(fill='both', expand=True, pady=(5, 0))
-        
-        self.selected_listbox = tk.Listbox(right_list_frame, font=('Segoe UI', 10),
-                                         relief='solid', bd=1, selectmode='extended')
-        right_scrollbar = tk.Scrollbar(right_list_frame, orient='vertical')
-        self.selected_listbox.config(yscrollcommand=right_scrollbar.set)
-        right_scrollbar.config(command=self.selected_listbox.yview)
-        
-        self.selected_listbox.pack(side='left', fill='both', expand=True)
-        right_scrollbar.pack(side='right', fill='y')
         
         # Double-click bindings
         self.available_listbox.bind('<Double-Button-1>', lambda e: self._add_selected())

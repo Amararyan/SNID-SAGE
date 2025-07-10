@@ -146,6 +146,11 @@ class UnifiedFontManager:
             FontCategory.PLOT_ANNOTATION: 10,   # Plot annotations
         }
         
+        # Linux-specific adjustments to prevent button text cutting
+        if self.is_linux:
+            # Reduce button font size for Linux to prevent overflow
+            base_sizes[FontCategory.BUTTON] = 11  # Reduced from 12 to 11 for Linux
+        
         # Apply all scaling factors
         total_scale = (self.platform_adjustment * 
                       self.dpi_scale_factor * 

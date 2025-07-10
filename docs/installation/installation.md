@@ -18,18 +18,16 @@ This guide provides comprehensive instructions for installing SNID SAGE on your 
 
 ## Quick Installation
 
-### Recommended Method: Install from TestPyPI
-
-SNID SAGE is available on TestPyPI. This is the preferred installation method:
+Install the latest stable release from PyPI:
 
 ```bash
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+pip install snid-sage
 ```
 
-For installation with all optional features:
+For optional extras (GUI, LLM, development tools):
 
 ```bash
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3 --extra-index-url https://pypi.org/simple
+pip install "snid-sage[all]"
 ```
 
 ### Virtual Environment Setup

@@ -305,13 +305,21 @@ class ImprovedButtonWorkflow:
 # Convenience functions for integration
 def create_workflow_button(parent, text, font, command, button_name, workflow_system):
     """Create a button that's automatically registered with the workflow system"""
-    # Get platform info for macOS-specific handling
+    # Get platform info for platform-specific handling
     try:
         from snid_sage.shared.utils.config.platform_config import get_platform_config
         platform_config = get_platform_config()
         is_macos = platform_config and platform_config.is_macos
+        is_linux = platform_config and platform_config.is_linux
     except:
         is_macos = False
+        is_linux = False
+    
+    # Linux-specific font size adjustment
+    if is_linux and isinstance(font, tuple) and len(font) >= 2:
+        # Reduce font size by 1 point for Linux to prevent text cutting
+        font_size = max(10, font[1] - 1)  # Minimum 10px
+        font = (font[0], font_size, font[2] if len(font) > 2 else 'normal')
     
     if is_macos:
         # macOS-specific button creation
