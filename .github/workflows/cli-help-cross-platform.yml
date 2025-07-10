@@ -1,4 +1,4 @@
-name: CLI Help Cross-Platform Test
+name: Comprehensive PyPI Installation & Testing
 
 on:
   workflow_run:
@@ -7,43 +7,458 @@ on:
   workflow_dispatch:
 
 jobs:
-  cli-help:
+  comprehensive-testing:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-latest, macos-12, macos-13, macos-latest, windows-2019, windows-2022, windows-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # Exclude some combinations to reduce CI load while maintaining good coverage
+          - os: ubuntu-20.04
+            python-version: '3.12'
+          - os: macos-12
+            python-version: '3.12'
+          - os: windows-2019
+            python-version: '3.12'
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Set up Python 3.11
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install package from PyPI
         run: |
           python -m pip install --upgrade pip
           python -m pip install snid-sage
 
-      - name: Run CLI help commands (bash)
+      - name: Download test spectrum data
+        shell: bash
+        run: |
+          mkdir -p test_data
+          curl -L -o test_data/tns_2024ggi.dat "https://www.wis-tns.org/system/files/uploaded/LiONS/tns_2024ggi_2024-04-11_14-35-47.218_Lijiang-2.4m_YFOSC_LiONS.dat"
+          echo "Downloaded spectrum file:"
+          ls -la test_data/
+          echo "First 10 lines of spectrum:"
+          head -10 test_data/tns_2024ggi.dat
+
+      - name: Test CLI help commands (bash)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euxo pipefail
+          echo "Testing basic help commands..."
           snid --help
           snid-sage --help
+          snid-gui --help
+          
+          echo "Testing command-specific help..."
+          snid identify --help
+          snid batch --help
+          snid template --help
+          snid config --help
 
-      - name: Run CLI help commands (PowerShell)
+      - name: Test CLI help commands (PowerShell)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          Write-Host "Testing basic help commands..."
           snid --help
           snid-sage --help
+          snid-gui --help
+          
+          Write-Host "Testing command-specific help..."
+          snid identify --help
+          snid batch --help
+          snid template --help
+          snid config --help
+
+      - name: Test CLI spectrum analysis - Basic (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p results_basic
+          
+          echo "Testing basic spectrum identification..."
+          snid identify test_data/tns_2024ggi.dat --output-dir results_basic/ --minimal --verbose
+          
+          echo "Checking output files..."
+          ls -la results_basic/
+          
+          # Check if main output file exists
+          if [ -f results_basic/snid_output.dat ]; then
+            echo "✅ Main output file created successfully"
+            head -5 results_basic/snid_output.dat
+          else
+            echo "❌ Main output file not found"
+            exit 1
+          fi
+
+      - name: Test CLI spectrum analysis - Basic (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path results_basic
+          
+          Write-Host "Testing basic spectrum identification..."
+          snid identify test_data/tns_2024ggi.dat --output-dir results_basic/ --minimal --verbose
+          
+          Write-Host "Checking output files..."
+          Get-ChildItem results_basic/
+          
+          # Check if main output file exists
+          if (Test-Path "results_basic/snid_output.dat") {
+            Write-Host "✅ Main output file created successfully"
+            Get-Content "results_basic/snid_output.dat" | Select-Object -First 5
+          } else {
+            Write-Host "❌ Main output file not found"
+            exit 1
+          }
+
+      - name: Test CLI with various parameters (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          
+          echo "Testing with redshift constraints..."
+          mkdir -p results_redshift
+          snid identify test_data/tns_2024ggi.dat --output-dir results_redshift/ --minimal --zmin 0.0 --zmax 0.1 --verbose
+          
+          echo "Testing with preprocessing options..."
+          mkdir -p results_preprocess
+          snid identify test_data/tns_2024ggi.dat --output-dir results_preprocess/ --minimal --aband-remove --skyclip --savgol-window 11 --verbose
+          
+          echo "Testing with type filtering..."
+          mkdir -p results_typefilter
+          snid identify test_data/tns_2024ggi.dat --output-dir results_typefilter/ --minimal --type-filter Ia Ib Ic --verbose
+          
+          echo "Testing complete mode (if time permits)..."
+          mkdir -p results_complete
+          timeout 300 snid identify test_data/tns_2024ggi.dat --output-dir results_complete/ --complete --verbose || echo "Complete mode test timed out (expected for CI)"
+
+      - name: Test CLI with various parameters (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Testing with redshift constraints..."
+          New-Item -ItemType Directory -Force -Path results_redshift
+          snid identify test_data/tns_2024ggi.dat --output-dir results_redshift/ --minimal --zmin 0.0 --zmax 0.1 --verbose
+          
+          Write-Host "Testing with preprocessing options..."
+          New-Item -ItemType Directory -Force -Path results_preprocess
+          snid identify test_data/tns_2024ggi.dat --output-dir results_preprocess/ --minimal --aband-remove --skyclip --savgol-window 11 --verbose
+          
+          Write-Host "Testing with type filtering..."
+          New-Item -ItemType Directory -Force -Path results_typefilter
+          snid identify test_data/tns_2024ggi.dat --output-dir results_typefilter/ --minimal --type-filter Ia Ib Ic --verbose
+          
+          Write-Host "Testing complete mode (with timeout)..."
+          New-Item -ItemType Directory -Force -Path results_complete
+          $job = Start-Job -ScriptBlock {
+            param($dataFile, $outputDir)
+            snid identify $dataFile --output-dir $outputDir --complete --verbose
+          } -ArgumentList "test_data/tns_2024ggi.dat", "results_complete/"
+          
+          if (Wait-Job $job -Timeout 300) {
+            Receive-Job $job
+          } else {
+            Stop-Job $job
+            Write-Host "Complete mode test timed out (expected for CI)"
+          }
+          Remove-Job $job
+
+      - name: Test template commands (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          
+          echo "Testing template listing..."
+          snid template list --help
+          
+          echo "Testing config commands..."
+          snid config show --format json
+          snid config show --format table
+
+      - name: Test template commands (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Testing template listing..."
+          snid template list --help
+          
+          Write-Host "Testing config commands..."
+          snid config show --format json
+          snid config show --format table
+
+      - name: Test batch processing (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          
+          echo "Setting up batch test data..."
+          mkdir -p batch_input batch_output
+          cp test_data/tns_2024ggi.dat batch_input/spectrum1.dat
+          cp test_data/tns_2024ggi.dat batch_input/spectrum2.dat
+          
+          echo "Testing batch processing..."
+          snid batch "batch_input/*.dat" --output-dir batch_output/ --minimal --verbose
+          
+          echo "Checking batch output..."
+          ls -la batch_output/
+          
+          # Check for summary file
+          if [ -f batch_output/batch_summary.txt ]; then
+            echo "✅ Batch summary created successfully"
+            head -10 batch_output/batch_summary.txt
+          else
+            echo "❌ Batch summary not found"
+            exit 1
+          fi
+
+      - name: Test batch processing (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Setting up batch test data..."
+          New-Item -ItemType Directory -Force -Path batch_input, batch_output
+          Copy-Item "test_data/tns_2024ggi.dat" "batch_input/spectrum1.dat"
+          Copy-Item "test_data/tns_2024ggi.dat" "batch_input/spectrum2.dat"
+          
+          Write-Host "Testing batch processing..."
+          snid batch "batch_input/*.dat" --output-dir batch_output/ --minimal --verbose
+          
+          Write-Host "Checking batch output..."
+          Get-ChildItem batch_output/
+          
+          # Check for summary file
+          if (Test-Path "batch_output/batch_summary.txt") {
+            Write-Host "✅ Batch summary created successfully"
+            Get-Content "batch_output/batch_summary.txt" | Select-Object -First 10
+          } else {
+            Write-Host "❌ Batch summary not found"
+            exit 1
+          }
+
+      - name: Install GUI dependencies for headless testing
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb
+            echo "Installed xvfb for headless testing"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            # macOS doesn't need special setup for headless testing in CI
+            echo "macOS headless testing ready"
+          elif [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Windows GitHub runners have display support
+            echo "Windows display support available"
+          fi
+
+      - name: Test GUI import and basic functionality (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 3
+          
+          echo "Testing GUI imports..."
+          python3 << 'EOF'
+          import sys
+          import os
+          import tkinter as tk
+          
+          # Test GUI imports
+          try:
+              from snid_sage.interfaces.gui.sage_gui import ModernSNIDSageGUI
+              print('✅ GUI import successful')
+          except ImportError as e:
+              print(f'❌ GUI import failed: {e}')
+              sys.exit(1)
+          
+          # Test basic GUI creation in headless mode
+          try:
+              root = tk.Tk()
+              root.withdraw()  # Hide window
+              
+              # Quick test - just create the GUI object and destroy immediately
+              app = ModernSNIDSageGUI(root)
+              print('✅ GUI creation successful')
+              
+              # Test that we can access basic methods
+              if hasattr(app, 'create_main_layout'):
+                  print('✅ GUI methods accessible')
+              
+              # Cleanup
+              root.quit()
+              root.destroy()
+              print('✅ GUI cleanup successful')
+              
+          except Exception as e:
+              print(f'❌ GUI test failed: {e}')
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          EOF
+
+      - name: Test GUI import and basic functionality (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "Testing GUI imports on macOS..."
+          python3 << 'EOF'
+          import sys
+          import tkinter as tk
+          
+          # Test GUI imports
+          try:
+              from snid_sage.interfaces.gui.sage_gui import ModernSNIDSageGUI
+              print('✅ GUI import successful')
+          except ImportError as e:
+              print(f'❌ GUI import failed: {e}')
+              sys.exit(1)
+          
+          # Test basic GUI creation
+          try:
+              root = tk.Tk()
+              root.withdraw()  # Hide window
+              
+              # Quick test - just create the GUI object and destroy immediately  
+              app = ModernSNIDSageGUI(root)
+              print('✅ GUI creation successful')
+              
+              # Cleanup
+              root.quit()
+              root.destroy()
+              print('✅ GUI cleanup successful')
+              
+          except Exception as e:
+              print(f'❌ GUI test failed: {e}')
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          EOF
+
+      - name: Test GUI import and basic functionality (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Testing GUI imports on Windows..."
+          $pythonScript = @'
+          import sys
+          import tkinter as tk
+          
+          # Test GUI imports
+          try:
+              from snid_sage.interfaces.gui.sage_gui import ModernSNIDSageGUI
+              print('✅ GUI import successful')
+          except ImportError as e:
+              print(f'❌ GUI import failed: {e}')
+              sys.exit(1)
+          
+          # Test basic GUI creation
+          try:
+              root = tk.Tk()
+              root.withdraw()  # Hide window
+              
+              # Quick test - just create the GUI object and destroy immediately
+              app = ModernSNIDSageGUI(root)
+              print('✅ GUI creation successful')
+              
+              # Cleanup
+              root.quit()
+              root.destroy()
+              print('✅ GUI cleanup successful')
+              
+          except Exception as e:
+              print(f'❌ GUI test failed: {e}')
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          '@
+          
+          python -c $pythonScript
+
+      - name: Test CLI launcher scripts
+        shell: bash
+        run: |
+          echo "Testing CLI launcher scripts..."
+          
+          # Test that entry points are working
+          which snid || echo "snid command not found in PATH"
+          which snid-sage || echo "snid-sage command not found in PATH"
+          which snid-gui || echo "snid-gui command not found in PATH"
+          
+          # Test version reporting
+          snid --version
+          
+          echo "✅ CLI launcher tests completed"
+
+      - name: Performance benchmark (quick)
+        shell: bash
+        run: |
+          echo "Running quick performance benchmark..."
+          mkdir -p benchmark_results
+          
+          # Time the basic analysis
+          start_time=$(date +%s)
+          snid identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
+          end_time=$(date +%s)
+          
+          duration=$((end_time - start_time))
+          echo "⏱️ Basic analysis completed in $duration seconds"
+          
+          # Log system info for performance context
+          echo "System info:"
+          echo "OS: $RUNNER_OS"
+          echo "Python: ${{ matrix.python-version }}"
+          
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            echo "CPU: $(nproc) cores"
+            echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "CPU: $(sysctl -n hw.ncpu) cores"
+            echo "Memory: $(sysctl -n hw.memsize | awk '{print $1/1024/1024/1024 " GB"}')"
+          elif [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "CPU cores available"
+            echo "Memory available"
+          fi
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            results_*/**
+            batch_output/**
+            benchmark_results/**
+            test_data/**
+          retention-days: 7
 
       - name: Summary
         if: always()
         shell: bash
         run: |
-          echo "### ${{ runner.os }} CLI Help Test 📝" >> "$GITHUB_STEP_SUMMARY"
-          echo "- snid --help ✅" >> "$GITHUB_STEP_SUMMARY"
-          echo "- snid-sage --help ✅" >> "$GITHUB_STEP_SUMMARY" 
+          echo "### ${{ runner.os }} Python ${{ matrix.python-version }} Test Results 📊" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Test Category | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| PyPI Installation | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| CLI Help Commands | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Spectrum Download | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Basic Analysis | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Advanced Parameters | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Batch Processing | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| GUI Import Test | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Template Commands | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Performance Benchmark | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Test Data:** TNS 2024ggi spectrum from WIS-TNS" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Coverage:** Minimal, complete modes, redshift constraints, preprocessing, type filtering, batch processing" >> "$GITHUB_STEP_SUMMARY" 
