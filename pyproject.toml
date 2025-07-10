@@ -153,7 +153,7 @@ exclude = [
 
 [tool.setuptools_scm]
 write_to = "snid_sage/_version.py"
-version_scheme = "no-guess-dev"
+version_scheme = "post-release"
 local_scheme = "no-local-version"
 fallback_version = "0.0.0"
 
