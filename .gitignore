@@ -268,8 +268,14 @@ tmp_*
 # ===== MONITORING & METRICS =====
 # Performance monitoring files
 *.perf
-*_metrics.*
-*_stats.*
+*_metrics.txt
+*_metrics.csv
+*_metrics.json
+*_metrics.log
+*_stats.txt
+*_stats.csv
+*_stats.json
+*_stats.log
 performance_*
 metrics_*
 stats_*
