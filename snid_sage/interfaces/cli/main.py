@@ -99,15 +99,15 @@ def create_parser() -> argparse.ArgumentParser:
     output_group.add_argument('--plot-types', nargs='+', 
                        choices=['flux', 'flat', 'all'],
                        default=['flux'],
-                       help='Types of plots to generate (default: flux)')
+                       help='Types of plots to generate')
     output_group.add_argument('--max-templates', type=int, default=5,
-                       help='Maximum number of templates for data output (default: 5)')
+                       help='Maximum number of templates for data output')
     output_group.add_argument('--max-plot-templates', type=int, default=20,
-                       help='Maximum number of templates for plot generation (default: 20)')
+                       help='Maximum number of templates for plot generation')
     output_group.add_argument('--plot-figsize', nargs=2, type=int, default=[10, 8],
-                       help='Figure size for plots in inches [width height] (default: 10 8)')
+                       help='Figure size for plots in inches [width height]')
     output_group.add_argument('--plot-dpi', type=int, default=150,
-                       help='DPI for saved plots (default: 150)')
+                       help='DPI for saved plots')
     
     # Plotting options
     plot_group = parser.add_argument_group('Plotting Options')

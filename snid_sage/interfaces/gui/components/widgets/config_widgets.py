@@ -14,7 +14,7 @@ Part of the modular configuration architecture following SNID SAGE patterns.
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from typing import Any, Callable, Optional, List, Union, Dict
+from typing import Any, Callable, Optional, List, Union, Dict, Tuple
 import threading
 import time
 import traceback
@@ -47,7 +47,7 @@ class ValidationMixin:
         """Set callback for validation results"""
         self.validation_callback = callback
     
-    def validate_value(self, value: Any) -> tuple[bool, str]:
+    def validate_value(self, value: Any) -> Tuple[bool, str]:
         """Validate value against rule"""
         if not self.validation_rule:
             return True, ""

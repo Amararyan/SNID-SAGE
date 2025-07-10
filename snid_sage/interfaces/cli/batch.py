@@ -790,13 +790,13 @@ Examples:
         "--zmin", 
         type=float, 
         default=-0.01,
-        help="Minimum redshift to consider (default: -0.01)"
+        help="Minimum redshift to consider"
     )
     analysis_group.add_argument(
         "--zmax", 
         type=float, 
         default=1,
-        help="Maximum redshift to consider (default: 1.0)"
+        help="Maximum redshift to consider"
     )
     analysis_group.add_argument(
         "--forced-redshift", 
@@ -819,12 +819,12 @@ Examples:
         "--max-workers", 
         type=int, 
         default=1,
-        help="Number of parallel workers (default: 1)"
+        help="Number of parallel workers"
     )
     parser.add_argument(
         "--stop-on-error", 
         action="store_true",
-        help="Stop processing if any spectrum fails (default: continue on error)"
+        help="Stop processing if any spectrum fails"
     )
     parser.add_argument(
         "--verbose", "-v", 

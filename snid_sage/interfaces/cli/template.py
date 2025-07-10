@@ -407,7 +407,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
     convert_parser.add_argument(
         '-o', '--output', 
-        help='Output file (default: input with .lnw extension)'
+        help='Output file'
     )
     convert_parser.add_argument(
         '--flatten', 

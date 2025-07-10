@@ -181,25 +181,25 @@ Examples:
         "--zmin", 
         type=float, 
         default=-0.01, 
-        help="Minimum redshift to consider (default: -0.01)"
+        help="Minimum redshift to consider"
     )
     analysis_group.add_argument(
         "--zmax", 
         type=float, 
         default=1.0, 
-        help="Maximum redshift to consider (default: 0.6)"
+        help="Maximum redshift to consider"
     )
     analysis_group.add_argument(
         "--rlapmin", 
         type=float, 
         default=5.0, 
-        help="Minimum rlap value required (default: 5.0)"
+        help="Minimum rlap value required"
     )
     analysis_group.add_argument(
         "--lapmin", 
         type=float, 
         default=0.3, 
-        help="Minimum overlap fraction required (default: 0.3)"
+        help="Minimum overlap fraction required"
     )
     # Analysis options completed
     
@@ -215,7 +215,7 @@ Examples:
         "--savgol-order", 
         type=int, 
         default=3, 
-        help="Savitzky-Golay filter polynomial order (default: 3)"
+        help="Savitzky-Golay filter polynomial order"
     )
     preproc_group.add_argument(
         "--savgol-fwhm", 
@@ -243,13 +243,13 @@ Examples:
         "--emwidth", 
         type=float, 
         default=40.0, 
-        help="Width in Angstroms for emission line clipping (default: 40.0)"
+        help="Width in Angstroms for emission line clipping"
     )
     preproc_group.add_argument(
         "--apodize-percent", 
         type=float, 
         default=10.0, 
-        help="Percentage of spectrum ends to apodize (default: 10.0)"
+        help="Percentage of spectrum ends to apodize"
     )
     preproc_group.add_argument(
         "--wavelength-masks", 
@@ -300,13 +300,13 @@ Examples:
         "--peak-window-size", 
         type=int, 
         default=10, 
-        help="Peak detection window size (default: 10)"
+        help="Peak detection window size"
     )
     advanced_group.add_argument(
         "--max-output-templates", 
         type=int, 
         default=10, 
-        help="Maximum number of templates to output (default: 10)"
+        help="Maximum number of templates to output"
     )
 
     advanced_group.add_argument(
