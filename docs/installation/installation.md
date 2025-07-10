@@ -43,7 +43,7 @@ python -m venv snid_env
 snid_env\Scripts\activate
 
 # Install SNID SAGE
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+pip install snid-sage
 
 # Verify installation
 python -c "import snid_sage; print('SNID SAGE installed successfully!')"
@@ -61,7 +61,7 @@ python3 -m venv snid_env
 source snid_env/bin/activate
 
 # Install SNID SAGE
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+pip install snid-sage
 
 # Verify installation
 python -c "import snid_sage; print('SNID SAGE installed successfully!')"
@@ -79,8 +79,8 @@ conda create -n snid_sage python=3.10
 # Activate environment
 conda activate snid_sage
 
-# Install SNID SAGE from TestPyPI
-pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+# Install SNID SAGE
+pip install snid-sage
 
 # Verify installation
 python -c "import snid_sage; print('SNID SAGE installed successfully!')"
@@ -117,7 +117,7 @@ pip install -e ".[all]"
    ```
 4. **Install SNID SAGE**:
    ```powershell
-   pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+   pip install snid-sage
    ```
 
 ### macOS
@@ -133,7 +133,7 @@ pip install -e ".[all]"
    ```
 3. **Install SNID SAGE**:
    ```bash
-   pip3 install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+   pip3 install snid-sage
    ```
 
 ### Linux
@@ -147,7 +147,7 @@ sudo apt update
 sudo apt install python3.10 python3-pip python3-tk
 
 # Install SNID SAGE
-pip3 install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+pip3 install snid-sage
 ```
 
 **Fedora/CentOS/RHEL:**
@@ -157,7 +157,7 @@ sudo dnf install python3.10 python3-pip python3-tkinter  # Fedora
 # sudo yum install python3 python3-pip python3-tkinter   # CentOS/RHEL
 
 # Install SNID SAGE
-pip3 install -i https://test.pypi.org/simple/ snid-sage==1.2.3
+pip3 install snid-sage
 ```
 
 ## Launching SNID SAGE
@@ -209,7 +209,7 @@ snid identify data/sn2003jo.dat --output-dir test_results/
 
 **"Module not found" errors:**
 - Ensure you're using the correct Python environment
-- Try reinstalling: `pip install -i https://test.pypi.org/simple/ snid-sage==1.2.3 --force-reinstall`
+- Try reinstalling: `pip install snid-sage --force-reinstall`
 
 **GUI doesn't launch:**
 - Linux: Install tkinter: `sudo apt install python3-tk`
@@ -217,12 +217,12 @@ snid identify data/sn2003jo.dat --output-dir test_results/
 - Windows: Tkinter should be included with Python
 
 **Permission errors:**
-- Use `--user` flag: `pip install --user -i https://test.pypi.org/simple/ snid-sage==1.2.3`
+- Use `--user` flag: `pip install --user snid-sage`
 - Or use a virtual environment (recommended)
 
 **SSL Certificate errors:**
-- Add `--trusted-host test.pypi.org` to pip command
 - Update certificates on macOS: `/Applications/Python\ 3.x/Install\ Certificates.command`
+- Check your internet connection and try again
 
 ### Getting Help
 
@@ -238,9 +238,9 @@ If you encounter issues:
 
 ## Updating SNID SAGE
 
-### From TestPyPI
+### From PyPI
 ```bash
-pip install -i https://test.pypi.org/simple/ snid-sage --upgrade
+pip install snid-sage --upgrade
 ```
 
 ### From Source
