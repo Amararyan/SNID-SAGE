@@ -1,14 +1,13 @@
 name: Test PyPI Installation & GUI
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-  workflow_dispatch:  # Manual trigger
-  schedule:
-    # Run weekly on Sundays at 2 AM UTC to catch any PyPI issues
-    - cron: '0 2 * * 0'
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      version:
+        description: 'Version to test from Test PyPI (e.g., 1.2.3)'
+        required: false
+        default: 'latest'
+        type: string
 
 jobs:
   test-pypi-installation:
@@ -103,11 +102,16 @@ jobs:
         python -c "import numpy, scipy, h5py, pandas, matplotlib, astropy, sklearn, requests, PIL, ttkbootstrap; print('✅ All dependencies verified')"
         
         # Install from Test PyPI without dependencies
-        echo "📦 Installing snid-sage==1.2.3 from Test PyPI (no deps)..."
-        python -m pip install --no-deps -i https://test.pypi.org/simple/ snid-sage==1.2.3 || {
-          echo "⚠️  Failed to install specific version, trying latest from Test PyPI..."
+        if [[ "${{ github.event.inputs.version }}" == "latest" ]]; then
+          echo "📦 Installing latest snid-sage from Test PyPI (no deps)..."
           python -m pip install --no-deps -i https://test.pypi.org/simple/ snid-sage
-        }
+        else
+          echo "📦 Installing snid-sage==${{ github.event.inputs.version }} from Test PyPI (no deps)..."
+          python -m pip install --no-deps -i https://test.pypi.org/simple/ snid-sage==${{ github.event.inputs.version }} || {
+            echo "⚠️  Failed to install specific version, trying latest from Test PyPI..."
+            python -m pip install --no-deps -i https://test.pypi.org/simple/ snid-sage
+          }
+        fi
         
         # Verify installation
         echo "🔍 Verifying installation..."
@@ -161,11 +165,16 @@ jobs:
         python -c "import numpy, scipy, h5py, pandas, matplotlib, astropy, sklearn, requests, PIL, ttkbootstrap; print('✅ All dependencies verified in conda')"
         
         # Install from Test PyPI without dependencies
-        echo "📦 Installing snid-sage==1.2.3 from Test PyPI (no deps)..."
-        pip install --no-deps -i https://test.pypi.org/simple/ snid-sage==1.2.3 || {
-          echo "⚠️  Failed to install specific version, trying latest from Test PyPI..."
+        if [[ "${{ github.event.inputs.version }}" == "latest" ]]; then
+          echo "📦 Installing latest snid-sage from Test PyPI (no deps)..."
           pip install --no-deps -i https://test.pypi.org/simple/ snid-sage
-        }
+        else
+          echo "📦 Installing snid-sage==${{ github.event.inputs.version }} from Test PyPI (no deps)..."
+          pip install --no-deps -i https://test.pypi.org/simple/ snid-sage==${{ github.event.inputs.version }} || {
+            echo "⚠️  Failed to install specific version, trying latest from Test PyPI..."
+            pip install --no-deps -i https://test.pypi.org/simple/ snid-sage
+          }
+        fi
         
         # Verify installation
         echo "🔍 Verifying installation..."
