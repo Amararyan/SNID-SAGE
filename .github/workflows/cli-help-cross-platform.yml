@@ -29,6 +29,22 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install system dependencies for tkinter (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk python3-dev tk-dev libffi-dev
+
+      - name: Install system dependencies for tkinter (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # macOS usually has tkinter built-in, but ensure Tcl/Tk is available
+          brew install tcl-tk || echo "tcl-tk already available or not needed"
+
+      - name: Verify tkinter installation
+        run: |
+          python -c "import tkinter as tk; print('✅ tkinter is available')"
+
       - name: Install package from PyPI
         run: |
           python -m pip install --upgrade pip
