@@ -19,6 +19,8 @@ jobs:
             python-version: '3.12'
           - os: macos-12
             python-version: '3.12'
+          - os: macos-12
+            python-version: '3.11'
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -37,7 +39,10 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           # macOS usually has tkinter built-in, but ensure Tcl/Tk is available
-          brew install tcl-tk || echo "tcl-tk already available or not needed"
+          # Add timeout to prevent hanging on macOS 12
+          timeout 300 brew install tcl-tk || echo "tcl-tk already available or not needed"
+          # Alternative: just verify tkinter is available without installing
+          python -c "import tkinter; print('tkinter available')" || echo "tkinter not available, will skip GUI tests"
 
       - name: Verify tkinter installation
         id: verify_tkinter
@@ -45,11 +50,24 @@ jobs:
           python -c "import tkinter as tk; print('SUCCESS: tkinter is available')"
         continue-on-error: true
 
+      - name: Debug system info (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "=== macOS System Info ==="
+          echo "macOS version: $(sw_vers -productVersion)"
+          echo "Architecture: $(uname -m)"
+          echo "Python version: $(python --version)"
+          echo "Available memory: $(sysctl -n hw.memsize | awk '{print $1/1024/1024/1024 " GB"}')"
+          echo "CPU cores: $(sysctl -n hw.ncpu)"
+          echo "Disk space: $(df -h .)"
+          echo "========================="
+
       - name: Install package from PyPI
         id: install_pypi
         run: |
           python -m pip install --upgrade pip
-          python -m pip install snid-sage
+          # Add timeout to prevent hanging on macOS 12
+          timeout 600 python -m pip install snid-sage
         continue-on-error: true
 
       - name: Prepare test spectrum data
@@ -57,7 +75,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p test_data
-          cat > test_data/tns_2024ggi.dat << 'EOF'
+          # Add timeout to prevent hanging on macOS 12
+          timeout 300 cat > test_data/tns_2024ggi.dat << 'EOF'
           3611.33837890625  6.537382E-15
           3614.19749164581  5.405052E-15
           3617.05660438538  7.089062E-15
