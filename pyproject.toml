@@ -155,8 +155,7 @@ exclude = [
     "data/*.ascii",
     "images/*.png", 
     "images/*.jpg", 
-    "custom_templates/*.md",
-    "../run_snid_gui.py"
+    "custom_templates/*.md"
 ]
 
 [tool.setuptools_scm]

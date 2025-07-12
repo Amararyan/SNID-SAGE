@@ -9,8 +9,7 @@ include pyproject.toml
 include BUILD_CHECKLIST.md
 include DIRECTORY_SCHEMA.md
 
-# Include GUI launcher scripts
-include run_snid_gui.py
+# GUI launcher is now integrated into the package
 
 # Include the main snid_sage package
 recursive-include snid_sage *.py

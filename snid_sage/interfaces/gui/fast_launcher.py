@@ -1,30 +1,13 @@
 #!/usr/bin/env python3
 """
-SNID SAGE GUI Launcher with Fast Startup
-========================================
+SNID SAGE Fast GUI Launcher
+===========================
 
-Launches the SNID SAGE GUI interface with optimized fast startup.
-Shows the window immediately with a loading screen while components
-load in the background.
+Simplified fast launcher that shows a loading screen immediately while
+loading heavy components in the background.
 
-Key features:
-- Immediate window appearance (1-2 seconds)
-- Background loading of heavy components
-- Professional loading screen with SNID SAGE branding
-- Proper DPI awareness and theme setup
-- Comprehensive error handling
-
-Usage:
-    python run_snid_gui.py                    # Fast startup mode (default)
-    python run_snid_gui.py --verbose          # With startup progress
-    python run_snid_gui.py --debug            # Full debug output
-    python run_snid_gui.py --quiet            # Minimal output
-    python run_snid_gui.py --silent           # Critical errors only
-    
-Environment Variables:
-    SNID_DEBUG=1        # Enable debug mode
-    SNID_VERBOSE=1      # Enable verbose mode
-    SNID_QUIET=1        # Enable quiet mode
+This is the single entry point for the SNID SAGE GUI that prioritizes
+immediate window appearance followed by background loading.
 """
 
 import sys
@@ -35,11 +18,6 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 from pathlib import Path
-# Note: ttk imported earlier for potential theming; keeping import optional
-try:
-    from tkinter import ttk
-except ImportError:
-    ttk = None
 
 # Import dynamic version
 try:
@@ -60,14 +38,14 @@ def suppress_third_party_output():
 def parse_arguments():
     """Parse command line arguments for the GUI launcher"""
     parser = argparse.ArgumentParser(
-        description="SNID SAGE GUI Launcher with Fast Startup",
+        description="SNID SAGE GUI with Fast Startup",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python run_snid_gui.py                    # Fast startup (default)
-    python run_snid_gui.py --verbose          # With loading progress
-    python run_snid_gui.py --debug            # Full debug output
-    python run_snid_gui.py --quiet            # Minimal output
+    snid-sage                    # Fast startup (default)
+    snid-sage --verbose          # With loading progress
+    snid-sage --debug            # Full debug output
+    snid-sage --quiet            # Minimal output
     
 Environment Variables:
     SNID_DEBUG=1        # Enable debug mode
@@ -130,7 +108,7 @@ class FastGUILauncher:
         self.background_loading_done = False
         
         # Progress bar tracking
-        self.total_steps = 7  # Number of distinct loading phases we update for (including version check)
+        self.total_steps = 7  # Number of distinct loading phases we update for
         self.progress_index = 0  # Current completed step count
         
         # Version checking
@@ -141,9 +119,9 @@ class FastGUILauncher:
         if self.verbose:
             print(f"🚀 {message}")
     
-    def show_minimal_gui(self):
-        """Show minimal GUI window immediately with proper DPI setup"""
-        self.log("Creating minimal GUI window...")
+    def show_loading_window(self):
+        """Show loading window immediately with proper DPI setup"""
+        self.log("Creating loading window...")
         start_time = time.time()
         
         # Create root window but keep it hidden initially
@@ -158,10 +136,7 @@ class FastGUILauncher:
         self.root.geometry("900x600")
         self.root.minsize(800, 550)
         
-        # OPTIMIZATION: Defer icon loading to after window is shown
-        # Window icon is not critical for immediate appearance
-        
-        # Create loading screen with better styling FIRST
+        # Create loading screen with better styling
         loading_frame = tk.Frame(self.root, bg='#1e1e1e')
         loading_frame.pack(fill='both', expand=True, padx=40, pady=40)
         
@@ -169,7 +144,7 @@ class FastGUILauncher:
         spacer_logo = tk.Frame(loading_frame, height=60, bg='#1e1e1e')
         spacer_logo.pack()
         
-        # OPTIMIZATION: Use system fonts or fall back gracefully
+        # Use system fonts or fall back gracefully
         try:
             title_font = ('Segoe UI', 32, 'bold')
             subtitle_font = ('Segoe UI', 14)
@@ -186,7 +161,7 @@ class FastGUILauncher:
             progress_font = ("Courier", 12)
             tip_font = ('Arial', 9)
         
-        # Re-introduce writing (title, version, subtitle)
+        # Title, version, subtitle
         title_label = tk.Label(
             loading_frame,
             text="SNID-SAGE",
@@ -214,7 +189,7 @@ class FastGUILauncher:
         )
         subtitle_label.pack(pady=(0, 40))
         
-        # Loading status with modern styling (left-aligned so it stays in place)
+        # Loading status
         self.status_label = tk.Label(
             loading_frame,
             text="🚀 Initializing...",
@@ -225,9 +200,9 @@ class FastGUILauncher:
         )
         self.status_label.pack(pady=(20, 10))
 
-        # Animated ASCII loading bar (visual feedback similar to original)
-        self._bar_length = 30  # number of characters
-        self._bar_pos = 0  # Will be controlled via update_progress
+        # Animated ASCII loading bar
+        self._bar_length = 30
+        self._bar_pos = 0
         self.progress_bar_label = tk.Label(
             loading_frame,
             text="░" * self._bar_length,
@@ -237,9 +212,6 @@ class FastGUILauncher:
         )
         self.progress_bar_label.pack(pady=15)
 
-        # Initialise bar (all empty)
-        self.progress_bar_label.config(text="░" * self._bar_length)
-        
         # Loading tip
         tip_label = tk.Label(
             loading_frame,
@@ -253,11 +225,10 @@ class FastGUILauncher:
         # Calculate window position BEFORE showing
         self.root.update_idletasks()  # This calculates sizes without showing
         
-        # Get screen dimensions and set window size
+        # Get screen dimensions and center window
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         
-        # Use the defined window size (900x600)
         window_width = 900
         window_height = 600
         
@@ -272,14 +243,14 @@ class FastGUILauncher:
         # Set final position before showing
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
-        # NOW show the window - it will appear in the correct position with correct styling
+        # NOW show the window
         self.root.deiconify()  # Show the window
         self.root.update()  # Force update to ensure it's visible
         
         window_time = time.time() - start_time
-        self.log(f"Minimal GUI window created in {window_time:.3f}s")
+        self.log(f"Loading window created in {window_time:.3f}s")
         
-        # OPTIMIZATION: Defer non-critical operations to after window is shown
+        # Set up window icon after the window is shown
         self.root.after(50, self._setup_window_icon_deferred)
         
         return self.root
@@ -287,26 +258,26 @@ class FastGUILauncher:
     def _setup_window_icon_deferred(self):
         """Set up window icon after the window is already visible"""
         try:
-            png_icon_path = Path("snid_sage/images/icon.png")
+            png_icon_path = Path(__file__).parent.parent.parent / "images" / "icon.png"
             if png_icon_path.exists():
                 from PIL import Image, ImageTk
                 img = Image.open(png_icon_path)
                 img = img.resize((32, 32), Image.Resampling.LANCZOS)
                 icon = ImageTk.PhotoImage(img)
                 self.root.iconphoto(True, icon)
-                self.log("Window icon set successfully from icon.png")
+                self.log("Window icon set successfully")
             else:
                 self.log("icon.png not found, using default window icon")
         except Exception as e:
             self.log(f"Could not set window icon: {e}")
     
-    def update_progress(self, status, progress_text):
+    def update_progress(self, status, progress_text=None):
         """Update loading progress"""
         if hasattr(self, 'status_label') and self.status_label:
             self.status_label.config(text=status)
-        # Advance progress bar based on defined steps
+        
+        # Advance progress bar
         if not self.loading_complete and hasattr(self, 'progress_bar_label'):
-            # Increment step counter but clamp to total_steps
             self.progress_index = min(self.progress_index + 1, self.total_steps)
             filled_len = int(self._bar_length * self.progress_index / self.total_steps)
             filled = "▓" * filled_len
@@ -322,7 +293,7 @@ class FastGUILauncher:
             self.log("Starting background component loading...")
             
             # Configure logging first
-            self.update_progress("⚙️ Configuring logging...", "▓▓▓▓░░░░░░ Setting up logging system...")
+            self.update_progress("⚙️ Configuring logging...")
             try:
                 from snid_sage.shared.utils.logging import configure_from_args
                 from snid_sage.shared.utils.logging import get_logger
@@ -334,22 +305,22 @@ class FastGUILauncher:
                 self.log("Logging system not available (using fallback)")
             
             # Check for updates (async, won't block loading)
-            self.update_progress("🔄 Checking for updates...", "▓▓▓▓▓░░░░░ Checking latest version...")
+            self.update_progress("🔄 Checking for updates...")
             self.start_version_check()
             
             # Load matplotlib
-            self.update_progress("📊 Loading matplotlib...", "▓▓▓▓▓▓░░░░ Loading plotting libraries...")
+            self.update_progress("📊 Loading matplotlib...")
             import matplotlib
             matplotlib.use('TkAgg')  # Set backend early
             self.log("Matplotlib loaded")
             
             # Load numpy
-            self.update_progress("🔢 Loading numpy...", "▓▓▓▓▓▓▓░░░ Loading numerical libraries...")
+            self.update_progress("🔢 Loading numpy...")
             import numpy as np
             self.log("Numpy loaded")
             
             # Check dependencies
-            self.update_progress("🔍 Checking dependencies...", "▓▓▓▓▓▓▓▓░░ Verifying installation...")
+            self.update_progress("🔍 Checking dependencies...")
             deps_ok = self.check_dependencies_fast()
             if not deps_ok:
                 error_msg = "Dependencies check failed"
@@ -367,12 +338,12 @@ class FastGUILauncher:
                 return
             
             # Load SNID core components
-            self.update_progress("🔬 Loading SNID engine...", "▓▓▓▓▓▓▓▓▓░ Loading SNID analysis engine...")
+            self.update_progress("🔬 Loading SNID engine...")
             from snid_sage.snid.snid import run_snid, preprocess_spectrum, run_snid_analysis
             self.log("SNID core loaded")
             
             # Now we can safely create the real GUI
-            self.update_progress("🖥️ Initializing interface...", "▓▓▓▓▓▓▓▓▓▓ Creating user interface...")
+            self.update_progress("🖥️ Initializing interface...")
             
             # Mark loading as complete; fill progress bar fully
             self.loading_complete = True
@@ -386,7 +357,7 @@ class FastGUILauncher:
             # Handle errors gracefully
             error_msg = f"❌ Error loading components: {e}"
             self.log(error_msg)
-            self.update_progress(error_msg, "▓▓▓▓▓▓▓▓▓▓ Error occurred!")
+            self.update_progress(error_msg)
             
             # Show error dialog
             self.root.after(100, lambda: messagebox.showerror("Loading Error", 
@@ -486,9 +457,6 @@ class FastGUILauncher:
         try:
             self.log("Creating real GUI interface...")
             
-            # Store current window position and size to maintain it
-            current_geometry = self.root.geometry()
-            
             # Import and create the real GUI
             from snid_sage.interfaces.gui.sage_gui import ModernSNIDSageGUI
             
@@ -502,13 +470,13 @@ class FastGUILauncher:
             # Set a flag to prevent the GUI from auto-centering (since we already positioned it)
             self.root._fast_launcher_positioned = True
             
-            # Create the real application (this might resize/reposition the window)
+            # Create the real application
             self.app = ModernSNIDSageGUI(self.root)
             
             # Update title
             self.root.title(f"SNID SAGE v{__version__} - Ready")
             
-            # Ensure the window stays in place (prevent jumping)
+            # Ensure the window stays in place
             self.root.update_idletasks()
             
             self.log("GUI fully loaded and ready!")
@@ -527,16 +495,16 @@ class FastGUILauncher:
         setup_dpi_awareness()
         self.log("DPI awareness configured")
         
-        # Step 2: Show minimal GUI immediately
-        root = self.show_minimal_gui()
+        # Step 2: Show loading window immediately
+        root = self.show_loading_window()
         
-        # PERFORMANCE CHECK: Ensure window appeared quickly
+        # Performance check
         window_time = time.time() - start_time
-        if window_time > 2.0:  # If window took more than 2 seconds
+        if window_time > 2.0:
             self.log(f"⚠️ Window appearance took {window_time:.3f}s (slower than expected)")
-        elif window_time < 0.5:  # Very fast
+        elif window_time < 0.5:
             self.log(f"🚀 Window appeared in {window_time:.3f}s (excellent)")
-        else:  # Normal range
+        else:
             self.log(f"✅ Window appeared in {window_time:.3f}s (good)")
         
         # Step 3: Start background loading
@@ -557,12 +525,12 @@ class FastGUILauncher:
         return 0
 
 def main():
-    """Main function for SNID SAGE GUI launcher with fast startup"""
+    """Main entry point for SNID SAGE GUI with fast startup"""
     
     # Suppress third-party library output FIRST, before any imports
     suppress_third_party_output()
     
-    # Parse command line arguments first
+    # Parse command line arguments
     args = parse_arguments()
     
     # Create and run the fast launcher
