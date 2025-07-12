@@ -18,7 +18,8 @@ from .integration import (
     enable_caching_for_cli,
     enable_caching_for_gui,
     get_cache_status,
-    clear_global_cache
+    clear_global_cache,
+    load_templates_unified
 )
 
 __all__ = [
@@ -32,5 +33,6 @@ __all__ = [
     'enable_caching_for_cli',
     'enable_caching_for_gui',
     'get_cache_status',
-    'clear_global_cache'
+    'clear_global_cache',
+    'load_templates_unified'
 ] 
