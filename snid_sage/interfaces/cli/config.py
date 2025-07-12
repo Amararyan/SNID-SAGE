@@ -92,7 +92,7 @@ def get_default_config() -> Dict[str, Any]:
     """Get default configuration values."""
     return {
         'templates': {
-            'default_dir': str(Path.home() / 'snid_templates'),
+            'default_dir': str(Path.home() / 'templates'),
             'auto_detect': True
         },
         'analysis': {
@@ -246,7 +246,24 @@ def main(args: argparse.Namespace) -> int:
                 return 1
                 
         elif args.config_command == "reset":
+            # Check if we're in a non-interactive environment (CI, etc.)
+            import sys
+            import os
+            
+            # Check multiple indicators of non-interactive environment
+            is_noninteractive = (
+                not sys.stdin.isatty() or  # Standard check
+                os.environ.get('CI') or  # GitHub Actions, GitLab CI, etc.
+                os.environ.get('GITHUB_ACTIONS') or  # GitHub Actions specific
+                os.environ.get('RUNNER_OS') or  # GitHub Actions runner
+                os.environ.get('SNID_NONINTERACTIVE')  # Manual override
+            )
+            
             if not args.confirm:
+                if is_noninteractive:
+                    print("Warning: Running in non-interactive environment. Use --confirm to reset configuration.")
+                    return 1
+                
                 response = input("This will reset all configuration to defaults. Continue? (y/N): ")
                 if response.lower() != 'y':
                     print("Reset cancelled.")

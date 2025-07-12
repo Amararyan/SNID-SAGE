@@ -164,7 +164,7 @@ jobs:
           set -euxo pipefail
           echo "Testing basic help commands..."
           snid --help
-          snid-sage --help
+          # Skip snid-sage --help as it's a GUI launcher, not a CLI command
           # Skip snid-gui --help as it tries to initialize the full GUI
           
           echo "Testing command-specific help..."
@@ -181,7 +181,8 @@ jobs:
         run: |
           Write-Host "Testing basic help commands..."
           snid --help
-          snid-sage --help
+          
+          # Skip snid-sage --help as it's a GUI launcher, not a CLI command
           # Skip snid-gui --help as it tries to initialize the full GUI
           
           Write-Host "Testing command-specific help..."
@@ -528,9 +529,9 @@ jobs:
           echo "Running quick performance benchmark..."
           mkdir -p benchmark_results
           
-          # Time the basic analysis
+          # Time the basic analysis with timeout
           start_time=$(date +%s)
-          snid identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
+          timeout 300 snid identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
           end_time=$(date +%s)
           
           duration=$((end_time - start_time))

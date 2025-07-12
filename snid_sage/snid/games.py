@@ -1834,6 +1834,24 @@ def show_game_menu() -> Optional[Callable]:
     except Exception as e:
         # Fallback to console if GUI fails
         print(f"GUI dialog failed ({e}), falling back to console...")
+        
+        # Check if we're in a non-interactive environment (CI, etc.)
+        import sys
+        import os
+        
+        # Check multiple indicators of non-interactive environment
+        is_noninteractive = (
+            not sys.stdin.isatty() or  # Standard check
+            os.environ.get('CI') or  # GitHub Actions, GitLab CI, etc.
+            os.environ.get('GITHUB_ACTIONS') or  # GitHub Actions specific
+            os.environ.get('RUNNER_OS') or  # GitHub Actions runner
+            os.environ.get('SNID_NONINTERACTIVE')  # Manual override
+        )
+        
+        if is_noninteractive:
+            print("Running in non-interactive environment, skipping game selection.")
+            return None
+        
         print("\nWould you like to play Space Debris Cleanup while you wait?")
         print("1. Space Debris Cleanup")
         print("2. No thanks")
