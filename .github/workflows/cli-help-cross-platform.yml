@@ -1987,12 +1987,14 @@ jobs:
           echo "Checking output files..."
           ls -la results_basic/
           
-          # Check if main output file exists
-          if [ -f results_basic/snid_output.dat ]; then
-            echo "SUCCESS: Main output file created successfully"
-            head -5 results_basic/snid_output.dat
+          # Check if main output file exists (look for any .output file)
+          output_file=$(find results_basic/ -name "*.output" -type f | head -1)
+          if [ -n "$output_file" ]; then
+            echo "SUCCESS: Main output file created successfully: $output_file"
+            head -5 "$output_file"
           else
             echo "ERROR: Main output file not found"
+            ls -la results_basic/
             exit 1
           fi
         continue-on-error: true
@@ -2010,12 +2012,14 @@ jobs:
           Write-Host "Checking output files..."
           Get-ChildItem results_basic/
           
-          # Check if main output file exists
-          if (Test-Path "results_basic/snid_output.dat") {
-            Write-Host "SUCCESS: Main output file created successfully"
-            Get-Content "results_basic/snid_output.dat" | Select-Object -First 5
+          # Check if main output file exists (look for any .output file)
+          $outputFile = Get-ChildItem "results_basic/" -Filter "*.output" | Select-Object -First 1
+          if ($outputFile) {
+            Write-Host "SUCCESS: Main output file created successfully: $($outputFile.Name)"
+            Get-Content $outputFile.FullName | Select-Object -First 5
           } else {
             Write-Host "ERROR: Main output file not found"
+            Get-ChildItem "results_basic/"
             exit 1
           }
         continue-on-error: true
