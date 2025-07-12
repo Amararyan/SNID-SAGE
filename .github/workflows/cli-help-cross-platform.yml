@@ -1931,8 +1931,7 @@ jobs:
           8926.42896175385  1.060191E-15
           8929.28807449341  1.042600E-15
           EOF
-            echo "Created synthetic spectrum for testing"
-          fi
+          echo "Created synthetic spectrum for testing"
           
           echo "Final file content check:"
           echo "File size: $(wc -l test_data/tns_2024ggi.dat)"
