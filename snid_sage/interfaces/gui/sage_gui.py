@@ -222,7 +222,7 @@ class ModernSNIDSageGUI:
             from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
             CrossPlatformWindowManager.set_window_icon(self.master, 'icon')
             if self.logger:
-                self.logger.debug("✅ Window icon set successfully")
+                self.logger.debug("✅ Window icon set successfully (PNG only)")
         except Exception as e:
             if self.logger:
                 self.logger.warning(f"⚠️ Could not set window icon: {e}")

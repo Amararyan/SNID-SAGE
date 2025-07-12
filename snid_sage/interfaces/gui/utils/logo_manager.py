@@ -66,7 +66,7 @@ class LogoManager:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             # From interfaces/gui/utils -> interfaces/gui -> interfaces -> project_root
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-            images_dir = os.path.join(project_root, 'images')
+            images_dir = os.path.join(project_root, 'snid_sage', 'images')
             
             # Support multiple naming conventions for logos - prioritize icon.png
             light_logo_candidates = [

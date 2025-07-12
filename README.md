@@ -8,7 +8,7 @@
 
 ---
 
-![SNID SAGE GUI](images/Screenshot.png)
+![SNID SAGE GUI](snid_sage/images/Screenshot.png)
 *SNID SAGE main GUI: intuitive workflow, interactive plotting, and advanced analysis tools.*
 
 ---

@@ -418,95 +418,32 @@ class CrossPlatformWindowManager:
     @classmethod
     def get_platform_icon_path(cls, icon_name: str, icons_dir: str) -> Optional[str]:
         """
-        Get platform-appropriate icon path
-        
-        Args:
-            icon_name: Base name of icon (without extension)
-            icons_dir: Directory containing icons
-            
-        Returns:
-            Path to appropriate icon file or None if not found
+        Get platform-appropriate icon path (PNG only)
         """
-        extensions = []
-        
-        if cls.is_windows():
-            extensions = ['.ico', '.png']
-        elif cls.is_macos():
-            extensions = ['.icns', '.png']
-        else:  # Linux
-            extensions = ['.png', '.svg', '.xpm']
-        
-        for ext in extensions:
-            icon_path = os.path.join(icons_dir, f"{icon_name}{ext}")
-            if os.path.exists(icon_path):
-                _LOGGER.debug(f"✅ Found icon: {icon_path}")
-                return icon_path
-        
-        _LOGGER.warning(f"⚠️ No suitable icon found for {icon_name}")
+        icon_path = os.path.join(icons_dir, f"{icon_name}.png")
+        if os.path.exists(icon_path):
+            return icon_path
         return None
-    
+
     @classmethod
     def set_window_icon(cls, window: tk.Tk, icon_name: str = 'icon') -> bool:
-        """Set window icon using platform-appropriate format"""
+        """Set window icon using images/icon.png if available (high quality PNG only)"""
         try:
-            # Check if icon has already been set for this window
-            if hasattr(window, '_snid_icon_set'):
-                _LOGGER.debug("✅ Window icon already set, skipping")
-                return True
-            
-            # Find icons directory using the same approach as templates
-            try:
-                from snid_sage.shared.utils.simple_template_finder import find_images_directory
-                icons_dir = find_images_directory()
-                
-                if not icons_dir:
-                    _LOGGER.warning("⚠️ Images directory not found")
-                    return False
-                    
-                # Convert to string for compatibility
-                icons_dir = str(icons_dir)
-            except ImportError:
-                # Fallback to old method if import fails
-                current_dir = Path(__file__).parent
-                
-                # Try different potential project roots
-                possible_roots = [
-                    current_dir.parent.parent.parent.parent,  # From snid_sage/interfaces/gui/utils/
-                    current_dir.parent.parent.parent,         # Fallback
-                    Path.cwd(),                               # Current working directory
-                ]
-                
-                icons_dir = None
-                for root in possible_roots:
-                    test_icons_dir = root / 'images'
-                    if test_icons_dir.exists():
-                        icons_dir = str(test_icons_dir)
-                        break
-                
-                if not icons_dir:
-                    _LOGGER.warning("⚠️ Images directory not found")
-                    return False
-            
-            icon_path = cls.get_platform_icon_path(icon_name, str(icons_dir))
-            
-            if icon_path:
-                if cls.is_windows() and icon_path.endswith('.ico'):
-                    window.iconbitmap(icon_path)
-                else:
-                    # Use PhotoImage for other platforms/formats
-                    icon = tk.PhotoImage(file=icon_path)
-                    window.iconphoto(True, icon)
-                
-                # Mark that icon has been set for this window
-                window._snid_icon_set = True
-                _LOGGER.debug(f"✅ Window icon set: {icon_path}")
-                return True
-            else:
-                _LOGGER.warning("⚠️ No suitable icon found")
+            from snid_sage.shared.utils.simple_template_finder import find_images_directory
+            icons_dir = find_images_directory()
+            if not icons_dir:
                 return False
-                
-        except Exception as e:
-            _LOGGER.warning(f"⚠️ Failed to set window icon: {e}")
+            icon_path = cls.get_platform_icon_path(icon_name, str(icons_dir))
+            if icon_path:
+                from PIL import Image, ImageTk
+                img = Image.open(icon_path)
+                img = img.resize((32, 32), Image.Resampling.LANCZOS)
+                icon = ImageTk.PhotoImage(img)
+                window.iconphoto(True, icon)
+                window._snid_icon_set = True
+                return True
+            return False
+        except Exception:
             return False
     
     @classmethod

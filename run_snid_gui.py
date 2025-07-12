@@ -41,6 +41,12 @@ try:
 except ImportError:
     ttk = None
 
+# Import dynamic version
+try:
+    from snid_sage import __version__
+except ImportError:
+    __version__ = "unknown"
+
 # Suppress third-party library output unless in verbose/debug mode
 def suppress_third_party_output():
     """Suppress console output from third-party libraries"""
@@ -143,7 +149,7 @@ class FastGUILauncher:
         # Create root window but keep it hidden initially
         self.root = tk.Tk()
         self.root.withdraw()  # Hide window initially
-        self.root.title("SNID SAGE v1.0.0 - Loading...")
+        self.root.title(f"SNID SAGE v{__version__} - Loading...")
         
         # Configure window properties BEFORE showing
         self.root.configure(bg='#1e1e1e')  # Dark background first
@@ -192,7 +198,7 @@ class FastGUILauncher:
 
         version_label = tk.Label(
             loading_frame,
-            text="v1.0.0",
+            text=f"v{__version__}",
             font=version_font,
             fg='#888888',
             bg='#1e1e1e'
@@ -281,19 +287,16 @@ class FastGUILauncher:
     def _setup_window_icon_deferred(self):
         """Set up window icon after the window is already visible"""
         try:
-            icon_path = Path("images/icon.ico")
-            if icon_path.exists():
-                self.root.iconbitmap(str(icon_path))
+            png_icon_path = Path("snid_sage/images/icon.png")
+            if png_icon_path.exists():
+                from PIL import Image, ImageTk
+                img = Image.open(png_icon_path)
+                img = img.resize((32, 32), Image.Resampling.LANCZOS)
+                icon = ImageTk.PhotoImage(img)
+                self.root.iconphoto(True, icon)
+                self.log("Window icon set successfully from icon.png")
             else:
-                # Try PNG icon
-                png_icon_path = Path("images/icon.png")
-                if png_icon_path.exists():
-                    from PIL import Image, ImageTk
-                    img = Image.open(png_icon_path)
-                    img = img.resize((32, 32), Image.Resampling.LANCZOS)
-                    icon = ImageTk.PhotoImage(img)
-                    self.root.iconphoto(True, icon)
-            self.log("Window icon set successfully")
+                self.log("icon.png not found, using default window icon")
         except Exception as e:
             self.log(f"Could not set window icon: {e}")
     
@@ -503,7 +506,7 @@ class FastGUILauncher:
             self.app = ModernSNIDSageGUI(self.root)
             
             # Update title
-            self.root.title("SNID SAGE v1.0.0 - Ready")
+            self.root.title(f"SNID SAGE v{__version__} - Ready")
             
             # Ensure the window stays in place (prevent jumping)
             self.root.update_idletasks()
