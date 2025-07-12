@@ -31,12 +31,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           # macOS usually has tkinter built-in, but ensure Tcl/Tk is available
-          # Use gtimeout if available, otherwise run without timeout
-          if command -v gtimeout >/dev/null 2>&1; then
-            gtimeout 300 brew install tcl-tk || echo "tcl-tk already available or not needed"
-          else
-            brew install tcl-tk || echo "tcl-tk already available or not needed"
-          fi
+          brew install tcl-tk || echo "tcl-tk already available or not needed"
           # Alternative: just verify tkinter is available without installing
           python -c "import tkinter; print('tkinter available')" || echo "tkinter not available, will skip GUI tests"
 
@@ -62,12 +57,7 @@ jobs:
         id: install_pypi
         run: |
           python -m pip install --upgrade pip
-          # Use gtimeout if available, otherwise run without timeout
-          if command -v gtimeout >/dev/null 2>&1; then
-            gtimeout 600 python -m pip install snid-sage
-          else
-            python -m pip install snid-sage
-          fi
+          python -m pip install snid-sage
         continue-on-error: true
 
       - name: Prepare test spectrum data
@@ -2051,12 +2041,7 @@ jobs:
           
           echo "Testing complete mode (if time permits)..."
           mkdir -p results_complete
-          # Use gtimeout if available, otherwise run without timeout
-          if command -v gtimeout >/dev/null 2>&1; then
-            gtimeout 300 snid identify test_data/tns_2024ggi.dat --output-dir results_complete/ --complete --verbose || echo "Complete mode test timed out (expected for CI)"
-          else
-            snid identify test_data/tns_2024ggi.dat --output-dir results_complete/ --complete --verbose || echo "Complete mode test completed or failed"
-          fi
+          snid identify test_data/tns_2024ggi.dat --output-dir results_complete/ --complete --verbose || echo "Complete mode test completed or failed"
         continue-on-error: true
 
       - name: Test CLI with various parameters (PowerShell)
@@ -2325,14 +2310,9 @@ jobs:
           echo "Running quick performance benchmark..."
           mkdir -p benchmark_results
           
-          # Time the basic analysis with timeout
+          # Time the basic analysis
           start_time=$(date +%s)
-          # Use gtimeout if available, otherwise run without timeout
-          if command -v gtimeout >/dev/null 2>&1; then
-            gtimeout 300 snid identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
-          else
-            snid identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
-          fi
+          snid identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
           end_time=$(date +%s)
           
           duration=$((end_time - start_time))
