@@ -88,7 +88,7 @@ def build_enhanced_context(snid_results: Union[Dict[str, Any], Any],
                     cluster_type = best_cluster.get('type', 'Unknown')
                     cluster_size = best_cluster.get('size', 0)
                     quality_score = best_cluster.get('composite_score', 0)
-                    top_10_count = best_cluster.get('top_10_count', 0)
+                    top_5_mean = best_cluster.get('top_5_mean', 0)
                     enhanced_redshift = best_cluster.get('weighted_mean_redshift', 0)
                     redshift_span = best_cluster.get('redshift_span', 0)
                     cluster_matches = best_cluster.get('matches', [])
@@ -97,25 +97,25 @@ def build_enhanced_context(snid_results: Union[Dict[str, Any], Any],
                     cluster_type = getattr(best_cluster, 'type', 'Unknown')
                     cluster_size = getattr(best_cluster, 'size', 0)
                     quality_score = getattr(best_cluster, 'composite_score', 0)
-                    top_10_count = getattr(best_cluster, 'top_10_count', 0)
+                    top_5_mean = getattr(best_cluster, 'top_5_mean', 0)
                     enhanced_redshift = getattr(best_cluster, 'weighted_mean_redshift', 0)
                     redshift_span = getattr(best_cluster, 'redshift_span', 0)
                     cluster_matches = getattr(best_cluster, 'matches', [])
                 
                 context['clustering_analysis'] = {
-                    'method': 'top10_rlap_gmm',
+                    'method': 'top5_rlap_cos_gmm',
                     'success': True,
                     'winning_cluster': {
                         'type': cluster_type,
                         'size': cluster_size,
                         'quality_score': quality_score,
-                        'top_10_count': top_10_count,
+                        'top_5_mean': top_5_mean,
                         'enhanced_redshift': enhanced_redshift,
                         'redshift_span': redshift_span,
                     },
                     'n_types_clustered': n_types_clustered,
                     'total_candidates': total_candidates,
-                    'clustering_method': 'Type-specific GMM with top-10% RLAP selection'
+                    'clustering_method': 'Type-specific GMM with top-5 RLAP-Cos selection'
                 }
                 
                 # Add subtype composition within cluster

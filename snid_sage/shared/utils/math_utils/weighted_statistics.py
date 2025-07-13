@@ -125,40 +125,41 @@ def calculate_hybrid_weighted_redshift(
     return float(z_final), float(sigma_final), float(np.sqrt(tau_squared))
 
 
-def calculate_rlap_weighted_age(
+def calculate_metric_weighted_age(
     ages: Union[np.ndarray, List[float]], 
-    rlaps: Union[np.ndarray, List[float]],
+    metric_weights: Union[np.ndarray, List[float]],
     include_cluster_scatter: bool = True
 ) -> Tuple[float, float, float, float]:
     """
-    Calculate RLAP-weighted age estimate with optional cluster scatter modeling.
+    Calculate metric-weighted age estimate with optional cluster scatter modeling.
     
-    This implements statistical age estimation methods:
-    1. RLAP-weighted mean age with effective sample size uncertainty
+    This function uses the best available metric (RLAP-cos if available, otherwise RLAP)
+    for weighting age estimates. This implements statistical age estimation methods:
+    1. Metric-weighted mean age with effective sample size uncertainty
     2. Hybrid error that incorporates cluster scatter in quadrature
     
     Parameters
     ----------
     ages : array-like
         Age values in days (already filtered for valid ages)
-    rlaps : array-like
-        RLAP values to use as weights
+    metric_weights : array-like
+        Metric values (RLAP-cos or RLAP) to use as weights
     include_cluster_scatter : bool, default=True
         Whether to include cluster scatter term
         
     Returns
     -------
     Tuple[float, float, float, float]
-        (final_age, rlap_only_error, total_error_with_scatter, cluster_scatter)
+        (final_age, metric_only_error, total_error_with_scatter, cluster_scatter)
         
     Notes
     -----
     Statistical Methods:
-    - RLAP-weighted mean with effective sample size uncertainty
+    - Metric-weighted mean with effective sample size uncertainty
     - Cluster scatter added in quadrature for total error
     """
     ages = np.asarray(ages, dtype=float)
-    rlaps = np.asarray(rlaps, dtype=float)
+    metric_weights = np.asarray(metric_weights, dtype=float)
     
     if len(ages) == 0:
         return np.nan, np.nan, np.nan, np.nan
@@ -167,49 +168,64 @@ def calculate_rlap_weighted_age(
         return float(ages[0]), 0.0, 0.0, 0.0
     
     # Remove invalid data
-    valid_mask = np.isfinite(ages) & np.isfinite(rlaps) & (rlaps > 0)
+    valid_mask = np.isfinite(ages) & np.isfinite(metric_weights) & (metric_weights > 0)
     
     if not np.any(valid_mask):
-        logger.warning("No valid age/RLAP pairs found")
+        logger.warning("No valid age/metric pairs found")
         return np.nan, np.nan, np.nan, np.nan
         
     valid_ages = ages[valid_mask]
-    valid_rlaps = rlaps[valid_mask]
+    valid_weights = metric_weights[valid_mask]
     N = len(valid_ages)
     
     if N == 1:
         return float(valid_ages[0]), 0.0, 0.0, 0.0
     
-    # Method 1: RLAP-only weighted mean age (ChatGPT Formula A1)
-    w_i = valid_rlaps  # RLAP weights
-    t_bar_rlap = np.sum(w_i * valid_ages) / np.sum(w_i)
+    # Method 1: Metric-weighted mean age (ChatGPT Formula A1)
+    w_i = valid_weights  # Metric weights (RLAP-cos or RLAP)
+    t_bar_metric = np.sum(w_i * valid_ages) / np.sum(w_i)
     
-    # RLAP-weighted uncertainty (ChatGPT Formula A2) 
+    # Metric-weighted uncertainty (ChatGPT Formula A2) 
     N_eff = (np.sum(w_i) ** 2) / np.sum(w_i ** 2)  # Effective number of templates
     
     # Weighted variance
-    weighted_variance = np.sum(w_i * (valid_ages - t_bar_rlap) ** 2) / np.sum(w_i)
+    weighted_variance = np.sum(w_i * (valid_ages - t_bar_metric) ** 2) / np.sum(w_i)
     
-    # Statistical uncertainty (RLAP-only)
-    sigma_rlap = np.sqrt(weighted_variance / N_eff)
+    # Statistical uncertainty (metric-only)
+    sigma_metric = np.sqrt(weighted_variance / N_eff)
     
     if not include_cluster_scatter:
-        return float(t_bar_rlap), float(sigma_rlap), float(sigma_rlap), 0.0
+        return float(t_bar_metric), float(sigma_metric), float(sigma_metric), 0.0
     
     # Method 2: Hybrid error with cluster scatter (ChatGPT Formula A3)
     
     # Cluster scatter in age space
-    s_tc_squared = weighted_variance  # This is the RLAP-weighted scatter
+    s_tc_squared = weighted_variance  # This is the metric-weighted scatter
     s_tc = np.sqrt(s_tc_squared)
     
     # Total error combining statistical and systematic components
-    sigma_total = np.sqrt(sigma_rlap ** 2 + s_tc_squared)
+    sigma_total = np.sqrt(sigma_metric ** 2 + s_tc_squared)
     
-    logger.info(f"Enhanced age estimate: {t_bar_rlap:.1f} days, "
-                f"RLAP-only error: ±{sigma_rlap:.1f}, "
+    logger.info(f"Enhanced age estimate: {t_bar_metric:.1f} days, "
+                f"metric-only error: ±{sigma_metric:.1f}, "
                 f"total error: ±{sigma_total:.1f}, cluster scatter: {s_tc:.1f}")
     
-    return float(t_bar_rlap), float(sigma_rlap), float(sigma_total), float(s_tc)
+    return float(t_bar_metric), float(sigma_metric), float(sigma_total), float(s_tc)
+
+
+# Keep the old function name for backward compatibility
+def calculate_rlap_weighted_age(
+    ages: Union[np.ndarray, List[float]], 
+    rlaps: Union[np.ndarray, List[float]],
+    include_cluster_scatter: bool = True
+) -> Tuple[float, float, float, float]:
+    """
+    DEPRECATED: Use calculate_metric_weighted_age instead.
+    
+    This function is kept for backward compatibility but now internally
+    uses the new calculate_metric_weighted_age function.
+    """
+    return calculate_metric_weighted_age(ages, rlaps, include_cluster_scatter)
 
 
 def calculate_inverse_variance_weighted_redshift(
@@ -357,9 +373,10 @@ def validate_weighted_calculation(
 # Backwards compatibility exports
 __all__ = [
     'calculate_hybrid_weighted_redshift',
+    'calculate_metric_weighted_age',
     'calculate_rlap_weighted_age',
     'calculate_inverse_variance_weighted_redshift',
-    # 'calculate_weighted_redshift_with_uncertainty',  # DEPRECATED - removed
+    'calculate_weighted_redshift_with_uncertainty',
     'calculate_weighted_median',
     'validate_weighted_calculation'
 ] 

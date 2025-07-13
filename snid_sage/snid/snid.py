@@ -1093,33 +1093,6 @@ def run_snid_analysis(
         templates = [t for t in templates if t.get('type', '') in type_filter]
         _LOG.info(f"Step 7a: Type filtering: {original_count} -> {len(templates)} templates")
     
-    if template_filter is not None and len(template_filter) > 0:
-        report_progress(f"Filtering templates by name: {template_filter}")
-        pre_template_filter_count = len(templates)
-        
-        # DEBUG: Add detailed logging to see what's happening
-        _LOG.info(f"DEBUG: Template filter received: {template_filter}")
-        _LOG.info(f"DEBUG: Template filter type: {type(template_filter)}")
-        _LOG.info(f"DEBUG: Template filter length: {len(template_filter)}")
-        if templates:
-            sample_names = [t.get('name', 'NO_NAME') for t in templates[:5]]
-            _LOG.info(f"DEBUG: Sample template names before filtering: {sample_names}")
-        
-        # Store original templates for debug
-        original_templates = templates[:]
-        templates = [t for t in templates if t.get('name', '') in template_filter]
-        
-        # DEBUG: Show why filtering failed if no templates remain
-        if len(templates) == 0 and pre_template_filter_count > 0:
-            _LOG.error(f"DEBUG: All templates filtered out!")
-            _LOG.error(f"DEBUG: Looking for names: {list(template_filter)[:10]}")
-            # Show first few available template names from original list
-            if original_templates:
-                available_names = [t.get('name', 'NO_NAME') for t in original_templates[:10]]
-                _LOG.error(f"DEBUG: Sample available names: {available_names}")
-        
-        _LOG.info(f"Step 7b: Template name filtering: {pre_template_filter_count} -> {len(templates)} templates")
-    
     if len(templates) == 0:
         report_progress("No templates remaining after filtering")
         _LOG.error("ERROR: No templates remaining after filtering")
@@ -1475,34 +1448,40 @@ def run_snid_analysis(
     
     # Compute RLAP-Cos metric before clustering (multiply RLAP with capped cosine similarity)
     if len(matches) >= 3:
-        try:
-            from snid_sage.shared.utils.math_utils import compute_rlap_cos_metric
-            report_progress("Computing RLAP-Cos similarity metrics")
-            _LOG.info("Computing RLAP-Cos metric for enhanced GMM clustering")
-            
-            # Pass the full processed spectrum for exact spectrum preparation matching snid_enhanced_metrics.py
-            processed_spectrum_for_cosine = {
-                'tapered_flux': tapered_flux,
-                'display_flat': processed_spectrum.get('display_flat'),  # May be None, which is fine
-                'flat_flux': flat_flux, 
-                'left_edge': left_edge,
-                'right_edge': right_edge,
-                'log_wave': log_wave
-            }
-            
-            # Enhance matches with RLAP-Cos metric using exact spectrum preparation
-            matches = compute_rlap_cos_metric(matches, processed_spectrum_for_cosine, verbose=verbose)
-            
-            _LOG.info(f"RLAP-Cos metric computed for {len(matches)} matches")
-            
-        except Exception as e:
-            _LOG.warning(f"RLAP-Cos computation failed, using original RLAP: {e}")
-            # Add dummy rlap_cos field equal to original rlap for compatibility
-            for match in matches:
-                match['rlap_cos'] = match.get('rlap', 0.0)
-                match['original_rlap'] = match.get('rlap', 0.0)
-                match['cosine_similarity'] = 0.0
-                match['cosine_similarity_capped'] = 0.0
+        # Check if RLAP-cos is already computed for all matches
+        already_computed = all('rlap_cos' in match for match in matches)
+        
+        if already_computed:
+            _LOG.info("RLAP-Cos metric already computed for all matches - skipping computation")
+        else:
+            try:
+                from snid_sage.shared.utils.math_utils import compute_rlap_cos_metric
+                report_progress("Computing RLAP-Cos similarity metrics")
+                _LOG.info("Computing RLAP-Cos metric for enhanced GMM clustering")
+                
+                # Pass the full processed spectrum for exact spectrum preparation matching snid_enhanced_metrics.py
+                processed_spectrum_for_cosine = {
+                    'tapered_flux': tapered_flux,
+                    'display_flat': processed_spectrum.get('display_flat'),  # May be None, which is fine
+                    'flat_flux': flat_flux, 
+                    'left_edge': left_edge,
+                    'right_edge': right_edge,
+                    'log_wave': log_wave
+                }
+                
+                # Enhance matches with RLAP-Cos metric using exact spectrum preparation
+                matches = compute_rlap_cos_metric(matches, processed_spectrum_for_cosine, verbose=verbose)
+                
+                _LOG.info(f"RLAP-Cos metric computed for {len(matches)} matches")
+                
+            except Exception as e:
+                _LOG.warning(f"RLAP-Cos computation failed, using original RLAP: {e}")
+                # Add dummy rlap_cos field equal to original rlap for compatibility
+                for match in matches:
+                    match['rlap_cos'] = match.get('rlap', 0.0)
+                    match['original_rlap'] = match.get('rlap', 0.0)
+                    match['cosine_similarity'] = 0.0
+                    match['cosine_similarity_capped'] = 0.0
 
     # ============================================================================
     # IMPROVED TOP-10% RLAP-COS GMM CLUSTERING (NOW DEFAULT)
@@ -1530,10 +1509,10 @@ def run_snid_analysis(
             if clustering_results['success'] and clustering_results['best_cluster']:
                 filtered_matches = clustering_results['best_cluster']['matches']
                 best_type = clustering_results['best_cluster']['type']
-                top_10_count = clustering_results['best_cluster']['top_10_count']
+                top_5_mean = clustering_results['best_cluster'].get('top_5_mean', 0)
                 
                 _LOG.info(f"Cosmological GMM: {len(matches)} -> {len(filtered_matches)} matches")
-                _LOG.info(f"Best cluster: {best_type} ({top_10_count} top-10% matches)")
+                _LOG.info(f"Best cluster: {best_type} (top-5 mean: {top_5_mean:.2f})")
                 
                 # Store clustering results for plotting
                 result.clustering_results = clustering_results
@@ -1601,35 +1580,18 @@ def run_snid_analysis(
             _LOG.info(f"Cluster-aware subtype determination: {best_subtype} "
                      f"(confidence: {subtype_confidence:.3f}, margin: {margin_over_second:.3f}, second: {second_best_subtype})")
             
-            # Assess type security based on cluster quality
-            cluster_quality = best_cluster.get('redshift_quality', 'loose')
-            top_10_fraction = best_cluster.get('top_10_fraction', 0.0)
-            cluster_size = best_cluster.get('size', 0)
-            
-            # Enhanced type security assessment - RELAXED THRESHOLDS
-            if cluster_quality == 'tight' and top_10_fraction > 0.2 and cluster_size >= 8:  # Relaxed from 0.3 and 10
-                type_secure = True
-            elif cluster_quality in ['tight', 'moderate'] and top_10_fraction > 0.15 and cluster_size >= 4:  # Relaxed from 0.2 and 5
-                type_secure = True
-            elif cluster_quality != 'very_loose' and cluster_size >= 3:  # Added quality check
-                type_secure = False
-            else:
-                type_secure = False
-            
-            # Create type determination result with new security assessment
+            # Create type determination result with cluster-based metrics
             type_determination = {
                 'success': True,
                 'consensus_type': winning_type,
                 'consensus_subtype': best_subtype,
-                'type_secure': type_secure,
-                'subtype_secure': subtype_confidence > 0.7,  # High confidence = secure
                 'subtype_confidence': subtype_confidence,
                 'subtype_margin_over_second': margin_over_second,
                 'second_best_subtype': second_best_subtype,
                 'cluster_metrics': {
-                    'cluster_quality': cluster_quality,
-                    'top_10_fraction': top_10_fraction,
-                    'cluster_size': cluster_size,
+                    'cluster_quality': best_cluster.get('redshift_quality', 'loose'),
+                    'top_5_mean': best_cluster.get('top_5_mean', 0.0),
+                    'cluster_size': best_cluster.get('size', 0),
                     'redshift_span': best_cluster.get('redshift_span', 0.0),
                     'mean_rlap': best_cluster.get('mean_rlap', 0.0)
                 },
@@ -1663,31 +1625,14 @@ def run_snid_analysis(
                 weighted_redshift = best_cluster.get('enhanced_redshift', result.initial_redshift)
                 weighted_uncertainty = best_cluster.get('weighted_redshift_uncertainty', 0.01)
             
-            # Assess type security based on cluster quality without subtype analysis
-            cluster_quality = best_cluster.get('redshift_quality', 'loose')
-            top_10_fraction = best_cluster.get('top_10_fraction', 0.0)
-            cluster_size = best_cluster.get('size', 0)
-            
-            # Type security assessment (same logic as above) - RELAXED THRESHOLDS
-            if cluster_quality == 'tight' and top_10_fraction > 0.2 and cluster_size >= 8:  # Relaxed from 0.3 and 10
-                type_secure = True
-            elif cluster_quality in ['tight', 'moderate'] and top_10_fraction > 0.15 and cluster_size >= 4:  # Relaxed from 0.2 and 5
-                type_secure = True
-            elif cluster_quality != 'very_loose' and cluster_size >= 3:  # Added quality check
-                type_secure = False
-            else:
-                type_secure = False
-            
             type_determination = {
                 'success': True,
                 'consensus_type': winning_type,
                 'consensus_subtype': 'Unknown',
-                'type_secure': type_secure,
-                'subtype_secure': False,
                 'cluster_metrics': {
-                    'cluster_quality': cluster_quality,
-                    'top_10_fraction': top_10_fraction,
-                    'cluster_size': cluster_size,
+                    'cluster_quality': best_cluster.get('redshift_quality', 'loose'),
+                    'top_5_mean': best_cluster.get('top_5_mean', 0.0),
+                    'cluster_size': best_cluster.get('size', 0),
                     'redshift_span': best_cluster.get('redshift_span', 0.0),
                     'mean_rlap': best_cluster.get('mean_rlap', 0.0)
                 },
@@ -1717,34 +1662,25 @@ def run_snid_analysis(
         if filtered_matches:
             # Find most common type among filtered matches
             type_counts = {}
-            type_rlaps = {}  # Track RLAP values for each type
+            type_rlaps = {}  # Track RLAP-cos values for each type
             for match in filtered_matches:
                 tp = match['template'].get('type', 'Unknown')
                 type_counts[tp] = type_counts.get(tp, 0) + 1
                 if tp not in type_rlaps:
                     type_rlaps[tp] = []
-                type_rlaps[tp].append(match['rlap'])
+                # Use RLAP-cos if available, otherwise RLAP
+                from snid_sage.shared.utils.math_utils import get_best_metric_value
+                type_rlaps[tp].append(get_best_metric_value(match))
             
             if type_counts:
                 consensus_type = max(type_counts.items(), key=lambda x: x[1])[0]
                 
-                # Enhanced security assessment based on match quality and quantity
+                # Match quality and quantity metrics
                 type_match_count = type_counts[consensus_type]
                 max_rlap = max(type_rlaps[consensus_type]) if type_rlaps[consensus_type] else 0
                 mean_rlap = sum(type_rlaps[consensus_type]) / len(type_rlaps[consensus_type]) if type_rlaps[consensus_type] else 0
-                
-                # Security assessment without clustering
-                if type_match_count >= 10 and max_rlap >= 8.0 and mean_rlap >= 6.0:
-                    type_secure = True  # Can't be high without clustering
-                elif type_match_count >= 5 and max_rlap >= 6.0:
-                    type_secure = False
-                elif type_match_count >= 2:
-                    type_secure = False
-                else:
-                    type_secure = False
             else:
                 consensus_type = 'Unknown'
-                type_secure = False
             
             # Use proper statistical redshift calculations instead of simple mean
             redshifts = [m['redshift'] for m in filtered_matches]
@@ -1762,8 +1698,6 @@ def run_snid_analysis(
                 'success': True,
                 'consensus_type': consensus_type,
                 'consensus_subtype': 'Unknown',  # No subtype without clustering
-                'type_secure': type_secure,  # Lower standards without clustering
-                'subtype_secure': False,
                 'match_metrics': {
                     'type_match_count': type_counts.get(consensus_type, 0),
                     'max_rlap': max(type_rlaps.get(consensus_type, [0])),
@@ -1795,8 +1729,6 @@ def run_snid_analysis(
                 'success': False,
                 'consensus_type': 'Unknown',
                 'consensus_subtype': 'Unknown',
-                'type_secure': False,
-                'subtype_secure': False,
                 'match_metrics': {
                     'type_match_count': 0,
                     'max_rlap': 0.0,
@@ -1895,8 +1827,6 @@ def run_snid_analysis(
             'bstslope': security_stats.get('bstslope', result.best_subtype),
             'btstfrac': security_stats.get('btstfrac', result.consensus_type),
             'btstslope': security_stats.get('btstslope', result.consensus_type),
-            'type_secure': type_determination['type_secure'],
-            'subtype_secure': type_determination.get('subtype_secure', False),
             'security_method': security_stats.get('method', 'unknown'),
             'cluster_based': security_stats.get('cluster_based', False)
         }
@@ -1921,7 +1851,9 @@ def run_snid_analysis(
         # Calculate confidence using new cluster-aware metrics
         type_matches = [m for m in filtered_matches if m['template'].get('type') == result.consensus_type]
         if type_matches:
-            max_rlap = max(m['rlap'] for m in type_matches)
+            # Use RLAP-cos if available, otherwise RLAP
+            from snid_sage.shared.utils.math_utils import get_best_metric_value
+            max_rlap = max(get_best_metric_value(m) for m in type_matches)
             
             # Use cluster metrics if available for confidence calculation
             if hasattr(result, 'clustering_results') and result.clustering_results:
@@ -1930,14 +1862,14 @@ def run_snid_analysis(
                 match_metrics = type_determination.get('match_metrics', {})
                 
                 if cluster_metrics:
-                    # Use cluster quality and top-10% fraction for confidence
+                    # Use cluster quality and top-5 mean for confidence
                     quality_factor = {'tight': 1.0, 'moderate': 0.8, 'loose': 0.6, 'very_loose': 0.4}.get(
                         cluster_metrics.get('cluster_quality', 'loose'), 0.5)
-                    top_10_factor = cluster_metrics.get('top_10_fraction', 0.0)
+                    top_5_factor = min(1.0, cluster_metrics.get('top_5_mean', 0.0) / 8.0)  # Normalize by good RLAP
                     size_factor = min(1.0, cluster_metrics.get('cluster_size', 0) / 10.0)  # Normalize by expected size
                     rlap_factor = min(1.0, cluster_metrics.get('mean_rlap', 0.0) / 8.0)  # Normalize by good RLAP
                     
-                    result.type_confidence = (quality_factor * 0.3 + top_10_factor * 0.3 + 
+                    result.type_confidence = (quality_factor * 0.3 + top_5_factor * 0.3 + 
                                             size_factor * 0.2 + rlap_factor * 0.2)
                 elif match_metrics:
                     # Use match-based metrics for confidence
@@ -1947,10 +1879,10 @@ def run_snid_analysis(
                     
                     result.type_confidence = (count_factor * 0.4 + rlap_factor * 0.3 + mean_rlap_factor * 0.3)
                 else:
-                    # Simple fallback based on RLAP
+                    # Simple fallback based on RLAP-cos
                     result.type_confidence = min(1.0, max_rlap / 8.0)
             else:
-                # Simple RLAP-based confidence without clustering
+                # Simple RLAP-cos-based confidence without clustering
                 result.type_confidence = min(1.0, max_rlap / 8.0)
         else:
             result.type_confidence = 0.0
@@ -1967,7 +1899,7 @@ def run_snid_analysis(
         result.type_confidence = 0.0
 
         result.success = False
-        report_progress("No secure matches found")
+        report_progress("No good matches found")
 
     # Store matches for plotting - limit best_matches to max_output_templates for GUI consistency
     result.best_matches = matches[:max_output_templates]
@@ -2411,7 +2343,7 @@ def run_snid(
         _LOG.info(f"   Confidence: {result.type_confidence:.2f}")
     
     else:
-        _LOG.error(f"[FAILED] NO SECURE MATCH FOUND")
+        _LOG.error(f"[FAILED] NO GOOD MATCH FOUND")
         _LOG.error(f"   Try lowering rlapmin or adjusting redshift range")
     
     _LOG.info(f"   Runtime: {result.runtime_sec:.2f} seconds")

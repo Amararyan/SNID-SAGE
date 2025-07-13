@@ -24,6 +24,14 @@ import numpy as np
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
 from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift, calculate_rlap_weighted_age
 
+# Import and apply centralized font configuration for consistent plotting
+try:
+    from snid_sage.shared.utils.plotting.font_sizes import apply_font_config
+    apply_font_config()
+except ImportError:
+    # Fallback if font configuration is not available
+    pass
+
 
 class BatchTemplateManager:
     """
@@ -34,24 +42,23 @@ class BatchTemplateManager:
     template loading and FFT computation.
     """
     
-    def __init__(self, templates_dir: str, verbose: bool = False):
+    def __init__(self, templates_dir: Optional[str], verbose: bool = False):
         # Validate and auto-correct templates directory
         self.templates_dir = self._validate_and_fix_templates_dir(templates_dir)
         self.verbose = verbose
         self._templates = None
         self._templates_metadata = None
         self._load_time = None
-        self._optimization_used = False
         
         # Initialize logging
         self._log = logging.getLogger('snid_sage.snid.batch.template_manager')
     
-    def _validate_and_fix_templates_dir(self, templates_dir: str) -> str:
+    def _validate_and_fix_templates_dir(self, templates_dir: Optional[str]) -> str:
         """
         Validate templates directory and auto-correct if needed.
         
         Args:
-            templates_dir: Path to templates directory
+            templates_dir: Path to templates directory (None to auto-discover)
             
         Returns:
             Valid templates directory path
@@ -59,6 +66,18 @@ class BatchTemplateManager:
         Raises:
             FileNotFoundError: If no valid templates directory can be found
         """
+        # If no templates directory provided, auto-discover
+        if templates_dir is None:
+            try:
+                from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
+                auto_found_dir = find_templates_directory_or_raise()
+                print(f"✅ Auto-discovered templates at: {auto_found_dir}")
+                return str(auto_found_dir)
+            except (ImportError, FileNotFoundError):
+                raise FileNotFoundError(
+                    "Could not auto-discover templates directory. Please provide templates_dir explicitly."
+                )
+        
         # Check if provided directory exists and is valid
         if os.path.exists(templates_dir):
             return templates_dir
@@ -89,50 +108,24 @@ class BatchTemplateManager:
         start_time = time.time()
         
         try:
-            # Check for optimization system
-            optimization_available = False
+            # Use unified storage system (for HDF5 templates) - this is already optimized
             try:
-                from snid_sage.snid.optimization_integration import (
-                    auto_enable_optimization, optimize_template_loading, is_optimization_enabled
-                )
-                optimization_available = True
-                self._log.info("✅ Optimization system available")
+                from snid_sage.snid.core.integration import load_templates_unified
+                self._templates = load_templates_unified(self.templates_dir)
+                self._templates_metadata = {}
+                self._log.info(f"✅ Loaded {len(self._templates)} templates using UNIFIED STORAGE")
             except ImportError:
-                self._log.info("📝 Using standard template loading (optimization not available)")
-            
-            if optimization_available:
-                # Try optimized loading first
-                try:
-                    # Check if optimization is already enabled to avoid warning
-                    try:
-                        from snid_sage.snid.core.integration import is_optimization_active
-                        if not is_optimization_active():
-                            auto_enable_optimization(self.templates_dir)
-                    except ImportError:
-                        # Fallback if is_optimization_active not available
-                        auto_enable_optimization(self.templates_dir)
-                    
-                    self._templates = optimize_template_loading(self.templates_dir)
-                    if self._templates is not None:
-                        self._optimization_used = True
-                        self._log.info(f"✅ Loaded {len(self._templates)} templates using OPTIMIZATION")
-                    else:
-                        raise RuntimeError("Optimization returned None")
-                except Exception as e:
-                    self._log.warning(f"⚠️ Optimization failed: {e}, falling back to standard loading")
-                    optimization_available = False
-            
-            if not optimization_available or self._templates is None:
-                # Fall back to standard loading
+                # Fallback to standard loading (for .lnw files)
                 from snid_sage.snid.io import load_templates
                 self._templates, self._templates_metadata = load_templates(self.templates_dir, flatten=True)
-                self._optimization_used = False
                 self._log.info(f"✅ Loaded {len(self._templates)} templates using STANDARD method")
             
             self._load_time = time.time() - start_time
             
             if not self._templates:
                 self._log.error("❌ No templates loaded")
+                self._log.error("   Check that templates directory exists and contains .hdf5 or .lnw files")
+                self._log.error(f"   Templates directory: {self.templates_dir}")
                 return False
                 
             self._log.info(f"🚀 Template loading complete in {self._load_time:.2f}s")
@@ -142,6 +135,11 @@ class BatchTemplateManager:
             
         except Exception as e:
             self._log.error(f"❌ Failed to load templates: {e}")
+            self._log.error(f"   Templates directory: {self.templates_dir}")
+            self._log.error("   Ensure the directory exists and contains valid template files")
+            if self.verbose:
+                import traceback
+                self._log.error(f"   Full traceback: {traceback.format_exc()}")
             return False
     
     def get_filtered_templates(self, 
@@ -207,11 +205,6 @@ class BatchTemplateManager:
     def load_time(self) -> float:
         """Get time taken to load templates."""
         return self._load_time or 0.0
-    
-    @property
-    def optimization_used(self) -> bool:
-        """Check if optimization was used for template loading."""
-        return self._optimization_used
 
 
 def process_single_spectrum_optimized(
@@ -273,7 +266,9 @@ def process_single_spectrum_optimized(
             }
         
         # STEP 3: Run SNID analysis with pre-loaded templates
-        # We need to create a custom analysis function that uses pre-loaded templates
+        # Pass the templates directory to the analysis function
+        _run_optimized_snid_analysis._templates_dir = template_manager.templates_dir
+        
         result = _run_optimized_snid_analysis(
             processed_spectrum=processed_spectrum,
             templates=filtered_templates,
@@ -323,47 +318,65 @@ def _run_optimized_snid_analysis(
     """
     Run SNID analysis using pre-loaded templates.
     
-    This is a simplified version of run_snid_analysis that skips
-    the template loading step since templates are already provided.
+    This bypasses the template loading in run_snid_analysis by monkey-patching
+    the template loading functions to return our pre-loaded templates.
     """
     try:
-        # Create a minimal mock templates_dir for the analysis function
-        # We'll inject our pre-loaded templates directly
+        # Import required modules
+        from snid_sage.snid.snid import SNIDResult
         
-        # We need to temporarily monkey-patch the template loading to use our pre-loaded templates
-        original_load_templates = None
+        # We need to pass a valid templates directory to avoid TemplateFFTStorage errors
+        # Get the templates directory from the global template manager if possible
+        templates_dir = getattr(_run_optimized_snid_analysis, '_templates_dir', None)
+        if not templates_dir:
+            # Fallback to a dummy directory - the monkey-patch will handle the actual loading
+            templates_dir = "dummy_templates_dir"
+        
+        # Import the functions we need to patch
+        import snid_sage.snid.core.integration
+        import snid_sage.snid.io
+        
+        # Store original functions
+        original_load_templates_unified = snid_sage.snid.core.integration.load_templates_unified
+        original_load_templates = snid_sage.snid.io.load_templates
+        
+        # Create mock functions that return our pre-loaded templates
+        def mock_load_templates_unified(template_dir, type_filter=None, template_names=None, exclude_templates=None):
+            # Apply filtering to our pre-loaded templates
+            filtered_templates = templates[:]
+            
+            if type_filter:
+                filtered_templates = [t for t in filtered_templates if t.get('type', '') in type_filter]
+            
+            if template_names:
+                filtered_templates = [t for t in filtered_templates if t.get('name', '') in template_names]
+            
+            if exclude_templates:
+                filtered_templates = [t for t in filtered_templates if t.get('name', '') not in exclude_templates]
+            
+            return filtered_templates
+        
+        def mock_load_templates(template_dir, flatten=True):
+            return templates, {}
+        
         try:
-            import snid_sage.snid.io
-            original_load_templates = snid.io.load_templates
+            # Apply the monkey patches
+            snid_sage.snid.core.integration.load_templates_unified = mock_load_templates_unified
+            snid_sage.snid.io.load_templates = mock_load_templates
             
-            # Replace with our pre-loaded templates
-            def mock_load_templates(template_dir, flatten=True):
-                return templates, {}
-            
-            snid.io.load_templates = mock_load_templates
-            
-            # Temporarily suppress optimization and clustering warnings during individual spectrum processing
+            # Temporarily suppress some logging during individual spectrum processing
             import logging
-            snid_integration_logger = logging.getLogger('snid_sage.snid.integration')
-            snid_clustering_logger = logging.getLogger('snid_sage.snid.cosmological_clustering')
             snid_pipeline_logger = logging.getLogger('snid_sage.snid.pipeline')
+            original_pipeline_level = snid_pipeline_logger.level
             
-            original_levels = {
-                'integration': snid_integration_logger.level,
-                'clustering': snid_clustering_logger.level,
-                'pipeline': snid_pipeline_logger.level
-            }
-            
-            # Suppress warnings during individual processing
-            snid_integration_logger.setLevel(logging.ERROR)
-            snid_clustering_logger.setLevel(logging.ERROR)
+            # Set to ERROR level to suppress "No templates loaded" messages
             snid_pipeline_logger.setLevel(logging.ERROR)
             
             try:
-                # Run the analysis with the mocked template loading
+                # Now call run_snid_analysis with the mocked functions
                 result, _ = run_snid_analysis(
                     processed_spectrum=processed_spectrum,
-                    templates_dir="",  # Dummy path since we're using mocked loading
+                    templates_dir=templates_dir,
                     zmin=zmin,
                     zmax=zmax,
                     forced_redshift=forced_redshift,
@@ -371,19 +384,18 @@ def _run_optimized_snid_analysis(
                     show_plots=False,
                     save_plots=False
                 )
-            finally:
-                # Restore logging levels
-                snid_integration_logger.setLevel(original_levels['integration'])
-                snid_clustering_logger.setLevel(original_levels['clustering'])
-                snid_pipeline_logger.setLevel(original_levels['pipeline'])
-            
-            return result
-            
-        finally:
-            # Restore original function
-            if original_load_templates is not None:
-                snid.io.load_templates = original_load_templates
                 
+                return result
+                
+            finally:
+                # Restore logging level
+                snid_pipeline_logger.setLevel(original_pipeline_level)
+                
+        finally:
+            # Restore original functions
+            snid_sage.snid.core.integration.load_templates_unified = original_load_templates_unified
+            snid_sage.snid.io.load_templates = original_load_templates
+            
     except Exception as e:
         # Return failed result
         result = SNIDResult(success=False)
@@ -498,7 +510,9 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                 age = template.get('age', 0.0) if template else 0.0
                 if age > 0:
                     ages.append(age)
-                    age_rlaps.append(m['rlap'])
+                    # Use RLAP-cos if available, otherwise RLAP
+                    from snid_sage.shared.utils.math_utils import get_best_metric_value
+                    age_rlaps.append(get_best_metric_value(m))
             
             if ages:
                 age_mean, age_stat_error, age_total_error, age_scatter = calculate_rlap_weighted_age(
@@ -580,10 +594,12 @@ def _save_spectrum_outputs(
     Save spectrum outputs based on the analysis mode using GUI-style cluster-aware approach.
     """
     try:
+        # Extract spectrum name from path
+        spectrum_name = Path(spectrum_path).stem
+        
         if args.minimal:
             # Minimal mode: save main result file only
             from snid_sage.snid.io import write_result
-            spectrum_name = Path(spectrum_path).stem
             output_file = output_dir / f"{spectrum_name}.output"
             write_result(result, str(output_file))
             
@@ -597,8 +613,6 @@ def _save_spectrum_outputs(
                 plot_redshift_age, plot_cluster_subtype_proportions,
                 plot_flux_comparison, plot_flat_comparison, plot_correlation_view
             )
-            
-            spectrum_name = Path(spectrum_path).stem
             
             # Save main result file
             output_file = output_dir / f"{spectrum_name}.output"
@@ -740,19 +754,22 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     # Set epilog with examples
     parser.epilog = """
 Examples:
-  # Minimal mode - only summary report (no individual files)
-  snid batch "spectra/*" templates/ --output-dir results/ --minimal
+  # Auto-discover templates - minimal mode (only summary report)
+  snid batch "spectra/*" --output-dir results/ --minimal
   
-  # Complete mode - all outputs + 3D plots (comprehensive)
-  snid batch "spectra/*" templates/ --output-dir results/ --complete
+  # Auto-discover templates - complete mode (all outputs + 3D plots)
+  snid batch "spectra/*" --output-dir results/ --complete
   
-  # Default mode - main outputs + summary (balanced)
+  # Auto-discover templates - default mode (main outputs + summary)
+  snid batch "spectra/*" --output-dir results/
+  
+  # Explicit templates directory
   snid batch "spectra/*" templates/ --output-dir results/
   
-  # Custom redshift range
-  snid batch "*.dat" templates/ --zmin 0.0 --zmax 0.5 --output-dir results/
+  # Custom redshift range with auto-discovery
+  snid batch "*.dat" --zmin 0.0 --zmax 0.5 --output-dir results/
   
-  # With forced redshift
+  # With forced redshift and explicit templates
   snid batch "*.dat" templates/ --forced-redshift 0.1 --output-dir results/
     """
     
@@ -763,7 +780,8 @@ Examples:
     )
     parser.add_argument(
         "templates_dir", 
-        help="Path to directory containing template spectra"
+        nargs="?",  # Make optional
+        help="Path to directory containing template spectra (optional - auto-discovers if not provided)"
     )
     parser.add_argument(
         "--output-dir", "-o", 
@@ -881,18 +899,19 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         report.append("📋 INDIVIDUAL SPECTRUM RESULTS")
         report.append("-"*50)
         report.append("Each spectrum represents a different astronomical object.")
-        report.append("Results are sorted by analysis quality (RLAP) - highest quality first.")
+        report.append("Results are sorted by analysis quality (RLAP-Cos) - highest quality first.")
         report.append("")
         
         # Header
-        header = f"{'Spectrum':<25} {'Type':<8} {'Subtype':<10} {'Template':<18} {'z':<8} {'RLAP':<6} {'Sec':<3} {'C':<1}"
+        header = f"{'Spectrum':<25} {'Type':<8} {'Subtype':<10} {'Template':<18} {'z':<8} {'RLAP-Cos':<8} {'C':<1}"
         report.append(header)
         report.append("-" * len(header))
-        report.append("Legend: 🎯 = Cluster-based analysis, Sec = Secure classification, z = redshift")
+        report.append("Legend: 🎯 = Cluster-based analysis, z = redshift")
         
-        # Sort results by RLAP descending (highest quality first)
+        # Sort results by RLAP-Cos descending (highest quality first)
+        from snid_sage.shared.utils.math_utils import get_best_metric_value
         successful_results_sorted = sorted(successful_results, 
-                                         key=lambda x: x[3].get('rlap', 0), reverse=True)
+                                         key=lambda x: get_best_metric_value(x[3]), reverse=True)
         
         # Results
         for _, _, _, summary in successful_results_sorted:
@@ -903,20 +922,21 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             
             # Use cluster-weighted redshift if available, otherwise regular redshift
             if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
-                redshift = f"{summary['cluster_redshift_weighted']:.5f}"
+                redshift = f"{summary['cluster_redshift_weighted']:.6f}"
             else:
-                redshift = f"{summary.get('redshift', 0):.5f}"
+                redshift = f"{summary.get('redshift', 0):.6f}"
             
-            rlap = f"{summary.get('rlap', 0):.1f}"
-            secure = "✓" if summary.get('secure', False) else "✗"
+            # Use RLAP-Cos if available, otherwise RLAP
+            from snid_sage.shared.utils.math_utils import get_best_metric_value
+            rlap_cos = f"{get_best_metric_value(summary):.1f}"
             cluster_marker = "🎯" if summary.get('has_clustering', False) else " "
             
-            row = f"{spectrum:<25} {cons_type:<8} {cons_subtype:<10} {template:<18} {redshift:<8} {rlap:<6} {secure:<3} {cluster_marker}"
+            row = f"{spectrum:<25} {cons_type:<8} {cons_subtype:<10} {template:<18} {redshift:<8} {rlap_cos:<8} {cluster_marker}"
             report.append(row)
         
         report.append("")
         
-        # Detailed analysis (sorted by RLAP - highest quality first)
+        # Detailed analysis (sorted by RLAP-Cos - highest quality first)
         report.append("🎯 DETAILED INDIVIDUAL ANALYSIS")
         report.append("-"*50)
         report.append("Detailed results for each spectrum (sorted by analysis quality):")
@@ -947,12 +967,15 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
                     report.append(f"      RLAP-Weighted Redshift: {summary['cluster_redshift_weighted']:.6f} ± {summary.get('cluster_redshift_weighted_uncertainty', 0):.6f}")
                     report.append(f"      Cluster RLAP: {summary.get('cluster_rlap_mean', 0):.2f}")
                 
-                report.append(f"   Best Match Redshift: {summary.get('redshift', 0):.5f} ± {summary.get('redshift_error', 0):.5f}")
+                report.append(f"   Best Match Redshift: {summary.get('redshift', 0):.6f} ± {summary.get('redshift_error', 0):.6f}")
             else:
-                report.append(f"   Redshift: {summary.get('redshift', 0):.5f} ± {summary.get('redshift_error', 0):.5f}")
+                report.append(f"   Redshift: {summary.get('redshift', 0):.6f} ± {summary.get('redshift_error', 0):.6f}")
             
-            report.append(f"   RLAP (analysis quality): {summary.get('rlap', 0):.2f}")
-            report.append(f"   Classification Security: {'SECURE' if summary.get('secure', False) else 'INSECURE'}")
+            # Use RLAP-Cos if available, otherwise RLAP
+            from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+            metric_value = get_best_metric_value(summary)
+            metric_name = get_best_metric_name(summary)
+            report.append(f"   {metric_name} (analysis quality): {metric_value:.2f}")
             report.append(f"   Runtime: {summary.get('runtime', 0):.1f} seconds")
             
             # Show subtype composition within this spectrum's analysis
@@ -970,24 +993,39 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         report.append("These statistics describe the quality of the batch processing, not the science.")
         report.append("")
         
-        # RLAP distribution (analysis quality)
-        all_rlaps = [summary.get('rlap', 0) for _, _, _, summary in successful_results]
-        avg_rlap = sum(all_rlaps) / len(all_rlaps) if all_rlaps else 0
-        high_quality = sum(1 for rlap in all_rlaps if rlap >= 10.0)
-        medium_quality = sum(1 for rlap in all_rlaps if 5.0 <= rlap < 10.0)
-        low_quality = sum(1 for rlap in all_rlaps if rlap < 5.0)
+        # RLAP-Cos distribution (analysis quality)
+        from snid_sage.shared.utils.math_utils import get_best_metric_value
+        all_metrics = [get_best_metric_value(summary) for _, _, _, summary in successful_results]
+        avg_metric = sum(all_metrics) / len(all_metrics) if all_metrics else 0
+        high_quality = sum(1 for metric in all_metrics if metric >= 10.0)
+        medium_quality = sum(1 for metric in all_metrics if 5.0 <= metric < 10.0)
+        low_quality = sum(1 for metric in all_metrics if metric < 5.0)
         
-        report.append(f"🎯 ANALYSIS QUALITY (RLAP Distribution):")
-        report.append(f"   Average RLAP: {avg_rlap:.2f}")
-        report.append(f"   High Quality (RLAP ≥ 10): {high_quality}/{success_count} ({high_quality/success_count*100:.1f}%)")
-        report.append(f"   Medium Quality (5 ≤ RLAP < 10): {medium_quality}/{success_count} ({medium_quality/success_count*100:.1f}%)")
-        report.append(f"   Low Quality (RLAP < 5): {low_quality}/{success_count} ({low_quality/success_count*100:.1f}%)")
+        # Determine metric name (RLAP-Cos if available, otherwise RLAP)
+        metric_name = "RLAP-Cos" if any('rlap_cos' in summary for _, _, _, summary in successful_results) else "RLAP"
         
-        # Classification confidence
-        secure_count = sum(1 for _, _, _, s in successful_results if s.get('secure', False))
+        report.append(f"🎯 ANALYSIS QUALITY ({metric_name} Distribution):")
+        report.append(f"   Average {metric_name}: {avg_metric:.2f}")
+        report.append(f"   High Quality ({metric_name} ≥ 10): {high_quality}/{success_count} ({high_quality/success_count*100:.1f}%)")
+        report.append(f"   Medium Quality (5 ≤ {metric_name} < 10): {medium_quality}/{success_count} ({medium_quality/success_count*100:.1f}%)")
+        report.append(f"   Low Quality ({metric_name} < 5): {low_quality}/{success_count} ({low_quality/success_count*100:.1f}%)")
+        
+        # Classification confidence (using cluster-based metrics)
+        cluster_count = sum(1 for _, _, _, s in successful_results if s.get('has_clustering', False))
+        high_confidence = sum(1 for _, _, _, s in successful_results 
+                             if s.get('cluster_confidence_level') == 'high')
+        medium_confidence = sum(1 for _, _, _, s in successful_results 
+                               if s.get('cluster_confidence_level') == 'medium')
+        low_confidence = sum(1 for _, _, _, s in successful_results 
+                            if s.get('cluster_confidence_level') == 'low')
+        
         report.append(f"\n🔒 CLASSIFICATION CONFIDENCE:")
-        report.append(f"   Secure Classifications: {secure_count}/{success_count} ({secure_count/success_count*100:.1f}%)")
-        report.append(f"   Insecure Classifications: {success_count-secure_count}/{success_count} ({(success_count-secure_count)/success_count*100:.1f}%)")
+        if cluster_count > 0:
+            report.append(f"   High Confidence: {high_confidence}/{success_count} ({high_confidence/success_count*100:.1f}%)")
+            report.append(f"   Medium Confidence: {medium_confidence}/{success_count} ({medium_confidence/success_count*100:.1f}%)")
+            report.append(f"   Low Confidence: {low_confidence}/{success_count} ({low_confidence/success_count*100:.1f}%)")
+        else:
+            report.append(f"   Note: Using legacy analysis method (no cluster-based confidence available)")
         
         # Clustering effectiveness
         cluster_count = sum(1 for _, _, _, s in successful_results if s.get('has_clustering', False))
@@ -1073,12 +1111,9 @@ def main(args: argparse.Namespace) -> int:
         
         # Additional suppression for CLI mode - silence specific noisy loggers
         if not args.verbose:
-            import logging
             # Suppress the most verbose loggers that users don't need to see
             logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
             logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
-            logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
-            logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
         
         # Suppress matplotlib warnings (tight layout warnings)
         import warnings
@@ -1107,7 +1142,7 @@ def main(args: argparse.Namespace) -> int:
         print(f"   Files: {len(input_files)} spectra")
         print(f"   Mode: {mode}")
         print(f"   Analysis: GUI-style cluster-aware (winning cluster)")
-        print(f"   Sorting: All results/plots sorted by RLAP (highest quality first)")
+        print(f"   Sorting: All results/plots sorted by RLAP-Cos (highest quality first)")
         print(f"   Output: {args.output_dir}")
         print(f"   Redshift Range: {args.zmin:.3f} ≤ z ≤ {args.zmax:.3f}")
         if args.forced_redshift:
@@ -1129,8 +1164,7 @@ def main(args: argparse.Namespace) -> int:
             print("❌ Failed to load templates", file=sys.stderr)
             return 1
         
-        optimization_msg = "OPTIMIZATION" if template_manager.optimization_used else "STANDARD"
-        print(f"✅ Templates loaded ({optimization_msg}) in {template_manager.load_time:.2f}s")
+        print(f"✅ Templates loaded in {template_manager.load_time:.2f}s")
         print(f"📊 Ready to process {len(input_files)} spectra with {template_manager.template_count} templates")
         print("")
         
@@ -1184,13 +1218,14 @@ def main(args: argparse.Namespace) -> int:
                             redshift = summary.get('redshift', 0)
                             z_marker = ""
                         
-                        rlap = summary.get('rlap', 0)
-                        secure_marker = "✓" if summary.get('secure', False) else ""
+                        # Use RLAP-Cos if available, otherwise RLAP
+                        from snid_sage.shared.utils.math_utils import get_best_metric_value
+                        rlap_cos = get_best_metric_value(summary)
                         
                         # Format subtype display
                         type_display = f"{consensus_type} {consensus_subtype}".strip()
                         
-                        print(f"      {name}: {type_display} z={redshift:.4f} RLAP={rlap:.1f} {z_marker}{secure_marker}")
+                        print(f"      {name}: {type_display} z={redshift:.6f} RLAP-Cos={rlap_cos:.1f} {z_marker}")
                     else:
                         print(f"      {name}: success")
         else:
@@ -1242,13 +1277,14 @@ def main(args: argparse.Namespace) -> int:
                             redshift = summary.get('redshift', 0)
                             z_marker = ""
                         
-                        rlap = summary.get('rlap', 0)
-                        secure_marker = "✓" if summary.get('secure', False) else ""
+                        # Use RLAP-Cos if available, otherwise RLAP
+                        from snid_sage.shared.utils.math_utils import get_best_metric_value
+                        rlap_cos = get_best_metric_value(summary)
                         
                         # Format subtype display
                         type_display = f"{consensus_type} {consensus_subtype}".strip()
                         
-                        print(f"      {name}: {type_display} z={redshift:.4f} RLAP={rlap:.1f} {z_marker}{secure_marker}")
+                        print(f"      {name}: {type_display} z={redshift:.6f} RLAP-Cos={rlap_cos:.1f} {z_marker}")
                     else:
                         print(f"      {name}: success")
         
@@ -1273,7 +1309,7 @@ def main(args: argparse.Namespace) -> int:
             print(f"📁 Individual results in: {output_dir}/")
             if args.complete:
                 print(f"   📊 3D Plots: Static PNG files with optimized viewing angle")
-                print(f"   📈 Top 5 templates: Sorted by RLAP (highest quality first)")
+                print(f"   📈 Top 5 templates: Sorted by RLAP-Cos (highest quality first)")
             
         return 0 if failed_count == 0 else 1
         

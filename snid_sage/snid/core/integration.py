@@ -334,7 +334,7 @@ def load_templates_unified(template_dir: str,
     type_filter : List[str], optional
         Types to include
     template_names : List[str], optional
-        Specific template names to include
+        Specific template names to include (supports both base names and epoch-expanded names)
     exclude_templates : List[str], optional
         Specific template names to exclude
         
@@ -353,10 +353,45 @@ def load_templates_unified(template_dir: str,
         final_template_names = [name for name in all_names if name not in exclude_templates]
         _LOG.info(f"Excluding {len(exclude_templates)} templates: {len(final_template_names)} remaining")
     
+    # ENHANCED TEMPLATE NAME FILTERING: Handle both base names and epoch-expanded names
+    enhanced_template_names = None
+    if final_template_names is not None:
+        # Get all available template names from storage
+        all_available_names = storage.get_all_template_names()
+        
+        # Create a mapping of base names to their epoch-expanded versions
+        base_to_expanded = {}
+        for name in all_available_names:
+            if '_epoch_' in name:
+                # Extract base name (everything before _epoch_)
+                base_name = name.split('_epoch_')[0]
+                if base_name not in base_to_expanded:
+                    base_to_expanded[base_name] = []
+                base_to_expanded[base_name].append(name)
+            else:
+                # Single epoch template - base name is the same as full name
+                base_to_expanded[name] = [name]
+        
+        # Expand the requested template names to include epoch variants
+        enhanced_template_names = []
+        for requested_name in final_template_names:
+            if requested_name in all_available_names:
+                # Direct match (epoch-expanded name or single-epoch template)
+                enhanced_template_names.append(requested_name)
+            elif requested_name in base_to_expanded:
+                # Base name match - include all epoch variants
+                enhanced_template_names.extend(base_to_expanded[requested_name])
+                _LOG.debug(f"Expanded base name '{requested_name}' to {len(base_to_expanded[requested_name])} epoch variants")
+            else:
+                # No match found - log warning but continue
+                _LOG.warning(f"Template '{requested_name}' not found in storage")
+        
+        _LOG.info(f"Enhanced template filtering: {len(final_template_names)} requested -> {len(enhanced_template_names)} expanded")
+    
     # Get templates from unified storage with prefetching
     template_entries = storage.get_templates(
         type_filter=type_filter,
-        template_names=final_template_names,
+        template_names=enhanced_template_names,  # Use enhanced names
         use_prefetching=True  # Enable prefetching for better performance
     )
     

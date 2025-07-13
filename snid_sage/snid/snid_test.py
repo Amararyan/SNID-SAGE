@@ -104,7 +104,7 @@ def test_output_directory_behavior(spectrum_path, templates_dir):
                 print(f"  Confidence: {result.type_confidence:.2f}")
             
             else:
-                print(f"  ❌ Analysis failed - no secure matches found")
+                print(f"  ❌ Analysis failed - no good matches found")
                 return False
                 
             return True
@@ -195,7 +195,7 @@ def main():
             print(f"Confidence: {result.type_confidence:.2f}")
         
         else:
-            print(f"❌ Analysis failed - no secure matches found")
+            print(f"❌ Analysis failed - no good matches found")
             return 1
         
         # Show output files if generated

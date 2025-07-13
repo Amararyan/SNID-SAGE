@@ -116,7 +116,20 @@ def compute_rlap_cos_metric(
     if not matches:
         return matches
     
-    logger.info(f"🔄 Computing RLAP-Cos metric for {len(matches)} matches")
+    # Check if RLAP-cos is already computed for all matches
+    already_computed = all('rlap_cos' in match for match in matches)
+    if already_computed:
+        if verbose:
+            logger.info(f"🔄 RLAP-Cos already computed for all {len(matches)} matches - skipping computation")
+        return matches
+    
+    # Check if partially computed - count how many need computation
+    needs_computation = [match for match in matches if 'rlap_cos' not in match]
+    if len(needs_computation) < len(matches):
+        if verbose:
+            logger.info(f"🔄 RLAP-Cos partially computed - computing for {len(needs_computation)}/{len(matches)} matches")
+    else:
+        logger.info(f"🔄 Computing RLAP-Cos metric for {len(matches)} matches")
     
     # ============================================================================
     # CRITICAL: Use *exactly* the same input spectrum preparation as snid_enhanced_metrics.py
@@ -171,6 +184,12 @@ def compute_rlap_cos_metric(
     successful_computations = 0
     
     for i, match in enumerate(matches):
+        # Skip if already computed
+        if 'rlap_cos' in match:
+            enhanced_matches.append(match)
+            successful_computations += 1
+            continue
+        
         # Extract template flux using the exact same logic as snid_enhanced_metrics.py
         tpl_flux = _extract_template_flux_exact(match)
         
@@ -206,7 +225,8 @@ def compute_rlap_cos_metric(
             template_name = match.get('template', {}).get('name', 'Unknown') if isinstance(match.get('template'), dict) else match.get('name', 'Unknown')
             logger.debug(f"  Match {i}: {template_name} - RLAP={rlap:.2f}, cos_sim={cos_sim:.3f}, capped={cos_sim_capped:.3f}, RLAP-Cos={rlap_cos:.3f}")
     
-    logger.info(f"✅ RLAP-Cos computation complete: {successful_computations}/{len(matches)} matches enhanced")
+    if len(needs_computation) > 0:
+        logger.info(f"✅ RLAP-Cos computation complete: {successful_computations}/{len(matches)} matches enhanced")
     
     return enhanced_matches
 
@@ -284,6 +304,30 @@ def get_metric_name_for_match(match: Dict[str, Any]) -> str:
         Name of the metric
     """
     return 'RLAP-Cos' if 'rlap_cos' in match else 'RLAP'
+
+
+def get_best_metric_name(match: Dict[str, Any]) -> str:
+    """
+    Get the name of the best available metric for a match.
+    
+    Returns 'RLAP-Cos' if available, otherwise 'RLAP'.
+    This is a convenience function for summary reports.
+    
+    Parameters
+    ----------
+    match : Dict[str, Any]
+        Template match dictionary or summary dictionary
+        
+    Returns
+    -------
+    str
+        Name of the best available metric
+    """
+    # Check if this is a summary dict with rlap_cos or a match dict
+    if 'rlap_cos' in match or (isinstance(match, dict) and any('rlap_cos' in str(k) for k in match.keys())):
+        return 'RLAP-Cos'
+    else:
+        return 'RLAP'
 
 
 def get_metric_display_values(match: Dict[str, Any]) -> Dict[str, float]:

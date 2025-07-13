@@ -669,7 +669,7 @@ def write_detailed_result(result: Any, filename: str) -> None:
             f.write(f"# Clustering method: {result.clustering_results.get('method', 'unknown')}\n")
             f.write(f"# Cluster quality: {best_cluster.get('redshift_quality', 'unknown')}\n")
             f.write(f"# Cluster size: {best_cluster.get('size', 0)}\n")
-            f.write(f"# Top-10% matches: {best_cluster.get('top_10_count', 0)}\n")
+            f.write(f"# Top-5 mean score: {best_cluster.get('top_5_mean', 0):.2f}\n")
         
         # Legacy compatibility (deprecated)
         

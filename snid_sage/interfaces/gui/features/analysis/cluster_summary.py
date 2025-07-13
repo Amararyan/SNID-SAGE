@@ -187,7 +187,9 @@ class AnalysisResultsAnalyzer:
             age = extract_age(m, template)
             if age is not None:
                 ages.append(age)
-                age_weights.append(m['rlap'])
+                # Use RLAP-cos if available, otherwise RLAP
+                from snid_sage.shared.utils.math_utils import get_best_metric_value
+                age_weights.append(get_best_metric_value(m))
         
         age_stats = {}
         if ages:
@@ -285,13 +287,15 @@ class AnalysisResultsAnalyzer:
             
             # Age-weighted statistics (only for templates with valid ages)
             if len(ages) > 0:
-                # Get RLAP values for templates that have valid ages
+                # Get RLAP-cos values for templates that have valid ages
                 age_rlaps = []
                 for match in self.matches:
                     template = match.get('template', {})
                     age = extract_age(match, template)
                     if age is not None:
-                        age_rlaps.append(match.get('rlap', 0))
+                        # Use RLAP-cos if available, otherwise RLAP
+                        from snid_sage.shared.utils.math_utils import get_best_metric_value
+                        age_rlaps.append(get_best_metric_value(match))
                 age_rlaps = np.array(age_rlaps[:len(ages)])  # Match length
                 
                 if len(age_rlaps) == len(ages) and len(ages) > 0:

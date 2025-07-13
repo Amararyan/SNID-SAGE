@@ -83,7 +83,7 @@ def perform_direct_gmm_clustering(
     max_clusters_per_type: int = 10,
     top_percentage: float = 0.10,
     verbose: bool = False,
-    use_rlap_cos: bool = False  # NEW: Use RLAP-Cos instead of RLAP
+    use_rlap_cos: bool = True  # NEW: Use RLAP-Cos instead of RLAP
 ) -> Dict[str, Any]:
     """
     Direct GMM clustering on redshift values with top 10% RLAP/RLAP-Cos selection.
@@ -109,7 +109,7 @@ def perform_direct_gmm_clustering(
     verbose : bool, optional
         Enable detailed logging
     use_rlap_cos : bool, optional
-        Use RLAP-Cos metric instead of RLAP for clustering (default: False)
+        Use RLAP-Cos metric instead of RLAP for clustering (default: True)
         
     Returns
     -------
@@ -124,20 +124,6 @@ def perform_direct_gmm_clustering(
     
     _LOGGER.info(f"🔄 Starting direct GMM top-{top_percentage*100:.0f}% {metric_name} clustering")
     _LOGGER.info(f"📐 Quality threshold: {quality_threshold:.3f} in redshift space")
-    
-    # Calculate top percentage threshold - use same approach as transformation_comparison_test.py
-    # top_percentage=0.10 means top 10%, which is 90th percentile and above
-    all_metric_values = [match.get(metric_key, match.get('rlap', 0)) for match in matches]
-    top_percentile = (1 - top_percentage) * 100  # 0.10 -> 90.0
-    top_threshold = np.percentile(all_metric_values, top_percentile)
-    
-    _LOGGER.info(f"📊 Top {top_percentage*100:.0f}% {metric_name} threshold: {top_threshold:.2f}")
-    
-    if use_rlap_cos and verbose:
-        # Show RLAP-Cos vs RLAP comparison
-        all_rlaps = [match.get('rlap', 0) for match in matches]
-        _LOGGER.info(f"📊 {metric_name} range: [{np.min(all_metric_values):.2f}, {np.max(all_metric_values):.2f}]")
-        _LOGGER.info(f"📊 Original RLAP range: [{np.min(all_rlaps):.2f}, {np.max(all_rlaps):.2f}]")
     
     # Group matches by type
     type_groups = {}
@@ -190,10 +176,6 @@ def perform_direct_gmm_clustering(
                 if cluster_info is None:
                     continue
                 
-                # Count top matches using exact threshold (use selected metric)
-                top_count = sum(1 for match in cluster_info['matches'] 
-                              if match.get(metric_key, match.get('rlap', 0)) >= top_threshold)
-                
                 # Calculate mean metric value for this cluster
                 cluster_metric_values = [match.get(metric_key, match.get('rlap', 0)) for match in cluster_info['matches']]
                 mean_metric = np.mean(cluster_metric_values) if cluster_metric_values else 0.0
@@ -203,8 +185,6 @@ def perform_direct_gmm_clustering(
                     'cluster_id': cluster_info['id'],
                     'matches': cluster_info['matches'],
                     'size': cluster_info['size'],
-                    'top_10_count': top_count,
-                    'top_10_fraction': top_count / cluster_info['size'],
                     'mean_rlap': cluster_info['mean_rlap'],  # Keep original RLAP for compatibility
                     'mean_metric': mean_metric,  # NEW: Mean of selected metric (RLAP or RLAP-Cos)
                     'metric_name': metric_name,  # NEW: Name of metric used
@@ -213,8 +193,8 @@ def perform_direct_gmm_clustering(
                     'redshift_span': cluster_info['redshift_span'],
                     'redshift_quality': cluster_info['redshift_quality'],
                     'cluster_method': 'direct_gmm',
-                    'quality_score': top_count,
-                    'composite_score': top_count,
+                    'quality_score': 0, # This will be updated by the new method
+                    'composite_score': 0, # This will be updated by the new method
                     'is_winning_cluster': False  # Will be determined by new method
                 }
                 
@@ -304,8 +284,6 @@ def perform_direct_gmm_clustering(
         'best_cluster': best_cluster,
         'all_candidates': all_cluster_candidates,
         'quality_assessment': quality_assessment,  # NEW: Complete quality assessment
-        'top_threshold': top_threshold,
-        'top_percentile': top_percentile,
         'quality_threshold': quality_threshold,
         'total_computation_time': total_time,
         'n_types_clustered': len(clustering_results),
@@ -319,7 +297,7 @@ def _perform_direct_gmm_clustering(
     max_clusters: int,
     quality_threshold: float,
     verbose: bool,
-    metric_key: str = 'rlap'  # NEW: Which metric to use for calculations
+    metric_key: str = 'rlap_cos'  # NEW: Which metric to use for calculations
 ) -> Dict[str, Any]:
     """
     Perform GMM clustering directly on redshift values using the same approach
@@ -463,7 +441,7 @@ def _create_single_cluster_result(
     redshifts: np.ndarray, 
     rlaps: np.ndarray,
     quality_threshold: float,
-    metric_key: str = 'rlap'  # NEW: Which metric to use
+    metric_key: str = 'rlap_cos'  # NEW: Which metric to use
 ) -> Dict[str, Any]:
     """Create a single cluster result when clustering isn't possible/needed."""
     
@@ -754,7 +732,7 @@ def demo_direct_gmm_clustering():
         print(f"\n🎯 CLUSTERING RESULTS:")
         print(f"   • Method: {clustering_result['method']}")
         print(f"   • Best cluster: {clustering_result['best_cluster']['type']}")
-        print(f"   • Top 10% matches: {clustering_result['best_cluster']['top_10_count']}")
+        print(f"   • Top-5 mean score: {clustering_result['best_cluster'].get('top_5_mean', 0):.2f}")
         print(f"   • Cluster size: {clustering_result['best_cluster']['size']}")
         print(f"   • Redshift span: {clustering_result['best_cluster']['redshift_span']:.4f}")
         print(f"   • Quality: {clustering_result['best_cluster']['redshift_quality']}")
@@ -763,7 +741,7 @@ def demo_direct_gmm_clustering():
         print(f"\n📋 ALL CLUSTER CANDIDATES:")
         for i, candidate in enumerate(clustering_result['all_candidates']):
             print(f"   {i+1}. {candidate['type']} cluster {candidate['cluster_id']}: "
-                  f"{candidate['top_10_count']} top matches, "
+                  f"top-5 mean={candidate.get('top_5_mean', 0):.2f}, "
                   f"size={candidate['size']}, "
                   f"z-span={candidate['redshift_span']:.4f}")
     else:
@@ -773,7 +751,7 @@ def demo_direct_gmm_clustering():
     print("   • ✅ Simple and straightforward - no transformations needed")
     print("   • ✅ GMM naturally handles different redshift scales")
     print("   • ✅ BIC-based model selection finds optimal cluster count")
-    print("   • ✅ Top 10% RLAP selection ensures quality-based clustering")
+    print("   • ✅ Top-5 RLAP-Cos method ensures quality-based clustering")
     print("   • ✅ Weighted voting for robust subtype determination")
     print("   • ✅ Statistical confidence assessment")
     print("   • ✅ Matches transformation_comparison_test.py approach exactly")

@@ -30,6 +30,41 @@ try:
 except ImportError:
     UNIFIED_SYSTEMS_AVAILABLE = False
 
+# Import centralized font size configuration
+try:
+    from snid_sage.shared.utils.plotting.font_sizes import (
+        PLOT_TITLE_FONTSIZE,
+        PLOT_AXIS_LABEL_FONTSIZE,
+        PLOT_TICK_FONTSIZE,
+        PLOT_LEGEND_FONTSIZE,
+        PLOT_ANNOTATION_FONTSIZE,
+        PLOT_INFO_TEXT_FONTSIZE,
+        PLOT_TABLE_FONTSIZE,
+        PLOT_PIE_AUTOPCT_FONTSIZE,
+        PLOT_BAR_VALUE_FONTSIZE,
+        PLOT_ERROR_FONTSIZE,
+        PLOT_STATUS_FONTSIZE,
+        apply_font_config
+    )
+    # Apply standardized font configuration globally
+    apply_font_config()
+except ImportError:
+    # Fallback font sizes if centralized config is not available
+    PLOT_TITLE_FONTSIZE: int = 14
+    PLOT_AXIS_LABEL_FONTSIZE: int = 12
+    PLOT_TICK_FONTSIZE: int = 10
+    PLOT_LEGEND_FONTSIZE: int = 11
+    PLOT_ANNOTATION_FONTSIZE: int = 10
+    PLOT_INFO_TEXT_FONTSIZE: int = 9
+    PLOT_TABLE_FONTSIZE: int = 9
+    PLOT_PIE_AUTOPCT_FONTSIZE: int = 10
+    PLOT_BAR_VALUE_FONTSIZE: int = 8
+    PLOT_ERROR_FONTSIZE: int = 14
+    PLOT_STATUS_FONTSIZE: int = 12
+
+# ---------------------------------------------------------------------------
+# Color Palette Functions
+# ---------------------------------------------------------------------------
 
 def get_custom_color_palette():
     """
@@ -201,7 +236,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
         # Create a single subplot for the message
         ax = fig.add_subplot(111)
         ax.text(0.5, 0.5, "No valid matches found for comparison", 
-               ha='center', va='center', fontsize=14,
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE,
                transform=ax.transAxes)
         ax.axis('off')
         
@@ -223,7 +258,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
     if not matches_to_use:
         ax = fig.add_subplot(111)
         ax.text(0.5, 0.5, "No matches available for plotting", 
-               ha='center', va='center', fontsize=14,
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE,
                transform=ax.transAxes)
         ax.axis('off')
         fig.tight_layout()
@@ -369,12 +404,12 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
         ax_corr.set_ylabel('Correlation')
         ax_corr.set_title('Cross-correlation')
         ax_corr.grid(True, alpha=0.3)
-        ax_corr.legend(fontsize='small')
+        ax_corr.legend(fontsize=PLOT_LEGEND_FONTSIZE)
         
     else:
         # Fallback message if no correlation data available
         ax_corr.text(0.5, 0.5, "No correlation data available", 
-               ha='center', va='center', fontsize=12,
+               ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE,
                transform=ax_corr.transAxes)
         ax_corr.set_title('Cross-correlation')
         ax_corr.axis('off')
@@ -435,7 +470,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
         for t, f in sorted_fractions:
             info_text += f"  {t}: {f:.2f}\n"
     
-    ax_info.text(0.05, 0.95, info_text, va='top', fontsize=9,
+    ax_info.text(0.05, 0.95, info_text, va='top', fontsize=PLOT_INFO_TEXT_FONTSIZE,
                 transform=ax_info.transAxes)
     
     # Add template metadata annotation to top panel
@@ -479,7 +514,7 @@ def plot_result(result: Any, figsize: Tuple[int, int] = (10, 8),
     
     ax = fig.add_subplot(111)
     ax.text(0.5, 0.5, "This function is deprecated.\nPlease use plot_flux_comparison, plot_flat_comparison, or plot_correlation_view instead.", 
-           ha='center', va='center', fontsize=12, 
+           ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, 
            transform=ax.transAxes)
     ax.axis('off')
     fig.tight_layout()
@@ -507,7 +542,7 @@ def plot_type_comparison(result: Any, figsize: Tuple[int, int] = (12, 8),
     
     ax = fig.add_subplot(111)
     ax.text(0.5, 0.5, "This function is deprecated.\nPlease use plot_flux_comparison, plot_flat_comparison, or plot_correlation_view instead.", 
-           ha='center', va='center', fontsize=12, 
+           ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, 
            transform=ax.transAxes)
     ax.axis('off')
     fig.tight_layout()
@@ -597,7 +632,8 @@ def plot_type_fractions(result: Any, figsize: Tuple[int, int] = (10, 8),
             labels=None,
             autopct='%1.1f%%',
             colors=colors,
-            startangle=90)
+            startangle=90,
+            textprops={'fontsize': PLOT_PIE_AUTOPCT_FONTSIZE})
         
         ax1.axis('equal')
         ax1.set_title(f'Type Fractions ({match_source} matches)')
@@ -629,7 +665,7 @@ def plot_type_fractions(result: Any, figsize: Tuple[int, int] = (10, 8),
             # Add value labels on bars
             for i, (bar, value) in enumerate(zip(bars, slope_values)):
                 ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.001,
-                        f'{value:.3f}', ha='center', va='bottom', fontsize=8)
+                        f'{value:.3f}', ha='center', va='bottom', fontsize=PLOT_BAR_VALUE_FONTSIZE)
         else:
             ax2.text(0.5, 0.5, "No slope data available", ha='center', va='center')
             ax2.axis('off')
@@ -673,7 +709,8 @@ def plot_type_fractions(result: Any, figsize: Tuple[int, int] = (10, 8),
                         autopct='%1.1f%%',
                         colors=sub_colors,
                         explode=sub_explode,
-                        startangle=90)
+                        startangle=90,
+                        textprops={'fontsize': PLOT_PIE_AUTOPCT_FONTSIZE})
                     
                     # Add dark edge around the winning slice
                     for i, (wedge, label) in enumerate(zip(wedges, sub_labels)):
@@ -848,7 +885,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
     # Check if we have a successful result with matches
     if not hasattr(result, 'success') or not result.success or not hasattr(result, 'best_matches') or not result.best_matches:
         ax.text(0.5, 0.5, "No valid matches found for correlation plot", 
-               ha='center', va='center', fontsize=14,
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE,
                transform=ax.transAxes)
         ax.axis('off')
         fig.tight_layout()
@@ -921,7 +958,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
             ax.set_xlim(z_min - 0.1 * z_range, z_max + 0.1 * z_range)
         else:
             ax.text(0.5, 0.5, "No correlation data available", 
-                   ha='center', va='center', fontsize=14,
+                   ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE,
                    transform=ax.transAxes)
             ax.axis('off')
             fig.tight_layout()
@@ -1031,7 +1068,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
     
     if not matches:
         ax.text(0.5, 0.5, "No match data available", 
-               ha='center', va='center', fontsize=14, 
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, 
                transform=ax.transAxes)
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
@@ -1045,7 +1082,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
     
     if not matches:
         ax.text(0.5, 0.5, f"No matches above RLAP threshold ({rlapmin})", 
-               ha='center', va='center', fontsize=14, 
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, 
                transform=ax.transAxes)
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
@@ -1111,7 +1148,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
     # If no valid data after filtering, show error
     if not data:
         ax.text(0.5, 0.5, "No valid redshift-age data available", 
-               ha='center', va='center', fontsize=14, 
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, 
                transform=ax.transAxes)
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
@@ -1238,36 +1275,112 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
     
     # Use cluster-specific consensus redshift first, then fall back to global consensus
     if cluster_consensus_z is not None:
-        median_z = cluster_consensus_z
+        weighted_z = cluster_consensus_z
         # Only show if within reasonable range of data
-        if current_xlim[0] <= median_z <= current_xlim[1] * 1.2:  # Allow 20% beyond axis
-            ax.axvline(x=median_z, color='red', linestyle='--', linewidth=2, alpha=0.8, 
-                      label=f'Cluster consensus z = {median_z:.4f}')
+        if current_xlim[0] <= weighted_z <= current_xlim[1] * 1.2:  # Allow 20% beyond axis
+            ax.axvline(x=weighted_z, color='red', linestyle='--', linewidth=2, alpha=0.8, 
+                      label=f'RLAP-cos weighted z = {weighted_z:.4f}')
             
             if all_ages:
-                median_age = np.median(all_ages)
-                ax.axhline(y=median_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                          label=f'Cluster median age = {median_age:.1f}d')
+                # Calculate weighted age using RLAP-cos metric weighting
+                try:
+                    from snid_sage.shared.utils.math_utils import calculate_metric_weighted_age, get_best_metric_value
+                    
+                    # Get ages and their corresponding metric weights (RLAP-cos if available, otherwise RLAP)
+                    ages = []
+                    age_weights = []
+                    # Use the same matches that are being plotted (cluster matches)
+                    for match in matches:
+                        template = match.get('template', {})
+                        age = template.get('age', 0.0) if template else 0.0
+                        if age > 0:
+                            ages.append(age)
+                            age_weights.append(get_best_metric_value(match))
+                    
+                    if ages and len(ages) == len(age_weights):
+                        weighted_age, _, _, _ = calculate_metric_weighted_age(
+                            np.array(ages), np.array(age_weights), include_cluster_scatter=True
+                        )
+                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
+                    else:
+                        # Fallback to consensus age if available, otherwise median
+                        if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                            weighted_age = result.consensus_age
+                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                      label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
+                        else:
+                            weighted_age = np.median(all_ages)
+                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                      label=f'Cluster median age = {weighted_age:.1f}d')
+                except ImportError:
+                    # Fallback to consensus age if available, otherwise median
+                    if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                        weighted_age = result.consensus_age
+                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
+                    else:
+                        weighted_age = np.median(all_ages)
+                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                  label=f'Cluster median age = {weighted_age:.1f}d')
                 
-                # Add intersection point showing cluster consensus
-                ax.plot(median_z, median_age, 'ro', markersize=12, markeredgecolor='black', 
-                       markeredgewidth=2, label='Cluster intersection', zorder=9)
+                # Add intersection point (no label)
+                ax.plot(weighted_z, weighted_age, 'ro', markersize=12, markeredgecolor='black', 
+                       markeredgewidth=2, zorder=9)
                    
     elif hasattr(result, 'consensus_redshift') and result.consensus_redshift is not None:
-        median_z = result.consensus_redshift
+        weighted_z = result.consensus_redshift
         # Only show if within reasonable range of data
-        if current_xlim[0] <= median_z <= current_xlim[1] * 1.2:  # Allow 20% beyond axis
-            ax.axvline(x=median_z, color='red', linestyle='--', linewidth=2, alpha=0.8, 
-                      label=f'Global consensus z = {median_z:.4f}')
+        if current_xlim[0] <= weighted_z <= current_xlim[1] * 1.2:  # Allow 20% beyond axis
+            ax.axvline(x=weighted_z, color='red', linestyle='--', linewidth=2, alpha=0.8, 
+                      label=f'RLAP-cos weighted z = {weighted_z:.4f}')
             
             if all_ages:
-                median_age = np.median(all_ages)
-                ax.axhline(y=median_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                          label=f'Median age = {median_age:.1f}d')
+                # Calculate weighted age using RLAP-cos metric weighting
+                try:
+                    from snid_sage.shared.utils.math_utils import calculate_metric_weighted_age, get_best_metric_value
+                    
+                    # Get ages and their corresponding metric weights (RLAP-cos if available, otherwise RLAP)
+                    ages = []
+                    age_weights = []
+                    # Use the same matches that are being plotted (cluster matches)
+                    for match in matches:
+                        template = match.get('template', {})
+                        age = template.get('age', 0.0) if template else 0.0
+                        if age > 0:
+                            ages.append(age)
+                            age_weights.append(get_best_metric_value(match))
+                    
+                    if ages and len(ages) == len(age_weights):
+                        weighted_age, _, _, _ = calculate_metric_weighted_age(
+                            np.array(ages), np.array(age_weights), include_cluster_scatter=True
+                        )
+                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
+                    else:
+                        # Fallback to consensus age if available, otherwise median
+                        if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                            weighted_age = result.consensus_age
+                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                      label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
+                        else:
+                            weighted_age = np.median(all_ages)
+                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                      label=f'Global median age = {weighted_age:.1f}d')
+                except ImportError:
+                    # Fallback to consensus age if available, otherwise median
+                    if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                        weighted_age = result.consensus_age
+                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
+                    else:
+                        weighted_age = np.median(all_ages)
+                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
+                                  label=f'Global median age = {weighted_age:.1f}d')
                 
-                # Add intersection point showing global consensus
-                ax.plot(median_z, median_age, 'ro', markersize=12, markeredgecolor='black', 
-                       markeredgewidth=2, label='Global intersection', zorder=9)
+                # Add intersection point (no label)
+                ax.plot(weighted_z, weighted_age, 'ro', markersize=12, markeredgecolor='black', 
+                       markeredgewidth=2, zorder=9)
                    
     elif all_redshifts:
         # Always use data-based median (this should always be within range)
@@ -1280,22 +1393,22 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
             ax.axhline(y=median_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
                       label=f'Data median age = {median_age:.1f}d')
             
-            # Add intersection point
+            # Add intersection point (no label)
             ax.plot(median_z, median_age, 'ro', markersize=12, markeredgecolor='black', 
-                   markeredgewidth=2, label='Data intersection', zorder=9)
+                   markeredgewidth=2, zorder=9)
     
     # Format plot correctly (no title per user requirement)
     if not _apply_no_title_styling_if_available(fig, ax, "Redshift", "Age (days)", theme_manager):
         # Fallback styling if unified systems not available
-        ax.set_xlabel('Redshift', fontsize=14)  # X-axis: redshift
-        ax.set_ylabel('Age (days)', fontsize=14)  # Y-axis: age
+        ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
+        ax.set_ylabel('Age (days)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: age
         ax.grid(True, alpha=0.3)
     
-    ax.legend(loc='upper right', fontsize=12)  # Increased legend font size
+    ax.legend(loc='upper right', fontsize=PLOT_LEGEND_FONTSIZE)  # Consistent legend font size
     
-    # Increase tick label font sizes
-    ax.tick_params(axis='x', labelsize=12)
-    ax.tick_params(axis='y', labelsize=12)
+    # Consistent tick label font sizes
+    ax.tick_params(axis='x', labelsize=PLOT_TICK_FONTSIZE)
+    ax.tick_params(axis='y', labelsize=PLOT_TICK_FONTSIZE)
     
     # Axis limits were already set earlier to ensure proper centering on data points
     
@@ -1509,7 +1622,7 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
     if not template_plotted:
         # Show a message on the plot
         ax.text(0.5, 0.3, "Template plotting failed - no template data found", 
-               ha='center', va='center', transform=ax.transAxes,
+               ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, transform=ax.transAxes,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8))
     
     # Create a secondary x-axis for rest wavelength
@@ -1677,7 +1790,7 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
     if not template_plotted:
         # Show a message on the plot
         ax.text(0.5, 0.3, "Template plotting failed - no template data found", 
-               ha='center', va='center', transform=ax.transAxes,
+               ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, transform=ax.transAxes,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8))
     
     # Add template metadata annotation
@@ -1816,7 +1929,7 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
             ax.set_xlim(z_min - 0.1 * z_range, z_max + 0.1 * z_range)
         else:
             ax.text(0.5, 0.5, "No correlation data available", 
-                   ha='center', va='center', fontsize=14,
+                   ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE,
                    transform=ax.transAxes)
             ax.axis('off')
             fig.tight_layout()
@@ -1908,7 +2021,7 @@ def plot_template_epochs(template_data: Dict[str, Any],
     
     if not epochs:
         ax.text(0.5, 0.5, "No epoch data available for this template", 
-               ha='center', va='center', fontsize=14,
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE,
                transform=ax.transAxes)
         ax.axis('off')
         return fig
@@ -2047,7 +2160,7 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
     
     if not cluster_matches:
         for ax in [ax1, ax2, ax3]:
-            ax.text(0.5, 0.5, "No cluster matches available", ha='center', va='center')
+            ax.text(0.5, 0.5, "No cluster matches available", ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE)
             ax.axis('off')
         return fig
     
@@ -2114,42 +2227,51 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
                 wedge.set_edgecolor('white')
                 wedge.set_linewidth(1)
         
-        ax1.set_title(f'{cluster_type} Subtype Proportions\n({len(cluster_matches)} matches)')
+        ax1.set_title(f'{cluster_type} Subtype Proportions\n({len(cluster_matches)} matches)', fontsize=PLOT_TITLE_FONTSIZE)
         
         # Style the text
         for autotext in autotexts:
             autotext.set_color('black')
-            autotext.set_fontsize(10)
+            autotext.set_fontsize(PLOT_PIE_AUTOPCT_FONTSIZE)
             autotext.set_weight('bold')
     else:
-        ax1.text(0.5, 0.5, f"No subtypes found for {cluster_type}", ha='center', va='center')
+        ax1.text(0.5, 0.5, f"No subtypes found for {cluster_type}", ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE)
         ax1.axis('off')
     
     # Plot 2: Subtype statistics table
     ax2.axis('off')
     if subtype_counts:
         table_data = []
-        headers = ['Subtype', 'Count', '%', 'Avg RLAP', 'Avg z', 'Avg Age']
+        headers = ['Subtype', 'Count', '%', 'Avg RLAP-cos', 'Weighted z', 'Weighted age']
         
         total_matches = len(cluster_matches)
         
         for subtype, count in sorted_subtypes:
             percentage = (count / total_matches) * 100
-            avg_rlap = np.mean(subtype_rlaps[subtype]) if subtype_rlaps[subtype] else 0
             
-            # Use proper statistical estimates for subtypes if enough data
+            # Calculate average RLAP-cos for this subtype
+            from snid_sage.shared.utils.math_utils import get_best_metric_value
+            subtype_rlap_cos_values = [get_best_metric_value(m) for m in cluster_matches 
+                                     if m.get('template', {}).get('subtype', 'Unknown') == subtype]
+            avg_rlap_cos = np.mean(subtype_rlap_cos_values) if subtype_rlap_cos_values else 0
+            
+            # Use RLAP-cos weighted redshift for subtypes if enough data
             if len(subtype_redshifts[subtype]) > 1:
-                from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
-                subtype_errors = [0.01] * len(subtype_redshifts[subtype])  # Default errors
-                avg_z, _, _ = calculate_hybrid_weighted_redshift(
-                    subtype_redshifts[subtype], subtype_errors, include_cluster_scatter=False
+                from snid_sage.shared.utils.math_utils import calculate_weighted_redshift_with_uncertainty, get_best_metric_value
+                # Get RLAP-cos weights for this subtype
+                subtype_weights = [get_best_metric_value(m) for m in cluster_matches 
+                                 if m.get('template', {}).get('subtype', 'Unknown') == subtype][:len(subtype_redshifts[subtype])]
+                avg_z, _ = calculate_weighted_redshift_with_uncertainty(
+                    subtype_redshifts[subtype], subtype_weights
                 )
             else:
                 avg_z = subtype_redshifts[subtype][0] if subtype_redshifts[subtype] else 0
             
             if len(subtype_ages[subtype]) > 1:
-                from snid_sage.shared.utils.math_utils import calculate_rlap_weighted_age
-                subtype_rlaps_list = [8.0] * len(subtype_ages[subtype])  # Default RLAPs
+                from snid_sage.shared.utils.math_utils import calculate_rlap_weighted_age, get_best_metric_value
+                # Use RLAP-cos if available, otherwise RLAP
+                subtype_rlaps_list = [get_best_metric_value(m) for m in cluster_matches 
+                                     if m.get('template', {}).get('subtype', 'Unknown') == subtype][:len(subtype_ages[subtype])]
                 avg_age, _, _, _ = calculate_rlap_weighted_age(
                     subtype_ages[subtype], subtype_rlaps_list, include_cluster_scatter=False
                 )
@@ -2160,7 +2282,7 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
                 subtype[:8],  # Truncate long subtype names
                 str(count),
                 f"{percentage:.1f}",
-                f"{avg_rlap:.1f}",
+                f"{avg_rlap_cos:.1f}",
                 f"{avg_z:.4f}",
                 f"{avg_age:.1f}" if avg_age > 0 else "N/A"
             ])
@@ -2170,7 +2292,7 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
                          cellLoc='center', loc='center',
                          colWidths=[0.15, 0.1, 0.1, 0.15, 0.15, 0.15])
         table.auto_set_font_size(False)
-        table.set_fontsize(9)
+        table.set_fontsize(PLOT_TABLE_FONTSIZE)
         table.scale(1, 1.5)
         
         # Style header
@@ -2178,26 +2300,27 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
             table[(0, i)].set_facecolor('#E0E0E0')
             table[(0, i)].set_text_props(weight='bold')
         
-        ax2.set_title(f'Subtype Statistics\n{match_source}')
+        ax2.set_title(f'Subtype Statistics\n{match_source}', fontsize=PLOT_TITLE_FONTSIZE)
     else:
-        ax2.text(0.5, 0.5, "No subtype statistics available", ha='center', va='center')
+        ax2.text(0.5, 0.5, "No subtype statistics available", ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE)
     
-    # Plot 3: Subtype proportions vs RLAP threshold
+    # Plot 3: Subtype proportions vs RLAP-cos threshold
     if cluster_matches and len(set(subtype_counts.keys())) > 1:
-        # Find RLAP range
-        all_rlaps = [m.get('rlap', 0) for m in cluster_matches]
-        max_rlap = max(all_rlaps)
-        min_rlap = min(5.0, min(all_rlaps))  # Start from 5.0 or lower if needed
+        # Find RLAP-cos range
+        from snid_sage.shared.utils.math_utils import get_best_metric_value
+        all_rlap_cos = [get_best_metric_value(m) for m in cluster_matches]
+        max_rlap_cos = max(all_rlap_cos)
+        min_rlap_cos = min(5.0, min(all_rlap_cos))  # Start from 5.0 or lower if needed
         
-        # Create RLAP thresholds
-        rlap_thresholds = np.linspace(min_rlap, min(max_rlap, 30), 12)
+        # Create RLAP-cos thresholds
+        rlap_cos_thresholds = np.linspace(min_rlap_cos, min(max_rlap_cos, 30), 12)
         
         subtype_proportions_by_rlap = {subtype: [] for subtype in subtype_counts.keys()}
         
         # Calculate proportions at each threshold
-        for threshold in rlap_thresholds:
+        for threshold in rlap_cos_thresholds:
             qualified_matches = [match for match in cluster_matches 
-                               if match.get('rlap', 0) >= threshold]
+                               if get_best_metric_value(match) >= threshold]
             
             if qualified_matches:
                 threshold_subtype_counts = defaultdict(int)
@@ -2221,19 +2344,18 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
             if any(p > 0 for p in proportions):  # Only plot if subtype has non-zero proportions
                 # Use the same color mapping as the pie chart for consistency
                 color = subtype_color_map.get(subtype, 'gray')
-                ax3.plot(rlap_thresholds, proportions, 'o-', label=subtype, 
+                ax3.plot(rlap_cos_thresholds, proportions, 'o-', label=subtype, 
                         color=color, linewidth=2, markersize=6)
         
-        ax3.set_xlabel('RLAP Threshold', fontsize=12)
-        ax3.set_ylabel('Subtype Proportion', fontsize=12)
-        ax3.set_title(f'Subtype Proportions vs RLAP Threshold\n{cluster_type} Cluster', fontsize=12)
+        ax3.set_xlabel('RLAP-cos Threshold', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+        ax3.set_ylabel('Subtype Proportion', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
         ax3.grid(True, alpha=0.3)
-        ax3.legend(loc='center right', frameon=True)
+        ax3.legend(loc='center right', frameon=True, fontsize=PLOT_LEGEND_FONTSIZE)
         # Set y-axis limits to include a bit below 0 and above 1 so lines don't get cut
         ax3.set_ylim(-0.05, 1.05)
     else:
         ax3.text(0.5, 0.5, "Insufficient subtype diversity for RLAP analysis\n(Need multiple subtypes)", 
-                ha='center', va='center')
+                ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE)
         ax3.set_xlim(0, 1)
         ax3.set_ylim(0, 1)
         ax3.set_xticks([])
@@ -2249,6 +2371,12 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
                 ax.title.set_color(theme.get('text_color', 'black'))
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_color(theme.get('text_color', 'black'))
+    
+    # Explicitly set font sizes for the subtype plot (ax3) to override theme defaults
+    if cluster_matches and len(set(subtype_counts.keys())) > 1:
+        ax3.set_xlabel('RLAP-cos Threshold', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+        ax3.set_ylabel('Subtype Proportion', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+        ax3.tick_params(axis='both', labelsize=PLOT_TICK_FONTSIZE)  # Set tick label size
     
     # Save if requested
     if save_path:
@@ -2280,7 +2408,9 @@ def compute_cluster_subtype_proportions(cluster_matches: List[Dict[str, Any]],
         if not subtype or subtype.strip() == '':
             subtype = 'Unknown'
         
-        value = match.get('rlap', 1.0) if weighted else 1.0
+        # Use RLAP-cos if available, otherwise RLAP
+        from snid_sage.shared.utils.math_utils import get_best_metric_value
+        value = get_best_metric_value(match) if weighted else 1.0
         subtype_values[subtype] += value
     
     total = sum(subtype_values.values())

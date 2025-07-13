@@ -19,6 +19,21 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('shared.plotting')
 
+# Import centralized font size configuration
+try:
+    from snid_sage.shared.utils.plotting.font_sizes import get_font_config
+    FONT_CONFIG = get_font_config()
+except ImportError:
+    # Fallback font configuration
+    FONT_CONFIG = {
+        'font.size': 10,
+        'axes.titlesize': 14,
+        'axes.labelsize': 12,
+        'xtick.labelsize': 10,
+        'ytick.labelsize': 10,
+        'legend.fontsize': 11,
+    }
+
 
 class ThemePlotManager:
     """Centralized plot theming manager for consistent matplotlib styling"""
@@ -120,13 +135,8 @@ class ThemePlotManager:
             'lines.color': colors['plot_line'],
             'patch.edgecolor': colors['plot_grid'],
             
-            # Font settings
-            'font.size': 10,
-            'axes.titlesize': 12,
-            'axes.labelsize': 10,
-            'xtick.labelsize': 9,
-            'ytick.labelsize': 9,
-            'legend.fontsize': 9,
+            # Font settings - standardized across all plots
+            **FONT_CONFIG
         }
         
         # Apply parameters

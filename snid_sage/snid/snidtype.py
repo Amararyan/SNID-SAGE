@@ -32,22 +32,8 @@ EPSSLOPE   = 0.01
 EPSRLAP    = 0.01  # For multiple best template check
 MAXRLAP    = 100   # Maximum rlap value for slope calculations
 
-# DEPRECATED: Legacy RLAP security thresholds - use cluster-based security assessment instead
-# This is kept for backward compatibility only. New code should use:
-# - Cluster-based security assessment from cosmological_clustering.py
-RLAP_SECURE = {
-    'Ia': 8.0, 'Ib': 6.0, 'Ic': 6.0, 'II': 4.0,  # Traditional thresholds
-    'NotSN': 4.0,                                  # Non-stellar objects (legacy)
-    'SLSN': 5.0,                                   # Superluminous SNe
-    'LFBOT': 5.0,                                  # Luminous Fast Blue Optical Transients  
-    'TDE': 4.0,                                    # Tidal Disruption Events
-    'KN': 6.0,                                     # Kilonovae (rare, need higher confidence)
-    'GAP': 4.0,                                    # Gap transients
-    'Galaxy': 4.0,                                 # Galaxies
-    'Star': 4.0,                                   # Stars
-    'AGN': 4.0,                                    # AGN/QSO
-    'default': 4.0 
-}
+# DEPRECATED: Legacy RLAP security thresholds removed
+# Use cluster-based security assessment from cosmological_clustering.py instead
 
 # Fortran type mapping (from enhanced typeinfo.f - 13 types, 70+ subtypes)
 TYPENAME = {
@@ -319,8 +305,8 @@ class SNIDResult:
             if cluster:
                 cluster_size = cluster.get('size', 0)
                 cluster_score = cluster.get('composite_score', 0)
-                top_10_count = cluster.get('top_10_count', 0)
-                cluster_info = f"   🎯 Cluster: {cluster_size} templates ({top_10_count} top-10%, score: {cluster_score:.2f})"
+                top_5_mean = cluster.get('top_5_mean', 0)
+                cluster_info = f"   🎯 Cluster: {cluster_size} templates (top-5 mean: {top_5_mean:.2f}, score: {cluster_score:.2f})"
         
         # Consensus redshift if different from template redshift
         consensus_info = ""
@@ -458,7 +444,9 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
         # Type-level statistics
         all_matches = data['_all']
         z_vals = np.array([m['redshift'] for m in all_matches])
-        rlap_weights = np.array([m['rlap'] for m in all_matches])
+        # Use RLAP-cos if available, otherwise RLAP
+        from snid_sage.shared.utils.math_utils import get_best_metric_value
+        rlap_weights = np.array([get_best_metric_value(m) for m in all_matches])
         
         z_median = weighted_median(z_vals, rlap_weights)
         z_mean, z_std = weighted_mean(z_vals, rlap_weights)
@@ -471,7 +459,8 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
             age_flag = m['template'].get('age_flag', 0)
             if age_flag == 0:
                 age_vals.append(age)
-                age_weights.append(m['rlap'])
+                # Use RLAP-cos if available, otherwise RLAP
+                age_weights.append(get_best_metric_value(m))
         
         if age_vals:
             age_vals = np.array(age_vals)
@@ -493,7 +482,8 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
                 continue
                 
             z_vals = np.array([m['redshift'] for m in sub_matches])
-            rlap_weights = np.array([m['rlap'] for m in sub_matches])
+            # Use RLAP-cos if available, otherwise RLAP
+            rlap_weights = np.array([get_best_metric_value(m) for m in sub_matches])
             
             z_median = weighted_median(z_vals, rlap_weights)
             z_mean, z_std = weighted_mean(z_vals, rlap_weights)
@@ -506,7 +496,8 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
                 age_flag = m['template'].get('age_flag', 0)
                 if age_flag == 0:
                     age_vals.append(age)
-                    age_weights.append(m['rlap'])
+                    # Use RLAP-cos if available, otherwise RLAP
+                    age_weights.append(get_best_metric_value(m))
             
             if age_vals:
                 age_vals = np.array(age_vals)

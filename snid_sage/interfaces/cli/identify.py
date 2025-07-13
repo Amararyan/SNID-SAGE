@@ -20,6 +20,14 @@ from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResu
 from snid_sage.snid.io import read_spectrum
 from snid_sage.shared.utils.math_utils import calculate_inverse_variance_weighted_redshift, calculate_hybrid_weighted_redshift, calculate_rlap_weighted_age
 
+# Import and apply centralized font configuration for consistent plotting
+try:
+    from snid_sage.shared.utils.plotting.font_sizes import apply_font_config
+    apply_font_config()
+except ImportError:
+    # Fallback if font configuration is not available
+    pass
+
 
 class CLIProgressIndicator:
     """
@@ -441,7 +449,9 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                 age = template.get('age', 0.0) if template else 0.0
                 if age > 0:
                     ages.append(age)
-                    age_rlaps.append(m['rlap'])
+                    # Use RLAP-cos if available, otherwise RLAP
+                    from snid_sage.shared.utils.math_utils import get_best_metric_value
+                    age_rlaps.append(get_best_metric_value(m))
             
             if ages:
                 age_mean, age_stat_error, age_total_error, age_scatter = calculate_rlap_weighted_age(

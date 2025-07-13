@@ -38,14 +38,21 @@ except ImportError:
     UNIFIED_SYSTEMS_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
-# Font-size constants (specific to this preview window)
-# ---------------------------------------------------------------------------
-# These central definitions make it easy to tweak typography in one place
-# without hunting through the entire file for hard-coded numbers.
-
-DEFAULT_LABEL_FONTSIZE: int = 10  # Axis labels: "Flux", "Wavelength"
-DEFAULT_TICK_FONTSIZE: int = 8   # Axis tick numbers
-DEFAULT_LEGEND_FONTSIZE: int = 9  # Legends inside the preview plots
+# Import centralized font size configuration
+try:
+    from snid_sage.shared.utils.plotting.font_sizes import (
+        PLOT_AXIS_LABEL_FONTSIZE,
+        PLOT_TICK_FONTSIZE,
+        PLOT_LEGEND_FONTSIZE
+    )
+    DEFAULT_LABEL_FONTSIZE = PLOT_AXIS_LABEL_FONTSIZE
+    DEFAULT_TICK_FONTSIZE = PLOT_TICK_FONTSIZE
+    DEFAULT_LEGEND_FONTSIZE = PLOT_LEGEND_FONTSIZE
+except ImportError:
+    # Fallback font sizes if centralized config is not available
+    DEFAULT_LABEL_FONTSIZE: int = 12  # Axis labels: "Flux", "Wavelength"
+    DEFAULT_TICK_FONTSIZE: int = 10   # Axis tick numbers
+    DEFAULT_LEGEND_FONTSIZE: int = 11  # Legends inside the preview plots
 
 class PreviewPlotManager:
     """

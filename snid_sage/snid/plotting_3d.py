@@ -12,6 +12,26 @@ from mpl_toolkits.mplot3d import Axes3D
 from typing import Dict, List, Any, Tuple, Optional
 import logging
 
+# Import centralized font size configuration
+try:
+    from snid_sage.shared.utils.plotting.font_sizes import (
+        PLOT_TITLE_FONTSIZE,
+        PLOT_AXIS_LABEL_FONTSIZE,
+        PLOT_TICK_FONTSIZE,
+        PLOT_LEGEND_FONTSIZE,
+        PLOT_ERROR_FONTSIZE,
+        apply_font_config
+    )
+    # Apply standardized font configuration globally
+    apply_font_config()
+except ImportError:
+    # Fallback font sizes if centralized config is not available
+    PLOT_TITLE_FONTSIZE: int = 14
+    PLOT_AXIS_LABEL_FONTSIZE: int = 12
+    PLOT_TICK_FONTSIZE: int = 10
+    PLOT_LEGEND_FONTSIZE: int = 11
+    PLOT_ERROR_FONTSIZE: int = 14
+
 _LOGGER = logging.getLogger(__name__)
 
 def plot_3d_type_clustering(
@@ -49,7 +69,7 @@ def plot_3d_type_clustering(
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111)
         ax.text(0.5, 0.5, "No clustering data available for 3D visualization", 
-               ha='center', va='center', fontsize=14, transform=ax.transAxes)
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, transform=ax.transAxes)
         ax.axis('off')
         return fig
     
@@ -109,10 +129,10 @@ def plot_3d_type_clustering(
                       label=type_name)
     
     # Set labels and title
-    ax.set_xlabel('Redshift (z)', fontsize=12, labelpad=10)
-    ax.set_ylabel('Type Index', fontsize=12, labelpad=10)
-    ax.set_zlabel(f'{metric_name}', fontsize=12, labelpad=10)
-    ax.set_title(f'3D GMM Clustering: Redshift vs Type vs {metric_name}', fontsize=14, pad=20)
+    ax.set_xlabel('Redshift (z)', fontsize=PLOT_AXIS_LABEL_FONTSIZE, labelpad=10)
+    ax.set_ylabel('Type', fontsize=PLOT_AXIS_LABEL_FONTSIZE, labelpad=10)
+    ax.set_zlabel(f'{metric_name}', fontsize=PLOT_AXIS_LABEL_FONTSIZE, labelpad=10)
+    ax.set_title(f'3D GMM Clustering: Redshift vs Type vs {metric_name}', fontsize=PLOT_TITLE_FONTSIZE, pad=20)
     
     # Set type labels
     ax.set_yticks(range(len(unique_types)))
@@ -145,14 +165,14 @@ def plot_type_clustering_comparison(
     
     # Plot current approach (left)
     _plot_current_approach(ax1, current_results)
-    ax1.set_title("Current Approach\n(All Types Together)", fontsize=12, fontweight='bold')
+    ax1.set_title("Current Approach\n(All Types Together)", fontsize=PLOT_TITLE_FONTSIZE, fontweight='bold')
     
     # Plot improved approach (right)
     _plot_improved_approach(ax2, improved_results)
-    ax2.set_title("Improved Approach\n(Type-Specific Clustering)", fontsize=12, fontweight='bold')
+    ax2.set_title("Improved Approach\n(Type-Specific Clustering)", fontsize=PLOT_TITLE_FONTSIZE, fontweight='bold')
     
     # Overall title
-    fig.suptitle("GMM Clustering Approach Comparison", fontsize=16, fontweight='bold')
+    fig.suptitle("GMM Clustering Approach Comparison", fontsize=PLOT_TITLE_FONTSIZE, fontweight='bold')
     
     # Skip tight_layout for complex plots to avoid layout warnings
     
@@ -168,7 +188,7 @@ def _plot_current_approach(ax, current_results):
     
     if not hasattr(current_results, 'best_matches'):
         ax.text(0.5, 0.5, "No current results available", 
-               ha='center', va='center', transform=ax.transAxes)
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, transform=ax.transAxes)
         return
     
     matches = current_results.best_matches
@@ -191,9 +211,9 @@ def _plot_current_approach(ax, current_results):
         from snid_sage.shared.utils.math_utils import get_metric_name_for_match
         metric_name = get_metric_name_for_match(matches[0])
     
-    ax.set_xlabel('Redshift (z)')
-    ax.set_ylabel(metric_name)
-    ax.legend(fontsize=8)
+    ax.set_xlabel('Redshift (z)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel(metric_name, fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.legend(fontsize=PLOT_LEGEND_FONTSIZE)
     ax.grid(True, alpha=0.3)
 
 def _plot_improved_approach(ax, improved_results):
@@ -201,7 +221,7 @@ def _plot_improved_approach(ax, improved_results):
     
     if not improved_results.get('success', False):
         ax.text(0.5, 0.5, "No improved results available", 
-               ha='center', va='center', transform=ax.transAxes)
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, transform=ax.transAxes)
         return
     
     best_cluster = improved_results.get('best_cluster')
@@ -231,9 +251,9 @@ def _plot_improved_approach(ax, improved_results):
     if all_candidates and all_candidates[0].get('matches'):
         metric_name = get_metric_name_for_match(all_candidates[0]['matches'][0])
     
-    ax.set_xlabel('Redshift (z)')
-    ax.set_ylabel(metric_name)
-    ax.legend(fontsize=8)
+    ax.set_xlabel('Redshift (z)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel(metric_name, fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.legend(fontsize=PLOT_LEGEND_FONTSIZE)
     ax.grid(True, alpha=0.3)
 
 def plot_cluster_statistics_summary(
@@ -252,7 +272,7 @@ def plot_cluster_statistics_summary(
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111)
         ax.text(0.5, 0.5, "No clustering results to display", 
-               ha='center', va='center', fontsize=14, transform=ax.transAxes)
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, transform=ax.transAxes)
         ax.axis('off')
         return fig
     
@@ -262,7 +282,7 @@ def plot_cluster_statistics_summary(
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111)
         ax.text(0.5, 0.5, "No cluster candidates found", 
-               ha='center', va='center', fontsize=14, transform=ax.transAxes)
+               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, transform=ax.transAxes)
         ax.axis('off')
         return fig
     
@@ -272,7 +292,7 @@ def plot_cluster_statistics_summary(
     
     # Create subplots
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=figsize)
-    fig.suptitle(f'Clustering Statistics Summary ({metric_name})', fontsize=16, fontweight='bold')
+    fig.suptitle(f'Clustering Statistics Summary ({metric_name})', fontsize=PLOT_TITLE_FONTSIZE, fontweight='bold')
     
     # 1. Cluster sizes by type
     type_names = []

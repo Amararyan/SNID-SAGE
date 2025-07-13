@@ -131,11 +131,15 @@ class UnifiedResultsFormatter:
                     age = template.get('age', 0.0) if template else 0.0
                     if age > 0:
                         ages.append(age)
-                        age_rlaps.append(m['rlap'])
+                        # Use RLAP-cos if available, otherwise RLAP
+                        from snid_sage.shared.utils.math_utils import get_best_metric_value
+                        age_rlaps.append(get_best_metric_value(m))
                 
                 if ages:
                     ages = np.array(ages)
-                    age_rlaps = np.array(age_rlaps)
+                    # Use RLAP-cos instead of RLAP for age weighting
+                    from snid_sage.shared.utils.math_utils import get_best_metric_value
+                    age_rlaps = np.array([get_best_metric_value(m) for m in cluster_matches if m.get('template', {}).get('age', 0.0) > 0])
                     age_mean, _, age_total_error, _ = calculate_rlap_weighted_age(
                         ages, age_rlaps, include_cluster_scatter=True
                     )

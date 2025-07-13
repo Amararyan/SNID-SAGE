@@ -656,7 +656,7 @@ class AnalysisController:
                                 )
                             else:
                                 self.gui.config_status_label.configure(
-                                    text="⚠️ Analysis finished – No secure match",
+                                    text="⚠️ Analysis finished – No good match",
                                     fg=self.gui.theme_manager.get_color('text_secondary') if hasattr(self.gui, 'theme_manager') else 'grey'
                                 )
                     else:
@@ -672,7 +672,7 @@ class AnalysisController:
                                 )
                             else:
                                 self.gui.config_status_label.configure(
-                                    text="⚠️ Analysis finished – No secure match",
+                                    text="⚠️ Analysis finished – No good match",
                                     fg=self.gui.theme_manager.get_color('text_secondary') if hasattr(self.gui, 'theme_manager') else 'grey'
                                 )
                     
@@ -704,11 +704,11 @@ class AnalysisController:
                         messagebox.showinfo("Analysis Complete", completion_msg)
                     
                 else:
-                    self.gui.update_header_status("⚠️ Analysis finished – No secure match")
-                    # Update status label to reflect no secure match
+                    self.gui.update_header_status("⚠️ Analysis finished – No good match")
+                    # Update status label to reflect no good match
                     if hasattr(self.gui, 'config_status_label'):
                         self.gui.config_status_label.configure(
-                            text="⚠️ Analysis finished – No secure match",
+                            text="⚠️ Analysis finished – No good match",
                             fg=self.gui.theme_manager.get_color('text_secondary') if hasattr(self.gui, 'theme_manager') else 'grey'
                         )
                     # Check if games are running - notify in-game instead of showing popup
@@ -716,19 +716,19 @@ class AnalysisController:
                         try:
                             from snid_sage.snid.games import notify_analysis_complete, notify_analysis_result
                             notify_analysis_complete("⚠️ SNID Analysis Complete")
-                            notify_analysis_result("No secure matches found")
+                            notify_analysis_result("No good matches found")
                             notify_analysis_result("Try adjusting parameters or preprocessing")
                             _LOGGER.debug("🎮 Notified game of analysis completion (no matches)")
                         except Exception as e:
                             _LOGGER.error(f"Failed to notify game: {e}")
                             # Fallback to regular popup if game notification fails
                             messagebox.showwarning("Analysis Results", 
-                                                 "No secure matches found.\n"
+                                                 "No good matches found.\n"
                                                  "Try adjusting parameters or preprocessing steps.")
                     else:
                         # No game running - show regular popup
                         messagebox.showwarning("Analysis Results", 
-                                             "No secure matches found.\n"
+                                             "No good matches found.\n"
                                              "Try adjusting parameters or preprocessing steps.")
                 
                 _LOGGER.debug("✅ SNID analysis completed successfully!")
@@ -1487,7 +1487,7 @@ class AnalysisController:
                             )
                         else:
                             self.gui.config_status_label.configure(
-                                text="⚠️ Analysis finished – No secure match",
+                                text="⚠️ Analysis finished – No good match",
                                 fg=self.gui.theme_manager.get_color('text_secondary') if hasattr(self.gui, 'theme_manager') else 'grey'
                             )
                 else:
@@ -1503,7 +1503,7 @@ class AnalysisController:
                             )
                         else:
                             self.gui.config_status_label.configure(
-                                text="⚠️ Analysis finished – No secure match",
+                                text="⚠️ Analysis finished – No good match",
                                 fg=self.gui.theme_manager.get_color('text_secondary') if hasattr(self.gui, 'theme_manager') else 'grey'
                             )
                 
@@ -1527,11 +1527,11 @@ class AnalysisController:
                 _LOGGER.info(f"✅ Analysis complete: {result.consensus_type} at z={result.redshift:.4f}")
             
             else:
-                self.gui.update_header_status("⚠️ Analysis finished – No secure match")
-                # Update status label to reflect no secure match
+                self.gui.update_header_status("⚠️ Analysis finished – No good match")
+                # Update status label to reflect no good match
                 if hasattr(self.gui, 'config_status_label'):
                     self.gui.config_status_label.configure(
-                        text="⚠️ Analysis finished – No secure match",
+                        text="⚠️ Analysis finished – No good match",
                         fg=self.gui.theme_manager.get_color('text_secondary') if hasattr(self.gui, 'theme_manager') else 'grey'
                     )
                 # Handle no matches case...
