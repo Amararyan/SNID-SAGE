@@ -983,12 +983,18 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
             bbox=_create_themed_bbox_if_available(theme_manager=theme_manager))
     
     # Format plot (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Redshift", "Correlation", theme_manager):
-        # Fallback styling if unified systems not available
-        ax.set_xlabel('Redshift')
-        ax.set_ylabel('Correlation')
-        ax.grid(True, alpha=0.3)
-    ax.legend(loc='upper right')
+    # Always use standardized font sizes, regardless of GUI styling
+    ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel('Correlation', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.grid(True, alpha=0.3)
+    
+    # Apply no-title styling if available, but ensure font sizes are preserved
+    if _apply_no_title_styling_if_available(fig, ax, "Redshift", "Correlation", theme_manager):
+        # Re-apply standardized font sizes after GUI styling
+        ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+        ax.set_ylabel('Correlation', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    
+    ax.legend(loc='upper right', fontsize=PLOT_LEGEND_FONTSIZE)
     
     # Set y-axis limits to show full correlation range with some padding
     y_data = []
@@ -1398,11 +1404,16 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
                    markeredgewidth=2, zorder=9)
     
     # Format plot correctly (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Redshift", "Age (days)", theme_manager):
-        # Fallback styling if unified systems not available
-        ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
-        ax.set_ylabel('Age (days)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: age
-        ax.grid(True, alpha=0.3)
+    # Always use standardized font sizes, regardless of GUI styling
+    ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
+    ax.set_ylabel('Age (days)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: age
+    ax.grid(True, alpha=0.3)
+    
+    # Apply no-title styling if available, but ensure font sizes are preserved
+    if _apply_no_title_styling_if_available(fig, ax, "Redshift", "Age (days)", theme_manager):
+        # Re-apply standardized font sizes after GUI styling
+        ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+        ax.set_ylabel('Age (days)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
     
     ax.legend(loc='upper right', fontsize=PLOT_LEGEND_FONTSIZE)  # Consistent legend font size
     
@@ -1954,12 +1965,18 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
             bbox=_create_themed_bbox_if_available(theme_manager=theme_manager))
     
     # Format plot (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Redshift", "Correlation", theme_manager):
-        # Fallback styling if unified systems not available
-        ax.set_xlabel('Redshift')
-        ax.set_ylabel('Correlation')
-        ax.grid(True, alpha=0.3)
-    ax.legend(loc='upper right')
+    # Always use standardized font sizes, regardless of GUI styling
+    ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel('Correlation', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.grid(True, alpha=0.3)
+    
+    # Apply no-title styling if available, but ensure font sizes are preserved
+    if _apply_no_title_styling_if_available(fig, ax, "Redshift", "Correlation", theme_manager):
+        # Re-apply standardized font sizes after GUI styling
+        ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+        ax.set_ylabel('Correlation', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    
+    ax.legend(loc='upper right', fontsize=PLOT_LEGEND_FONTSIZE)
     
     # Set y-axis limits to show full correlation range with some padding
     y_data = []
@@ -2085,10 +2102,15 @@ def plot_template_epochs(template_data: Dict[str, Any],
     ax.set_ylim(0, y_max)
     
     # Labels (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Rest Wavelength [Å]", "Flattened Flux", theme_manager):
-        # Fallback styling if unified systems not available
-        ax.set_xlabel('Rest Wavelength [Å]')
-        ax.set_ylabel('Flattened Flux')
+    # Always use standardized font sizes, regardless of GUI styling
+    ax.set_xlabel('Rest Wavelength [Å]', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel('Flattened Flux', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    
+    # Apply no-title styling if available, but ensure font sizes are preserved
+    if _apply_no_title_styling_if_available(fig, ax, "Rest Wavelength [Å]", "Flattened Flux", theme_manager):
+        # Re-apply standardized font sizes after GUI styling
+        ax.set_xlabel('Rest Wavelength [Å]', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+        ax.set_ylabel('Flattened Flux', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
     
     # Add grid
     ax.grid(True, alpha=0.3)
