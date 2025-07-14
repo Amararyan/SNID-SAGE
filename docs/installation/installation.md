@@ -179,7 +179,10 @@ snid --help
 ### Quick Analysis Example
 ```bash
 # Analyze a spectrum
-snid identify spectrum.dat -o results
+snid spectrum.dat -o results
+
+# Or with explicit templates directory
+snid identify spectrum.dat templates/ -o results
 ```
 
 ## Installation Verification
@@ -200,7 +203,10 @@ snid-gui
 ```bash
 # Download sample spectrum (if not included)
 # Run analysis
-snid identify data/sn2003jo.dat --output-dir test_results/
+snid data/sn2003jo.dat --output-dir test_results/
+
+# Or with explicit templates directory
+snid identify data/sn2003jo.dat templates/ --output-dir test_results/
 ```
 
 ## Troubleshooting

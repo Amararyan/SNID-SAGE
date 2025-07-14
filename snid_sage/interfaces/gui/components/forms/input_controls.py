@@ -27,10 +27,10 @@ class InputControlsComponent:
         try:
             # Define supported file types
             filetypes = [
-                ("All Supported", "*.txt *.dat *.ascii *.fits *.fit"),
+                ("All Supported", "*.txt *.dat *.ascii *.asci *.fits *.fit"),
                 ("Text files", "*.txt"),
                 ("Data files", "*.dat"),
-                ("ASCII files", "*.ascii"),
+                ("ASCII files", "*.ascii *.asci"),
                 ("FITS files", "*.fits *.fit"),
                 ("All files", "*.*")
             ]

@@ -29,7 +29,7 @@ def read_spectrum(filename: str, apodize: bool = False) -> Tuple[np.ndarray, np.
     Read a spectrum from a file.
     
     Supports multiple file formats:
-    - ASCII/text files (.txt, .dat, .ascii, .csv)
+    - ASCII/text files (.txt, .dat, .ascii, .asci, .csv)
     - FITS files (.fits, .fit)
     
     Parameters:

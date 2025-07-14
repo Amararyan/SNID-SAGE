@@ -153,6 +153,7 @@ exclude = [
     "data/*.dat", 
     "data/*.txt", 
     "data/*.ascii",
+    "data/*.asci",
     "images/*.png", 
     "images/*.jpg", 
     "custom_templates/*.md"

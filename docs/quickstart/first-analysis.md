@@ -104,7 +104,10 @@ You can also analyze the same spectrum using the command line interface, which p
 ### Basic CLI Command
 ```bash
 # Analyze the same spectrum using CLI
-snid identify data/tns_2024ggi.dat --output-dir results/
+snid data/tns_2024ggi.dat --output-dir results/
+
+# Or with explicit templates directory
+snid identify data/tns_2024ggi.dat templates/ --output-dir results/
 ```
 
 ### What This Does
@@ -135,34 +138,34 @@ The command produces the same comprehensive results:
 **Processing Modes:**
 ```bash
 # Minimal mode - main result file only
-snid identify data/tns_2024ggi.dat --output-dir results/ --minimal
+snid data/tns_2024ggi.dat --output-dir results/ --minimal
 
 # Complete mode - all outputs + plots
-snid identify data/tns_2024ggi.dat --output-dir results/ --complete
+snid data/tns_2024ggi.dat --output-dir results/ --complete
 
 # Default mode - balanced outputs 
-snid identify data/tns_2024ggi.dat --output-dir results/
+snid data/tns_2024ggi.dat --output-dir results/
 ```
 
 **Preprocessing Options:**
 ```bash
 # With smoothing
-snid identify data/tns_2024ggi.dat --output-dir results/ --savgol-window 11 --savgol-order 3
+snid data/tns_2024ggi.dat --output-dir results/ --savgol-window 11 --savgol-order 3
 
 # Remove telluric features
-snid identify data/tns_2024ggi.dat --output-dir results/ --aband-remove --skyclip
+snid data/tns_2024ggi.dat --output-dir results/ --aband-remove --skyclip
 ```
 
 **Analysis Options:**
 ```bash
 # Custom redshift range
-snid identify data/tns_2024ggi.dat --output-dir results/ --zmin 0.0 --zmax 0.1
+snid data/tns_2024ggi.dat --output-dir results/ --zmin 0.0 --zmax 0.1
 
 # Force specific redshift
-snid identify data/tns_2024ggi.dat --output-dir results/ --forced-redshift 0.02435
+snid data/tns_2024ggi.dat --output-dir results/ --forced-redshift 0.02435
 
 # Filter by type
-snid identify data/tns_2024ggi.dat --output-dir results/ --type-filter Ia II
+snid data/tns_2024ggi.dat --output-dir results/ --type-filter Ia II
 ```
 
 ### Key Differences from GUI
@@ -180,6 +183,7 @@ snid identify data/tns_2024ggi.dat --output-dir results/ --type-filter Ia II
 - **Consistency** - Same results every time
 - **Speed** - No interactive delays
 - **Server-friendly** - No GUI required
+- **Auto-discovery** - Automatically finds templates directory
 
 ## Next Steps
 

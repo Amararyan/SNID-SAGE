@@ -36,7 +36,7 @@ class FileController:
         
         # Supported file extensions
         self.supported_extensions = [
-            '.txt', '.dat', '.spec', '.fits', '.fit', '.ascii', '.csv',
+            '.txt', '.dat', '.spec', '.fits', '.fit', '.ascii', '.asci', '.csv',
             '.lnw', '.flm', '.sn', '.dat2', '.spectrum'
         ]
         
@@ -57,8 +57,8 @@ class FileController:
         try:
             # Define file types for the dialog
             filetypes = [
-                ("All Spectrum Files", "*.txt *.dat *.spec *.fits *.fit *.ascii *.csv *.lnw *.flm *.sn *.dat2 *.spectrum"),
-                ("Text Files", "*.txt *.dat *.ascii"),
+                ("All Spectrum Files", "*.txt *.dat *.spec *.fits *.fit *.ascii *.asci *.csv *.lnw *.flm *.sn *.dat2 *.spectrum"),
+                ("Text Files", "*.txt *.dat *.ascii *.asci"),
                 ("FITS Files", "*.fits *.fit"),
                 ("SNID Templates", "*.lnw *.flm"),
                 ("CSV Files", "*.csv"),

@@ -82,14 +82,14 @@ snid-sage
 
 ### Use the CLI (For automation)
 ```bash
-# Single spectrum analysis
-snid identify data/sn2003jo.dat --output-dir results/
+# Single spectrum analysis (templates auto-discovered)
+snid data/sn2003jo.dat --output-dir results/
+
+# Single spectrum analysis with explicit templates
+snid identify data/sn2003jo.dat templates/ --output-dir results/
 
 # Batch processing
 snid batch "data/*.dat" templates/ --output-dir results/
-
-# Template management
-snid template list
 ```
 
 
@@ -107,7 +107,7 @@ snid template list
 ## Supported Data Formats
 
 - **FITS files** (.fits, .fit)
-- **ASCII tables** (.dat, .txt, .ascii)
+- **ASCII tables** (.dat, .txt, .ascii, .asci)
 - **Space-separated values** with flexible column detection
 - **Custom formats** with configurable parsers
 
