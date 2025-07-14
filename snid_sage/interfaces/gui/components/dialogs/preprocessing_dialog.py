@@ -129,10 +129,10 @@ class PreprocessingDialog:
         self.fonts = {
             'title': (base_font_family, 16, 'bold'),           # Step titles
             'section_header': (base_font_family, 13, 'bold'),  # Section headers (LabelFrames)
-            'body': (base_font_family, 12, 'normal'),          # Regular body text
-            'body_bold': (base_font_family, 12, 'bold'),       # Emphasized body text
+            'body': (base_font_family, 13, 'normal'),          # Regular body text (increased from 12)
+            'body_bold': (base_font_family, 13, 'bold'),       # Emphasized body text (increased from 12)
             'button': (base_font_family, 11, 'bold'),          # Buttons
-            'small': (base_font_family, 10, 'normal'),         # Small text/help
+            'small': (base_font_family, 12, 'normal'),         # Small text/help (increased from 10)
             'monospace': ('Consolas', 11, 'normal')            # Code/data display
         }
     
@@ -912,11 +912,12 @@ class PreprocessingDialog:
         help_frame.pack(fill='x', padx=15, pady=(10, 8))
         
         help_text = tk.Label(help_frame,
-                            text="💡 Savitzky-Golay smoothing preserves peak shapes better than median filtering\n"
-                                 "   Higher polynomial orders provide better fitting but may amplify noise",
+                            text="💡 Savitzky-Golay smoothing preserves peak shapes better than median filtering.\n"
+                                 "   Higher polynomial orders provide better fitting but may amplify noise.",
                             font=self.fonts['small'],
                             bg=self.colors['bg_panel'], fg=self.colors['text_secondary'],
-                            justify='left')
+                            justify='left',
+                            wraplength=300)  # Reduced to 300 for better wrapping
         help_text.pack(anchor='w')
     
     def create_rebinning_with_scaling_options(self):
@@ -991,10 +992,11 @@ class PreprocessingDialog:
         gauss_help_frame.pack(fill='x', padx=30, pady=(0, 6))
         
         help_text = tk.Label(gauss_help_frame,
-                            text="💡 Use 'auto' for automatic sigma calculation based on spectrum characteristics",
+                            text="💡 Use 'auto' for automatic sigma calculation based on spectrum characteristics.",
                             font=self.fonts['small'],
                             bg=self.colors['bg_panel'], fg=self.colors['text_secondary'],
-                            justify='left')
+                            justify='left',
+                            wraplength=300)  # Reduced to 300 for better wrapping
         help_text.pack(anchor='w')
         
         # Interactive continuum editing section
@@ -1009,12 +1011,13 @@ class PreprocessingDialog:
             edge_message_frame.pack(fill='x', padx=15, pady=(10, 5))
             
             edge_message = tk.Label(edge_message_frame,
-                                   text="💡 Note: Don't worry about the spectrum edges during continuum editing - they will be properly handled in the next step (apodization).",
+                                   text="💡 Note: Don't worry about the spectrum edges during continuum editing.\n"
+                                        "   They will be properly handled in the next step (apodization).",
                                    font=self.fonts['small'],
                                    bg=self.colors['bg_panel'], fg=self.colors['text_secondary'],
                                    justify='left',
-                                   wraplength=400)
-            edge_message.pack(anchor='w')
+                                   wraplength=280)  # Further reduced to 280 to prevent any cutoff
+            edge_message.pack(anchor='w', padx=(5, 0))  # Added left padding to ensure no cutoff
             
             # Add interactive controls
             controls = self.interactive_widget.create_interactive_controls(interactive_frame)

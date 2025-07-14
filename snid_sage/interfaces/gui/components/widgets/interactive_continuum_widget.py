@@ -75,18 +75,8 @@ class InteractiveContinuumWidget:
         # Additional state
         self._current_method: str = "spline"  # Track current continuum method
         
-        # --- New: interactive point down-sampling factor ---
-        # Showing every single wavelength grid point can result in an
-        # unreadable plot where markers overlap heavily.  By default we now
-        # display every *fourth* point while in interactive editing mode.
-        # Hidden points will still be updated whenever a visible point is
-        # moved to ensure the final manual continuum is smooth.
-        self._interactive_step: int = 8  # Visible point spacing (>=1)
+        self._interactive_step: int = 16  # Visible point spacing (>=1) 
         
-        # Track whether the user has made manual changes in the current
-        # session.  This information is used by other GUI components to
-        # decide if they should recalculate a fresh continuum or preserve the
-        # user-edited one when interactive mode is disabled.
         self._has_manual_changes: bool = False
         
     def set_update_callback(self, callback: Callable):
@@ -110,17 +100,6 @@ class InteractiveContinuumWidget:
         """
         self.controls_frame = tk.Frame(parent_frame, bg=self.colors['bg_panel'])
         
-        # Instructions label
-        instructions = tk.Label(
-            self.controls_frame,
-            text="Interactive Mode: Click and drag to adjust continuum values up/down",
-            bg=self.colors['bg_panel'],
-            fg=self.colors['text_secondary'],
-            font=('Arial', 9, 'italic'),
-            wraplength=400
-        )
-        instructions.pack(pady=(0, 5))
-        
         # Control buttons frame
         buttons_frame = tk.Frame(self.controls_frame, bg=self.colors['bg_panel'])
         buttons_frame.pack()
@@ -128,46 +107,45 @@ class InteractiveContinuumWidget:
         # Enable/Disable button
         self.toggle_button = tk.Button(
             buttons_frame,
-            text="Modify Continuum",
+            text="Modify",
             command=self.toggle_interactive_mode,
-            bg=self.colors['button_bg'],
-            fg=self.colors['text_primary'],
-            font=('Arial', 9),
+            bg=self.colors.get('accent', '#3b82f6'),  # Nice blue color
+            fg='white',
+            font=('Arial', 11),  # Back to 11pt
             relief='raised',
             bd=2,
-            padx=10
+            padx=8
         )
-        self.toggle_button.pack(side='left', padx=(0, 10))
+        self.toggle_button.pack(side='left', padx=(0, 8))
         
         # Reset button
         reset_button = tk.Button(
             buttons_frame,
-            text="Reset to Fit",
+            text="Reset",
             command=self.reset_to_fitted_continuum,
-            bg=self.colors['button_bg'],
-            fg=self.colors['text_primary'],
-            font=('Arial', 9),
+            bg=self.colors.get('warning', '#f59e0b'),  # Nice amber color
+            fg='white',
+            font=('Arial', 11),  # Back to 11pt
             relief='raised',
             bd=2,
-            padx=10
+            padx=8
         )
-        reset_button.pack(side='left', padx=(0, 10))
+        reset_button.pack(side='left', padx=(0, 8))
         
-        # Double Points button (only visible in interactive mode)
+        # Double Points button (always visible)
         self.double_points_button = tk.Button(
             buttons_frame,
-            text="Double Points",
+            text="More Points",
             command=self.double_visible_points,
-            bg=self.colors['button_bg'],
-            fg=self.colors['text_primary'],
-            font=('Arial', 9),
+            bg=self.colors.get('success', '#10b981'),  # Nice green color
+            fg='white',
+            font=('Arial', 11),  # Back to 11pt
             relief='raised',
             bd=2,
-            padx=10
+            padx=8
         )
-        self.double_points_button.pack(side='left', padx=(0, 10))
-        # Initially hidden - will be shown when interactive mode is enabled
-        self.double_points_button.pack_forget()
+        self.double_points_button.pack(side='left', padx=(0, 8))
+        # Always visible - removed pack_forget()
         
         # Status label
         self.status_label = tk.Label(
@@ -175,7 +153,7 @@ class InteractiveContinuumWidget:
             text="Interactive mode disabled",
             bg=self.colors['bg_panel'],
             fg=self.colors['text_secondary'],
-            font=('Arial', 8)
+            font=('Arial', 12)  # Increased from 8 to 12
         )
         self.status_label.pack(pady=(5, 0))
         
@@ -194,19 +172,16 @@ class InteractiveContinuumWidget:
         
         # Update button appearance
         self.toggle_button.config(
-            text="Stop Modifying",
+            text="Stop",
             bg=self.colors['bg_step_active'],
             relief='sunken'
         )
         
         # Update status
         self.status_label.config(
-            text="Interactive mode enabled - Click and drag continuum to adjust values",
+            text="Interactive mode enabled",
             fg=self.colors['text_primary']
         )
-        
-        # Show the double points button
-        self.double_points_button.pack(side='left', padx=(0, 10))
         
         # Update button state and text
         self._update_double_points_button()
@@ -237,8 +212,8 @@ class InteractiveContinuumWidget:
         
         # Update button appearance
         self.toggle_button.config(
-            text="Modify Continuum",
-            bg=self.colors['button_bg'],
+            text="Modify",
+            bg=self.colors.get('accent', '#3b82f6'),  # Use original accent color
             relief='raised'
         )
         
@@ -248,8 +223,7 @@ class InteractiveContinuumWidget:
             fg=self.colors['text_secondary']
         )
         
-        # Hide the double points button
-        self.double_points_button.pack_forget()
+        # Double points button is always visible now
         
         # Disconnect mouse events
         self._disconnect_mouse_events()
@@ -376,11 +350,12 @@ class InteractiveContinuumWidget:
             return
             
         click_x = event.xdata
+        click_y = event.ydata
         if click_x is None:
             return
         
-        # Find nearest wavelength point
-        nearest_index = self._find_nearest_wavelength_index(click_x)
+        # Find nearest wavelength point with precise click detection
+        nearest_index = self._find_nearest_wavelength_index(click_x, click_y)
         
         if nearest_index is not None:
             # Start dragging
@@ -400,13 +375,10 @@ class InteractiveContinuumWidget:
             # Ensure positive continuum values
             new_value = max(0.01, event.ydata)  # Avoid zero-division later
 
-            # --- New behaviour: scale surrounding hidden points ---------
-            # We first calculate the scaling factor between the new and old
-            # values of the selected (visible) point and then apply that same
-            # factor to all *hidden* points that lie between this point and
-            # its neighbours ( ``±(step-1)`` indices ).  This guarantees that
-            # even though only every *step*-th point is shown, the full manual
-            # continuum array is consistently updated.
+            # --- Improved behaviour: smooth interpolation for surrounding hidden points ---------
+            # We calculate the scaling factor and apply it with a smooth falloff
+            # to all *hidden* points that lie between this point and its neighbours.
+            # This creates a more natural interpolation instead of uniform scaling.
 
             old_value = self.manual_continuum[self.selected_point_index]
             if old_value <= 0:
@@ -416,23 +388,32 @@ class InteractiveContinuumWidget:
 
             step = max(1, self._interactive_step)
 
-            # Update the central (visible) point *after* scaling adjacent ones
-            # so that the exact dragged value is preserved.
-
             # Mark that we have user modifications
             self._has_manual_changes = True
 
-            # Forward indices (selected+1 .. selected+step-1)
+            # Apply smooth interpolation to forward indices (selected+1 .. selected+step-1)
             for offset in range(1, step):
                 idx = self.selected_point_index + offset
                 if idx < len(self.manual_continuum):
-                    self.manual_continuum[idx] *= scale_factor
+                    # Calculate distance-based scaling factor (1.0 at selected point, 0.0 at step distance)
+                    distance_ratio = offset / step
+                    # Use cosine interpolation for smooth falloff
+                    smooth_factor = 0.5 * (1.0 + np.cos(np.pi * distance_ratio))
+                    # Apply interpolated scaling
+                    local_scale = 1.0 + (scale_factor - 1.0) * smooth_factor
+                    self.manual_continuum[idx] *= local_scale
 
-            # Backward indices (selected-1 .. selected-step+1)
+            # Apply smooth interpolation to backward indices (selected-1 .. selected-step+1)
             for offset in range(1, step):
                 idx = self.selected_point_index - offset
                 if idx >= 0:
-                    self.manual_continuum[idx] *= scale_factor
+                    # Calculate distance-based scaling factor (1.0 at selected point, 0.0 at step distance)
+                    distance_ratio = offset / step
+                    # Use cosine interpolation for smooth falloff
+                    smooth_factor = 0.5 * (1.0 + np.cos(np.pi * distance_ratio))
+                    # Apply interpolated scaling
+                    local_scale = 1.0 + (scale_factor - 1.0) * smooth_factor
+                    self.manual_continuum[idx] *= local_scale
 
             # Finally set the exact value for the selected index
             self.manual_continuum[self.selected_point_index] = new_value
@@ -445,12 +426,13 @@ class InteractiveContinuumWidget:
             self.dragging = False
             self.selected_point_index = None
     
-    def _find_nearest_wavelength_index(self, wavelength: float) -> Optional[int]:
+    def _find_nearest_wavelength_index(self, wavelength: float, flux_value: float = None) -> Optional[int]:
         """
-        Find nearest wavelength index in the grid
+        Find nearest wavelength index in the grid with precise click detection
         
         Args:
             wavelength: Target wavelength
+            flux_value: Target flux/continuum value (for Y-coordinate checking)
             
         Returns:
             Index of nearest wavelength point or None if not found
@@ -466,22 +448,45 @@ class InteractiveContinuumWidget:
         if self.interactive_mode:
             step = max(1, self._interactive_step)
             visible_indices = np.arange(0, len(self.wave_grid), step)
+            
+            # Calculate distances for visible points only
             distances_visible = np.abs(self.wave_grid[visible_indices] - wavelength)
             nearest_visible_pos = int(np.argmin(distances_visible))
             nearest_index = int(visible_indices[nearest_visible_pos])
-            min_distance = float(distances_visible[nearest_visible_pos])
+            min_x_distance = float(distances_visible[nearest_visible_pos])
+            
+            # If we have flux value, also check Y-distance for precise clicking
+            if flux_value is not None and self.manual_continuum is not None:
+                nearest_flux = self.manual_continuum[nearest_index]
+                min_y_distance = abs(nearest_flux - flux_value)
+            else:
+                min_y_distance = 0.0
         else:
             distances_full = np.abs(self.wave_grid - wavelength)
             nearest_index = int(np.argmin(distances_full))
-            min_distance = float(distances_full[nearest_index])
+            min_x_distance = float(distances_full[nearest_index])
+            min_y_distance = 0.0
         
-        # Check if the distance is reasonable (within plot resolution)
+        # Get plot dimensions for precise threshold calculation
         ax = self.plot_manager.get_top_axis()
         xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
         x_range = xlim[1] - xlim[0]
-        threshold = x_range * 0.02  # 2% of plot range
+        y_range = ylim[1] - ylim[0]
         
-        if min_distance <= threshold:
+        # Calculate precise thresholds based on marker size
+        # The scatter points have size=30, which corresponds to approximately 
+        # 30 points^2 in matplotlib. We need to convert this to data coordinates.
+        # A rough approximation: marker size in data coordinates ≈ size_in_points / 72 * axis_range
+        marker_size_data_x = (30 / 72) * x_range * 0.1  # Conservative estimate
+        marker_size_data_y = (30 / 72) * y_range * 0.1  # Conservative estimate
+        
+        # Use smaller threshold for more precise clicking
+        x_threshold = marker_size_data_x * 0.5  # Half the marker size for precise clicking
+        y_threshold = marker_size_data_y * 0.5  # Half the marker size for precise clicking
+        
+        # Check both X and Y distances for precise point selection
+        if min_x_distance <= x_threshold and min_y_distance <= y_threshold:
             return int(nearest_index)
         
         return None
@@ -747,7 +752,7 @@ class InteractiveContinuumWidget:
             self.double_points_button.config(
                 text=f"Double Points ({point_count})",
                 state='normal',
-                bg=self.colors['button_bg']
+                bg=self.colors.get('success', '#10b981')  # Use original success color
             )
 
     def get_visible_point_count(self) -> int:
