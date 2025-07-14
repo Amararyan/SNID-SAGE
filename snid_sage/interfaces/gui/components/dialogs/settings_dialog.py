@@ -251,7 +251,6 @@ class GUISettingsDialog:
         self._create_display_section(left_column)
         
         # Middle column sections
-        self._create_theme_section(middle_column)
         self._create_window_section(middle_column)
         
         # Right column sections
@@ -329,18 +328,6 @@ class GUISettingsDialog:
         self._create_choice_setting(section_frame, "icon_size", "Icon Size:",
                                    ["Small", "Medium", "Large"], "Interface icon size")
     
-    def _create_theme_section(self, parent):
-        """Create theme and appearance settings section"""
-        section_frame = self._create_colorful_section(parent, "🎨 Theme & Appearance", self.colors['bg_warning'])
-        
-        # Watercolor effects
-        self._create_checkbox_setting(section_frame, "watercolor_effects", "Watercolor Visual Effects",
-                                     "Enable beautiful watercolor transitions and effects")
-        
-        # Color saturation
-        self._create_slider_setting(section_frame, "color_saturation", "Color Saturation:", 50, 150, 5,
-                                   "Adjust interface color saturation (%)")
-    
     def _create_window_section(self, parent):
         """Create window behavior settings section"""
         section_frame = self._create_colorful_section(parent, "🪟 Window Behavior", 
@@ -387,14 +374,6 @@ class GUISettingsDialog:
         # Reduce animations
         self._create_checkbox_setting(section_frame, "reduce_animations", "Reduce Animations",
                                      "Minimize visual effects for better performance")
-        
-        # Lazy loading
-        self._create_checkbox_setting(section_frame, "lazy_loading", "Lazy Loading",
-                                     "Load interface elements on demand")
-        
-        # Thread pool size
-        self._create_slider_setting(section_frame, "thread_pool_size", "Thread Pool Size:", 1, 16, 1,
-                                   "Number of background processing threads")
     
     def _create_colorful_section(self, parent, title, bg_color):
         """Create a colorful section with title"""
@@ -449,8 +428,8 @@ class GUISettingsDialog:
                         width=10, justify='center')
         entry.pack(side='left')
         
-        # Determine if this should be integer-only (like font_size, thread_pool_size, etc.)
-        integer_fields = {'font_size', 'thread_pool_size', 'button_height', 'widget_padding', 'animation_speed'}
+        # Determine if this should be integer-only (like font_size, button_height, etc.)
+        integer_fields = {'font_size', 'button_height', 'widget_padding', 'animation_speed'}
         is_integer_field = key in integer_fields
         
         # Validation function
@@ -569,7 +548,7 @@ class GUISettingsDialog:
         apply_btn = tk.Button(button_container, text="✅ Apply Settings",
                              bg=self.colors['accent_green'], fg='white',
                              font=('Segoe UI', 12, 'bold'),
-                             relief='flat', bd=0, pady=10, padx=20, cursor='hand2',
+                             relief='raised', bd=2, pady=10, padx=20, cursor='hand2',
                              command=self._apply)
         apply_btn.pack(side='right', padx=(10, 0))
         
@@ -577,7 +556,7 @@ class GUISettingsDialog:
         cancel_btn = tk.Button(button_container, text="❌ Cancel",
                               bg=self.colors['shadow'], fg='white',
                               font=('Segoe UI', 12, 'normal'),
-                              relief='flat', bd=0, pady=10, padx=20, cursor='hand2',
+                              relief='raised', bd=2, pady=10, padx=20, cursor='hand2',
                               command=self._cancel)
         cancel_btn.pack(side='right', padx=(10, 0))
         
@@ -585,7 +564,7 @@ class GUISettingsDialog:
         reset_btn = tk.Button(button_container, text="🔄 Reset to Defaults",
                              bg=self.colors['accent_orange'], fg='white',
                              font=('Segoe UI', 12, 'normal'),
-                             relief='flat', bd=0, pady=10, padx=20, cursor='hand2',
+                             relief='raised', bd=2, pady=10, padx=20, cursor='hand2',
                              command=self._reset_defaults)
         reset_btn.pack(side='left')
     
@@ -621,8 +600,6 @@ class GUISettingsDialog:
             'button_height': 40,
             'widget_padding': 8,
             'icon_size': 'Medium',
-            'watercolor_effects': True,
-            'color_saturation': 100,
             'remember_position': True,
             'remember_size': True,
             'minimize_to_tray': False,
@@ -630,9 +607,7 @@ class GUISettingsDialog:
             'plot_dpi': 150,
             'animation_speed': 5,
             'grid_opacity': 30,
-            'reduce_animations': False,
-            'lazy_loading': True,
-            'thread_pool_size': 4
+            'reduce_animations': False
         }
     
     def _on_font_changed(self, event=None):

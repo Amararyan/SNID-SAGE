@@ -1004,6 +1004,18 @@ class PreprocessingDialog:
                                             bg=self.colors['bg_panel'], fg=self.colors['text_primary'])
             interactive_frame.pack(fill='x', pady=(0, 15))
             
+            # Add message about edge handling
+            edge_message_frame = tk.Frame(interactive_frame, bg=self.colors['bg_panel'])
+            edge_message_frame.pack(fill='x', padx=15, pady=(10, 5))
+            
+            edge_message = tk.Label(edge_message_frame,
+                                   text="💡 Note: Don't worry about the spectrum edges during continuum editing - they will be properly handled in the next step (apodization).",
+                                   font=self.fonts['small'],
+                                   bg=self.colors['bg_panel'], fg=self.colors['text_secondary'],
+                                   justify='left',
+                                   wraplength=400)
+            edge_message.pack(anchor='w')
+            
             # Add interactive controls
             controls = self.interactive_widget.create_interactive_controls(interactive_frame)
             controls.pack(fill='x', padx=15, pady=15)

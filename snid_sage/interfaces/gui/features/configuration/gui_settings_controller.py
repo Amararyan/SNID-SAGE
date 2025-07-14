@@ -100,10 +100,6 @@ class GUISettingsController:
             'widget_padding': 8,
             'icon_size': 'Medium',
             
-            # Theme and appearance (removed auto_theme - light mode only)
-            'watercolor_effects': True,
-            'color_saturation': 100,
-            
             # Window behavior
             'remember_position': True,
             'remember_size': True,
@@ -116,9 +112,7 @@ class GUISettingsController:
             'grid_opacity': 30,
             
             # Performance
-            'reduce_animations': False,
-            'lazy_loading': True,
-            'thread_pool_size': 4
+            'reduce_animations': False
             
             # Removed obsolete optimization settings
         }
@@ -262,9 +256,6 @@ class GUISettingsController:
             # Apply display settings
             self._apply_display_settings(settings)
             
-            # Apply theme settings
-            self._apply_theme_settings(settings)
-            
             # Apply window settings
             self._apply_window_settings(settings)
             
@@ -398,7 +389,6 @@ class GUISettingsController:
         """Apply performance settings"""
         try:
             reduce_animations = settings.get('reduce_animations', False)
-            thread_pool_size = settings.get('thread_pool_size', 4)
             
             # Apply animation settings
             if hasattr(self.main_gui, 'theme_manager'):
@@ -409,15 +399,7 @@ class GUISettingsController:
                     # Store animation preference
                     theme_manager.animations_enabled = not reduce_animations
             
-            # Update thread pool size if applicable
-            if hasattr(self.main_gui, 'thread_pool'):
-                thread_pool = self.main_gui.thread_pool
-                if hasattr(thread_pool, 'set_max_workers'):
-                    thread_pool.set_max_workers(thread_pool_size)
-                elif hasattr(thread_pool, '_max_workers'):
-                    thread_pool._max_workers = thread_pool_size
-            
-            _LOGGER.debug(f"Applied performance settings: animations={not reduce_animations}, threads={thread_pool_size}")
+            _LOGGER.debug(f"Applied performance settings: animations={not reduce_animations}")
             
         except Exception as e:
             _LOGGER.error(f"Error applying performance settings: {e}")

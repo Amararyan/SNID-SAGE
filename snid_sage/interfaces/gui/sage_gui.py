@@ -67,8 +67,7 @@ from snid_sage.interfaces.gui.utils.layout_utils import LayoutUtils
 from snid_sage.interfaces.gui.utils.state_manager import StateManager
 from snid_sage.interfaces.gui.utils.logo_manager import LogoManager
 from snid_sage.interfaces.gui.utils.spectrum_reset_manager import SpectrumResetManager
-from snid_sage.interfaces.gui.utils.import_manager import (_import_matplotlib, _import_preprocessing, _import_pil,
-                                    _import_astropy, _import_scipy, _import_snid_dependencies)
+from snid_sage.interfaces.gui.utils.import_manager import check_optional_features
 from snid_sage.interfaces.gui.utils.startup_manager import (StartupManager, setup_dpi_awareness,
                                create_main_gui, destroy_gui_safely,
                                setup_controllers, bind_controller_events,
