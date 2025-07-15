@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-**SNID SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is a comprehensive spectrum analysis suite featuring an intuitive GUI and powerful cross-correlation techniques, enhanced with modern LLM-powered analysis capabilities.
+**SNID SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is your go-to tool for analyzing supernova spectra. It combines an intuitive graphical interface with the original SNID (Blondin & Tonry 2007) cross-correlation techniques, enhanced with a new clustering methodology for classification choice and LLM-powered analysis summaries and interactive chat assistance.
 
 ---
 
