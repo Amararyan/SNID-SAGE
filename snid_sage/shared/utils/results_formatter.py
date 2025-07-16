@@ -385,16 +385,16 @@ class UnifiedResultsFormatter:
         
         # Build display summary
         lines = [
-            "🔬 SNID CLASSIFICATION RESULTS",
+            "SNID CLASSIFICATION RESULTS",
             "=" * 50,
             "",
         ]
         
         # Different header based on selection method
         if is_manual_selection:
-            lines.append("🎯 FINAL CLASSIFICATION (Manual Selection):")
+            lines.append("FINAL CLASSIFICATION (Manual Selection):")
         else:
-            lines.append("🎯 FINAL CLASSIFICATION (Automatic Method):")
+            lines.append("FINAL CLASSIFICATION (Automatic Method):")
         
         # Type with quality metrics (always show quality as it's cluster-specific)
         if s['has_clustering'] and s['cluster_quality_level']:

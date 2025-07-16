@@ -120,11 +120,6 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
         try:
             # Force background color using multiple techniques
             button.configure(background=bg_color)
-            # Try to add selectforeground separately (may not be supported)
-            try:
-                button.configure(selectforeground=fg_color)
-            except Exception:
-                pass  # Skip selectforeground if not supported
             
             # Try to disable system button styling if available (macOS-specific)
             try:
@@ -142,6 +137,12 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
             
             # Force immediate update
             button.update_idletasks()
+            
+            # Try to add selectforeground separately (may not be supported)
+            try:
+                button.configure(selectforeground=fg_color)
+            except Exception:
+                pass  # Skip selectforeground if not supported
             
             # Schedule delayed color application to overcome macOS timing issues
             def apply_delayed_macOS_styling():
@@ -294,7 +295,7 @@ class LayoutUtils:
             status_content.pack(fill='both', expand=True, padx=10, pady=1)
             
             # Status label
-            gui_instance.header_status_label = tk.Label(status_content, text="🚀 Ready - Load a spectrum to begin analysis",
+            gui_instance.header_status_label = tk.Label(status_content, text="Ready - Load a spectrum to begin analysis",
                                                        font=('Segoe UI', 11, 'normal'),
                                                        bg=gui_instance.theme_manager.get_color('bg_tertiary'),
                                                        fg=gui_instance.theme_manager.get_color('text_primary'),

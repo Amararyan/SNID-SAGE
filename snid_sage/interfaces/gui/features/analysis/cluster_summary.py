@@ -500,13 +500,15 @@ class AnalysisResultsDialog:
                 'fg': self.theme_manager.get_color('text_primary'),
                 'insertbackground': self.theme_manager.get_color('text_primary'),
                 'selectbackground': self.theme_manager.get_color('accent'),
+                'selectforeground': self.theme_manager.get_color('bg_primary')
             }
-            # Only add selectforeground if supported (may not work on all platforms)
+            # Apply configuration safely
             try:
-                config['selectforeground'] = self.theme_manager.get_color('bg_primary')
-            except:
-                pass  # Skip selectforeground if not supported
-            text_widget.configure(**config)
+                text_widget.configure(**config)
+            except tk.TclError:
+                # If selectforeground fails, apply without it
+                safe_config = {k: v for k, v in config.items() if k != 'selectforeground'}
+                text_widget.configure(**safe_config)
         
         scrollbar = tk.Scrollbar(text_frame, command=text_widget.yview)
         if self.theme_manager:

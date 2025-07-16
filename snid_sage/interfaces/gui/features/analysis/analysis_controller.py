@@ -1142,13 +1142,18 @@ class AnalysisController:
             'padx': 15, 
             'pady': 15,  # Added padding for better readability
             'selectbackground': self.gui.theme_manager.get_color('accent'),
+            'selectforeground': self.gui.theme_manager.get_color('bg_primary')
         }
-        # Only add selectforeground if supported (may not work on all platforms)
+        # Create text widget and apply safe configuration
+        text_widget = tk.Text(text_frame)
+        # Apply configuration safely
         try:
-            text_widget_config['selectforeground'] = self.gui.theme_manager.get_color('bg_primary')
-        except:
-            pass  # Skip selectforeground if not supported
-        text_widget = tk.Text(text_frame, **text_widget_config)
+            text_widget.configure(**text_widget_config)
+        except tk.TclError:
+            # If selectforeground fails, apply without it
+            safe_config = {k: v for k, v in text_widget_config.items() if k != 'selectforeground'}
+            text_widget.configure(**safe_config)
+        
         text_widget.pack(side='left', fill='both', expand=True)
         
         scrollbar = tk.Scrollbar(text_frame, orient='vertical', command=text_widget.yview,

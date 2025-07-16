@@ -235,11 +235,6 @@ class ImprovedButtonWorkflow:
                 # Apply configuration in stages to ensure it sticks
                 try:
                     button.configure(**macos_config)
-                    # Try to add selectforeground separately (may not be supported)
-                    try:
-                        button.configure(selectforeground=self._get_text_color(color))
-                    except Exception:
-                        pass  # Skip selectforeground if not supported
                 except Exception as config_error:
                     _LOGGER.debug(f"Initial macOS button config failed: {config_error}")
                     # Try essential properties only
@@ -252,6 +247,12 @@ class ImprovedButtonWorkflow:
                         )
                     except:
                         pass
+                
+                # Try to add selectforeground separately (may not be supported)
+                try:
+                    button.configure(selectforeground=self._get_text_color(color))
+                except Exception:
+                    pass  # Skip selectforeground if not supported
                 
                 # Force background color using multiple techniques
                 try:

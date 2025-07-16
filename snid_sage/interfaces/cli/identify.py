@@ -934,7 +934,7 @@ def main(args: argparse.Namespace) -> int:
         print(f"[ERROR] File not found - {e}", file=sys.stderr)
         return 1
     except Exception as e:
-        print(f"💥 Error during SNID identification: {e}", file=sys.stderr)
+        print(f"[ERROR] Error during SNID identification: {e}", file=sys.stderr)
         if args.verbose:
             import traceback
             traceback.print_exc()

@@ -270,9 +270,9 @@ def perform_direct_gmm_clustering(
                         f"quality={candidate['redshift_quality']}")
     
     _LOGGER.info(f"✅ Direct GMM clustering completed in {total_time:.3f}s")
-    _LOGGER.info(f"🎯 Best cluster: {best_cluster['type']} cluster {best_cluster.get('cluster_id', 0)} "
-                f"(Quality: {best_cluster['quality_assessment']['quality_category']}, "
-                f"Confidence: {best_cluster['confidence_assessment']['confidence_level']})")
+    _LOGGER.info(f"Best cluster: {best_cluster['type']} cluster {best_cluster.get('cluster_id', 0)} "
+                 f"(Quality: {best_cluster['quality_assessment']['quality_category']}, "
+                 f"Confidence: {best_cluster['confidence_assessment']['confidence_level']})")
     
     return {
         'success': True,

@@ -360,6 +360,36 @@ class UnifiedThemeManager:
         # Default to neutral
         return ButtonType.NEUTRAL
     
+    def _safe_configure_widget(self, widget, config_dict):
+        """Safely configure widget with platform-specific option handling"""
+        # Create a copy of config to avoid modifying original
+        safe_config = config_dict.copy()
+        
+        # Handle selectforeground separately for macOS compatibility
+        selectforeground_value = safe_config.pop('selectforeground', None)
+        
+        # Apply main configuration
+        try:
+            widget.configure(**safe_config)
+        except tk.TclError as e:
+            # If main configuration fails, apply essential properties only
+            essential_config = {
+                key: value for key, value in safe_config.items()
+                if key in ['bg', 'fg', 'background', 'foreground', 'font']
+            }
+            try:
+                widget.configure(**essential_config)
+            except tk.TclError:
+                pass  # If even essential config fails, continue
+        
+        # Try to apply selectforeground separately if it was specified
+        if selectforeground_value is not None:
+            try:
+                widget.configure(selectforeground=selectforeground_value)
+            except (tk.TclError, AttributeError):
+                # selectforeground not supported on this platform/widget
+                pass
+
     def _theme_entry(self, widget: tk.Entry, colors: Dict[str, str]):
         """Theme Entry widgets with platform-specific styling"""
         config = {
@@ -373,18 +403,13 @@ class UnifiedThemeManager:
         # Apply platform-specific entry styling
         if self.platform_config and self.platform_config.is_macos:
             # macOS entries have rounded corners and focus rings
-            macos_config = {
+            config.update({
                 'relief': 'solid',
                 'borderwidth': 1,
                 'highlightthickness': 2,
                 'selectbackground': colors['focus'],
-            }
-            # Only add selectforeground if supported (may not work on all macOS versions)
-            try:
-                macos_config['selectforeground'] = colors['text_on_accent']
-            except:
-                pass  # Skip selectforeground if not supported
-            config.update(macos_config)
+                'selectforeground': colors['text_on_accent'],  # Will be handled safely
+            })
         elif self.platform_config and self.platform_config.is_windows:
             # Windows entries have flat appearance
             config.update({
@@ -393,7 +418,7 @@ class UnifiedThemeManager:
                 'highlightthickness': 1,
             })
         
-        widget.configure(**config)
+        self._safe_configure_widget(widget, config)
     
     def _theme_text(self, widget: tk.Text, colors: Dict[str, str]):
         """Theme Text widgets with platform-specific styling"""
@@ -408,19 +433,14 @@ class UnifiedThemeManager:
         # Apply platform-specific text styling
         if self.platform_config and self.platform_config.is_macos:
             # macOS text widgets have native scrollbars and focus rings
-            macos_config = {
+            config.update({
                 'relief': 'solid',
                 'borderwidth': 1,
                 'highlightthickness': 2,
                 'selectbackground': colors['focus'],
+                'selectforeground': colors['text_on_accent'],  # Will be handled safely
                 'wrap': 'word',
-            }
-            # Only add selectforeground if supported (may not work on all macOS versions)
-            try:
-                macos_config['selectforeground'] = colors['text_on_accent']
-            except:
-                pass  # Skip selectforeground if not supported
-            config.update(macos_config)
+            })
         elif self.platform_config and self.platform_config.is_windows:
             # Windows text widgets have standard appearance
             config.update({
@@ -429,7 +449,7 @@ class UnifiedThemeManager:
                 'highlightthickness': 1,
             })
         
-        widget.configure(**config)
+        self._safe_configure_widget(widget, config)
     
     def _theme_listbox(self, widget: tk.Listbox, colors: Dict[str, str]):
         """Theme Listbox widgets"""
@@ -437,13 +457,9 @@ class UnifiedThemeManager:
             'bg': colors['bg_secondary'],
             'fg': colors['text_primary'],
             'selectbackground': colors['focus'],
+            'selectforeground': colors['text_on_accent']  # Will be handled safely
         }
-        # Only add selectforeground if supported (may not work on all macOS versions)
-        try:
-            config['selectforeground'] = colors['text_on_accent']
-        except:
-            pass  # Skip selectforeground if not supported
-        widget.configure(**config)
+        self._safe_configure_widget(widget, config)
     
     def _theme_canvas(self, widget: tk.Canvas, colors: Dict[str, str]):
         """Theme Canvas widgets"""
