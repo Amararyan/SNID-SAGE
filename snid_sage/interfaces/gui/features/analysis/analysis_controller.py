@@ -1134,12 +1134,21 @@ class AnalysisController:
         text_frame = tk.Frame(main_frame, bg=self.gui.theme_manager.get_color('bg_secondary'))
         text_frame.pack(fill='both', expand=True, pady=(0, 10))
         
-        text_widget = tk.Text(text_frame, wrap='word', font=('Consolas', 14),  # Increased font size
-                             bg=self.gui.theme_manager.get_color('bg_tertiary'), 
-                             fg=self.gui.theme_manager.get_color('text_primary'),
-                             padx=15, pady=15,  # Added padding for better readability
-                             selectbackground=self.gui.theme_manager.get_color('accent'),
-                             selectforeground=self.gui.theme_manager.get_color('bg_primary'))
+        text_widget_config = {
+            'wrap': 'word', 
+            'font': ('Consolas', 14),  # Increased font size
+            'bg': self.gui.theme_manager.get_color('bg_tertiary'), 
+            'fg': self.gui.theme_manager.get_color('text_primary'),
+            'padx': 15, 
+            'pady': 15,  # Added padding for better readability
+            'selectbackground': self.gui.theme_manager.get_color('accent'),
+        }
+        # Only add selectforeground if supported (may not work on all platforms)
+        try:
+            text_widget_config['selectforeground'] = self.gui.theme_manager.get_color('bg_primary')
+        except:
+            pass  # Skip selectforeground if not supported
+        text_widget = tk.Text(text_frame, **text_widget_config)
         text_widget.pack(side='left', fill='both', expand=True)
         
         scrollbar = tk.Scrollbar(text_frame, orient='vertical', command=text_widget.yview,

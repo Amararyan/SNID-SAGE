@@ -373,13 +373,18 @@ class UnifiedThemeManager:
         # Apply platform-specific entry styling
         if self.platform_config and self.platform_config.is_macos:
             # macOS entries have rounded corners and focus rings
-            config.update({
+            macos_config = {
                 'relief': 'solid',
                 'borderwidth': 1,
                 'highlightthickness': 2,
                 'selectbackground': colors['focus'],
-                'selectforeground': colors['text_on_accent'],
-            })
+            }
+            # Only add selectforeground if supported (may not work on all macOS versions)
+            try:
+                macos_config['selectforeground'] = colors['text_on_accent']
+            except:
+                pass  # Skip selectforeground if not supported
+            config.update(macos_config)
         elif self.platform_config and self.platform_config.is_windows:
             # Windows entries have flat appearance
             config.update({
@@ -403,14 +408,19 @@ class UnifiedThemeManager:
         # Apply platform-specific text styling
         if self.platform_config and self.platform_config.is_macos:
             # macOS text widgets have native scrollbars and focus rings
-            config.update({
+            macos_config = {
                 'relief': 'solid',
                 'borderwidth': 1,
                 'highlightthickness': 2,
                 'selectbackground': colors['focus'],
-                'selectforeground': colors['text_on_accent'],
                 'wrap': 'word',
-            })
+            }
+            # Only add selectforeground if supported (may not work on all macOS versions)
+            try:
+                macos_config['selectforeground'] = colors['text_on_accent']
+            except:
+                pass  # Skip selectforeground if not supported
+            config.update(macos_config)
         elif self.platform_config and self.platform_config.is_windows:
             # Windows text widgets have standard appearance
             config.update({
@@ -423,12 +433,17 @@ class UnifiedThemeManager:
     
     def _theme_listbox(self, widget: tk.Listbox, colors: Dict[str, str]):
         """Theme Listbox widgets"""
-        widget.configure(
-            bg=colors['bg_secondary'],
-            fg=colors['text_primary'],
-            selectbackground=colors['focus'],
-            selectforeground=colors['text_on_accent']
-        )
+        config = {
+            'bg': colors['bg_secondary'],
+            'fg': colors['text_primary'],
+            'selectbackground': colors['focus'],
+        }
+        # Only add selectforeground if supported (may not work on all macOS versions)
+        try:
+            config['selectforeground'] = colors['text_on_accent']
+        except:
+            pass  # Skip selectforeground if not supported
+        widget.configure(**config)
     
     def _theme_canvas(self, widget: tk.Canvas, colors: Dict[str, str]):
         """Theme Canvas widgets"""

@@ -106,9 +106,9 @@ class CLIProgressIndicator:
             else:
                 time_str = f"{elapsed/3600:.1f}h"
             
-            print(f"\r✅ {message} ({self.total_templates} templates in {time_str})")
+            print(f"\r[SUCCESS] {message} ({self.total_templates} templates in {time_str})")
         else:
-            print(f"\r✅ {message}")
+            print(f"\r[SUCCESS] {message}")
 
 
 def _extract_spectrum_name(spectrum_path: str) -> str:
@@ -697,7 +697,7 @@ def _validate_and_fix_templates_dir(templates_dir: Optional[str]) -> str:
         try:
             from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
             auto_found_dir = find_templates_directory_or_raise()
-            print(f"✅ Auto-discovered templates at: {auto_found_dir}")
+            print(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
             return str(auto_found_dir)
         except (ImportError, FileNotFoundError):
             raise FileNotFoundError(
@@ -738,14 +738,14 @@ def main(args: argparse.Namespace) -> int:
         
         # Validate inputs
         if not os.path.exists(args.spectrum_path):
-            print(f"❌ Error: Spectrum file not found: {args.spectrum_path}", file=sys.stderr)
+            print(f"[ERROR] Spectrum file not found: {args.spectrum_path}", file=sys.stderr)
             return 1
         
         # Validate and auto-correct templates directory
         try:
             args.templates_dir = _validate_and_fix_templates_dir(args.templates_dir)
         except FileNotFoundError as e:
-            print(f"❌ Error: {e}", file=sys.stderr)
+            print(f"[ERROR] {e}", file=sys.stderr)
             return 1
         
         # Additional suppression for CLI mode - silence specific noisy loggers
@@ -864,7 +864,7 @@ def main(args: argparse.Namespace) -> int:
             print()  # Add newline after progress
         
         if not result or not result.success:
-            print(f"\n❌ SNID analysis failed for {spectrum_name}")
+            print(f"\n[ERROR] SNID analysis failed for {spectrum_name}")
             if hasattr(result, 'error_message'):
                 print(f"   Error: {result.error_message}")
             return 1
@@ -927,11 +927,11 @@ def main(args: argparse.Namespace) -> int:
             
             return 0
         else:
-            print(f"\n❌ {spectrum_name}: No good matches found")
+            print(f"\n[ERROR] {spectrum_name}: No good matches found")
             return 1
             
     except FileNotFoundError as e:
-        print(f"❌ Error: File not found - {e}", file=sys.stderr)
+        print(f"[ERROR] File not found - {e}", file=sys.stderr)
         return 1
     except Exception as e:
         print(f"💥 Error during SNID identification: {e}", file=sys.stderr)

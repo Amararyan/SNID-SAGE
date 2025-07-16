@@ -495,13 +495,18 @@ class AnalysisResultsDialog:
         
         text_widget = tk.Text(text_frame, wrap=tk.WORD, font=('Consolas', 12))
         if self.theme_manager:
-            text_widget.configure(
-                bg=self.theme_manager.get_color('bg_tertiary'),
-                fg=self.theme_manager.get_color('text_primary'),
-                insertbackground=self.theme_manager.get_color('text_primary'),
-                selectbackground=self.theme_manager.get_color('accent'),
-                selectforeground=self.theme_manager.get_color('bg_primary')
-            )
+            config = {
+                'bg': self.theme_manager.get_color('bg_tertiary'),
+                'fg': self.theme_manager.get_color('text_primary'),
+                'insertbackground': self.theme_manager.get_color('text_primary'),
+                'selectbackground': self.theme_manager.get_color('accent'),
+            }
+            # Only add selectforeground if supported (may not work on all platforms)
+            try:
+                config['selectforeground'] = self.theme_manager.get_color('bg_primary')
+            except:
+                pass  # Skip selectforeground if not supported
+            text_widget.configure(**config)
         
         scrollbar = tk.Scrollbar(text_frame, command=text_widget.yview)
         if self.theme_manager:

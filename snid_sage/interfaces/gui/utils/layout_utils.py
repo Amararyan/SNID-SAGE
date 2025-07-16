@@ -107,7 +107,6 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
             'takefocus': True,
             
             # Additional properties to force custom appearance
-            'selectforeground': fg_color,
             'selectbackground': bg_color,
             'disabledforeground': '#999999',
             
@@ -121,6 +120,11 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
         try:
             # Force background color using multiple techniques
             button.configure(background=bg_color)
+            # Try to add selectforeground separately (may not be supported)
+            try:
+                button.configure(selectforeground=fg_color)
+            except Exception:
+                pass  # Skip selectforeground if not supported
             
             # Try to disable system button styling if available (macOS-specific)
             try:

@@ -71,7 +71,7 @@ class BatchTemplateManager:
             try:
                 from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
                 auto_found_dir = find_templates_directory_or_raise()
-                print(f"✅ Auto-discovered templates at: {auto_found_dir}")
+                print(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
                 return str(auto_found_dir)
             except (ImportError, FileNotFoundError):
                 raise FileNotFoundError(
@@ -87,7 +87,7 @@ class BatchTemplateManager:
             from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
             auto_found_dir = find_templates_directory_or_raise()
             print(f"⚠️  Templates directory '{templates_dir}' not found.")
-            print(f"✅ Auto-discovered templates at: {auto_found_dir}")
+            print(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
             return str(auto_found_dir)
         except (ImportError, FileNotFoundError):
             # Fallback failed
@@ -1126,7 +1126,7 @@ def main(args: argparse.Namespace) -> int:
         # Find input files
         input_files = glob.glob(args.input_pattern)
         if not input_files:
-            print(f"❌ No files found matching pattern: {args.input_pattern}", file=sys.stderr)
+            print(f"[ERROR] No files found matching pattern: {args.input_pattern}", file=sys.stderr)
             return 1
         
         # Determine mode
@@ -1161,10 +1161,10 @@ def main(args: argparse.Namespace) -> int:
         template_manager = BatchTemplateManager(args.templates_dir, verbose=args.verbose)
         
         if not template_manager.load_templates_once():
-            print("❌ Failed to load templates", file=sys.stderr)
+            print("[ERROR] Failed to load templates", file=sys.stderr)
             return 1
         
-        print(f"✅ Templates loaded in {template_manager.load_time:.2f}s")
+        print(f"[SUCCESS] Templates loaded in {template_manager.load_time:.2f}s")
         print(f"📊 Ready to process {len(input_files)} spectra with {template_manager.template_count} templates")
         print("")
         
@@ -1174,7 +1174,7 @@ def main(args: argparse.Namespace) -> int:
         
         if args.max_workers == 1:
             # Sequential processing with optimized template loading
-            print("🚀 Starting optimized sequential processing...")
+            print("[INFO] Starting optimized sequential processing...")
             
             for i, spectrum_path in enumerate(input_files, 1):
                 if args.verbose:
@@ -1198,9 +1198,9 @@ def main(args: argparse.Namespace) -> int:
                     else:
                         # Actual error
                         if args.verbose:
-                            print(f"      ❌ {name}: {message}")
+                            print(f"      [ERROR] {name}: {message}")
                         else:
-                            print(f"      ❌ {name}: error")
+                            print(f"      [ERROR] {name}: error")
                     if args.stop_on_error:
                         print("🛑 Stopping due to error.")
                         break
@@ -1233,7 +1233,7 @@ def main(args: argparse.Namespace) -> int:
             # For now, we'll fall back to sequential processing with a warning
             print(f"⚠️  Parallel processing not yet supported with template optimization.")
             print(f"    Using sequential processing for maximum efficiency.")
-            print(f"🚀 Starting optimized sequential processing...")
+            print(f"[INFO] Starting optimized sequential processing...")
             
             for i, spectrum_path in enumerate(input_files, 1):
                 if args.verbose:
@@ -1257,9 +1257,9 @@ def main(args: argparse.Namespace) -> int:
                     else:
                         # Actual error
                         if args.verbose:
-                            print(f"      ❌ {name}: {message}")
+                            print(f"      [ERROR] {name}: {message}")
                         else:
-                            print(f"      ❌ {name}: error")
+                            print(f"      [ERROR] {name}: error")
                     if args.stop_on_error:
                         print("🛑 Stopping due to error.")
                         break
@@ -1302,7 +1302,7 @@ def main(args: argparse.Namespace) -> int:
         with open(summary_path, 'w', encoding='utf-8') as f:
             f.write(summary_report)
         
-        print(f"✅ Summary report: {summary_path}")
+        print(f"[SUCCESS] Summary report: {summary_path}")
         
                 # Show what was created
         if not args.minimal and successful_count > 0:

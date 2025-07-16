@@ -229,13 +229,17 @@ class ImprovedButtonWorkflow:
                     'takefocus': True,      # Allow focus for keyboard navigation
                     
                     # Try to override aqua styling
-                    'selectforeground': self._get_text_color(color),
                     'selectbackground': self._darken_color(color),
                 }
                 
                 # Apply configuration in stages to ensure it sticks
                 try:
                     button.configure(**macos_config)
+                    # Try to add selectforeground separately (may not be supported)
+                    try:
+                        button.configure(selectforeground=self._get_text_color(color))
+                    except Exception:
+                        pass  # Skip selectforeground if not supported
                 except Exception as config_error:
                     _LOGGER.debug(f"Initial macOS button config failed: {config_error}")
                     # Try essential properties only
@@ -413,7 +417,6 @@ def create_workflow_button(parent, text, font, command, button_name, workflow_sy
             takefocus=True,      # Allow focus
             
             # Additional properties to force custom appearance
-            selectforeground='black',
             selectbackground=ButtonColors.LIGHT_GREY,
             disabledforeground='#999999',
         )
@@ -422,6 +425,11 @@ def create_workflow_button(parent, text, font, command, button_name, workflow_sy
         try:
             # Force the button to use our styling instead of system styling
             button.configure(background=ButtonColors.LIGHT_GREY)
+            # Try to add selectforeground separately (may not be supported)
+            try:
+                button.configure(selectforeground='black')
+            except Exception:
+                pass  # Skip selectforeground if not supported
             
             # Try to disable system button styling if available
             try:
