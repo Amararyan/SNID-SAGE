@@ -162,11 +162,11 @@ class AnalysisResultsAnalyzer:
         redshifts = np.array([m['redshift'] for m in self.matches])
         rlaps = np.array([m['rlap'] for m in self.matches])
         
-        # Calculate hybrid weighted redshift statistics (ChatGPT Method 2)
+        # Calculate hybrid weighted redshift statistics
         from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
         redshift_errors = np.array([m.get('redshift_error', 0) for m in self.matches])
         
-        # Hybrid weighted redshift estimation with cluster scatter (ChatGPT Method 2)
+        # Hybrid weighted redshift estimation with cluster scatter
         z_weighted_mean, z_weighted_uncertainty, cluster_scatter = calculate_hybrid_weighted_redshift(
             redshifts=redshifts, 
             redshift_errors=redshift_errors,
@@ -279,7 +279,7 @@ class AnalysisResultsAnalyzer:
             laps = np.array(data['laps'])
             ages = np.array(data['ages']) if data['ages'] else np.array([])
             
-            # Hybrid weighted redshift statistics (ChatGPT Method 2)
+            # Hybrid weighted redshift statistics
             from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
             z_weighted_mean, z_weighted_uncertainty, _ = calculate_hybrid_weighted_redshift(
                 redshifts, redshift_errors, include_cluster_scatter=True

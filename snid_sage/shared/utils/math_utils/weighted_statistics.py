@@ -2,7 +2,7 @@
 Statistically rigorous weighted calculations for redshift estimation in SNID SAGE.
 
 This module implements both pure inverse variance weighting and hybrid methods that
-include cluster-level scatter, following the ChatGPT recommendations for optimal
+include cluster-level scatter, following improved statistical recommendations for optimal
 redshift and age estimation in the winning cluster.
 
 The weighting schemes supported:
@@ -97,7 +97,7 @@ def calculate_hybrid_weighted_redshift(
     if not include_cluster_scatter:
         return float(z_iv), float(sigma_iv), 0.0
     
-    # Method 2: Hybrid method with cluster scatter (ChatGPT approach)
+    # Method 2: Hybrid method with cluster scatter
     
     # Step 1: Preliminary unweighted mean for scatter estimation
     z_tilde = np.mean(valid_redshifts)
@@ -181,11 +181,11 @@ def calculate_metric_weighted_age(
     if N == 1:
         return float(valid_ages[0]), 0.0, 0.0, 0.0
     
-    # Method 1: Metric-weighted mean age (ChatGPT Formula A1)
+    # Method 1: Metric-weighted mean age
     w_i = valid_weights  # Metric weights (RLAP-cos or RLAP)
     t_bar_metric = np.sum(w_i * valid_ages) / np.sum(w_i)
     
-    # Metric-weighted uncertainty (ChatGPT Formula A2) 
+    # Metric-weighted uncertainty
     N_eff = (np.sum(w_i) ** 2) / np.sum(w_i ** 2)  # Effective number of templates
     
     # Weighted variance
@@ -197,7 +197,7 @@ def calculate_metric_weighted_age(
     if not include_cluster_scatter:
         return float(t_bar_metric), float(sigma_metric), float(sigma_metric), 0.0
     
-    # Method 2: Hybrid error with cluster scatter (ChatGPT Formula A3)
+    # Method 2: Hybrid error with cluster scatter
     
     # Cluster scatter in age space
     s_tc_squared = weighted_variance  # This is the metric-weighted scatter
@@ -256,7 +256,7 @@ def calculate_weighted_redshift_with_uncertainty(
     DEPRECATED: This function is obsolete. Use calculate_hybrid_weighted_redshift() instead.
     
     This legacy function is maintained only for backwards compatibility.
-    All new code should use the enhanced methods that implement the ChatGPT
+    All new code should use the enhanced methods that implement improved
     statistical recommendations.
     """
     logger.warning("Using deprecated function. Switch to calculate_hybrid_weighted_redshift()")

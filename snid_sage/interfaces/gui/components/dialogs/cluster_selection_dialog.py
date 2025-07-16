@@ -679,6 +679,17 @@ class ClusterSelectionDialog:
         self.cluster_selector_menu.overrideredirect(True)  # Remove window decorations
         self.cluster_selector_menu.configure(bg='white')
         
+        # Apply Mac-specific improvements to the menu window
+        try:
+            from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+            if CrossPlatformWindowManager.is_macos():
+                # Ensure the menu window gets proper focus and event handling
+                self.cluster_selector_menu.focus_set()
+                self.cluster_selector_menu.lift()
+                self.cluster_selector_menu.attributes('-topmost', True)
+        except Exception as e:
+            _LOGGER.debug(f"Mac menu window setup failed: {e}")
+        
         # Create frame with border
         menu_frame = tk.Frame(self.cluster_selector_menu, bg='white', relief='solid', bd=1)
         menu_frame.pack(fill='both', expand=True)
@@ -709,42 +720,23 @@ class ClusterSelectionDialog:
             option_frame = tk.Frame(menu_frame, bg='white')
             option_frame.pack(fill='x', padx=2, pady=2)
             
-            # Main button with large font
-            btn = tk.Button(option_frame, text=text,
-                          font=('Segoe UI', 13, 'bold'),
-                          bg='#e3f2fd' if is_selected else 'white',
-                          fg='#0078d4' if is_best else 'black',
-                          relief='flat',
-                          anchor='w',
-                          padx=15,
-                          pady=10,
-                          cursor='hand2',
-                          command=lambda idx=i: self._select_cluster_from_menu(idx))
+            # Enhanced button creation with Mac compatibility
+            btn = self._create_mac_compatible_button(
+                option_frame, 
+                text=text,
+                font=('Segoe UI', 13, 'bold'),
+                bg='#e3f2fd' if is_selected else 'white',
+                fg='#0078d4' if is_best else 'black',
+                relief='flat',
+                anchor='w',
+                padx=15,
+                pady=10,
+                cluster_index=i
+            )
             btn.pack(fill='x')
             
-            # No details label - only cluster info on one line
-            
-            # Hover effects for the whole frame
-            def on_enter(e, frame=option_frame, button=btn, selected=is_selected):
-                if not selected:
-                    button.config(bg='#f0f8ff')
-                    frame.config(bg='#f0f8ff')
-                    for child in frame.winfo_children():
-                        if isinstance(child, tk.Label):
-                            child.config(bg='#f0f8ff')
-            
-            def on_leave(e, frame=option_frame, button=btn, selected=is_selected):
-                if not selected:
-                    button.config(bg='white')
-                    frame.config(bg='white')
-                    for child in frame.winfo_children():
-                        if isinstance(child, tk.Label):
-                            child.config(bg='white')
-            
-            option_frame.bind('<Enter>', on_enter)
-            option_frame.bind('<Leave>', on_leave)
-            btn.bind('<Enter>', on_enter)
-            btn.bind('<Leave>', on_leave)
+            # Enhanced hover effects with Mac event bindings
+            self._setup_enhanced_hover_effects(option_frame, btn, is_selected, i)
         
         # Position menu near button (top left of plot)
         self.cluster_selector_menu.update_idletasks()
@@ -761,8 +753,8 @@ class ClusterSelectionDialog:
         
         self.cluster_selector_open = True
         
-        # Bind click outside to close
-        self.dialog.bind('<Button-1>', self._on_click_outside_menu, add='+')
+        # Enhanced click outside detection with Mac compatibility
+        self._setup_enhanced_outside_click_detection()
         
     def _close_cluster_selector_menu(self):
         """Close the cluster selector menu"""
@@ -793,6 +785,155 @@ class ClusterSelectionDialog:
         # Update the button text
         self._update_cluster_button_text()
     
+    def _create_mac_compatible_button(self, parent, text, font, bg, fg, relief, anchor, padx, pady, cluster_index):
+        """Create a button that works properly on macOS with enhanced click detection"""
+        try:
+            from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+            
+            # Create button with enhanced Mac compatibility
+            btn = tk.Button(parent, text=text,
+                          font=font,
+                          bg=bg, fg=fg,
+                          relief=relief,
+                          anchor=anchor,
+                          padx=padx,
+                          pady=pady,
+                          cursor='hand2')
+            
+            # Enhanced command binding that works better on macOS
+            def enhanced_click_handler():
+                try:
+                    _LOGGER.debug(f"Button click detected for cluster {cluster_index}")
+                    self._select_cluster_from_menu(cluster_index)
+                except Exception as e:
+                    _LOGGER.error(f"Button click handler error: {e}")
+            
+            btn.configure(command=enhanced_click_handler)
+            
+            # Apply Mac-specific event bindings for better click detection
+            if CrossPlatformWindowManager.is_macos():
+                CrossPlatformWindowManager.setup_mac_event_bindings(
+                    btn, 
+                    click_callback=lambda e: enhanced_click_handler()
+                )
+                
+                # Additional Mac-specific bindings for better responsiveness
+                btn.bind("<Button-1>", lambda e: enhanced_click_handler(), add="+")
+                btn.bind("<Return>", lambda e: enhanced_click_handler(), add="+")
+                btn.bind("<space>", lambda e: enhanced_click_handler(), add="+")
+                
+                # Ensure button can receive focus on Mac
+                btn.configure(takefocus=True)
+                
+                # Mac-specific styling to override system appearance
+                btn.configure(
+                    highlightbackground=bg,
+                    highlightcolor=bg,
+                    highlightthickness=0,
+                    borderwidth=1,
+                    compound='none'
+                )
+            
+            return btn
+            
+        except Exception as e:
+            _LOGGER.error(f"Enhanced button creation failed: {e}")
+            # Fallback to simple button
+            return tk.Button(parent, text=text, font=font, bg=bg, fg=fg, 
+                           relief=relief, anchor=anchor, padx=padx, pady=pady,
+                           command=lambda: self._select_cluster_from_menu(cluster_index))
+    
+    def _setup_enhanced_hover_effects(self, option_frame, button, is_selected, cluster_index):
+        """Setup enhanced hover effects with Mac compatibility"""
+        try:
+            from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+            
+            # Enhanced hover effects for the whole frame
+            def on_enter(e, frame=option_frame, btn=button, selected=is_selected):
+                if not selected:
+                    try:
+                        btn.config(bg='#f0f8ff')
+                        frame.config(bg='#f0f8ff')
+                        for child in frame.winfo_children():
+                            if isinstance(child, tk.Label):
+                                child.config(bg='#f0f8ff')
+                        
+                        # Mac-specific: Ensure button gets focus on hover
+                        if CrossPlatformWindowManager.is_macos():
+                            btn.focus_set()
+                            
+                    except Exception as e:
+                        _LOGGER.debug(f"Hover enter effect failed: {e}")
+            
+            def on_leave(e, frame=option_frame, btn=button, selected=is_selected):
+                if not selected:
+                    try:
+                        btn.config(bg='white')
+                        frame.config(bg='white')
+                        for child in frame.winfo_children():
+                            if isinstance(child, tk.Label):
+                                child.config(bg='white')
+                    except Exception as e:
+                        _LOGGER.debug(f"Hover leave effect failed: {e}")
+            
+            # Bind hover events to both frame and button
+            option_frame.bind('<Enter>', on_enter)
+            option_frame.bind('<Leave>', on_leave)
+            button.bind('<Enter>', on_enter)
+            button.bind('<Leave>', on_leave)
+            
+            # Mac-specific: Additional event bindings for better interaction
+            if CrossPlatformWindowManager.is_macos():
+                # Handle trackpad and mouse wheel events
+                def handle_mac_events(event):
+                    # Ensure button receives focus when interacted with
+                    button.focus_set()
+                    return "continue"
+                
+                button.bind("<Motion>", handle_mac_events, add="+")
+                option_frame.bind("<Motion>", handle_mac_events, add="+")
+            
+        except Exception as e:
+            _LOGGER.debug(f"Enhanced hover effects setup failed: {e}")
+    
+    def _setup_enhanced_outside_click_detection(self):
+        """Setup enhanced outside click detection with Mac compatibility"""
+        try:
+            from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+            
+            def enhanced_outside_click_handler(event):
+                try:
+                    if self.cluster_selector_menu and self.cluster_selector_menu.winfo_exists():
+                        # Check if click is outside the menu
+                        x, y = event.x_root, event.y_root
+                        menu_x = self.cluster_selector_menu.winfo_x()
+                        menu_y = self.cluster_selector_menu.winfo_y()
+                        menu_width = self.cluster_selector_menu.winfo_width()
+                        menu_height = self.cluster_selector_menu.winfo_height()
+                        
+                        if not (menu_x <= x <= menu_x + menu_width and menu_y <= y <= menu_y + menu_height):
+                            self._close_cluster_selector_menu()
+                except Exception as e:
+                    _LOGGER.debug(f"Outside click detection error: {e}")
+                    # If detection fails, just close the menu
+                    self._close_cluster_selector_menu()
+            
+            # Bind click outside detection with Mac compatibility
+            if CrossPlatformWindowManager.is_macos():
+                # Mac-specific bindings for all click types
+                self.dialog.bind('<Button-1>', enhanced_outside_click_handler, add='+')
+                self.dialog.bind('<Button-2>', enhanced_outside_click_handler, add='+')
+                self.dialog.bind('<Button-3>', enhanced_outside_click_handler, add='+')
+                self.dialog.bind('<Control-Button-1>', enhanced_outside_click_handler, add='+')
+            else:
+                # Standard binding for other platforms
+                self.dialog.bind('<Button-1>', enhanced_outside_click_handler, add='+')
+                
+        except Exception as e:
+            _LOGGER.debug(f"Enhanced outside click detection setup failed: {e}")
+            # Fallback to simple binding
+            self.dialog.bind('<Button-1>', self._on_click_outside_menu, add='+')
+
     def _plot_clusters(self):
         """Plot clusters with enhanced visual design and black edge selection"""
         if not self.all_candidates:

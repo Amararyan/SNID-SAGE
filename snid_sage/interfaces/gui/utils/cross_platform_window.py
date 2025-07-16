@@ -263,17 +263,36 @@ class CrossPlatformWindowManager:
             # Button-2 is right-click on Mac (not Button-3 like on Linux/Windows)
             def mac_right_click_handler(event):
                 # Convert Mac right-click to standard right-click event
+                original_button = event.button
                 event.button = 3  # Convert to standard right-click
+                
+                # Re-trigger the event with the corrected button number
+                # This ensures other handlers receive the standardized event
+                if hasattr(event.widget, 'event_generate'):
+                    try:
+                        event.widget.event_generate("<Button-3>", 
+                                                   x=event.x, y=event.y,
+                                                   rootx=event.x_root, rooty=event.y_root)
+                    except:
+                        pass  # Fallback to just modifying the event
+                
                 return event
             
-            # Bind Mac-specific events globally to the window
-            window.bind_class("Button", "<Button-2>", mac_right_click_handler, add="+")
-            window.bind_class("Listbox", "<Button-2>", mac_right_click_handler, add="+") 
-            window.bind_class("Text", "<Button-2>", mac_right_click_handler, add="+")
-            window.bind_class("Canvas", "<Button-2>", mac_right_click_handler, add="+")
-            window.bind_class("Frame", "<Button-2>", mac_right_click_handler, add="+")
+            # Enhanced global right-click binding for all widget types
+            widget_classes = [
+                "Button", "Checkbutton", "Radiobutton", "Label", "Frame",
+                "Listbox", "Text", "Entry", "Canvas", "Toplevel", "Menu",
+                "Menubutton", "Scale", "Spinbox", "Scrollbar"
+            ]
             
-            _LOGGER.debug("✅ Mac mouse event handling configured")
+            for widget_class in widget_classes:
+                # Bind Mac-specific Button-2 events to all widget classes
+                window.bind_class(widget_class, "<Button-2>", mac_right_click_handler, add="+")
+                
+                # Also ensure Control+Click is handled as right-click on Mac
+                window.bind_class(widget_class, "<Control-Button-1>", mac_right_click_handler, add="+")
+            
+            _LOGGER.debug("✅ Enhanced Mac mouse event handling configured")
         except Exception as e:
             _LOGGER.warning(f"⚠️ Mac mouse event setup failed: {e}")
     
@@ -534,26 +553,45 @@ class CrossPlatformWindowManager:
                 def mac_right_click(event):
                     # Mac uses Button-2 for right-click, convert to standard event
                     event.button = 3  # Convert to standard right-click button
-                    return right_click_callback(event)
+                    try:
+                        return right_click_callback(event)
+                    except Exception as e:
+                        _LOGGER.debug(f"Right-click callback error: {e}")
+                        return None
                 
-                # Bind both Button-2 (Mac right-click) and Button-3 (standard)
-                widget.bind("<Button-2>", mac_right_click)
-                widget.bind("<Button-3>", right_click_callback)  # Fallback for external mice
+                # Comprehensive right-click binding for Mac
+                widget.bind("<Button-2>", mac_right_click, add="+")  # Trackpad/Magic Mouse right-click
+                widget.bind("<Button-3>", right_click_callback, add="+")  # External mouse right-click
+                widget.bind("<Control-Button-1>", mac_right_click, add="+")  # Control+click = right-click on Mac
+                
+                # Also handle context menu events
+                widget.bind("<Button-2>", lambda e: widget.tk.call('::tk::mac::contextualMenuBind', widget, e.x_root, e.y_root) if hasattr(widget.tk, 'call') else None, add="+")
             
             # Handle regular click events with improved sensitivity
             if click_callback:
                 def improved_click(event):
                     # Ensure widget gets focus to improve responsiveness
                     if hasattr(widget, 'focus_set'):
-                        widget.focus_set()
-                    return click_callback(event)
+                        try:
+                            widget.focus_set()
+                        except:
+                            pass
+                    
+                    # Add visual feedback for better user experience
+                    cls._add_visual_click_feedback(widget)
+                    
+                    try:
+                        return click_callback(event)
+                    except Exception as e:
+                        _LOGGER.debug(f"Click callback error: {e}")
+                        return None
                 
-                widget.bind("<Button-1>", improved_click)
+                widget.bind("<Button-1>", improved_click, add="+")
             
             # Add trackpad-specific improvements
             cls._add_trackpad_improvements(widget)
             
-            _LOGGER.debug(f"✅ Mac event bindings set for {widget.__class__.__name__}")
+            _LOGGER.debug(f"✅ Enhanced Mac event bindings set for {widget.__class__.__name__}")
             return True
             
         except Exception as e:
@@ -673,120 +711,219 @@ class CrossPlatformWindowManager:
     def _apply_global_mac_bindings(cls, root_window: tk.Tk) -> None:
         """Apply Mac-specific event bindings globally"""
         try:
-            # Global right-click handler for Mac
+            # Enhanced global right-click handler for Mac
             def global_mac_right_click(event):
-                event.button = 3  # Convert Mac Button-2 to standard Button-3
-                # Re-trigger the event with corrected button
-                widget = event.widget
-                widget.event_generate("<Button-3>", 
-                                    x=event.x, y=event.y, 
-                                    rootx=event.x_root, rooty=event.y_root)
-                return "break"
+                try:
+                    # Store original button for debugging
+                    original_button = event.button
+                    
+                    # Convert Mac Button-2 to standard Button-3
+                    event.button = 3  
+                    
+                    # Re-trigger the event with corrected button
+                    widget = event.widget
+                    if hasattr(widget, 'event_generate'):
+                        try:
+                            # Create new standardized right-click event
+                            widget.event_generate("<Button-3>", 
+                                                x=event.x, y=event.y, 
+                                                rootx=event.x_root, rooty=event.y_root)
+                        except Exception as regen_error:
+                            _LOGGER.debug(f"Event regeneration failed: {regen_error}")
+                            
+                    return "break"  # Prevent default handling
+                    
+                except Exception as e:
+                    _LOGGER.debug(f"Global right-click handler error: {e}")
+                    return "continue"  # Allow other handlers to try
             
-            # Global click responsiveness improver
+            # Enhanced global click responsiveness improver
             def global_mac_click_improver(event):
-                widget = event.widget
-                # Ensure focus for better responsiveness
-                if hasattr(widget, 'focus_set'):
-                    widget.focus_set()
-                # Add brief visual feedback
-                cls._add_visual_click_feedback(widget)
-                return "continue"
+                try:
+                    widget = event.widget
+                    
+                    # Ensure focus for better responsiveness
+                    if hasattr(widget, 'focus_set'):
+                        try:
+                            widget.focus_set()
+                        except:
+                            pass  # Some widgets can't receive focus
+                            
+                    # Add brief visual feedback (non-blocking)
+                    try:
+                        cls._add_visual_click_feedback(widget)
+                    except:
+                        pass  # Visual feedback is optional
+                        
+                    return "continue"  # Allow other handlers to process
+                    
+                except Exception as e:
+                    _LOGGER.debug(f"Global click improver error: {e}")
+                    return "continue"
             
-            # Bind globally to all widget classes
+            # Comprehensive Control+Click handling (Mac right-click alternative)
+            def global_mac_control_click(event):
+                try:
+                    # Convert Control+Click to right-click on Mac
+                    event.button = 3  
+                    
+                    widget = event.widget
+                    if hasattr(widget, 'event_generate'):
+                        try:
+                            widget.event_generate("<Button-3>", 
+                                                x=event.x, y=event.y, 
+                                                rootx=event.x_root, rooty=event.y_root)
+                        except:
+                            pass
+                            
+                    return "break"
+                    
+                except Exception as e:
+                    _LOGGER.debug(f"Control+click handler error: {e}")
+                    return "continue"
+            
+            # Enhanced widget class list for comprehensive coverage
             widget_classes = [
                 "Button", "Checkbutton", "Radiobutton", "Label", 
                 "Canvas", "Frame", "Toplevel", "Text", "Listbox",
-                "Entry", "Scale", "Spinbox", "Menubutton"
+                "Entry", "Scale", "Spinbox", "Menubutton", "Menu",
+                "Scrollbar", "PanedWindow", "LabelFrame"
             ]
             
             for widget_class in widget_classes:
-                # Improve right-click handling
-                root_window.bind_class(widget_class, "<Button-2>", global_mac_right_click, add="+")
-                # Improve general click responsiveness  
-                root_window.bind_class(widget_class, "<Button-1>", global_mac_click_improver, add="+")
+                try:
+                    # Multiple right-click binding strategies for Mac
+                    root_window.bind_class(widget_class, "<Button-2>", global_mac_right_click, add="+")
+                    root_window.bind_class(widget_class, "<Control-Button-1>", global_mac_control_click, add="+")
+                    
+                    # Improve general click responsiveness  
+                    root_window.bind_class(widget_class, "<Button-1>", global_mac_click_improver, add="+")
+                    
+                except Exception as bind_error:
+                    _LOGGER.debug(f"Failed to bind events to {widget_class}: {bind_error}")
+                    continue  # Continue with other widget classes
             
-            _LOGGER.debug("✅ Global Mac bindings applied")
+            _LOGGER.debug("✅ Enhanced global Mac bindings applied")
             
         except Exception as e:
             _LOGGER.warning(f"⚠️ Global Mac bindings failed: {e}")
-    
+
     @classmethod
     def _setup_global_trackpad_improvements(cls, root_window: tk.Tk) -> None:
         """Setup global trackpad improvements"""
         try:
-            # Global trackpad scroll handler
+            # Enhanced global trackpad scroll handler
             def global_trackpad_scroll(event):
-                # Reduce trackpad scroll sensitivity globally
-                if hasattr(event, 'delta'):
-                    # Scale down scroll speed for better control
-                    scaled_delta = int(event.delta * 0.4)
+                try:
+                    # Reduce trackpad scroll sensitivity globally
+                    if hasattr(event, 'delta') and event.delta != 0:
+                        # Scale down scroll speed for better control
+                        scaled_delta = int(event.delta * 0.3)  # Reduced sensitivity
+                        
+                        # Find the appropriate scrollable parent
+                        widget = event.widget
+                        scrollable_widget = None
+                        
+                        # Check current widget first
+                        if hasattr(widget, 'yview'):
+                            scrollable_widget = widget
+                        else:
+                            # Search parent hierarchy for scrollable widget
+                            current = widget
+                            while current and current.master:
+                                current = current.master
+                                if hasattr(current, 'yview'):
+                                    scrollable_widget = current
+                                    break
+                        
+                        if scrollable_widget:
+                            try:
+                                scrollable_widget.yview_scroll(-1 * (scaled_delta // 120), "units")
+                                return "break"  # Handled, prevent default
+                            except:
+                                pass  # Let default handling proceed
+                                
+                except Exception as e:
+                    _LOGGER.debug(f"Trackpad scroll handler error: {e}")
                     
-                    # Find the appropriate scrollable parent
-                    widget = event.widget
-                    while widget and not hasattr(widget, 'yview'):
-                        widget = widget.master
-                        
-                    if widget and hasattr(widget, 'yview'):
-                        widget.yview_scroll(-1 * (scaled_delta // 120), "units")
-                        return "break"
-                        
-                return "continue"
+                return "continue"  # Allow default handling as fallback
             
-            # Apply to scrollable widgets
-            scrollable_classes = ["Text", "Listbox", "Canvas", "Frame"]
+            # Apply to scrollable and container widgets
+            scrollable_classes = ["Text", "Listbox", "Canvas", "Frame", "Toplevel", "PanedWindow"]
             for widget_class in scrollable_classes:
-                root_window.bind_class(widget_class, "<MouseWheel>", global_trackpad_scroll, add="+")
+                try:
+                    root_window.bind_class(widget_class, "<MouseWheel>", global_trackpad_scroll, add="+")
+                except Exception as e:
+                    _LOGGER.debug(f"Failed to bind scroll events to {widget_class}: {e}")
+                    continue
             
-            _LOGGER.debug("✅ Global trackpad improvements applied")
+            _LOGGER.debug("✅ Enhanced global trackpad improvements applied")
             
         except Exception as e:
             _LOGGER.warning(f"⚠️ Global trackpad improvements failed: {e}")
-    
+
     @classmethod
     def _improve_mac_widget_responsiveness(cls, root_window: tk.Tk) -> None:
         """Improve overall widget responsiveness on Mac"""
         try:
             # Configure global options for better Mac performance
-            root_window.option_add('*highlightThickness', '0')
-            root_window.option_add('*Button.borderWidth', '1')
-            root_window.option_add('*Button.relief', 'flat')
+            try:
+                root_window.option_add('*highlightThickness', '0')
+                root_window.option_add('*Button.borderWidth', '1')
+                root_window.option_add('*Button.relief', 'flat')
+                root_window.option_add('*Button.highlightBackground', 'systemWindowBackgroundColor')
+            except Exception as e:
+                _LOGGER.debug(f"Option configuration failed: {e}")
             
-            # Improve focus handling
+            # Improve focus handling and keyboard navigation
             def improve_focus_chain(event):
-                widget = event.widget
-                # Ensure proper focus chain for keyboard navigation
-                if hasattr(widget, 'tk_focusNext'):
-                    next_widget = widget.tk_focusNext()
-                    if next_widget and hasattr(next_widget, 'focus_set'):
-                        # Pre-configure next widget for faster focus switching
-                        pass
+                try:
+                    widget = event.widget
+                    # Ensure proper focus chain for keyboard navigation
+                    if hasattr(widget, 'tk_focusNext'):
+                        next_widget = widget.tk_focusNext()
+                        if next_widget and hasattr(next_widget, 'focus_set'):
+                            # Pre-configure next widget for faster focus switching
+                            pass
+                            
+                except Exception as e:
+                    _LOGGER.debug(f"Focus chain improvement error: {e}")
+                    
                 return "continue"
             
-            root_window.bind_class("all", "<Tab>", improve_focus_chain, add="+")
+            try:
+                root_window.bind_class("all", "<Tab>", improve_focus_chain, add="+")
+            except Exception as e:
+                _LOGGER.debug(f"Tab binding failed: {e}")
             
-            _LOGGER.debug("✅ Mac widget responsiveness improved")
+            _LOGGER.debug("✅ Enhanced Mac widget responsiveness applied")
             
         except Exception as e:
             _LOGGER.warning(f"⚠️ Mac responsiveness improvements failed: {e}")
     
     @classmethod
     def _add_visual_click_feedback(cls, widget) -> None:
-        """Add subtle visual feedback for trackpad clicks"""
+        """Add visual feedback for clicks to improve user experience on Mac"""
         try:
-            if hasattr(widget, 'configure') and hasattr(widget, 'cget'):
-                # Get current background
+            if hasattr(widget, 'configure') and 'bg' in widget.keys():
+                original_bg = widget.cget('bg')
+                
+                # Brief visual feedback
+                def restore_color():
+                    try:
+                        widget.configure(bg=original_bg)
+                    except:
+                        pass
+                
                 try:
-                    current_bg = widget.cget('bg')
-                    # Brief color change to show click registration
-                    widget.configure(bg='#E6F3FF')  # Light blue
-                    # Restore original color after brief delay
-                    widget.after(75, lambda: widget.configure(bg=current_bg))
-                except tk.TclError:
-                    # Widget doesn't support bg configuration
-                    pass
-        except Exception:
-            # Non-critical, ignore failures
+                    # Quick flash to show click was registered
+                    widget.configure(bg='#e8f4fd')  # Light blue flash
+                    widget.after(75, restore_color)
+                except:
+                    pass  # Ignore if widget doesn't support background color
+                    
+        except Exception as e:
+            # Non-critical, don't log as error
             pass
 
 

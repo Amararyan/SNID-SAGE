@@ -424,7 +424,7 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
             summary['cluster_statistical_significance'] = ca.get('statistical_significance', 'unknown')
             summary['cluster_second_best_type'] = ca.get('second_best_type', 'N/A')
         
-        # Calculate enhanced cluster statistics using ChatGPT hybrid methods
+        # Calculate enhanced cluster statistics using hybrid methods
         if cluster_matches:
             redshifts = np.array([m['redshift'] for m in cluster_matches])
             rlaps = np.array([m['rlap'] for m in cluster_matches])

@@ -113,7 +113,7 @@ class WorkflowIntegrator:
 
     
     def _workflow_update_button_states(self):
-        """New button state update method using workflow system"""
+        """New button state update method using workflow system with enhanced macOS handling"""
         try:
             # Only update workflow button states, not global theme/colors
             # This prevents the blue button color override issue
@@ -136,17 +136,28 @@ class WorkflowIntegrator:
             current_index = state_order.index(current_workflow_state)
             detected_index = state_order.index(gui_detected_state)
             
+            # Store previous state for macOS color correction
+            previous_state = current_workflow_state
+            
             # Only update workflow state if detected state is higher than current state
             # This prevents regression during file loading process
             if detected_index > current_index:
                 # Only update workflow-managed buttons, not all GUI elements
                 self.workflow.update_workflow_state(gui_detected_state)
                 _LOGGER.debug(f"🔄 Workflow state progressed: {current_workflow_state.value} → {gui_detected_state.value}")
+                
+                # Enhanced macOS handling: Ensure colors stick after state changes
+                self._apply_macos_color_fixes_after_state_change(previous_state, gui_detected_state)
+                
             elif detected_index < current_index:
                 # Only allow regression if we've completely lost data (e.g., reset)
                 if gui_detected_state == WorkflowState.INITIAL and not self._has_any_data():
                     self.workflow.update_workflow_state(gui_detected_state)
                     _LOGGER.debug(f"🔄 Workflow state reset: {current_workflow_state.value} → {gui_detected_state.value}")
+                    
+                    # Enhanced macOS handling for reset state
+                    self._apply_macos_color_fixes_after_state_change(previous_state, gui_detected_state)
+                    
                 else:
                     _LOGGER.debug(f"🔒 Preventing workflow regression: {current_workflow_state.value} (keeping current state)")
             
@@ -155,7 +166,10 @@ class WorkflowIntegrator:
             if ai_configured != self.workflow.ai_configured:
                 self.workflow.set_ai_configured(ai_configured)
             
-            _LOGGER.debug(f"🔄 Workflow-based button state update completed - NO theme override")
+            # Additional macOS-specific: Force color reapplication periodically
+            self._schedule_macos_color_maintenance()
+            
+            _LOGGER.debug(f"🔄 Enhanced workflow-based button state update completed")
             
         except Exception as e:
             _LOGGER.error(f"❌ Error in workflow button state update: {e}")
@@ -165,6 +179,162 @@ class WorkflowIntegrator:
                     self.gui._original_update_button_states()
                 except:
                     pass
+    
+    def _apply_macos_color_fixes_after_state_change(self, previous_state: WorkflowState, new_state: WorkflowState):
+        """Apply macOS-specific color fixes after workflow state changes"""
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            
+            if not platform_config or not platform_config.is_macos:
+                return  # Only apply on macOS
+            
+            _LOGGER.debug(f"🎨 Applying macOS color fixes for state change: {previous_state.value} → {new_state.value}")
+            
+            # Get all workflow-managed buttons
+            workflow_buttons = getattr(self.workflow, 'button_widgets', {})
+            
+            for button_name, button_widget in workflow_buttons.items():
+                try:
+                    if button_widget and button_widget.winfo_exists():
+                        # Force color reapplication with macOS-specific techniques
+                        self._force_macos_button_color_reapplication(button_widget, button_name)
+                        
+                except Exception as button_error:
+                    _LOGGER.debug(f"Color fix failed for button {button_name}: {button_error}")
+                    
+            # Schedule delayed color verification
+            if hasattr(self.gui, 'master'):
+                self.gui.master.after(100, lambda: self._verify_macos_button_colors())
+                
+        except Exception as e:
+            _LOGGER.debug(f"macOS color fixes failed: {e}")
+    
+    def _force_macos_button_color_reapplication(self, button_widget, button_name: str):
+        """Force color reapplication for a specific button on macOS"""
+        try:
+            # Get the expected color for this button based on its current state
+            button_definitions = getattr(self.workflow, 'BUTTON_DEFINITIONS', {})
+            if button_name not in button_definitions:
+                return
+                
+            definition = button_definitions[button_name]
+            should_be_enabled = self.workflow._should_button_be_enabled(definition)
+            
+            if should_be_enabled:
+                expected_color = definition.enabled_color
+            else:
+                from snid_sage.interfaces.gui.utils.improved_button_workflow import ButtonColors
+                expected_color = ButtonColors.LIGHT_GREY
+            
+            # Get current color to check if reapplication is needed
+            try:
+                current_bg = button_widget.cget('bg')
+                if current_bg != expected_color:
+                    _LOGGER.debug(f"🔧 macOS color mismatch detected for {button_name}: {current_bg} != {expected_color}")
+                    
+                    # Apply multiple macOS color setting techniques
+                    button_widget.configure(bg=expected_color)
+                    button_widget.configure(background=expected_color)
+                    button_widget.configure(highlightbackground=expected_color)
+                    
+                    # Force update
+                    button_widget.update_idletasks()
+                    
+                    # Schedule another verification
+                    button_widget.after(50, lambda: self._verify_single_button_color(button_widget, button_name, expected_color))
+                    
+            except Exception as color_check_error:
+                _LOGGER.debug(f"Color check failed for {button_name}: {color_check_error}")
+                
+        except Exception as e:
+            _LOGGER.debug(f"Force color reapplication failed for {button_name}: {e}")
+    
+    def _verify_single_button_color(self, button_widget, button_name: str, expected_color: str):
+        """Verify a single button has the correct color"""
+        try:
+            if button_widget and button_widget.winfo_exists():
+                current_bg = button_widget.cget('bg')
+                if current_bg != expected_color:
+                    _LOGGER.debug(f"⚠️ macOS button {button_name} color still incorrect after fix: {current_bg} != {expected_color}")
+                    # One more attempt
+                    button_widget.configure(bg=expected_color, highlightbackground=expected_color)
+                else:
+                    _LOGGER.debug(f"✅ macOS button {button_name} color verified: {current_bg}")
+        except:
+            pass
+    
+    def _schedule_macos_color_maintenance(self):
+        """Schedule periodic color maintenance for macOS"""
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            
+            if not platform_config or not platform_config.is_macos:
+                return
+            
+            # Only schedule if not already scheduled
+            if not hasattr(self, '_macos_maintenance_scheduled') or not self._macos_maintenance_scheduled:
+                self._macos_maintenance_scheduled = True
+                
+                def periodic_color_check():
+                    try:
+                        self._verify_macos_button_colors()
+                        # Reschedule for next check
+                        if hasattr(self.gui, 'master'):
+                            self.gui.master.after(5000, periodic_color_check)  # Every 5 seconds
+                    except:
+                        self._macos_maintenance_scheduled = False
+                
+                if hasattr(self.gui, 'master'):
+                    self.gui.master.after(2000, periodic_color_check)  # First check after 2 seconds
+                    
+        except Exception as e:
+            _LOGGER.debug(f"macOS color maintenance scheduling failed: {e}")
+    
+    def _verify_macos_button_colors(self):
+        """Verify all button colors are correct on macOS"""
+        try:
+            from snid_sage.shared.utils.config.platform_config import get_platform_config
+            platform_config = get_platform_config()
+            
+            if not platform_config or not platform_config.is_macos:
+                return
+            
+            workflow_buttons = getattr(self.workflow, 'button_widgets', {})
+            button_definitions = getattr(self.workflow, 'BUTTON_DEFINITIONS', {})
+            
+            incorrect_buttons = []
+            
+            for button_name, button_widget in workflow_buttons.items():
+                try:
+                    if button_widget and button_widget.winfo_exists() and button_name in button_definitions:
+                        definition = button_definitions[button_name]
+                        should_be_enabled = self.workflow._should_button_be_enabled(definition)
+                        
+                        if should_be_enabled:
+                            expected_color = definition.enabled_color
+                        else:
+                            from snid_sage.interfaces.gui.utils.improved_button_workflow import ButtonColors
+                            expected_color = ButtonColors.LIGHT_GREY
+                        
+                        current_bg = button_widget.cget('bg')
+                        if current_bg != expected_color:
+                            incorrect_buttons.append((button_name, current_bg, expected_color))
+                            
+                except Exception as button_check_error:
+                    _LOGGER.debug(f"Button color verification failed for {button_name}: {button_check_error}")
+            
+            if incorrect_buttons:
+                _LOGGER.debug(f"🔧 macOS button color corrections needed: {len(incorrect_buttons)} buttons")
+                for button_name, current, expected in incorrect_buttons:
+                    button_widget = workflow_buttons[button_name]
+                    self._force_macos_button_color_reapplication(button_widget, button_name)
+            else:
+                _LOGGER.debug("✅ All macOS button colors verified correct")
+                
+        except Exception as e:
+            _LOGGER.debug(f"macOS button color verification failed: {e}")
     
     def _determine_current_gui_state(self) -> WorkflowState:
         """Determine the current workflow state based on GUI state"""

@@ -85,26 +85,73 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
     }
     
     if is_macos:
-        # macOS-specific button configuration
+        # Enhanced macOS-specific button configuration with aggressive styling override
         macos_config = {
             **base_config,
+            
+            # Multiple background color approaches for macOS
             'bg': bg_color,
+            'background': bg_color,
             'fg': fg_color,
-            # Use highlightbackground for macOS color control
+            'foreground': fg_color,
+            
+            # macOS color control techniques
             'highlightbackground': bg_color,
             'highlightcolor': bg_color,
             'highlightthickness': 0,
-            # Override system appearance
+            
+            # System appearance override
             'borderwidth': base_config['bd'],
             'compound': 'none',
+            'default': 'disabled',  # Disable default button styling
+            'takefocus': True,
+            
+            # Additional properties to force custom appearance
+            'selectforeground': fg_color,
+            'selectbackground': bg_color,
+            'disabledforeground': '#999999',
+            
+            # Active state colors
+            'activebackground': bg_color,
+            'activeforeground': fg_color,
         }
         button = tk.Button(parent, **macos_config)
         
-        # Additional macOS workaround: force background color
+        # Post-creation macOS enhancements
         try:
+            # Force background color using multiple techniques
             button.configure(background=bg_color)
-        except:
-            pass
+            
+            # Try to disable system button styling if available (macOS-specific)
+            try:
+                button.tk.call('::tk::unsupported::MacWindowStyle', 'style', button, 'plain')
+            except:
+                pass  # Not available on all Tk versions
+            
+            # Set option database entries to override system defaults
+            try:
+                if hasattr(button, '_name') and button._name:
+                    button.option_add(f'*{button._name}.background', bg_color)
+                    button.option_add(f'*{button._name}.highlightBackground', bg_color)
+            except:
+                pass
+            
+            # Force immediate update
+            button.update_idletasks()
+            
+            # Schedule delayed color application to overcome macOS timing issues
+            def apply_delayed_macOS_styling():
+                try:
+                    button.configure(bg=bg_color, highlightbackground=bg_color)
+                    _LOGGER.debug(f"✅ Delayed macOS button color applied: {bg_color}")
+                except Exception as delayed_error:
+                    _LOGGER.debug(f"Delayed macOS styling failed: {delayed_error}")
+            
+            button.after(25, apply_delayed_macOS_styling)
+            
+        except Exception as enhancement_error:
+            _LOGGER.debug(f"macOS button post-creation enhancements failed: {enhancement_error}")
+            
     else:
         # Windows/Linux configuration
         windows_config = {

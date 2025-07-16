@@ -380,7 +380,7 @@ def _perform_direct_gmm_clustering(
             else:
                 redshift_quality = 'very_loose'
               
-            # Calculate enhanced redshift statistics (ChatGPT Method 2 - statistically optimal)
+            # Calculate enhanced redshift statistics (statistically optimal)
             weighted_mean_redshift, weighted_redshift_uncertainty = calculate_inverse_variance_weighted_redshift_from_matches(
                 cluster_matches
             )
@@ -394,7 +394,7 @@ def _perform_direct_gmm_clustering(
                 'mean_metric': np.mean(cluster_metric_values),  # NEW: Mean of selected metric
                 'std_metric': np.std(cluster_metric_values) if len(cluster_metric_values) > 1 else 0.0,  # NEW
                 'metric_key': metric_key,  # NEW: Which metric was used
-                # Enhanced redshift statistics (ChatGPT Method 2)
+                # Enhanced redshift statistics
                 'weighted_mean_redshift': weighted_mean_redshift,
                 'weighted_redshift_uncertainty': weighted_redshift_uncertainty,
                 'redshift_span': redshift_span,
@@ -458,7 +458,7 @@ def _create_single_cluster_result(
     else:
         redshift_quality = 'loose'
     
-    # Calculate enhanced redshift statistics (ChatGPT Method 2 - statistically optimal)
+                # Calculate enhanced redshift statistics (statistically optimal)
     weighted_mean_redshift, weighted_redshift_uncertainty = calculate_inverse_variance_weighted_redshift_from_matches(
         type_matches
     )
@@ -472,7 +472,7 @@ def _create_single_cluster_result(
         'mean_metric': np.mean(metric_values),  # NEW: Mean of selected metric
         'std_metric': np.std(metric_values) if len(metric_values) > 1 else 0.0,  # NEW
         'metric_key': metric_key,  # NEW: Which metric was used
-        # Enhanced redshift statistics (ChatGPT Method 2)
+                    # Enhanced redshift statistics
         'weighted_mean_redshift': weighted_mean_redshift,
         'weighted_redshift_uncertainty': weighted_redshift_uncertainty,
         'redshift_span': redshift_span,

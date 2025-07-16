@@ -149,6 +149,10 @@ class ModernSNIDSageGUI:
         # Initialize unified theme manager first - critical for subsequent components
         self.theme_manager = UnifiedThemeManager(self.master)
         
+        # Enhanced macOS coordination: Apply Mac-specific button handling improvements
+        if self.platform_config and self.platform_config.is_macos:
+            self._setup_enhanced_macos_button_coordination()
+        
         # Initialize GUI settings controller
         try:
             from snid_sage.interfaces.gui.features.configuration.gui_settings_controller import GUISettingsController
@@ -198,7 +202,7 @@ class ModernSNIDSageGUI:
         self.init_controllers_immediately()
         
         # Apply theme to main window only to avoid interfering with workflow buttons
-        # This prevents the dialog creation race condition identified in ChatGPT analysis
+        # This prevents the dialog creation race condition identified in previous analysis
         self.theme_manager._apply_theme_to_main_window_only()
         
         # THEN update button states to ensure proper initial appearance
@@ -1699,6 +1703,70 @@ class ModernSNIDSageGUI:
         except Exception as e:
             if self.logger:
                 self.logger.error(f"❌ Error ensuring initial button states: {e}")
+    
+    def _setup_enhanced_macos_button_coordination(self):
+        """Setup enhanced macOS button coordination for better color association"""
+        try:
+            if self.logger:
+                self.logger.debug("🍎 Setting up enhanced macOS button coordination")
+            
+            # Store reference for macOS-specific handling
+            self._macos_button_coordination_active = True
+            
+            # Schedule periodic color maintenance once the workflow system is initialized
+            def schedule_color_maintenance():
+                try:
+                    if hasattr(self, 'workflow_integrator') and self.workflow_integrator:
+                        # Trigger enhanced macOS color maintenance
+                        if hasattr(self.workflow_integrator, '_schedule_macos_color_maintenance'):
+                            self.workflow_integrator._schedule_macos_color_maintenance()
+                            if self.logger:
+                                self.logger.debug("✅ macOS color maintenance scheduled")
+                    else:
+                        # Retry later if workflow not ready
+                        self.master.after(1000, schedule_color_maintenance)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.debug(f"macOS color maintenance scheduling failed: {e}")
+            
+            # Schedule the color maintenance setup
+            self.master.after(2000, schedule_color_maintenance)
+            
+            # Add enhanced button update callback for macOS
+            def enhanced_macos_button_update():
+                try:
+                    # Ensure button colors are correct after any state changes
+                    if hasattr(self, 'workflow_integrator') and self.workflow_integrator:
+                        if hasattr(self.workflow_integrator, '_verify_macos_button_colors'):
+                            self.workflow_integrator._verify_macos_button_colors()
+                except Exception as e:
+                    if self.logger:
+                        self.logger.debug(f"Enhanced macOS button update failed: {e}")
+            
+            # Store the callback for potential cleanup
+            self._macos_button_update_callback = enhanced_macos_button_update
+            
+            # Apply global macOS window optimizations for better button responsiveness
+            try:
+                from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
+                
+                # Apply additional window-level optimizations
+                self.master.option_add('*Button.highlightThickness', '0')
+                self.master.option_add('*Button.borderWidth', '1')
+                
+                if self.logger:
+                    self.logger.debug("✅ macOS window-level button optimizations applied")
+                    
+            except Exception as optimization_error:
+                if self.logger:
+                    self.logger.debug(f"macOS window optimizations failed: {optimization_error}")
+            
+            if self.logger:
+                self.logger.debug("🍎 Enhanced macOS button coordination setup complete")
+                
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error setting up macOS button coordination: {e}")
 
     def __del__(self):
         """Destructor to clean up matplotlib figures and prevent hanging"""

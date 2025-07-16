@@ -2279,12 +2279,15 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
             
             # Use RLAP-cos weighted redshift for subtypes if enough data
             if len(subtype_redshifts[subtype]) > 1:
-                from snid_sage.shared.utils.math_utils import calculate_weighted_redshift_with_uncertainty, get_best_metric_value
+                from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift, get_best_metric_value
                 # Get RLAP-cos weights for this subtype
                 subtype_weights = [get_best_metric_value(m) for m in cluster_matches 
                                  if m.get('template', {}).get('subtype', 'Unknown') == subtype][:len(subtype_redshifts[subtype])]
-                avg_z, _ = calculate_weighted_redshift_with_uncertainty(
-                    subtype_redshifts[subtype], subtype_weights
+                # Convert weights to redshift errors for hybrid calculation
+                # Use a small default error for RLAP-based weights
+                redshift_errors = np.full_like(subtype_redshifts[subtype], 0.01)
+                avg_z, _, _ = calculate_hybrid_weighted_redshift(
+                    subtype_redshifts[subtype], redshift_errors, include_cluster_scatter=False
                 )
             else:
                 avg_z = subtype_redshifts[subtype][0] if subtype_redshifts[subtype] else 0

@@ -203,33 +203,89 @@ class ImprovedButtonWorkflow:
             }
             
             if platform_config and platform_config.is_macos:
-                # macOS-specific button styling to override system appearance
+                # Enhanced macOS-specific button styling to forcefully override system appearance
                 macos_config = {
                     **base_config,
-                    # On macOS, use highlightbackground for the button color
+                    # Primary approach: Set background color
+                    'bg': color,
+                    'background': color,  # Alternative background property
+                    
+                    # Secondary approach: Use highlightbackground for macOS color control
                     'highlightbackground': color,
                     'highlightcolor': color,
                     'highlightthickness': 0,
-                    # Force background color even on macOS
-                    'bg': color,
-                    # Active colors for when button is pressed
+                    
+                    # Active and pressed state colors
                     'activebackground': self._darken_color(color),
                     'activeforeground': self._get_text_color(color),
-                    # Override system appearance
+                    
+                    # Aggressive system appearance override
                     'borderwidth': 2,
                     'relief': 'raised',
-                    # Force button to not use system appearance
                     'compound': 'none',
+                    
+                    # Additional macOS-specific properties to force custom appearance
+                    'default': 'disabled',  # Disable default button styling
+                    'takefocus': True,      # Allow focus for keyboard navigation
+                    
+                    # Try to override aqua styling
+                    'selectforeground': self._get_text_color(color),
+                    'selectbackground': self._darken_color(color),
                 }
-                button.configure(**macos_config)
                 
-                # Additional macOS-specific workaround: set the background after configuration
+                # Apply configuration in stages to ensure it sticks
                 try:
+                    button.configure(**macos_config)
+                except Exception as config_error:
+                    _LOGGER.debug(f"Initial macOS button config failed: {config_error}")
+                    # Try essential properties only
+                    try:
+                        button.configure(
+                            bg=color, 
+                            highlightbackground=color,
+                            state=('normal' if enabled else 'disabled'),
+                            fg=self._get_text_color(color)
+                        )
+                    except:
+                        pass
+                
+                # Force background color using multiple techniques
+                try:
+                    # Technique 1: Direct background setting
                     button.configure(background=color)
-                    # Force update
+                    
+                    # Technique 2: Use itemconfigure if available
+                    if hasattr(button, 'itemconfigure'):
+                        try:
+                            button.itemconfigure('background', background=color)
+                        except:
+                            pass
+                    
+                    # Technique 3: Set through option database
+                    try:
+                        button.option_add(f'*{button._name}.background', color)
+                    except:
+                        pass
+                        
+                    # Technique 4: Force update and re-apply color
                     button.update_idletasks()
-                except:
-                    pass
+                    button.configure(bg=color)
+                    
+                except Exception as force_error:
+                    _LOGGER.debug(f"Force background color failed: {force_error}")
+                
+                # Schedule a delayed color re-application to overcome timing issues
+                try:
+                    def reapply_color():
+                        try:
+                            button.configure(bg=color, highlightbackground=color)
+                        except:
+                            pass
+                    
+                    button.after(50, reapply_color)  # Apply again after 50ms
+                    
+                except Exception as schedule_error:
+                    _LOGGER.debug(f"Scheduled color reapplication failed: {schedule_error}")
                     
             else:
                 # Windows/Linux configuration (original approach)
@@ -240,6 +296,16 @@ class ImprovedButtonWorkflow:
                     'activeforeground': self._get_text_color(color),
                 }
                 button.configure(**windows_config)
+            
+            # Final verification and logging
+            try:
+                current_bg = button.cget('bg')
+                if current_bg != color:
+                    _LOGGER.debug(f"⚠️ Button color mismatch: expected {color}, got {current_bg}")
+                else:
+                    _LOGGER.debug(f"✅ Button color successfully set to {color}")
+            except:
+                pass
             
         except Exception as e:
             _LOGGER.error(f"Error setting button state: {e}")
@@ -322,7 +388,7 @@ def create_workflow_button(parent, text, font, command, button_name, workflow_sy
         font = (font[0], font_size, font[2] if len(font) > 2 else 'normal')
     
     if is_macos:
-        # macOS-specific button creation
+        # Enhanced macOS-specific button creation with aggressive styling override
         button = tk.Button(
             parent,
             text=text,
@@ -331,15 +397,60 @@ def create_workflow_button(parent, text, font, command, button_name, workflow_sy
             relief='raised',
             bd=2,
             pady=10,
-            # Use highlightbackground for macOS color control
+            
+            # Primary color setting approaches
+            bg=ButtonColors.LIGHT_GREY,
+            background=ButtonColors.LIGHT_GREY,
+            
+            # macOS-specific color control
             highlightbackground=ButtonColors.LIGHT_GREY,
             highlightcolor=ButtonColors.LIGHT_GREY,
             highlightthickness=0,
-            # Override system appearance
-            bg=ButtonColors.LIGHT_GREY,
-            borderwidth=2,
+            
+            # System appearance override
             compound='none',
+            default='disabled',  # Disable default styling
+            takefocus=True,      # Allow focus
+            
+            # Additional properties to force custom appearance
+            selectforeground='black',
+            selectbackground=ButtonColors.LIGHT_GREY,
+            disabledforeground='#999999',
         )
+        
+        # Post-creation macOS enhancements
+        try:
+            # Force the button to use our styling instead of system styling
+            button.configure(background=ButtonColors.LIGHT_GREY)
+            
+            # Try to disable system button styling if available
+            try:
+                button.tk.call('::tk::unsupported::MacWindowStyle', 'style', button, 'plain')
+            except:
+                pass  # Not available on all Tk versions
+            
+            # Set option database entries to override defaults
+            try:
+                button.option_add(f'*{button._name}.background', ButtonColors.LIGHT_GREY)
+                button.option_add(f'*{button._name}.highlightBackground', ButtonColors.LIGHT_GREY)
+            except:
+                pass
+            
+            # Schedule delayed styling to overcome macOS timing issues
+            def apply_delayed_styling():
+                try:
+                    button.configure(
+                        bg=ButtonColors.LIGHT_GREY,
+                        highlightbackground=ButtonColors.LIGHT_GREY
+                    )
+                except:
+                    pass
+            
+            button.after(10, apply_delayed_styling)
+            
+        except Exception as e:
+            _LOGGER.debug(f"macOS button post-creation enhancements failed: {e}")
+            
     else:
         # Windows/Linux button creation (original)
         button = tk.Button(

@@ -2,7 +2,7 @@
 Mathematical utility functions for SNID SAGE.
 
 This module provides statistically rigorous weighted calculations including:
-- Enhanced redshift estimation with cluster scatter (ChatGPT method)
+- Enhanced redshift estimation with cluster scatter
 - Enhanced age estimation with RLAP weighting and cluster scatter
 - Legacy functions for backwards compatibility
 - Weighted median calculation

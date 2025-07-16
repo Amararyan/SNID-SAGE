@@ -18,7 +18,7 @@ All font sizes are carefully chosen for readability and consistency:
 # These are the primary font sizes used throughout the application
 
 PLOT_TITLE_FONTSIZE: int = 14        # Plot titles (when used)
-PLOT_AXIS_LABEL_FONTSIZE: int = 12   # X/Y axis labels
+PLOT_AXIS_LABEL_FONTSIZE: int = 14   # X/Y axis labels
 PLOT_TICK_FONTSIZE: int = 10         # Axis tick labels
 PLOT_LEGEND_FONTSIZE: int = 11       # Legend text
 PLOT_ANNOTATION_FONTSIZE: int = 10   # Text annotations on plots
