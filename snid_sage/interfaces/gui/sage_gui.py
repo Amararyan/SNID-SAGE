@@ -981,6 +981,87 @@ class ModernSNIDSageGUI:
                 self.logger.error(f"Error creating interface: {e}")
                 self.logger.debug("Interface creation error details:", exc_info=True)
             print(f"ERROR: Error creating interface: {e}")
+            
+            # Create minimal fallback interface
+            self._create_fallback_interface()
+    
+    def _create_fallback_interface(self):
+        """Create a minimal fallback interface when main interface creation fails"""
+        try:
+            if self.logger:
+                self.logger.info("Creating fallback interface...")
+            
+            # Clear any existing widgets
+            for widget in self.master.winfo_children():
+                try:
+                    widget.destroy()
+                except:
+                    pass
+            
+            # Create minimal interface
+            main_frame = tk.Frame(self.master, bg='#f0f0f0')
+            main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+            
+            # Title
+            title_label = tk.Label(main_frame, text="SNID SAGE - Fallback Mode", 
+                                 font=('Arial', 18, 'bold'),
+                                 bg='#f0f0f0', fg='#333333')
+            title_label.pack(pady=(0, 20))
+            
+            # Error message
+            error_label = tk.Label(main_frame, 
+                                 text="The main interface failed to load. This is a minimal fallback.\n"
+                                      "Please check the console for error details.",
+                                 font=('Arial', 12),
+                                 bg='#f0f0f0', fg='#666666',
+                                 justify='center')
+            error_label.pack(pady=(0, 20))
+            
+            # File loading
+            file_frame = tk.Frame(main_frame, bg='#f0f0f0')
+            file_frame.pack(pady=10)
+            
+            tk.Button(file_frame, text="Load Spectrum File", 
+                     command=self._fallback_browse_file,
+                     font=('Arial', 12),
+                     bg='#0078d4', fg='white', padx=20, pady=10).pack()
+            
+            # Status
+            self.header_status_label = tk.Label(main_frame, text="Ready (Fallback Mode)",
+                                               font=('Arial', 10),
+                                               bg='#f0f0f0', fg='#333333')
+            self.header_status_label.pack(pady=(20, 0))
+            
+            if self.logger:
+                self.logger.info("✅ Fallback interface created successfully")
+                
+        except Exception as fallback_error:
+            if self.logger:
+                self.logger.error(f"Even fallback interface creation failed: {fallback_error}")
+            print(f"CRITICAL ERROR: Even fallback interface creation failed: {fallback_error}")
+    
+    def _fallback_browse_file(self):
+        """Fallback file browser"""
+        from tkinter import filedialog, messagebox
+        try:
+            file_path = filedialog.askopenfilename(
+                title="Select Spectrum File",
+                filetypes=[
+                    ("All supported", "*.txt *.dat *.fits *.csv"),
+                    ("Text files", "*.txt"),
+                    ("Data files", "*.dat"),
+                    ("FITS files", "*.fits"),
+                    ("CSV files", "*.csv"),
+                    ("All files", "*.*")
+                ]
+            )
+            if file_path:
+                self.header_status_label.config(text=f"Loaded: {file_path}")
+                messagebox.showinfo("File Loaded", 
+                                  f"File loaded in fallback mode:\n{file_path}\n\n"
+                                  "Please restart the application to use full features.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load file: {e}")
     
     def browse_file(self):
         """Browse for a spectrum file - delegate to file controller"""

@@ -107,7 +107,6 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
             'takefocus': True,
             
             # Additional properties to force custom appearance
-            'selectbackground': bg_color,
             'disabledforeground': '#999999',
             
             # Active state colors
@@ -115,6 +114,13 @@ def create_cross_platform_button(parent, text, command=None, **kwargs):
             'activeforeground': fg_color,
         }
         button = tk.Button(parent, **macos_config)
+        
+        # Apply selectbackground separately for macOS compatibility
+        try:
+            button.configure(selectbackground=bg_color)
+        except (tk.TclError, AttributeError):
+            # selectbackground not supported on this platform/widget
+            pass
         
         # Post-creation macOS enhancements
         try:
@@ -261,28 +267,47 @@ class LayoutUtils:
             info_frame.pack(side='left', padx=(0, 10))
             info_frame.pack_propagate(False)  # Prevent frame from resizing to fit contents
             
-            info_btn = create_cross_platform_button(
-                info_frame,
-                text="ℹ",
-                font=('Segoe UI', 24, 'bold'),  # Large font for the icon
-                bg=gui_instance.theme_manager.get_color('accent_primary'),
-                fg='white',
-                relief='raised',
-                bd=1,
-                padx=0,  # No internal padding - frame controls size
-                pady=0,  # No internal padding - frame controls size
-                cursor='hand2',
-                command=lambda: gui_instance._show_shortcuts_dialog() if hasattr(gui_instance, '_show_shortcuts_dialog') else None
-            )
-            # Position the button precisely within the frame to control icon placement
-            # x=0, y=0 would be top-left, y=5 pushes the icon down 5 pixels
-            info_btn.place(x=-2, y=-5, width=40, height=40)
+            try:
+                info_btn = create_cross_platform_button(
+                    info_frame,
+                    text="ℹ",
+                    font=('Segoe UI', 24, 'bold'),  # Large font for the icon
+                    bg=gui_instance.theme_manager.get_color('accent_primary'),
+                    fg='white',
+                    relief='raised',
+                    bd=1,
+                    padx=0,  # No internal padding - frame controls size
+                    pady=0,  # No internal padding - frame controls size
+                    cursor='hand2',
+                    command=lambda: gui_instance._show_shortcuts_dialog() if hasattr(gui_instance, '_show_shortcuts_dialog') else None
+                )
+                # Position the button precisely within the frame to control icon placement
+                # x=0, y=0 would be top-left, y=5 pushes the icon down 5 pixels
+                info_btn.place(x=-2, y=-5, width=40, height=40)
+            except Exception as btn_error:
+                _LOGGER.warning(f"Failed to create info button: {btn_error}. Creating fallback button.")
+                # Fallback: create a simple tk.Button if cross-platform button fails
+                info_btn = tk.Button(
+                    info_frame,
+                    text="ℹ",
+                    font=('Segoe UI', 20, 'bold'),
+                    bg='#0078d4',
+                    fg='white',
+                    relief='raised',
+                    bd=1,
+                    cursor='hand2',
+                    command=lambda: gui_instance._show_shortcuts_dialog() if hasattr(gui_instance, '_show_shortcuts_dialog') else None
+                )
+                info_btn.place(x=0, y=0, width=36, height=36)
             
             # Store reference to info button
             gui_instance.info_btn = info_btn
             
             # Add tooltip for info button
-            LayoutUtils._add_tooltip(gui_instance, info_btn, "Show keyboard shortcuts and hotkeys")
+            try:
+                LayoutUtils._add_tooltip(gui_instance, info_btn, "Show keyboard shortcuts and hotkeys")
+            except Exception as tooltip_error:
+                _LOGGER.debug(f"Failed to add tooltip: {tooltip_error}")
             
             # Status box with border (takes remaining space)
             status_box = tk.Frame(status_container, bg=gui_instance.theme_manager.get_color('bg_tertiary'), 

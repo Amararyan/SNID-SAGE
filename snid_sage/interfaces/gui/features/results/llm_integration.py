@@ -46,10 +46,8 @@ class LLMIntegration:
             self._check_openrouter_availability()
             
             if self.llm_available:
-                _LOGGER.info("✅ OpenRouter LLM backend available")
                 self._update_llm_status("OpenRouter backend configured and ready")
             else:
-                _LOGGER.warning("⚠️ OpenRouter backend not configured")
                 self._update_llm_status("Configure OpenRouter to enable AI features")
                 
         except Exception as e:
@@ -69,9 +67,9 @@ class LLMIntegration:
                 self.llm_available = True
                 _LOGGER.info("✅ OpenRouter LLM backend available")
             else:
-                _LOGGER.warning("⚠️ OpenRouter API key not configured")
+                _LOGGER.info("💡 OpenRouter API not configured - AI features will be disabled until configured")
         except ImportError:
-            _LOGGER.warning("⚠️ OpenRouter LLM module not available")
+            _LOGGER.info("💡 OpenRouter LLM module not available - AI features disabled")
         except Exception as e:
             _LOGGER.warning(f"⚠️ Error checking OpenRouter: {e}")
     

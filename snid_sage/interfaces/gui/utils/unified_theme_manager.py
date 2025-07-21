@@ -365,8 +365,9 @@ class UnifiedThemeManager:
         # Create a copy of config to avoid modifying original
         safe_config = config_dict.copy()
         
-        # Handle selectforeground separately for macOS compatibility
+        # Handle selectforeground and selectbackground separately for macOS compatibility
         selectforeground_value = safe_config.pop('selectforeground', None)
+        selectbackground_value = safe_config.pop('selectbackground', None)
         
         # Apply main configuration
         try:
@@ -388,6 +389,14 @@ class UnifiedThemeManager:
                 widget.configure(selectforeground=selectforeground_value)
             except (tk.TclError, AttributeError):
                 # selectforeground not supported on this platform/widget
+                pass
+        
+        # Try to apply selectbackground separately if it was specified
+        if selectbackground_value is not None:
+            try:
+                widget.configure(selectbackground=selectbackground_value)
+            except (tk.TclError, AttributeError):
+                # selectbackground not supported on this platform/widget
                 pass
 
     def _theme_entry(self, widget: tk.Entry, colors: Dict[str, str]):

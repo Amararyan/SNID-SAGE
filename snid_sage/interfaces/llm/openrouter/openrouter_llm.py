@@ -294,8 +294,27 @@ def configure_openrouter_dialog(parent):
     tk.Label(main_frame, text="OpenRouter API Configuration", 
              font=('Arial', 20, 'bold'), bg=colors['bg_primary'], fg=colors['text_primary']).pack(anchor='w', pady=(0,10))
     
-    tk.Label(main_frame, text="OpenRouter provides access to various LLM models. You'll need an API key from https://openrouter.ai", 
-             wraplength=500, bg=colors['bg_primary'], fg=colors['text_secondary'], font=('Segoe UI', 14)).pack(anchor='w', pady=(0,15))
+    intro_text = "OpenRouter provides access to various LLM models for enhanced AI analysis features. This is optional but enables powerful AI summaries and chat functionality."
+    tk.Label(main_frame, text=intro_text, 
+             wraplength=500, bg=colors['bg_primary'], fg=colors['text_secondary'], font=('Segoe UI', 14)).pack(anchor='w', pady=(0,10))
+    
+    # Registration link frame
+    link_frame = tk.Frame(main_frame, bg=colors['bg_primary'])
+    link_frame.pack(anchor='w', pady=(0,15))
+    
+    def open_openrouter_registration():
+        """Open OpenRouter registration page"""
+        import webbrowser
+        webbrowser.open('https://openrouter.ai')
+    
+    tk.Label(link_frame, text="🌐 Get your free API key:", 
+             bg=colors['bg_primary'], fg=colors['text_secondary'], font=('Segoe UI', 12)).pack(side='left')
+    
+    link_button = tk.Button(link_frame, text="OpenRouter.ai", 
+                           bg=colors['btn_info'], fg='white', relief='raised', bd=1,
+                           font=('Segoe UI', 11, 'underline'), cursor='hand2',
+                           command=open_openrouter_registration)
+    link_button.pack(side='left', padx=(10, 0))
     
     # API Key section - replace ttk.Label with tk.Label
     tk.Label(main_frame, text="API Key", font=('Arial', 16, 'bold'), bg=colors['bg_primary'], fg=colors['text_primary']).pack(anchor='w', pady=(10,5))
