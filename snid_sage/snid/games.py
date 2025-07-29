@@ -16,7 +16,11 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 
 # Check if pygame is available, otherwise games won't work
 try:
-    import pygame
+    # Suppress pkg_resources deprecation warning from pygame
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
+        import pygame
     PYGAME_AVAILABLE = True
 except ImportError:
     PYGAME_AVAILABLE = False
@@ -63,7 +67,7 @@ def bring_to_foreground(window_id=None):
     CrossPlatformGameFocus.bring_to_foreground(window_id)
 
 # -- Space Debris Game Configuration --------------------------
-DEBRIS_WIDTH, DEBRIS_HEIGHT = 800, 600
+DEBRIS_WIDTH, DEBRIS_HEIGHT = 1024, 768  # Bigger window for better gameplay
 DEBRIS_FPS = 60
 
 # Ship constants (NEW DESIGN - Space Station/Rectangular)

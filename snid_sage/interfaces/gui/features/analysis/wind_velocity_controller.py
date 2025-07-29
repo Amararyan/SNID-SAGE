@@ -19,16 +19,8 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.wind_velocity_controller')
 
-# Import wind velocity dialog
-try:
-    from snid_sage.interfaces.gui.components.dialogs.wind_velocity_dialog import show_wind_velocity_dialog
-    _LOGGER.debug("✅ Wind velocity dialog imported successfully")
-except ImportError as e:
-    _LOGGER.warning(f"⚠️ Could not import wind velocity dialog: {e}")
-    show_wind_velocity_dialog = None
-except Exception as e:
-    _LOGGER.error(f"❌ Error importing wind velocity dialog: {e}")
-    show_wind_velocity_dialog = None
+# Wind velocity dialog functionality removed - module no longer exists
+show_wind_velocity_dialog = None
 
 
 class WindVelocityController:

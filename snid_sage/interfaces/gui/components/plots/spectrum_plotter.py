@@ -110,7 +110,7 @@ class SpectrumPlotter:
             # )
             
             # Plot observed spectrum with consistent colors
-            spectrum_color = '#0078d4'  # Consistent blue color for all spectra
+            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             template_color = '#E74C3C'  # Nice red that complements blue
             
             self.ax.plot(obs_wave, obs_flux, color=spectrum_color, linewidth=2, alpha=0.9)
@@ -126,12 +126,14 @@ class SpectrumPlotter:
                         f"Subtype: {subtype}, Age: {current_match['age']:.1f}d\n"
                         f"z = {current_match['redshift']:.4f}, RLAP = {current_match['rlap']:.2f}")
             
-            info_bg_color = self.theme_manager.get_color('bg_tertiary')
-            # Reposition annotation to top-right corner
-            self.ax.text(0.98, 0.98, info_text, transform=self.ax.transAxes,
-                        verticalalignment='top', horizontalalignment='right',
-                        fontsize=12, color=text_color,
-                        bbox=dict(boxstyle='round,pad=0.5', facecolor=info_bg_color, alpha=0.8))
+            # Use adaptive positioning for template info
+            from ...utils.plot_legend_utils import add_adaptive_template_info
+            theme_colors = {
+                'text_primary': text_color,
+                'bg_tertiary': self.theme_manager.get_color('bg_tertiary')
+            }
+            add_adaptive_template_info(self.ax, info_text, position='upper right', 
+                                     theme_colors=theme_colors, fontsize=12)
             
             self.gui._finalize_plot_standard()
             
@@ -203,7 +205,7 @@ class SpectrumPlotter:
             # )
             
             # Plot observed spectrum with consistent colors
-            spectrum_color = '#0078d4'  # Consistent blue color for all spectra
+            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             template_color = '#E74C3C'  # Nice red that complements blue
             
             self.ax.plot(obs_wave, obs_flux, color=spectrum_color, linewidth=2, alpha=0.9)
@@ -219,12 +221,14 @@ class SpectrumPlotter:
                         f"Subtype: {subtype}, Age: {current_match['age']:.1f}d\n"
                         f"z = {current_match['redshift']:.4f}, RLAP = {current_match['rlap']:.2f}")
             
-            info_bg_color = self.theme_manager.get_color('bg_tertiary')
-            # Reposition annotation to top-right corner
-            self.ax.text(0.98, 0.98, info_text, transform=self.ax.transAxes,
-                        verticalalignment='top', horizontalalignment='right',
-                        fontsize=12, color=text_color,
-                        bbox=dict(boxstyle='round,pad=0.5', facecolor=info_bg_color, alpha=0.8))
+            # Use adaptive positioning for template info
+            from ...utils.plot_legend_utils import add_adaptive_template_info
+            theme_colors = {
+                'text_primary': text_color,
+                'bg_tertiary': self.theme_manager.get_color('bg_tertiary')
+            }
+            add_adaptive_template_info(self.ax, info_text, position='upper right', 
+                                     theme_colors=theme_colors, fontsize=12)
             
             self.gui._finalize_plot_standard()
             
@@ -258,7 +262,7 @@ class SpectrumPlotter:
                 ylabel='Flux'
             )
             
-            spectrum_color = '#0078d4'  # Consistent blue color for all spectra
+            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             self.ax.plot(wave, flux, color=spectrum_color, linewidth=2, alpha=0.8)
             
             self.gui._finalize_plot_standard()
@@ -283,7 +287,7 @@ class SpectrumPlotter:
                 ylabel='Flux'
             )
             
-            spectrum_color = '#0078d4'  # Consistent blue color for all spectra
+            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             self.ax.plot(wave, flux, color=spectrum_color, linewidth=2, alpha=0.8)
                     
         elif hasattr(self.gui, 'original_wave') and hasattr(self.gui, 'original_flux'):
@@ -292,7 +296,7 @@ class SpectrumPlotter:
                 title='Original Spectrum'
             )
             
-            spectrum_color = '#0078d4'  # Consistent blue color for all spectra
+            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             self.ax.plot(self.gui.original_wave, self.gui.original_flux, color=spectrum_color, 
                        linewidth=2, alpha=0.8)
         else:
@@ -320,7 +324,7 @@ class SpectrumPlotter:
                 ylabel='Flattened Flux'
             )
             
-            spectrum_color = '#0078d4'  # Consistent blue color for all spectra
+            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             self.ax.plot(wave, flux, color=spectrum_color, linewidth=2, alpha=0.8)
                     
         elif hasattr(self.gui, 'original_wave') and hasattr(self.gui, 'original_flux'):

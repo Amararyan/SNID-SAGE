@@ -266,17 +266,17 @@ class PreviewCalculator:
             # For continuum-removed spectra, find the range where we have "significant" data
             # Use absolute value and find where it's above a small threshold
             abs_flux = np.abs(self.current_flux)
-            threshold = np.max(abs_flux) * 0.01  # 1% of max absolute value
+            threshold = np.max(abs_flux) * 0.01 if np.max(abs_flux) > 0 else 0  # 1% of max absolute value
             nz = np.nonzero(abs_flux > threshold)[0]
         else:
             # For non-continuum-removed spectra, use positive values only
             nz = np.nonzero(self.current_flux > 0)[0]
         
         if nz.size > 0:
-            l1, l2 = nz[0], nz[-1]
+            n1, n2 = nz[0], nz[-1]
             # Ensure we have at least a few points to taper
-            if l2 - l1 >= 10:  # Need at least 10 points for meaningful apodization
-                temp_flux = apodize(self.current_flux, l1, l2, percent=percent)
+            if n2 - n1 >= 10:  # Need at least 10 points for meaningful apodization
+                temp_flux = apodize(self.current_flux, n1, n2, percent=percent)
                 return self.current_wave.copy(), temp_flux
         
         # If we can't find a valid range, return unchanged

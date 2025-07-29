@@ -142,19 +142,7 @@ class FileController:
             self.gui.original_wave = wave
             self.gui.original_flux = flux
             
-            # Enable view navigation (up/down) buttons as soon as a spectrum is loaded
-            # This lets users switch between Flux and Flat without waiting for analysis
-            if hasattr(self.gui, 'up_btn') and self.gui.up_btn:
-                try:
-                    self.gui.up_btn.configure(state='normal', relief='raised', bd=2)
-                except Exception:
-                    pass
-
-            if hasattr(self.gui, 'down_btn') and self.gui.down_btn:
-                try:
-                    self.gui.down_btn.configure(state='normal', relief='raised', bd=2)
-                except Exception:
-                    pass
+            # Note: Up/down arrow buttons have been removed - users can use Flux/Flat buttons instead
             
             # Plot the spectrum if matplotlib is available
             self._plot_loaded_spectrum(wave, flux)
@@ -565,7 +553,7 @@ class FileController:
                                ha='center', va='center')
             else:
                 # FIXED: Use the same nice blue color as preprocessing plots
-                spectrum_color = '#0078d4'  # Nice blue matching preprocessing dialog
+                spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
                 
                 # Plot the spectrum
                 self.gui.ax.plot(wave_clean, flux_clean, color=spectrum_color, linewidth=2, alpha=0.8)

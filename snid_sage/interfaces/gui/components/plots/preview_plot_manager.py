@@ -19,9 +19,24 @@ from typing import Optional, Dict, List, Tuple, Any
 
 # Ensure proper matplotlib backend and clean state
 import matplotlib
-# Only set backend if not already set to avoid conflicts
-if matplotlib.get_backend() != 'TkAgg':
+import os
+
+# Check if PySide6 GUI is running (environment variable set by PySide6 GUI)
+pyside6_gui_running = os.environ.get('SNID_SAGE_GUI_BACKEND') == 'PySide6'
+
+# Only set backend if not in PySide6 context and not already set to avoid conflicts
+if not pyside6_gui_running and matplotlib.get_backend() != 'TkAgg':
     matplotlib.use('TkAgg')
+elif pyside6_gui_running and matplotlib.get_backend() not in ['Qt5Agg', 'QtAgg']:
+    # Use Qt backend when PySide6 is running
+    try:
+        matplotlib.use('Qt5Agg')
+    except ImportError:
+        try:
+            matplotlib.use('QtAgg')
+        except ImportError:
+            # Fallback to Agg if Qt backends not available
+            matplotlib.use('Agg')
 
 # Clean import order to prevent backend conflicts
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg

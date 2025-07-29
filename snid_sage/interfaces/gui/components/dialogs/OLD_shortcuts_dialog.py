@@ -123,7 +123,8 @@ class ShortcutsDialog:
                 "category": "🚀 QUICK WORKFLOW",
                 "shortcuts": [
                     {"action": "Open Spectrum", "shortcut": f"{mod_key}+O", "description": "Load spectrum file"},
-                    {"action": "Quick Analysis", "shortcut": f"{mod_key}+Enter", "description": "Auto-preprocess + analyze spectrum"},
+                                         {"action": "Quick Analysis", "shortcut": f"{mod_key}+Enter", "description": "Right-click preprocessing + analysis"},
+                     {"action": "Extended Quick Analysis", "shortcut": f"{mod_key}+Shift+Enter", "description": "Right-click preprocessing + analysis + auto-cluster"},
                     {"action": "Reset", "shortcut": f"{mod_key}+R", "description": "Reset all analysis and plots"}
                 ]
             },
@@ -132,8 +133,7 @@ class ShortcutsDialog:
                 "shortcuts": [
                     {"action": "Previous Template", "shortcut": "← (Left Arrow)", "description": "Go to previous template"},
                     {"action": "Next Template", "shortcut": "→ (Right Arrow)", "description": "Go to next template"},
-                    {"action": "Cycle View Up", "shortcut": "↑ (Up Arrow)", "description": "Switch display up"},
-                    {"action": "Cycle View Down", "shortcut": "↓ (Down Arrow)", "description": "Switch display down"},
+                    
                     {"action": "Switch Mode", "shortcut": "Spacebar", "description": "Toggle view mode"}
                 ]
             }

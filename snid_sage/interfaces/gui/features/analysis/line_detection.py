@@ -423,8 +423,7 @@ class LineDetectionController:
                         return None
                     
                     # Apply zero-region filtering like the main GUI
-                    from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
-                    filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
+                    filtered_wave, filtered_flux = self._filter_nonzero_spectrum(
                         log_wave, flat_flux, processed
                     )
                     

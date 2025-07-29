@@ -8,7 +8,8 @@ This package contains reusable GUI components organized by functionality.
 from .plots import SpectrumPlotter
 
 # Import dialog components
-from .dialogs import MaskManagerDialog, AISummaryDialog
+# Old tkinter dialogs moved to OLD_ - use PySide6 versions instead
+# from .dialogs import MaskManagerDialog, AISummaryDialog
 
 # Import analysis components
 from .analysis import AnalysisPlotter

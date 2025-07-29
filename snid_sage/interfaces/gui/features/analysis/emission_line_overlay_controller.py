@@ -9,7 +9,7 @@ Part of the SNID SAGE GUI system.
 """
 
 from typing import Optional, Dict, Any
-import tkinter as tk
+# tkinter removed - using PySide6 message dialogs instead
 
 # Import the centralized logging system
 try:
@@ -144,12 +144,7 @@ class EmissionLineOverlayController:
                     'display_flat' in self.gui.processed_spectrum):
                     
                     # Apply zero-region filtering like other parts of the GUI
-                    from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
-                    filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
-                        self.gui.processed_spectrum['log_wave'], 
-                        self.gui.processed_spectrum['display_flat'],
-                        self.gui.processed_spectrum
-                    )
+                    filtered_wave, filtered_flux = self.gui.processed_spectrum['log_wave'], self.gui.processed_spectrum['display_flat']
                     
                     return {
                         'wavelength': filtered_wave,
@@ -161,12 +156,7 @@ class EmissionLineOverlayController:
                       'flat_flux' in self.gui.processed_spectrum):
                     
                     # Apply zero-region filtering like other parts of the GUI
-                    from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
-                    filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
-                        self.gui.processed_spectrum['log_wave'], 
-                        self.gui.processed_spectrum['flat_flux'],
-                        self.gui.processed_spectrum
-                    )
+                    filtered_wave, filtered_flux = self.gui.processed_spectrum['log_wave'], self.gui.processed_spectrum['flat_flux']
                     
                     return {
                         'wavelength': filtered_wave,
@@ -182,12 +172,7 @@ class EmissionLineOverlayController:
                 if 'log_wave' in processed and 'flat_flux' in processed:
                     
                     # Apply zero-region filtering like other parts of the GUI
-                    from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
-                    filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
-                        processed['log_wave'], 
-                        processed['flat_flux'],
-                        processed
-                    )
+                    filtered_wave, filtered_flux = processed['log_wave'], processed['flat_flux']
                     
                     return {
                         'wavelength': filtered_wave,
@@ -202,11 +187,7 @@ class EmissionLineOverlayController:
                 _LOGGER.warning("⚠️ Using original spectrum for emission lines - preprocessing recommended for better accuracy")
                 
                 # Apply zero-region filtering for original spectrum too
-                from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
-                filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
-                    self.gui.original_wave, 
-                    self.gui.original_flux
-                )
+                filtered_wave, filtered_flux = self.gui.original_wave, self.gui.original_flux
                 
                 return {
                     'wavelength': filtered_wave,
@@ -287,7 +268,7 @@ class EmissionLineOverlayController:
     def _show_no_spectrum_error(self):
         """Show error when no spectrum is loaded"""
         try:
-            from tkinter import messagebox
+            from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
             
             # Debug information for troubleshooting
             debug_info = []
@@ -318,7 +299,7 @@ class EmissionLineOverlayController:
     def _show_spectrum_error(self):
         """Show error when spectrum data is invalid"""
         try:
-            from tkinter import messagebox
+            from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
             messagebox.showerror(
                 "Invalid Spectrum Data",
                 "The loaded spectrum data appears to be invalid or corrupted.\n\n"
@@ -337,7 +318,7 @@ class EmissionLineOverlayController:
     def _show_import_error(self):
         """Show error when dialog cannot be imported"""
         try:
-            from tkinter import messagebox
+            from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
             messagebox.showerror(
                 "Feature Not Available",
                 "The emission line overlay dialog could not be loaded.\n\n"
@@ -349,7 +330,7 @@ class EmissionLineOverlayController:
     def _show_generic_error(self, error_message: str):
         """Show generic error message"""
         try:
-            from tkinter import messagebox
+            from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
             messagebox.showerror(
                 "Error",
                 f"An error occurred while opening the emission line overlay:\n\n{error_message}"
@@ -369,22 +350,8 @@ class EmissionLineOverlayController:
         if not self._is_spectrum_loaded():
             return "Load a spectrum to use emission line overlay"
         
-        # Check if wind velocity analysis is available
-        wind_analysis_available = False
-        try:
-            from snid_sage.interfaces.gui.features.analysis.wind_velocity_controller import WindVelocityController
-            wind_analysis_available = True
-        except ImportError:
-            pass
-        
         estimated_z = self._get_estimated_redshift()
         if estimated_z > 0:
-            base_status = f"Ready (estimated z={estimated_z:.4f})"
+            return f"Ready (estimated z={estimated_z:.4f})"
         else:
-            base_status = "Ready (no redshift estimate)"
-        
-        # Add wind velocity status if available
-        if wind_analysis_available:
-            base_status += " - Wind velocity analysis available"
-        
-        return base_status 
+            return "Ready (no redshift estimate)" 

@@ -32,17 +32,19 @@ def _import_matplotlib():
     global _matplotlib_imported
     if not _matplotlib_imported:
         import matplotlib
-        matplotlib.use('TkAgg')
+        # Use Qt backend for PySide6 compatibility
+        matplotlib.use('QtAgg')
         import matplotlib.pyplot as plt
-        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
         
         globals()['plt'] = plt
-        globals()['FigureCanvasTkAgg'] = FigureCanvasTkAgg 
-        globals()['NavigationToolbar2Tk'] = NavigationToolbar2Tk
+        globals()['FigureCanvas'] = FigureCanvas 
+        globals()['NavigationToolbar'] = NavigationToolbar
         _matplotlib_imported = True
-        return plt, FigureCanvasTkAgg, NavigationToolbar2Tk
+        return plt, FigureCanvas, NavigationToolbar
     else:
-        return globals()['plt'], globals()['FigureCanvasTkAgg'], globals()['NavigationToolbar2Tk']
+        return globals()['plt'], globals()['FigureCanvas'], globals()['NavigationToolbar']
 
 
 class PlotController:
@@ -66,7 +68,7 @@ class PlotController:
             self._ensure_matplotlib_backend_configured()
             
             # Import matplotlib components
-            plt, FigureCanvasTkAgg, NavigationToolbar2Tk = _import_matplotlib()
+            plt, FigureCanvas, NavigationToolbar = _import_matplotlib()
             
             # Check if matplotlib components already exist and are valid
             if self._matplotlib_components_valid():
@@ -105,12 +107,15 @@ class PlotController:
                         _LOGGER.debug(f"Warning cleaning up old canvas: {e}")
                 
                 # Create canvas with explicit parent to prevent window splitting
-                self.gui.canvas = FigureCanvasTkAgg(self.gui.fig, master=plot_frame)
+                self.gui.canvas = FigureCanvas(self.gui.fig, parent=plot_frame)
                 canvas_widget = self.gui.canvas.get_tk_widget()
                 
                 # Configure canvas widget to stay embedded and fill all available space
                 canvas_widget.configure(highlightthickness=0)
                 canvas_widget.pack(fill='both', expand=True, padx=0, pady=0)
+                
+                # Bind resize event for dynamic plot sizing
+                canvas_widget.bind('<Configure>', self._on_canvas_resize)
                 
                 # Ensure canvas stays within the GUI
                 canvas_widget.focus_set()
@@ -119,7 +124,7 @@ class PlotController:
                 self.gui.canvas.draw()
                 
                 # Add toolbar and store reference for proper cleanup
-                self.gui.toolbar = NavigationToolbar2Tk(self.gui.canvas, plot_frame)
+                self.gui.toolbar = NavigationToolbar(self.gui.canvas, plot_frame)
                 self.gui.toolbar.update()
                 
                 # Exclude the toolbar and its children from global theming so the icons keep their native colours
@@ -346,18 +351,15 @@ class PlotController:
                 # Validate data before plotting
                 if len(log_wave) > 0 and len(flux_data) > 0 and log_wave is not None and flux_data is not None:
                     # Filter out zero-padded regions
-                    from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
-                    filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
-                        log_wave, flux_data, self.gui.processed_spectrum
-                    )
+                    filtered_wave, filtered_flux = self.gui._filter_nonzero_spectrum(log_wave, flux_data)
                     
                     # Validate filtered data
                     if filtered_wave is not None and filtered_flux is not None and len(filtered_wave) > 0 and len(filtered_flux) > 0:
                         # Get theme colors if available
                         if hasattr(self.gui, 'theme_manager'):
-                            spectrum_color = '#0078d4'  # Consistent blue color matching original spectrum
+                            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
                         else:
-                            spectrum_color = '#0078d4'  # Default blue
+                            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
                         
                         self.gui.ax.plot(filtered_wave, filtered_flux, color=spectrum_color, 
                                        linewidth=2, alpha=0.8, label=spectrum_label)
@@ -506,18 +508,15 @@ class PlotController:
                 # Validate data before plotting
                 if len(log_wave) > 0 and len(flat_data) > 0 and log_wave is not None and flat_data is not None:
                     # Filter out zero-padded regions
-                    from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
-                    filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
-                        log_wave, flat_data, self.gui.processed_spectrum
-                    )
+                    filtered_wave, filtered_flux = self.gui._filter_nonzero_spectrum(log_wave, flat_data)
                     
                     # Validate filtered data
                     if filtered_wave is not None and filtered_flux is not None and len(filtered_wave) > 0 and len(filtered_flux) > 0:
                         # Get theme colors if available
                         if hasattr(self.gui, 'theme_manager'):
-                            spectrum_color = '#0078d4'  # Consistent blue color matching original spectrum
+                            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
                         else:
-                            spectrum_color = '#0078d4'  # Default blue
+                            spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
                         
                         self.gui.ax.plot(filtered_wave, filtered_flux, color=spectrum_color, 
                                        linewidth=2, alpha=0.8, label=spectrum_label)
@@ -585,9 +584,9 @@ class PlotController:
                 
                 # FIXED: Use the same nice blue color as the preprocessing plots
                 if hasattr(self.gui, 'theme_manager'):
-                    spectrum_color = '#0078d4'  # Nice blue matching preprocessing dialog
+                    spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
                 else:
-                    spectrum_color = '#0078d4'  # Default to same blue
+                    spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
                 
                 self.gui.ax.plot(self.gui.original_wave, self.gui.original_flux, 
                                color=spectrum_color, linewidth=2, alpha=0.8)
@@ -691,9 +690,9 @@ class PlotController:
             
             # Get theme colors if available
             if hasattr(self.gui, 'theme_manager'):
-                spectrum_color = '#0078d4'  # Consistent blue color matching original spectrum
+                spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             else:
-                spectrum_color = '#0078d4'  # Default blue
+                spectrum_color = '#3b82f6'  # Same blue as Flux/Flat buttons
             
             # Plot the preprocessed spectrum
             self.gui.ax.plot(wave, flux, color=spectrum_color, linewidth=1.5, alpha=0.8)
@@ -910,14 +909,39 @@ class PlotController:
         except Exception as e:
             _LOGGER.error(f"Error handling view style change: {e}")
 
+    def _on_canvas_resize(self, event):
+        """Handle canvas resize events to dynamically adjust plot size"""
+        try:
+            if hasattr(self.gui, 'fig') and self.gui.fig and hasattr(self.gui, 'canvas') and self.gui.canvas:
+                # Get new canvas dimensions
+                width = event.width
+                height = event.height
+                
+                # Only resize if dimensions are reasonable
+                if width > 100 and height > 100:
+                    # Calculate size in inches for the figure
+                    dpi = self.gui.fig.get_dpi()
+                    fig_width = width / dpi
+                    fig_height = height / dpi
+                    
+                    # Set new figure size
+                    self.gui.fig.set_size_inches(fig_width, fig_height, forward=True)
+                    
+                    # Use draw_idle for smooth updates without blocking
+                    self.gui.canvas.draw_idle()
+                    
+                    _LOGGER.debug(f"Plot resized to {fig_width:.2f}x{fig_height:.2f} inches ({width}x{height} pixels)")
+        except Exception as e:
+            _LOGGER.debug(f"Plot resize handling failed: {e}")
+
     def _ensure_matplotlib_backend_configured(self):
         """Ensure matplotlib is properly configured to stay embedded"""
         try:
             import matplotlib
             import matplotlib.pyplot as plt
             
-            # Force TkAgg backend and turn off interactive mode to prevent external windows
-            matplotlib.use('TkAgg', force=True)
+            # Force QtAgg backend and turn off interactive mode to prevent external windows
+            matplotlib.use('QtAgg', force=True)
             plt.ioff()  # Turn off interactive mode
             
             # Configure matplotlib to not create separate windows
@@ -925,10 +949,115 @@ class PlotController:
             mpl.rcParams['figure.raise_window'] = False
             mpl.rcParams['tk.window_focus'] = False
             
+            # Configure for responsive plots
+            mpl.rcParams['figure.autolayout'] = True
+            mpl.rcParams['savefig.dpi'] = 'figure'
+            
+            # Apply platform-specific DPI and backend configurations
+            self._configure_platform_specific_matplotlib()
+            
             _LOGGER.debug("✅ Matplotlib backend configured for embedded display")
             
         except Exception as e:
-            _LOGGER.warning(f"⚠️ Warning configuring matplotlib backend: {e}") 
+            _LOGGER.warning(f"⚠️ Warning configuring matplotlib backend: {e}")
+    
+    def _configure_platform_specific_matplotlib(self):
+        """Configure matplotlib with platform-specific settings for optimal DPI and rendering"""
+        try:
+            import matplotlib as mpl
+            import platform
+            
+            platform_name = platform.system()
+            
+            if platform_name == "Windows":
+                # Windows-specific matplotlib configuration
+                mpl.rcParams['figure.dpi'] = 100  # Good default for Windows
+                mpl.rcParams['savefig.dpi'] = 150  # Higher DPI for saved figures
+                # Windows handles DPI scaling well with QtAgg
+                
+            elif platform_name == "Darwin":  # macOS
+                # macOS-specific configuration for retina displays
+                try:
+                    # Detect retina display
+                    # Get system DPI using Qt
+                    try:
+                        import PySide6.QtWidgets as QtWidgets
+                        app = QtWidgets.QApplication.instance()
+                        if app is None:
+                            app = QtWidgets.QApplication([])
+                        screen = app.primaryScreen()
+                        screen_dpi = screen.logicalDotsPerInch()
+                    except ImportError:
+                        # Fallback if PySide6 not available
+                        screen_dpi = 96  # Default DPI
+                    
+                    if screen_dpi > 120:  # Likely retina display
+                        mpl.rcParams['figure.dpi'] = 144  # 2x scaling for retina
+                        mpl.rcParams['savefig.dpi'] = 144
+                        _LOGGER.debug(f"✅ macOS retina display detected, using DPI=144")
+                    else:
+                        mpl.rcParams['figure.dpi'] = 100
+                        mpl.rcParams['savefig.dpi'] = 150
+                        _LOGGER.debug(f"✅ macOS standard display detected, using DPI=100")
+                        
+                except Exception:
+                    # Fallback for macOS
+                    mpl.rcParams['figure.dpi'] = 120  # Conservative default for macOS
+                    mpl.rcParams['savefig.dpi'] = 150
+                
+                    # Ensure we use QtAgg on macOS (avoid macOS native backends)
+                    if mpl.get_backend() != 'QtAgg':
+                        mpl.use('QtAgg', force=True)
+                    
+            elif platform_name == "Linux":
+                # Linux-specific configuration for varied DPI environments
+                try:
+                    # Get system DPI using Qt
+                    try:
+                        import PySide6.QtWidgets as QtWidgets
+                        app = QtWidgets.QApplication.instance()
+                        if app is None:
+                            app = QtWidgets.QApplication([])
+                        screen = app.primaryScreen()
+                        screen_dpi = screen.logicalDotsPerInch()
+                    except ImportError:
+                        # Fallback if PySide6 not available
+                        screen_dpi = 96  # Default DPI
+                    
+                    # Scale matplotlib DPI based on detected screen DPI
+                    if screen_dpi > 120:  # High DPI Linux
+                        plot_dpi = int(screen_dpi * 0.8)  # Slightly lower than screen DPI
+                        plot_dpi = min(plot_dpi, 150)  # Cap at 150
+                        mpl.rcParams['figure.dpi'] = plot_dpi
+                        mpl.rcParams['savefig.dpi'] = plot_dpi
+                        _LOGGER.debug(f"✅ Linux high-DPI display detected, using DPI={plot_dpi}")
+                    else:
+                        mpl.rcParams['figure.dpi'] = 100
+                        mpl.rcParams['savefig.dpi'] = 150
+                        _LOGGER.debug(f"✅ Linux standard display detected, using DPI=100")
+                        
+                except Exception:
+                    # Fallback for Linux
+                    mpl.rcParams['figure.dpi'] = 100
+                    mpl.rcParams['savefig.dpi'] = 150
+                
+                # Check for environment variable overrides common on Linux
+                import os
+                if 'GDK_DPI_SCALE' in os.environ:
+                    try:
+                        scale = float(os.environ['GDK_DPI_SCALE'])
+                        current_dpi = mpl.rcParams['figure.dpi']
+                        scaled_dpi = int(current_dpi * scale)
+                        scaled_dpi = min(scaled_dpi, 200)  # Cap to prevent issues
+                        mpl.rcParams['figure.dpi'] = scaled_dpi
+                        _LOGGER.debug(f"✅ Applied GDK_DPI_SCALE={scale}, final DPI={scaled_dpi}")
+                    except (ValueError, KeyError):
+                        pass
+                        
+            _LOGGER.debug(f"✅ Platform-specific matplotlib config applied: {platform_name}, DPI={mpl.rcParams['figure.dpi']}")
+            
+        except Exception as e:
+            _LOGGER.warning(f"⚠️ Platform-specific matplotlib configuration failed: {e}") 
 
     def _set_plot_type(self, plot_type):
         """Set the current plot type and handle view state transitions"""
@@ -1179,7 +1308,25 @@ class PlotController:
                     _LOGGER.error("Results summary method not available")
                     self._show_error_message("Results summary method not available")
             else:
-                from tkinter import messagebox
+                # Use PySide6 messagebox instead of tkinter
+                try:
+                    import PySide6.QtWidgets as QtWidgets
+                    def show_error(title, message):
+                        app = QtWidgets.QApplication.instance()
+                        if app is None:
+                            app = QtWidgets.QApplication([])
+                        msg = QtWidgets.QMessageBox()
+                        msg.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+                        msg.setWindowTitle(title)
+                        msg.setText(message)
+                        msg.exec()
+                    messagebox = type('messagebox', (), {'showerror': show_error})()
+                except ImportError:
+                    # Fallback to print if PySide6 not available
+                    class FallbackMessageBox:
+                        def showerror(self, title, message):
+                            print(f"ERROR [{title}]: {message}")
+                    messagebox = FallbackMessageBox()
                 messagebox.showwarning("No Analysis Results", 
                                      "No SNID-SAGE analysis results available.\n"
                                      "Run SNID-SAGE analysis first to generate results.")

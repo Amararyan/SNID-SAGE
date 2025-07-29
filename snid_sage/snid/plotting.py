@@ -984,8 +984,8 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
     
     # Format plot (no title per user requirement)
     # Always use standardized font sizes, regardless of GUI styling
-    ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
-    ax.set_ylabel('Correlation', fontsize=PLOT_AXIS_LABEL_FONTSIZE)
+    ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
+    ax.set_ylabel('Correlation', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: correlation
     ax.grid(True, alpha=0.3)
     
     # Apply no-title styling if available, but ensure font sizes are preserved
@@ -1162,43 +1162,39 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
         fig.tight_layout()
         return fig
     
-    # Group data by main type (not full type)
+    # Group data by subtype instead of main type
     grouped_data = {}
     for item in data:
-        main_type = item['type']
-        if main_type not in grouped_data:
-            grouped_data[main_type] = []
-        grouped_data[main_type].append(item)
+        # Extract subtype from template
+        template = item.get('template', {})
+        subtype = template.get('subtype', 'Unknown') if isinstance(template, dict) else 'Unknown'
+        if not subtype or subtype.strip() == '':
+            subtype = 'Unknown'
+        
+        if subtype not in grouped_data:
+            grouped_data[subtype] = []
+        grouped_data[subtype].append(item)
     
-    # Create color mapping for main types
-    main_type_colors = {
-        'Ia': 'red',
-        'Ib': 'blue', 
-        'Ic': 'green',
-        'II': 'purple',
-        'IIn': 'lightgreen', 
-        'IIP': 'forestgreen',
-        'Galaxy': '#8A2BE2',      # Blue-violet for galaxies
-        'Star': '#FFD700',        # Gold for stars
-        'AGN': '#FF6347',         # Tomato red for AGN/QSO
-        'SLSN': 'cyan',
-        'LBV': 'cyan',
-        'Unknown': 'gray'
-    }
+    # Create color mapping for subtypes using custom palette
+    custom_palette = get_custom_color_palette()
+    sorted_subtypes = sorted(grouped_data.keys())
+    subtype_color_map = {}
+    for i, subtype in enumerate(sorted_subtypes):
+        subtype_color_map[subtype] = custom_palette[i % len(custom_palette)]
     
-    # Plot each type group with error bars
+    # Plot each subtype group
     marker_size = 80  # Balanced size for good visibility without being too large
-    for main_type, items in sorted(grouped_data.items()):
+    for subtype, items in sorted(grouped_data.items()):
         if not items:
             continue
             
-        # Extract data for this type group
+        # Extract data for this subtype group
         ages = [item['age'] for item in items]
         redshifts = [item['z'] for item in items]
         rlaps = [item['rlap'] for item in items]
         
-        # Get color for this type
-        color = main_type_colors.get(main_type, 'black')
+        # Get color for this subtype
+        color = subtype_color_map.get(subtype, '#A9A9A9')  # Gray fallback
         
         # Create simple scatter plot (like original Fortran SNID - no error bars)
         scatter = ax.scatter(
@@ -1208,7 +1204,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
             alpha=0.7,
             edgecolors='black',
             linewidths=1.5,
-            label=main_type
+            label=subtype
         )
     
     # Plot best match separately with a star marker (like original Fortran)
@@ -1405,6 +1401,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
     
     # Format plot correctly (no title per user requirement)
     # Always use standardized font sizes, regardless of GUI styling
+    # Note: Plot is now colored by subtype instead of type (legend will show subtypes)
     ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
     ax.set_ylabel('Age (days)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: age
     ax.grid(True, alpha=0.3)

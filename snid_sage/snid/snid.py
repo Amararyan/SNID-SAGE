@@ -1330,8 +1330,7 @@ def run_snid_analysis(
                         batch_duration = time.time() - batch_start_time
                         final_progress = (processed_templates / total_templates) * 100
 
-                        # Quiet progress update (empty message, just percentage)
-                        report_progress(" ", final_progress)
+                        # Skip empty progress update - we don't want empty lines in the UI
 
                         _LOG.info(f"✅ Type {sn_type} batch {batch_idx}/{len(batches)} complete ({len(batch_templates)} templates, {batch_duration:.2f}s)")
 

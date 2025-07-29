@@ -252,6 +252,7 @@ class GUISettingsDialog:
         
         # Middle column sections
         self._create_window_section(middle_column)
+        self._create_layout_section(middle_column)
         
         # Right column sections
         self._create_plot_section(right_column)
@@ -348,6 +349,59 @@ class GUISettingsDialog:
         # Auto-save settings
         self._create_checkbox_setting(section_frame, "auto_save_settings", "Auto-save Settings",
                                      "Automatically save changes to settings")
+    
+    def _create_layout_section(self, parent):
+        """Create layout customization settings section"""
+        section_frame = self._create_colorful_section(parent, "📐 Layout Settings", 
+                                                     self.colors['bg_warning'])
+        
+        # Plot-Controls spacing
+        self._create_slider_setting(section_frame, "plot_controls_spacing", "Plot-Controls Spacing:", 2, 30, 1,
+                                   "Space between control buttons and main plot (px)")
+        
+        # Controls frame height
+        self._create_slider_setting(section_frame, "controls_frame_height", "Controls Height:", 24, 48, 2,
+                                   "Height of the controls frame (px)")
+        
+        # Plot margins
+        plot_margins_frame = tk.Frame(section_frame, bg=self.colors['bg_warning'])
+        plot_margins_frame.pack(fill='x', pady=(10, 5))
+        
+        tk.Label(plot_margins_frame, text="Plot Margins:",
+                font=('Segoe UI', 12, 'bold'),
+                bg=self.colors['bg_warning'], fg=self.colors['text_primary']).pack(anchor='w')
+        
+        # Top margin
+        self._create_slider_setting(section_frame, "plot_margin_top", "Top:", 0, 20, 1,
+                                   "Top margin around plot (px)")
+        
+        # Bottom margin  
+        self._create_slider_setting(section_frame, "plot_margin_bottom", "Bottom:", 0, 20, 1,
+                                   "Bottom margin around plot (px)")
+        
+        # Left margin
+        self._create_slider_setting(section_frame, "plot_margin_left", "Left:", 0, 20, 1,
+                                   "Left margin around plot (px)")
+        
+        # Right margin
+        self._create_slider_setting(section_frame, "plot_margin_right", "Right:", 0, 20, 1,
+                                   "Right margin around plot (px)")
+        
+        # Button layout style
+        self._create_choice_setting(section_frame, "button_layout_style", "Button Layout:",
+                                   ["horizontal", "vertical"], "Layout style for control buttons")
+        
+        # Reset to defaults button
+        reset_frame = tk.Frame(section_frame, bg=self.colors['bg_warning'])
+        reset_frame.pack(fill='x', pady=(10, 0))
+        
+        reset_btn = tk.Button(reset_frame, text="🔄 Reset Layout to Defaults",
+                             font=('Segoe UI', 10, 'bold'),
+                             bg='#ef4444', fg='white',
+                             relief='raised', bd=2,
+                             padx=10, pady=4,
+                             command=self._reset_layout_defaults)
+        reset_btn.pack(anchor='w')
     
     def _create_plot_section(self, parent):
         """Create plot display settings section"""
@@ -718,6 +772,75 @@ class GUISettingsDialog:
     def add_settings_changed_callback(self, callback: Callable[[Dict[str, Any]], None]):
         """Add callback for settings changes"""
         self.settings_changed_callbacks.append(callback)
+    
+    def _reset_layout_defaults(self):
+        """Reset layout settings to defaults"""
+        try:
+            # Default layout values
+            default_values = {
+                'plot_controls_spacing': 15,
+                'controls_frame_height': 36,
+                'plot_margin_top': 2,
+                'plot_margin_bottom': 5,
+                'plot_margin_left': 5,
+                'plot_margin_right': 5,
+                'button_layout_style': 'horizontal'
+            }
+            
+            # Update widgets with default values
+            for setting_name, default_value in default_values.items():
+                if setting_name in self.widgets:
+                    widget = self.widgets[setting_name]
+                    if hasattr(widget, 'set'):  # Scale widget
+                        widget.set(default_value)
+                    elif hasattr(widget, 'current'):  # StringVar for OptionMenu
+                        widget.set(default_value)
+                        
+            # Apply changes immediately if GUI supports it
+            self._apply_layout_changes()
+            
+            if hasattr(self, 'logger'):
+                self.logger.info("Layout settings reset to defaults")
+            
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"Error resetting layout defaults: {e}")
+    
+    def _apply_layout_changes(self):
+        """Apply layout changes to the GUI"""
+        try:
+            # Check if GUI has unified layout manager
+            if hasattr(self.gui, 'unified_layout_manager'):
+                # Create new settings object
+                from snid_sage.interfaces.gui.utils.unified_pyside6_layout_manager import LayoutSettings
+                
+                new_settings = LayoutSettings()
+                
+                # Update settings from widgets
+                if 'plot_controls_spacing' in self.widgets:
+                    new_settings.plot_controls_spacing = int(self.widgets['plot_controls_spacing'].get())
+                if 'controls_frame_height' in self.widgets:
+                    new_settings.controls_frame_height = int(self.widgets['controls_frame_height'].get())
+                if 'plot_margin_top' in self.widgets:
+                    new_settings.plot_margin_top = int(self.widgets['plot_margin_top'].get())
+                if 'plot_margin_bottom' in self.widgets:
+                    new_settings.plot_margin_bottom = int(self.widgets['plot_margin_bottom'].get())
+                if 'plot_margin_left' in self.widgets:
+                    new_settings.plot_margin_left = int(self.widgets['plot_margin_left'].get())
+                if 'plot_margin_right' in self.widgets:
+                    new_settings.plot_margin_right = int(self.widgets['plot_margin_right'].get())
+                if 'button_layout_style' in self.widgets:
+                    new_settings.button_layout_style = self.widgets['button_layout_style'].get()
+                
+                # Apply the new settings
+                self.gui.unified_layout_manager.update_settings(new_settings)
+                
+                if hasattr(self, 'logger'):
+                    self.logger.debug("Layout changes applied to unified layout manager")
+                
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"Error applying layout changes: {e}")
 
 
 def show_gui_settings_dialog(parent, current_settings=None) -> Optional[Dict[str, Any]]:

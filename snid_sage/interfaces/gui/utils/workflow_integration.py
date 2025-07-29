@@ -374,7 +374,7 @@ class WorkflowIntegrator:
             # Update header status
             if hasattr(self.gui, 'update_header_status'):
                 status_messages = {
-                    WorkflowState.INITIAL: "🚀 Ready - Load a spectrum to begin analysis",
+                    WorkflowState.INITIAL: "Ready - Load a spectrum to begin analysis",
                     WorkflowState.FILE_LOADED: "📂 Spectrum loaded - Ready for preprocessing",
                     WorkflowState.PREPROCESSED: "🔧 Preprocessing complete - Determine redshift or continue with analysis",
                     WorkflowState.REDSHIFT_SET: "🌌 Redshift set - Ready for SNID analysis",

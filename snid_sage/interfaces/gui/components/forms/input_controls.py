@@ -129,7 +129,7 @@ class InputControlsComponent:
             fg=self.theme_manager.get_color('text_secondary')
         )
         self.parent_gui.header_status_label.config(
-            text="🚀 Ready - Load a spectrum to begin analysis"
+            text="Ready - Load a spectrum to begin analysis"
         )
         
         # Disable dependent buttons

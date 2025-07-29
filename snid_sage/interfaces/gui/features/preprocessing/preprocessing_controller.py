@@ -8,11 +8,10 @@ manual preprocessing wizard, and SNID preprocessing pipeline.
 
 import os
 import json
-import tkinter as tk
-from tkinter import messagebox
+# Use PySide6 message dialogs instead of tkinter
+from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
 from snid_sage.snid.snid import preprocess_spectrum
 import logging
-from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,12 +51,12 @@ class PreprocessingController:
                 
                 if hasattr(self.gui, 'preprocess_status_label'):
                     self.gui.preprocess_status_label.configure(
-                        text="✅ Preprocessed",
+                        text="Preprocessed",
                         fg=self.gui.theme_manager.get_color('success') if hasattr(self.gui, 'theme_manager') else 'green',
                     )
                 
                 # Also update header status in GUI
-                self.gui.update_header_status("✅ Quick preprocessing complete - ready for analysis")
+                self.gui.update_header_status("Quick preprocessing complete - ready for analysis")
                 
                 # CRITICAL: Set view to Flat mode after preprocessing since flattened spectrum is usually shown
                 if hasattr(self.gui, 'view_style') and self.gui.view_style:
@@ -122,11 +121,11 @@ class PreprocessingController:
             
             if processed_spectrum is not None:
                 # Inline status – no modal dialog
-                self.gui.update_header_status("✅ Quick preprocessing complete - ready for analysis")
+                self.gui.update_header_status("Quick preprocessing complete - ready for analysis")
                 
                 if hasattr(self.gui, 'preprocess_status_label'):
                     self.gui.preprocess_status_label.configure(
-                        text="✅ Preprocessed",
+                        text="Preprocessed",
                         fg=self.gui.theme_manager.get_color('success') if hasattr(self.gui, 'theme_manager') else 'green',
                     )
                 
@@ -173,7 +172,7 @@ class PreprocessingController:
                 self.gui.master.update_idletasks()
                 
                 _LOGGER.debug(f"🔄 Button states updated - SNID analysis button enabled")
-                _LOGGER.info("✅ Silent quick preprocessing completed successfully")
+                _LOGGER.info("Silent quick preprocessing completed successfully")
             
         except Exception as e:
             messagebox.showerror("Preprocessing Error", f"Quick preprocessing failed: {str(e)}")
@@ -214,7 +213,7 @@ class PreprocessingController:
             if hasattr(self.gui, '_last_preprocessing_masks'):
                 self.gui._last_preprocessing_masks = None
             
-            _LOGGER.debug("✅ Preprocessing controller state reset")
+            _LOGGER.debug("Preprocessing controller state reset")
             
         except Exception as e:
             # Log error without printing to console
@@ -239,7 +238,7 @@ class PreprocessingController:
             return None
         
         try:
-            _LOGGER.info("🔧 Running SNID preprocessing pipeline...")
+            _LOGGER.info("Running SNID preprocessing pipeline...")
             
             # Get current masks
             current_masks = self.gui._parse_wavelength_masks(self.gui.params.get('wavelength_masks', ''))
@@ -294,12 +293,12 @@ class PreprocessingController:
             processed_spectrum['display_flux'] = display_flux   # For "Flux" button - apodized flux with continuum
             processed_spectrum['display_flat'] = display_flat   # For "Flat" button - apodized continuum-removed
             
-            _LOGGER.debug(f"📊 Generated display versions:")
+            _LOGGER.debug(f"Generated display versions:")
             _LOGGER.debug(f"   • Flux view: (tapered_flux + 1.0) * continuum (correct unflatten formula)")
             _LOGGER.debug(f"   • Flat view: tapered_flux (apodized continuum-removed)")
             
             # Apply final filtering to remove zero regions for display
-            filtered_wave, filtered_flux = GUIHelpers.filter_nonzero_spectrum(
+            filtered_wave, filtered_flux = self.gui.filter_nonzero_spectrum(
                 log_wave, display_flux, processed_spectrum
             )
             
@@ -313,11 +312,11 @@ class PreprocessingController:
             if hasattr(self.gui, 'original_flux'):
                 self.gui.original_flux = None
             
-            _LOGGER.info("✅ SNID preprocessing completed successfully")
+            _LOGGER.info("SNID preprocessing completed successfully")
             return processed_spectrum
             
         except Exception as e:
-            _LOGGER.error(f"❌ SNID preprocessing failed: {e}")
+            _LOGGER.error(f"SNID preprocessing failed: {e}")
             messagebox.showerror("Preprocessing Error", f"SNID preprocessing failed: {str(e)}")
             return None
     

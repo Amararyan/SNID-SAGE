@@ -79,6 +79,8 @@ llm = [
 ]
 gui = [
     "pillow>=8.0.0",
+    "PySide6==6.9.0",  # Specific version - 6.9.1+ have known issues
+    "pyqtgraph>=0.13.0",  # High-performance plotting for PySide6
 ]
 dev = [
     "pytest>=6.0.0",

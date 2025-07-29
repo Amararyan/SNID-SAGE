@@ -60,12 +60,12 @@ class ConfigurationManager:
         self._current_config = None
         
     def _get_config_directory(self) -> Path:
-        """Get platform-appropriate configuration directory (Cross-platform)"""
+        """Get platform-appropriate configuration directory"""
         try:
-            # Try to use the cross-platform window manager for config paths
-            from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
-            config_path = CrossPlatformWindowManager.get_config_directory('SNID_SAGE')
-            return Path(config_path)
+            # Use Qt's QStandardPaths for cross-platform config directories
+            from PySide6.QtCore import QStandardPaths
+            config_path = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+            return Path(config_path) / 'SNID_SAGE'
         except ImportError:
             # Fallback to legacy OS detection
             if os.name == 'nt':  # Windows
@@ -266,8 +266,8 @@ class ConfigurationManager:
             'analysis': {
                 'redshift_min': -0.01,
                 'redshift_max': 2.0,
-                'age_min': -1000.0,
-                'age_max': 10000.0,
+                'age_min': None,
+                'age_max': None,
                 'correlation_min': 3.0,
                 'fraction_coverage': 0.7,
                 'max_output_templates': 10,

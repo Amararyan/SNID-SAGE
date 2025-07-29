@@ -1,13 +1,26 @@
 """
-SNID SAGE GUI Launcher Entry Point
-==================================
+SNID SAGE GUI Launcher
+======================
 
-Simplified entry point for the SNID SAGE GUI when installed via pip.
-This directly uses the FastGUILauncher without complex import fallbacks.
+This module provides the entry point for launching the SNID SAGE GUI.
+Only supports PySide6/Qt backend for modern cross-platform interface.
 """
 
-import sys
 import os
+import sys
+
+# CRITICAL: Set environment variables for PySide6 backend and WSL compatibility
+# This must be set before any GUI imports happen
+os.environ['SNID_SAGE_GUI_BACKEND'] = 'PySide6'
+
+# Comprehensive Qt software rendering for WSL/Linux compatibility
+os.environ['QT_OPENGL'] = 'software'
+os.environ['QT_QUICK_BACKEND'] = 'software'
+os.environ['QT_XCB_FORCE_SOFTWARE_OPENGL'] = '1'
+os.environ['LIBGL_ALWAYS_SOFTWARE'] = '1'
+os.environ['QT_DEBUG_PLUGINS'] = '0'
+os.environ['QT_LOGGING_RULES'] = 'qt.qpa.gl.debug=false'
+
 import argparse
 
 def parse_arguments():
@@ -31,55 +44,48 @@ def parse_arguments():
     
     return args
 
+def launch_pyside6_gui(args=None):
+    """Launch PySide6 GUI"""
+    try:
+        if args and args.verbose:
+            print("Launching SNID SAGE PySide6 GUI...")
+        
+        # Import PySide6 GUI
+        from snid_sage.interfaces.gui.pyside6_gui import main as pyside6_main
+        
+        if args and args.verbose:
+            print("✅ PySide6 GUI loaded successfully")
+        
+        return pyside6_main(args)
+        
+    except ImportError as e:
+        print(f"❌ PySide6 not available: {e}")
+        print("💡 Install PySide6 with: pip install PySide6 pyqtgraph")
+        return 1
+    except Exception as e:
+        print(f"❌ Error launching PySide6 GUI: {e}")
+        return 1
+
 def main():
     """
     Main entry point for snid-sage and snid-gui commands
+    
+    Only supports PySide6 (modern Qt interface) for cross-platform compatibility.
     """
-    try:
-        # Import the fast launcher directly
-        from snid_sage.interfaces.gui.fast_launcher import main as fast_main
-        return fast_main()
-        
-    except ImportError as e:
-        print(f"❌ Error importing fast launcher: {e}")
-        
-        # Try fallback to direct GUI launch
-        try:
-            print("🔄 Attempting fallback launch...")
-            from snid_sage.interfaces.gui.sage_gui import main as sage_main
-            return sage_main()
-        except Exception as fallback_error:
-            print(f"❌ Fallback launch also failed: {fallback_error}")
-            print("💡 Try running: pip install --upgrade snid-sage")
-            return 1
-            
-    except Exception as e:
-        print(f"❌ Error launching SNID SAGE GUI: {e}")
-        return 1
+    args = parse_arguments()
+    
+    if args.verbose:
+        print("🎯 Using PySide6/Qt GUI backend")
+    
+    return launch_pyside6_gui(args)
 
 def main_with_args():
     """
     Alternative entry point that accepts command line arguments
     """
     try:
-        args = parse_arguments()
+        return main()
         
-        # Import and use FastGUILauncher with parsed args
-        from snid_sage.interfaces.gui.fast_launcher import FastGUILauncher
-        
-        launcher = FastGUILauncher(args)
-        return launcher.run()
-        
-    except ImportError as e:
-        print(f"❌ Error importing fast launcher: {e}")
-        # Fallback to direct GUI launch
-        try:
-            from snid_sage.interfaces.gui.sage_gui import main as sage_main
-            return sage_main()
-        except Exception as fallback_error:
-            print(f"❌ Fallback launch also failed: {fallback_error}")
-            return 1
-            
     except Exception as e:
         print(f"❌ Error launching SNID SAGE GUI: {e}")
         return 1

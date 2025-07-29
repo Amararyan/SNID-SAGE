@@ -74,11 +74,11 @@ class GUISettingsController:
             # Use config manager's directory
             config_dir = config_manager.config_dir
         else:
-            # Try to use cross-platform path manager
+            # Try to use Qt's QStandardPaths for cross-platform config directories
             try:
-                from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager
-                config_path = CrossPlatformWindowManager.get_config_directory('SNID_SAGE')
-                config_dir = Path(config_path)
+                from PySide6.QtCore import QStandardPaths
+                config_path = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+                config_dir = Path(config_path) / 'SNID_SAGE'
             except ImportError:
                 # Fallback to legacy OS detection
                 if os.name == 'nt':  # Windows

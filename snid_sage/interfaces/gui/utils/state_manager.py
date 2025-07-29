@@ -105,7 +105,7 @@ class StateManager:
         """Update header status with current workflow step"""
         try:
             status_messages = {
-                ApplicationState.INITIAL: "🚀 Ready - Load a spectrum to begin analysis",
+                ApplicationState.INITIAL: "Ready - Load a spectrum to begin analysis",
                 ApplicationState.SPECTRUM_LOADED: "📊 Spectrum loaded - Configure galaxy properties and preprocessing",  
                 ApplicationState.PREPROCESSED: "⚙️ Preprocessing complete - Configure SNID parameters and run analysis",
                 ApplicationState.ANALYSIS_COMPLETE: "✅ Analysis complete - Explore results and run additional tools",
@@ -236,8 +236,8 @@ class StateManager:
             
             # Advanced options
             'type_filter': '',
-            'age_min': '-1000',
-            'age_max': '10000',
+            'age_min': '',
+            'age_max': '',
             'verbose': 'True',
             'show_plots': 'True',
             'save_plots': 'False',

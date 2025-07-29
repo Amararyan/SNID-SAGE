@@ -111,13 +111,18 @@ class SummaryPlotter:
                         f"Subtype: {subtype}, Age: {current_match['age']:.1f}d\n"
                         f"z = {current_match['redshift']:.4f}, RLAP = {current_match['rlap']:.2f}")
             
+            # Use adaptive positioning for template info
+            from ...utils.plot_legend_utils import add_adaptive_template_info
             theme = self.theme_manager.get_current_theme()
             text_color = theme.get('text_color', 'black')
             info_bg_color = theme.get('bg_tertiary', 'lightcyan')
             
-            self.ax.text(0.02, 0.98, info_text, transform=self.ax.transAxes,
-                        verticalalignment='top', fontsize=10, color=text_color,
-                        bbox=dict(boxstyle='round,pad=0.5', facecolor=info_bg_color, alpha=0.8))
+            theme_colors = {
+                'text_primary': text_color,
+                'bg_tertiary': info_bg_color
+            }
+            add_adaptive_template_info(self.ax, info_text, position='upper right', 
+                                     theme_colors=theme_colors, fontsize=10)
             
             # Apply no-title styling per user requirement
             # self.ax.set_title(f'Combined View - {current_match["name"]} (z={current_match["redshift"]:.4f})', color=text_color)

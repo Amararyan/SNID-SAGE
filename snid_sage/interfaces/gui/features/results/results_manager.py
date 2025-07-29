@@ -455,7 +455,7 @@ class ResultsManager:
             
             # Reset header status
             self.parent_gui.header_status_label.config(
-                text="🚀 Ready - Load a spectrum to begin analysis"
+                text="Ready - Load a spectrum to begin analysis"
             )
             
             # Disable result-related buttons

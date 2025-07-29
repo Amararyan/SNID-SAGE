@@ -11,13 +11,36 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.cluster_summary')
 
+# Import all needed math utility functions
+try:
+    from snid_sage.shared.utils.math_utils import (
+        calculate_hybrid_weighted_redshift,
+        calculate_weighted_median,
+        calculate_rlap_weighted_age,
+        get_best_metric_value,
+        get_metric_name_for_match
+    )
+except ImportError as e:
+    _LOGGER.error(f"Failed to import math utilities: {e}")
+    # Create dummy functions to prevent crashes
+    def calculate_hybrid_weighted_redshift(*args, **kwargs):
+        return 0.0, 0.01, 0.01
+    def calculate_weighted_median(values, weights):
+        return np.median(values) if len(values) > 0 else 0.0
+    def calculate_rlap_weighted_age(*args, **kwargs):
+        return 0.0, 0.0, 0.0, 0.0
+    def get_best_metric_value(match):
+        return match.get('rlap', 0.0)
+    def get_metric_name_for_match(match):
+        return "RLAP"
+
 
 def is_valid_age(age):
     """
     Check if an age value is valid and available.
     
-    Returns True if age is a finite positive number.
-    Returns False if age is NaN, -999 (not available marker), <= 0, or non-finite.
+    Returns True if age is a finite number (including negative values for pre-maximum times).
+    Returns False if age is NaN, -999 (not available marker), or non-finite.
     """
     if age is None:
         return False
@@ -25,7 +48,8 @@ def is_valid_age(age):
     try:
         age_float = float(age)
         # Check for common "not available" markers and invalid values
-        if not np.isfinite(age_float) or age_float <= 0 or age_float == -999:
+        # FIXED: Removed age_float <= 0 check since negative ages are valid (pre-maximum light)
+        if not np.isfinite(age_float) or age_float == -999:
             return False
         return True
     except (ValueError, TypeError):
@@ -132,7 +156,6 @@ def weighted_mean_with_uncertainty(values, weights):
     
     This function exists only for backwards compatibility.
     """
-    from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
     import numpy as np
     # For backwards compatibility only
     result = calculate_hybrid_weighted_redshift(values, np.zeros_like(values), include_cluster_scatter=False)
@@ -163,7 +186,6 @@ class AnalysisResultsAnalyzer:
         rlaps = np.array([m['rlap'] for m in self.matches])
         
         # Calculate hybrid weighted redshift statistics
-        from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
         redshift_errors = np.array([m.get('redshift_error', 0) for m in self.matches])
         
         # Hybrid weighted redshift estimation with cluster scatter
@@ -188,12 +210,10 @@ class AnalysisResultsAnalyzer:
             if age is not None:
                 ages.append(age)
                 # Use RLAP-cos if available, otherwise RLAP
-                from snid_sage.shared.utils.math_utils import get_best_metric_value
                 age_weights.append(get_best_metric_value(m))
         
         age_stats = {}
         if ages:
-            from snid_sage.shared.utils.math_utils import calculate_rlap_weighted_age
             ages = np.array(ages)
             age_weights = np.array(age_weights)
             age_weighted_mean, age_stat_error, age_total_error, age_scatter = calculate_rlap_weighted_age(
@@ -204,6 +224,7 @@ class AnalysisResultsAnalyzer:
                 'min': np.min(ages),
                 'max': np.max(ages),
                 'weighted_mean': age_weighted_mean,
+                'weighted_uncertainty': age_total_error,  # Use consistent key name
                 'statistical_uncertainty': age_stat_error,
                 'total_uncertainty': age_total_error,
                 'cluster_scatter': age_scatter,
@@ -280,7 +301,6 @@ class AnalysisResultsAnalyzer:
             ages = np.array(data['ages']) if data['ages'] else np.array([])
             
             # Hybrid weighted redshift statistics
-            from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
             z_weighted_mean, z_weighted_uncertainty, _ = calculate_hybrid_weighted_redshift(
                 redshifts, redshift_errors, include_cluster_scatter=True
             )
@@ -294,12 +314,10 @@ class AnalysisResultsAnalyzer:
                     age = extract_age(match, template)
                     if age is not None:
                         # Use RLAP-cos if available, otherwise RLAP
-                        from snid_sage.shared.utils.math_utils import get_best_metric_value
                         age_rlaps.append(get_best_metric_value(match))
                 age_rlaps = np.array(age_rlaps[:len(ages)])  # Match length
                 
                 if len(age_rlaps) == len(ages) and len(ages) > 0:
-                    from snid_sage.shared.utils.math_utils import calculate_rlap_weighted_age
                     age_weighted_mean, _, age_weighted_uncertainty, _ = calculate_rlap_weighted_age(
                         ages, age_rlaps, include_cluster_scatter=True
                     )
@@ -360,16 +378,26 @@ class AnalysisResultsAnalyzer:
                 ])
         
         # Essential measurements only
-        z_stats = stats['redshift']
-        lines.extend([
-            f"📏 MEASUREMENTS:",
-            f"   Redshift: {z_stats['weighted_mean']:.4f} ± {z_stats['weighted_uncertainty']:.4f}",
-        ])
+        z_stats = stats.get('redshift', {})
+        if z_stats:
+            weighted_mean = z_stats.get('weighted_mean', 0.0)
+            weighted_uncertainty = z_stats.get('weighted_uncertainty', 0.0)
+            lines.extend([
+                f"📏 MEASUREMENTS:",
+                f"   Redshift: {weighted_mean:.4f} ± {weighted_uncertainty:.4f}",
+            ])
+        else:
+            lines.extend([
+                f"📏 MEASUREMENTS:",
+                f"   Redshift: Not available",
+            ])
         
         # Age if available
         if stats.get('age') and stats['age'].get('count', 0) > 0:
             age_stats = stats['age']
-            lines.append(f"   Age: {age_stats['weighted_mean']:.0f} ± {age_stats['weighted_uncertainty']:.0f} days")
+            age_mean = age_stats.get('weighted_mean', 0.0)
+            age_uncertainty = age_stats.get('weighted_uncertainty', 0.0)
+            lines.append(f"   Age: {age_mean:.0f} ± {age_uncertainty:.0f} days")
         
         lines.extend([
             "",
@@ -394,7 +422,6 @@ class AnalysisResultsAnalyzer:
         lines.append("")
         
         # Sort matches by RLAP descending
-        from snid_sage.shared.utils.math_utils import get_best_metric_value, get_metric_name_for_match
         sorted_matches = sorted(self.matches, key=get_best_metric_value, reverse=True)
         
         # Get metric name from first match

@@ -9,7 +9,6 @@ UI updates, and general application flow control.
 import tkinter as tk
 from tkinter import messagebox
 import os
-from snid_sage.interfaces.gui.utils.gui_helpers import GUIHelpers
 
 # Import the centralized logging system
 try:
@@ -86,7 +85,8 @@ class AppController:
         # Initialize mask regions from parameters
         if self.gui.params.get('wavelength_masks'):
             try:
-                GUIHelpers.parse_wavelength_masks(self.gui.params['wavelength_masks'])
+                # GUIHelpers.parse_wavelength_masks(self.gui.params['wavelength_masks']) # Removed GUIHelpers
+                pass  # Ignore errors during initialization
             except:
                 pass  # Ignore errors during initialization
         

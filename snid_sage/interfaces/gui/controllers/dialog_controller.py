@@ -8,10 +8,12 @@ Moved from sage_gui.py to reduce main file complexity.
 Part of the SNID SAGE GUI restructuring - Controllers Module
 """
 
-import tkinter as tk
-from tkinter import messagebox
-from snid_sage.interfaces.gui.components.dialogs import MaskManagerDialog
-from snid_sage.interfaces.gui.components.dialogs import AISummaryDialog
+# Use PySide6 message dialogs instead of tkinter
+from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
+# Use PySide6 mask manager dialog instead of tkinter
+# from snid_sage.interfaces.gui.components.dialogs import MaskManagerDialog
+# Use PySide6 AI assistant dialog instead of tkinter
+# from snid_sage.interfaces.gui.components.dialogs import AISummaryDialog
 from typing import Dict, Any
 
 # Import centralized logging system
@@ -47,29 +49,31 @@ class DialogController:
                 messagebox.showwarning("No Spectrum", "Please load a spectrum file first.")
                 return
             
-            # Import the modular preprocessing components from their new locations
-            from snid_sage.interfaces.gui.features.preprocessing.spectrum_preprocessor import SpectrumPreprocessor
-            from snid_sage.interfaces.gui.components.dialogs.preprocessing_dialog import PreprocessingDialog
+            # Use PySide6 preprocessing dialog instead of tkinter
+            from snid_sage.interfaces.gui.components.pyside6_dialogs.preprocessing_dialog import PySide6PreprocessingDialog as PreprocessingDialog
+            from PySide6 import QtWidgets
             
-            # Create a spectrum preprocessor instance
-            preprocessor = SpectrumPreprocessor(self.gui)
-            
-            # Load the current spectrum into the preprocessor
-            if preprocessor.load_spectrum(self.gui.file_path):
-                # Create and show the step-by-step preprocessing dialog
-                dialog = PreprocessingDialog(self.gui.master, preprocessor)
-                
-                # Register the dialog
-                self.register_dialog('preprocessing', dialog)
-                
-                # Show the dialog - this is a non-blocking call that just displays the window
-                # The dialog handles its own workflow and applies results in its on_close method
-                dialog.show()
-                
-                _LOGGER.info("🔧 Advanced preprocessing dialog opened successfully")
+            # Get spectrum data from the GUI
+            if hasattr(self.gui, 'original_wave') and hasattr(self.gui, 'original_flux'):
+                wave = self.gui.original_wave
+                flux = self.gui.original_flux
+                if wave is not None and flux is not None:
+                    # Create and show the PySide6 preprocessing dialog
+                    dialog = PreprocessingDialog(self.gui, (wave, flux))
                     
+                    # Register the dialog
+                    self.register_dialog('preprocessing', dialog)
+                    
+                    # Show the dialog and handle result
+                    if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+                        _LOGGER.info("🔧 Advanced preprocessing completed successfully")
+                    else:
+                        _LOGGER.debug("Advanced preprocessing dialog cancelled")
+                        
+                else:
+                    messagebox.showerror("Error", "Spectrum data is not available.")
             else:
-                messagebox.showerror("Error", "Failed to load spectrum for preprocessing.")
+                messagebox.showerror("Error", "No spectrum loaded for preprocessing.")
                 
         except Exception as e:
             _LOGGER.error(f"❌ Error opening preprocessing dialog: {e}")
@@ -110,7 +114,8 @@ class DialogController:
                 return
             
             # Import the preprocessing selection dialog
-            from snid_sage.interfaces.gui.components.dialogs.preprocessing_selection_dialog import PreprocessingSelectionDialog
+            # Use PySide6 preprocessing selection dialog instead of tkinter
+            from snid_sage.interfaces.gui.components.pyside6_dialogs.preprocessing_selection_dialog import PySide6PreprocessingSelectionDialog as PreprocessingSelectionDialog
             
             # Create and show the preprocessing selection dialog
             dialog = PreprocessingSelectionDialog(self.gui)
@@ -128,7 +133,9 @@ class DialogController:
         """Open mask manager dialog"""
         try:
             if not hasattr(self.gui, 'mask_manager_dialog') or self.gui.mask_manager_dialog is None:
-                self.gui.mask_manager_dialog = MaskManagerDialog(self.gui)
+                # Use PySide6 mask manager dialog instead of tkinter
+                from snid_sage.interfaces.gui.components.pyside6_dialogs.mask_manager_dialog import PySide6MaskManagerDialog
+                self.gui.mask_manager_dialog = PySide6MaskManagerDialog(self.gui)
             
             self.gui.mask_manager_dialog.show()
         except Exception as e:
@@ -142,7 +149,8 @@ class DialogController:
             bool: True if options were configured and applied, False if cancelled
         """
         try:
-            from snid_sage.interfaces.gui.components.dialogs.configuration_dialog import show_snid_options_dialog
+            # Use PySide6 configuration dialog instead of tkinter
+            from snid_sage.interfaces.gui.components.pyside6_dialogs.configuration_dialog import show_configuration_dialog as show_snid_options_dialog
             
             # Get current parameters from GUI
             current_params = {}
@@ -273,7 +281,10 @@ class DialogController:
                     indicators.append("S")  # Save summary
                 if options.get('type_filter'):
                     indicators.append("T")  # Type filter
-                if options.get('age_min') or options.get('age_max'):
+                # Only show age filter indicator if age values are actually set (not empty)
+                age_min = options.get('age_min', '').strip() if options.get('age_min') else ''
+                age_max = options.get('age_max', '').strip() if options.get('age_max') else ''
+                if age_min or age_max:
                     indicators.append("A")  # Age filter
                 
                 indicators_text = f" [{'.'.join(indicators)}]" if indicators else ""
