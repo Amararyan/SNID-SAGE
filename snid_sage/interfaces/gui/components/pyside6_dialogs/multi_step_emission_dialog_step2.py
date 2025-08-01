@@ -41,6 +41,9 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_emission_step2')
 
+# Import platform configuration
+from snid_sage.shared.utils.config.platform_config import get_platform_config
+
 
 class EmissionLineStep2Analysis:
     """
@@ -80,12 +83,16 @@ class EmissionLineStep2Analysis:
         layout.addWidget(desc)
         
         # Manual Points Instructions (always visible since it's the only method)
+        # Get platform-appropriate click text
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text("right")
+        
         self.manual_instructions = QtWidgets.QLabel(
             "Manual Selection Instructions:\n"
             "• Left Click: Smart peak detection\n"
             "• Ctrl+Click: Add free-floating point\n"
             "• Shift+Click: Add spectrum-snapped point\n" 
-            "• Right Click: Remove closest point"
+            f"• {right_click_text}: Remove closest point"
         )
         self.manual_instructions.setWordWrap(True)
         self.manual_instructions.setStyleSheet(f"color: {self.colors.get('text_secondary', '#666')}; padding: 5px;")
@@ -154,6 +161,9 @@ class EmissionLineStep2Analysis:
     
     def populate_line_dropdown(self):
         """Populate line dropdown with available lines"""
+        if not self.line_dropdown:
+            return
+            
         self.line_dropdown.clear()
         self.available_lines = []
         
@@ -202,7 +212,8 @@ class EmissionLineStep2Analysis:
         if self.available_lines and 0 <= self.current_line_index < len(self.available_lines):
             line_type, line_name = self.available_lines[self.current_line_index]
             display_name = f"{'🌟' if line_type == 'sn' else '🌌'} {line_name}"
-            self.line_dropdown.setCurrentText(display_name)
+            if self.line_dropdown:
+                self.line_dropdown.setCurrentText(display_name)
             self.update_line_counter()
             self.plot_focused_line()
     
@@ -210,13 +221,17 @@ class EmissionLineStep2Analysis:
         """Update line counter display"""
         total_lines = len(self.available_lines)
         current = self.current_line_index + 1 if total_lines > 0 else 0
-        self.line_counter_label.setText(f"Line {current} of {total_lines}")
+        if self.line_counter_label:
+            self.line_counter_label.setText(f"Line {current} of {total_lines}")
     
     def update_line_navigation_buttons(self):
         """Update navigation button states"""
         has_lines = len(self.available_lines) > 0
-        self.prev_line_btn.setEnabled(has_lines and self.current_line_index > 0)
-        self.next_line_btn.setEnabled(has_lines and self.current_line_index < len(self.available_lines) - 1)
+        # Use the correct button references from the dialog
+        if hasattr(self.parent, 'step2_prev_btn'):
+            self.parent.step2_prev_btn.setEnabled(has_lines and self.current_line_index > 0)
+        if hasattr(self.parent, 'step2_next_btn'):
+            self.parent.step2_next_btn.setEnabled(has_lines and self.current_line_index < len(self.available_lines) - 1)
     
     def on_zoom_changed(self, value):
         """Handle zoom range change with fixed zoom value of 100"""

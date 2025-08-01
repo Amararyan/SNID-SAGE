@@ -24,6 +24,9 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.dialog_controller')
 
+# Import platform configuration
+from snid_sage.shared.utils.config.platform_config import get_platform_config
+
 
 class DialogController:
     """Manages dialogs and modal windows"""
@@ -398,7 +401,7 @@ class DialogController:
                 "• F1: Show this help\n\n"
                 "Features:\n"
                 "• Toggle switches for easy configuration\n"
-                "• Right-click plots for context menu\n"
+                f"• {get_platform_config().get_click_text('right')} plots for context menu\n"
                 "• Drag to select wavelength ranges\n"
                 "• LLM integration for intelligent analysis\n\n"
                 "For more help, consult the documentation."

@@ -410,9 +410,12 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
             'text_secondary': '#64748b',
             'border': '#e2e8f0',
             'accent_primary': '#8b5cf6',
-            'btn_success': '#22c55e',
+            'btn_success': '#16a34a',
             'btn_warning': '#f59e0b',
             'btn_danger': '#ef4444',
+            'btn_primary': '#3b82f6',
+            'btn_load': '#6E6E6E',
+            'btn_preprocessing': '#FFA600',
             'hover': '#f1f5f9'
         }
         
@@ -426,8 +429,8 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
     def _setup_dialog(self):
         """Setup dialog window properties"""
         self.setWindowTitle("Manual Galaxy Redshift Determination - SNID SAGE")
-        self.setMinimumSize(1100, 450)
-        self.resize(1100, 450)
+        self.setMinimumSize(1100, 500)
+        self.resize(1100, 500)
         self.setModal(True)
         
         # Apply styling matching Advanced Preprocessing
@@ -588,11 +591,11 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         group_layout.addLayout(input_layout)
         
         # Precision mode toggle
-        self.precision_button = QtWidgets.QPushButton("⚡ Sensitivity: Normal")
+        self.precision_button = QtWidgets.QPushButton("Sensitivity: Normal")
         self.precision_button.clicked.connect(self._toggle_precision_mode)
         self.precision_button.setStyleSheet(f"""
             QPushButton {{
-                background-color: {self.colors['btn_warning']};
+                background-color: {self.colors['btn_load']};
                 color: white;
                 font-weight: bold;
                 padding: 6px 12px;
@@ -618,7 +621,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         auto_btn.clicked.connect(self._perform_auto_search)
         auto_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {self.colors['accent_primary']};
+                background-color: {self.colors['btn_danger']};
                 color: white;
                 font-weight: bold;
                 padding: 6px 12px;
@@ -637,6 +640,19 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         # Help button
         help_btn = QtWidgets.QPushButton("Help")
         help_btn.clicked.connect(self._show_help)
+        help_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['btn_primary']};
+                color: white;
+                font-weight: bold;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }}
+            QPushButton:hover {{
+                background-color: #2563eb;
+            }}
+        """)
         button_layout.addWidget(help_btn)
         
         button_layout.addStretch()
@@ -674,7 +690,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         right_layout.setSpacing(10)
         
         # Compact header matching Advanced Preprocessing "Preview" style
-        viz_header = QtWidgets.QLabel("📊 Live Preview")
+        viz_header = QtWidgets.QLabel("Live Preview")
         viz_header.setStyleSheet("font-size: 16pt; font-weight: bold; color: #1e293b;")
         right_layout.addWidget(viz_header)
         
@@ -779,10 +795,10 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         # Update spin box step size
         if self.precision_mode:
             self.redshift_input.setSingleStep(0.001)  # Precision step
-            self.precision_button.setText("🔬 Sensitivity: Precision")
+            self.precision_button.setText("Sensitivity: Precision")
             self.precision_button.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {self.colors['btn_danger']};
+                    background-color: {self.colors['btn_preprocessing']};
                     color: white;
                     font-weight: bold;
                     padding: 6px 12px;
@@ -793,10 +809,10 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
             _LOGGER.info("Precision mode activated - Ultra-fine sensitivity")
         else:
             self.redshift_input.setSingleStep(0.1)  # Normal step
-            self.precision_button.setText("⚡ Sensitivity: Normal")
+            self.precision_button.setText("Sensitivity: Normal")
             self.precision_button.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {self.colors['btn_warning']};
+                    background-color: {self.colors['btn_load']};
                     color: white;
                     font-weight: bold;
                     padding: 6px 12px;

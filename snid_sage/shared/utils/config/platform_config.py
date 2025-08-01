@@ -30,6 +30,25 @@ class PlatformConfig:
         
         _LOGGER.info(f"Platform detected: {self.platform_name}")
     
+    def get_click_text(self, click_type: str = "right") -> str:
+        """
+        Get platform-appropriate click text for GUI instructions.
+        
+        Args:
+            click_type: Type of click ("right", "left", "middle")
+            
+        Returns:
+            Platform-appropriate text for the click type
+        """
+        if click_type.lower() == "right":
+            return "Two finger click" if self.is_macos else "Right click"
+        elif click_type.lower() == "left":
+            return "Click" if self.is_macos else "Left click"
+        elif click_type.lower() == "middle":
+            return "Middle click"  # Same across platforms
+        else:
+            return f"{click_type.capitalize()} click"
+    
     def get_gui_config(self) -> Dict[str, Any]:
         """Get platform-specific GUI configuration"""
         base_config = {

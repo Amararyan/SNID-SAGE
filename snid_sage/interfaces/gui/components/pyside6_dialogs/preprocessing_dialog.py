@@ -188,8 +188,8 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
     def setup_ui(self):
         """Setup the dialog UI with split-panel layout matching original design"""
         self.setWindowTitle("Advanced Spectrum Preprocessing - SNID SAGE")
-        self.setMinimumSize(900, 320)
-        self.resize(900, 320)
+        self.setMinimumSize(900, 500)  # Match SN Emission Lines minimum size
+        self.resize(1000, 600)  # Match SN Emission Lines default size
         self.setModal(True)
         
         # Apply global styling with reduced font sizes for left panel

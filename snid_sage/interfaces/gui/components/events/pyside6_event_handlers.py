@@ -29,6 +29,9 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_event_handlers')
 
+# Import platform configuration
+from snid_sage.shared.utils.config.platform_config import get_platform_config
+
 
 class PySide6EventHandlers(QtCore.QObject):
     """
@@ -436,7 +439,9 @@ class PySide6EventHandlers(QtCore.QObject):
     def on_run_quick_workflow(self):
         """Handle quick workflow (simulate right-click preprocessing + right-click analysis)"""
         try:
-            _LOGGER.info("Starting quick workflow (simulating right-click on preprocessing + analysis buttons)")
+            platform_config = get_platform_config()
+            right_click_text = platform_config.get_click_text("right")
+            _LOGGER.info(f"Starting quick workflow (simulating {right_click_text.lower()} on preprocessing + analysis buttons)")
             
             # Check if spectrum is loaded
             wave, flux = self.app_controller.get_spectrum_data()
@@ -450,7 +455,9 @@ class PySide6EventHandlers(QtCore.QObject):
             
             # Simulate right-click on preprocessing button (quick preprocessing)
             if hasattr(self.main_window, 'preprocessing_controller') and hasattr(self.main_window.preprocessing_controller, 'run_quick_preprocessing'):
-                _LOGGER.info("🔧 Simulating right-click on preprocessing button...")
+                platform_config = get_platform_config()
+                right_click_text = platform_config.get_click_text("right")
+                _LOGGER.info(f"🔧 Simulating {right_click_text.lower()} on preprocessing button...")
                 self.main_window.preprocessing_controller.run_quick_preprocessing()
             else:
                 _LOGGER.warning("Quick preprocessing not available")
@@ -458,7 +465,9 @@ class PySide6EventHandlers(QtCore.QObject):
             
             # Simulate right-click on analysis button (quick analysis)
             if hasattr(self.main_window, 'run_quick_analysis'):
-                _LOGGER.info("🚀 Simulating right-click on analysis button...")
+                platform_config = get_platform_config()
+                right_click_text = platform_config.get_click_text("right")
+                _LOGGER.info(f"🚀 Simulating {right_click_text.lower()} on analysis button...")
                 self.main_window.run_quick_analysis()
             else:
                 _LOGGER.warning("Quick analysis not available")
@@ -470,7 +479,9 @@ class PySide6EventHandlers(QtCore.QObject):
     def on_run_quick_workflow_with_auto_cluster(self):
         """Handle extended quick workflow (simulate right-click preprocessing + right-click analysis + auto cluster selection)"""
         try:
-            _LOGGER.info("Starting extended quick workflow (simulating right-click on buttons + auto cluster)")
+            platform_config = get_platform_config()
+            right_click_text = platform_config.get_click_text("right")
+            _LOGGER.info(f"Starting extended quick workflow (simulating {right_click_text.lower()} on buttons + auto cluster)")
             
             # Check if spectrum is loaded
             wave, flux = self.app_controller.get_spectrum_data()
@@ -488,7 +499,9 @@ class PySide6EventHandlers(QtCore.QObject):
             
             # Simulate right-click on preprocessing button (quick preprocessing)
             if hasattr(self.main_window, 'preprocessing_controller') and hasattr(self.main_window.preprocessing_controller, 'run_quick_preprocessing'):
-                _LOGGER.info("🔧 Simulating right-click on preprocessing button...")
+                platform_config = get_platform_config()
+                right_click_text = platform_config.get_click_text("right")
+                _LOGGER.info(f"🔧 Simulating {right_click_text.lower()} on preprocessing button...")
                 self.main_window.preprocessing_controller.run_quick_preprocessing()
             else:
                 _LOGGER.warning("Quick preprocessing not available")
@@ -498,7 +511,9 @@ class PySide6EventHandlers(QtCore.QObject):
             
             # Simulate right-click on analysis button (quick analysis with auto cluster)
             if hasattr(self.main_window, 'run_quick_analysis'):
-                _LOGGER.info("🚀 Simulating right-click on analysis button (with auto cluster)...")
+                platform_config = get_platform_config()
+                right_click_text = platform_config.get_click_text("right")
+                _LOGGER.info(f"🚀 Simulating {right_click_text.lower()} on analysis button (with auto cluster)...")
                 self.main_window.run_quick_analysis()
             else:
                 _LOGGER.warning("Quick analysis not available")
@@ -590,7 +605,9 @@ class PySide6EventHandlers(QtCore.QObject):
     def on_show_shortcuts_dialog(self):
         """Handle showing keyboard shortcuts dialog"""
         try:
-            shortcuts_text = """
+            platform_config = get_platform_config()
+            right_click_text = platform_config.get_click_text('right').lower()
+            shortcuts_text = f"""
             <h3>Keyboard Shortcuts</h3>
             <p><b>File Operations:</b></p>
             <ul>
@@ -600,8 +617,8 @@ class PySide6EventHandlers(QtCore.QObject):
             <p><b>Workflow:</b></p>
             <ul>
             <li>F6 : Open preprocessing dialog</li>
-                         <li>Ctrl+Enter : Quick workflow (simulate right-click preprocessing + analysis)</li>
-             <li>Ctrl+Shift+Enter : Extended quick workflow (right-click preprocessing + analysis + auto-select best cluster)</li>
+            <li>Ctrl+Enter : Quick workflow (simulate {right_click_text} preprocessing + analysis)</li>
+            <li>Ctrl+Shift+Enter : Extended quick workflow ({right_click_text} preprocessing + analysis + auto-select best cluster)</li>
             <li>Ctrl+Shift+R : Reset to initial state</li>
             </ul>
             <p><b>View Controls:</b></p>

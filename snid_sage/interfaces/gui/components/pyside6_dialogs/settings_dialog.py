@@ -31,6 +31,14 @@ except ImportError:
 class PySide6SettingsDialog(QtWidgets.QDialog):
     """PySide6 dialog for comprehensive GUI settings"""
     
+    # Define custom signals for thread communication
+    models_fetched = QtCore.Signal(str)  # JSON string of models
+    fetch_error = QtCore.Signal(str)     # Error message
+    connection_success = QtCore.Signal()  # Connection test success
+    connection_error = QtCore.Signal(str) # Connection test error
+    model_test_success = QtCore.Signal(str, str)  # model_id, model_name
+    model_test_error = QtCore.Signal(str, str)    # model_id, error_message
+    
     def __init__(self, parent=None, current_settings=None):
         """Initialize settings dialog"""
         super().__init__(parent)
@@ -51,6 +59,17 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         
         # Settings change callbacks
         self.settings_changed_callbacks: List[Callable[[Dict[str, Any]], None]] = []
+        
+        # Connect custom signals to slots
+        self.models_fetched.connect(self._on_models_fetched)
+        self.fetch_error.connect(self._on_fetch_error)
+        self.connection_success.connect(self._on_connection_success)
+        self.connection_error.connect(self._on_connection_error)
+        self.model_test_success.connect(self._on_model_test_success)
+        self.model_test_error.connect(self._on_model_test_error)
+        
+        # Store all models for filtering
+        self.all_models = []
         
         self.setup_ui()
     
@@ -181,15 +200,6 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
             border: none;
         """)
         header_layout.addWidget(title_label)
-        
-        subtitle_label = QtWidgets.QLabel("Customize the appearance and behavior of SNID SAGE")
-        subtitle_label.setStyleSheet(f"""
-            font-size: 12px;
-            color: {self.colors['text_secondary']};
-            background: transparent;
-            border: none;
-        """)
-        header_layout.addWidget(subtitle_label)
         
         layout.addWidget(header_frame)
     
@@ -357,20 +367,38 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         api_layout = QtWidgets.QVBoxLayout(api_group)
         api_layout.setSpacing(12)
         
-        # Information label
-        info_label = QtWidgets.QLabel(
-            "Configure your OpenRouter API key to enable AI-powered analysis features.\n"
-            "Get your free API key at: https://openrouter.ai"
-        )
-        info_label.setStyleSheet(f"""
+        # Information label with clickable link
+        info_frame = QtWidgets.QFrame()
+        info_frame.setStyleSheet(f"""
             color: {self.colors['text_secondary']};
             font-style: italic;
             padding: 8px;
             background: {self.colors['bg_tertiary']};
             border-radius: 4px;
         """)
-        info_label.setWordWrap(True)
-        api_layout.addWidget(info_label)
+        
+        info_layout = QtWidgets.QHBoxLayout(info_frame)
+        info_layout.setContentsMargins(8, 8, 8, 8)
+        info_layout.setSpacing(4)
+        
+        # Main text
+        info_text = QtWidgets.QLabel("Configure your OpenRouter API key to enable AI-powered analysis features. Get your free API key at:")
+        info_text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-style: italic;")
+        info_layout.addWidget(info_text)
+        
+        # Clickable link
+        link_label = QtWidgets.QLabel("https://openrouter.ai")
+        link_label.setStyleSheet(f"""
+            color: {self.colors['accent_primary']};
+            text-decoration: underline;
+            font-style: italic;
+        """)
+        link_label.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        link_label.mousePressEvent = lambda event: self._open_openrouter_website()
+        info_layout.addWidget(link_label)
+        
+        info_layout.addStretch()
+        api_layout.addWidget(info_frame)
         
         # API Key input
         key_layout = QtWidgets.QHBoxLayout()
@@ -420,69 +448,98 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         # Model selection controls
         model_controls_layout = QtWidgets.QHBoxLayout()
         
-        self.fetch_models_btn = QtWidgets.QPushButton("📡 Fetch Free Models")
-        self.fetch_models_btn.clicked.connect(self._fetch_free_models)
+        self.fetch_models_btn = QtWidgets.QPushButton("📡 Fetch All Models")
+        self.fetch_models_btn.clicked.connect(self._fetch_all_models)
         model_controls_layout.addWidget(self.fetch_models_btn)
+        
+        self.fetch_free_btn = QtWidgets.QPushButton("🆓 Free Only")
+        self.fetch_free_btn.clicked.connect(self._fetch_free_models)
+        model_controls_layout.addWidget(self.fetch_free_btn)
+        
+        self.test_model_btn = QtWidgets.QPushButton("🧪 Test Selected")
+        self.test_model_btn.clicked.connect(self._test_selected_model)
+        self.test_model_btn.setEnabled(False)
+        model_controls_layout.addWidget(self.test_model_btn)
+        
+        model_controls_layout.addStretch()
         
         self.model_status_label = QtWidgets.QLabel("No models loaded")
         self.model_status_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
         model_controls_layout.addWidget(self.model_status_label)
-        model_controls_layout.addStretch()
         
         model_layout.addLayout(model_controls_layout)
         
-        # Model list
-        self.widgets['favorite_model'] = QtWidgets.QListWidget()
-        self.widgets['favorite_model'].setMaximumHeight(200)
+        # Filter controls
+        filter_layout = QtWidgets.QHBoxLayout()
+        
+        filter_layout.addWidget(QtWidgets.QLabel("Filter:"))
+        
+        self.filter_input = QtWidgets.QLineEdit()
+        self.filter_input.setPlaceholderText("Search models...")
+        self.filter_input.textChanged.connect(self._filter_models)
+        filter_layout.addWidget(self.filter_input)
+        
+        self.free_only_check = QtWidgets.QCheckBox("Free only")
+        self.free_only_check.toggled.connect(self._filter_models)
+        filter_layout.addWidget(self.free_only_check)
+        
+        self.reasoning_check = QtWidgets.QCheckBox("Reasoning support")
+        self.reasoning_check.toggled.connect(self._filter_models)
+        filter_layout.addWidget(self.reasoning_check)
+        
+        model_layout.addLayout(filter_layout)
+        
+        # Model table
+        self.widgets['favorite_model'] = QtWidgets.QTableWidget()
+        self.widgets['favorite_model'].setColumnCount(6)
+        self.widgets['favorite_model'].setHorizontalHeaderLabels([
+            "Model Name", "Provider", "Context", "Reasoning", "Price", "Status"
+        ])
+        self.widgets['favorite_model'].setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.widgets['favorite_model'].setAlternatingRowColors(True)
+        self.widgets['favorite_model'].setSortingEnabled(True)
+        self.widgets['favorite_model'].setMaximumHeight(300)
+        
+        # Set column widths
+        header = self.widgets['favorite_model'].horizontalHeader()
+        header.setStretchLastSection(True)
+        header.resizeSection(0, 250)  # Model Name
+        header.resizeSection(1, 100)  # Provider
+        header.resizeSection(2, 80)   # Context
+        header.resizeSection(3, 80)   # Reasoning
+        header.resizeSection(4, 120)  # Price
+        header.resizeSection(5, 80)   # Status
+        
         self.widgets['favorite_model'].setStyleSheet(f"""
-            QListWidget {{
+            QTableWidget {{
                 background: {self.colors['bg_secondary']};
                 border: 1px solid {self.colors['border']};
                 border-radius: 4px;
-                font-family: 'Consolas', monospace;
                 font-size: 9pt;
+                gridline-color: {self.colors['bg_tertiary']};
             }}
-            QListWidget::item {{
+            QTableWidget::item {{
                 padding: 4px 8px;
-                border-bottom: 1px solid {self.colors['bg_tertiary']};
+                border: none;
             }}
-            QListWidget::item:selected {{
+            QTableWidget::item:selected {{
                 background: {self.colors['btn_primary']};
                 color: white;
             }}
+            QHeaderView::section {{
+                background: {self.colors['bg_tertiary']};
+                border: 1px solid {self.colors['border']};
+                padding: 4px 8px;
+                font-weight: bold;
+            }}
         """)
+        
+        # Connect selection change
+        self.widgets['favorite_model'].itemSelectionChanged.connect(self._on_model_selection_changed)
+        
         model_layout.addWidget(self.widgets['favorite_model'])
         
         layout.addWidget(model_group)
-        
-        # AI preferences group
-        prefs_group = QtWidgets.QGroupBox("⚙️ AI Preferences")
-        prefs_layout = QtWidgets.QFormLayout(prefs_group)
-        
-        # Temperature setting
-        self.widgets['ai_temperature'] = QtWidgets.QDoubleSpinBox()
-        self.widgets['ai_temperature'].setRange(0.0, 2.0)
-        self.widgets['ai_temperature'].setSingleStep(0.1)
-        self.widgets['ai_temperature'].setValue(0.7)
-        self.widgets['ai_temperature'].setDecimals(1)
-        prefs_layout.addRow("Temperature:", self.widgets['ai_temperature'])
-        
-        # Max tokens setting
-        self.widgets['ai_max_tokens'] = QtWidgets.QSpinBox()
-        self.widgets['ai_max_tokens'].setRange(100, 4000)
-        self.widgets['ai_max_tokens'].setValue(2000)
-        prefs_layout.addRow("Max Tokens:", self.widgets['ai_max_tokens'])
-        
-        # Checkboxes
-        self.widgets['ai_verbose'] = QtWidgets.QCheckBox("Use verbose explanations")
-        self.widgets['ai_verbose'].setChecked(True)
-        prefs_layout.addRow("", self.widgets['ai_verbose'])
-        
-        self.widgets['ai_references'] = QtWidgets.QCheckBox("Include scientific references")
-        self.widgets['ai_references'].setChecked(True)
-        prefs_layout.addRow("", self.widgets['ai_references'])
-        
-        layout.addWidget(prefs_group)
         
         layout.addStretch()
         tab_widget.addTab(tab, "🤖 AI Assistant")
@@ -701,6 +758,17 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
     
     def _load_current_values(self):
         """Load current settings values into widgets"""
+        # Load saved OpenRouter API key
+        saved_api_key = ''
+        saved_model = ''
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_api_key, get_openrouter_config
+            saved_api_key = get_openrouter_api_key() or ''
+            config = get_openrouter_config()
+            saved_model = config.get('model_id', '') if config else ''
+        except Exception as e:
+            _LOGGER.warning(f"Could not load saved OpenRouter settings: {e}")
+        
         # Set default values or load from settings
         defaults = {
             'font_family': 'Arial',
@@ -724,12 +792,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
             'log_level': 'INFO',
             'debug_mode': False,
             # AI settings
-            'openrouter_api_key': '',
-            'favorite_model': '',
-            'ai_temperature': 0.7,
-            'ai_max_tokens': 2000,
-            'ai_verbose': True,
-            'ai_references': True
+            'openrouter_api_key': saved_api_key,
+            'favorite_model': saved_model
         }
         
         for key, default_value in defaults.items():
@@ -749,14 +813,23 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
                     widget.setChecked(bool(value))
                 elif isinstance(widget, QtWidgets.QLineEdit):
                     widget.setText(str(value))
-                elif isinstance(widget, QtWidgets.QListWidget):
+                elif isinstance(widget, (QtWidgets.QListWidget, QtWidgets.QTableWidget)):
                     # For favorite_model, select the item if it exists
                     if key == 'favorite_model' and value:
-                        for i in range(widget.count()):
-                            item = widget.item(i)
-                            if item and item.data(QtCore.Qt.UserRole) == value:
-                                widget.setCurrentItem(item)
-                                break
+                        if isinstance(widget, QtWidgets.QTableWidget):
+                            # Search through table rows
+                            for row in range(widget.rowCount()):
+                                item = widget.item(row, 0)  # First column contains model data
+                                if item and item.data(QtCore.Qt.UserRole) == value:
+                                    widget.selectRow(row)
+                                    break
+                        else:
+                            # Original list widget logic
+                            for i in range(widget.count()):
+                                item = widget.item(i)
+                                if item and item.data(QtCore.Qt.UserRole) == value:
+                                    widget.setCurrentItem(item)
+                                    break
         
         # Update font preview
         self._update_font_preview()
@@ -776,14 +849,26 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
                 settings[key] = widget.isChecked()
             elif isinstance(widget, QtWidgets.QLineEdit):
                 settings[key] = widget.text()
-            elif isinstance(widget, QtWidgets.QListWidget):
+            elif isinstance(widget, (QtWidgets.QListWidget, QtWidgets.QTableWidget)):
                 # For favorite model, get the selected item's model ID
                 if key == 'favorite_model':
-                    current_item = widget.currentItem()
-                    if current_item:
-                        settings[key] = current_item.data(QtCore.Qt.UserRole)
+                    if isinstance(widget, QtWidgets.QTableWidget):
+                        selected_rows = widget.selectionModel().selectedRows()
+                        if selected_rows:
+                            row = selected_rows[0].row()
+                            item = widget.item(row, 0)  # First column
+                            if item:
+                                settings[key] = item.data(QtCore.Qt.UserRole)
+                            else:
+                                settings[key] = ''
+                        else:
+                            settings[key] = ''
                     else:
-                        settings[key] = ''
+                        current_item = widget.currentItem()
+                        if current_item:
+                            settings[key] = current_item.data(QtCore.Qt.UserRole)
+                        else:
+                            settings[key] = ''
                 else:
                     settings[key] = ''
         
@@ -792,6 +877,31 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
     def _apply_settings(self):
         """Apply settings without closing dialog"""
         settings = self._collect_settings()
+        
+        # Save OpenRouter API key if provided
+        api_key = settings.get('openrouter_api_key', '').strip()
+        if api_key:
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import save_openrouter_api_key
+                save_openrouter_api_key(api_key)
+                _LOGGER.info("OpenRouter API key saved successfully")
+            except Exception as e:
+                _LOGGER.error(f"Failed to save OpenRouter API key: {e}")
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "API Key Save Error",
+                    f"Failed to save OpenRouter API key: {str(e)}"
+                )
+        
+        # Save selected model if provided
+        selected_model = settings.get('favorite_model', '').strip()
+        if selected_model:
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import save_openrouter_config
+                save_openrouter_config(api_key, selected_model)
+                _LOGGER.info(f"OpenRouter model preference saved: {selected_model}")
+            except Exception as e:
+                _LOGGER.error(f"Failed to save OpenRouter model preference: {e}")
         
         # Apply to parent if available
         if hasattr(self.parent_gui, 'apply_settings'):
@@ -863,37 +973,24 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
                 )
                 
                 if response.status_code == 200:
-                    QtCore.QMetaObject.invokeMethod(
-                        self, "_on_connection_success", 
-                        QtCore.Qt.QueuedConnection
-                    )
+                    self.connection_success.emit()
                 else:
                     error_msg = f"API Error: {response.status_code}"
-                    QtCore.QMetaObject.invokeMethod(
-                        self, "_on_connection_error", 
-                        QtCore.Qt.QueuedConnection,
-                        QtCore.Q_ARG(str, error_msg)
-                    )
+                    self.connection_error.emit(error_msg)
                     
             except Exception as e:
-                QtCore.QMetaObject.invokeMethod(
-                    self, "_on_connection_error", 
-                    QtCore.Qt.QueuedConnection,
-                    QtCore.Q_ARG(str, str(e))
-                )
+                self.connection_error.emit(str(e))
         
         import threading
         thread = threading.Thread(target=test_connection, daemon=True)
         thread.start()
     
-    @QtCore.Slot()
     def _on_connection_success(self):
         """Handle successful connection test"""
         self.connection_status_label.setText("✅ Connected successfully")
         self.connection_status_label.setStyleSheet(f"color: {self.colors['btn_success']};")
         self.test_connection_btn.setEnabled(True)
     
-    @QtCore.Slot(str)
     def _on_connection_error(self, error):
         """Handle connection test error"""
         self.connection_status_label.setText(f"❌ Error: {error}")
@@ -942,60 +1039,310 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
                                     'context_length': model.get('context_length', 4096)
                                 })
                     
-                    QtCore.QMetaObject.invokeMethod(
-                        self, "_on_models_fetched", 
-                        QtCore.Qt.QueuedConnection,
-                        QtCore.Q_ARG(list, free_models)
-                    )
+                    # Convert to JSON string and emit signal
+                    import json
+                    models_json = json.dumps(free_models)
+                    self.models_fetched.emit(models_json)
                 else:
                     error_msg = f"API Error: {response.status_code}"
-                    QtCore.QMetaObject.invokeMethod(
-                        self, "_on_fetch_error", 
-                        QtCore.Qt.QueuedConnection,
-                        QtCore.Q_ARG(str, error_msg)
-                    )
+                    self.fetch_error.emit(error_msg)
                     
             except Exception as e:
-                QtCore.QMetaObject.invokeMethod(
-                    self, "_on_fetch_error", 
-                    QtCore.Qt.QueuedConnection,
-                    QtCore.Q_ARG(str, str(e))
-                )
+                self.fetch_error.emit(str(e))
         
         import threading
         thread = threading.Thread(target=fetch_models, daemon=True)
         thread.start()
     
-    @QtCore.Slot(list)
-    def _on_models_fetched(self, models):
+    def _on_models_fetched(self, models_json):
         """Handle successful model fetch"""
-        self.widgets['favorite_model'].clear()
+        # Parse JSON string back to list
+        try:
+            import json
+            models = json.loads(models_json)
+        except (json.JSONDecodeError, ValueError) as e:
+            _LOGGER.error(f"Failed to parse models JSON: {e}")
+            self.model_status_label.setText("Error parsing models data")
+            self.model_status_label.setStyleSheet(f"color: {self.colors['btn_danger']};")
+            self.fetch_models_btn.setEnabled(True)
+            self.fetch_free_btn.setEnabled(True)
+            return
         
         if models:
-            for model in models:
-                # Create display text with model name and context length
-                context = model.get('context_length', 4096)
-                if context >= 1000:
-                    context_str = f"{context//1000}k"
-                else:
-                    context_str = str(context)
-                    
-                display_text = f"{model['name']} ({context_str} tokens)"
-                item = QtWidgets.QListWidgetItem(display_text)
-                item.setData(QtCore.Qt.UserRole, model['id'])  # Store model ID
-                self.widgets['favorite_model'].addItem(item)
+            # Store models for filtering
+            self.all_models = models
             
-            self.model_status_label.setText(f"Found {len(models)} free models")
+            # Populate table
+            self._populate_model_table(models)
+            
+            self.model_status_label.setText(f"Found {len(models)} models")
             self.model_status_label.setStyleSheet(f"color: {self.colors['btn_success']};")
         else:
-            self.model_status_label.setText("No free models found")
+            self.model_status_label.setText("No models found")
             self.model_status_label.setStyleSheet(f"color: {self.colors['btn_warning']};")
         
         self.fetch_models_btn.setEnabled(True)
+        self.fetch_free_btn.setEnabled(True)
     
-    @QtCore.Slot(str)
+    def _populate_model_table(self, models):
+        """Populate the model table with data"""
+        table = self.widgets['favorite_model']
+        table.setRowCount(len(models))
+        
+        # Get current selected model to preserve selection
+        config = {}
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_config, get_model_test_status
+            config = get_openrouter_config()
+        except Exception as e:
+            _LOGGER.warning(f"Could not load OpenRouter config: {e}")
+        
+        current_model_id = config.get('model_id', '')
+        
+        for row, model in enumerate(models):
+            # Model Name (with fallback)
+            model_name = model.get('name', model.get('id', 'Unknown Model'))
+            model_id = model.get('id', '')
+            name_item = QtWidgets.QTableWidgetItem(model_name)
+            name_item.setData(QtCore.Qt.UserRole, model_id)
+            table.setItem(row, 0, name_item)
+            
+            # Provider (with fallback)
+            provider = model.get('provider', 'Unknown')
+            if not provider and 'id' in model:
+                # Extract provider from model ID as fallback
+                provider = model['id'].split('/')[0] if '/' in model['id'] else 'Unknown'
+            provider_item = QtWidgets.QTableWidgetItem(provider)
+            table.setItem(row, 1, provider_item)
+            
+            # Context Length (with fallback)
+            context_display = model.get('context_display', str(model.get('context_length', 'Unknown')))
+            context_item = QtWidgets.QTableWidgetItem(context_display)
+            context_item.setData(QtCore.Qt.UserRole, model.get('context_length', 0))  # Store raw number for sorting
+            table.setItem(row, 2, context_item)
+            
+            # Reasoning Support (with fallback)
+            supports_reasoning = model.get('supports_reasoning', False)
+            reasoning_text = "✅ Yes" if supports_reasoning else "❌ No"
+            reasoning_item = QtWidgets.QTableWidgetItem(reasoning_text)
+            reasoning_item.setData(QtCore.Qt.UserRole, supports_reasoning)  # Store boolean for sorting
+            table.setItem(row, 3, reasoning_item)
+            
+            # Price (with fallback)
+            price_display = model.get('price_display', 'Unknown')
+            price_item = QtWidgets.QTableWidgetItem(price_display)
+            prompt_price = model.get('prompt_price', 0)
+            price_item.setData(QtCore.Qt.UserRole, prompt_price)  # Store raw price for sorting
+            is_free = model.get('is_free', False)
+            if is_free:
+                price_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green for free
+            table.setItem(row, 4, price_item)
+            
+            # Status
+            try:
+                is_tested = get_model_test_status(model_id)
+                if model_id == current_model_id and is_tested:
+                    status_text = "✅ Active"
+                    status_item = QtWidgets.QTableWidgetItem(status_text)
+                    status_item.setBackground(QtGui.QColor(144, 238, 144))  # Light green
+                elif is_tested:
+                    status_text = "✅ Tested"
+                    status_item = QtWidgets.QTableWidgetItem(status_text)
+                    status_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green
+                else:
+                    status_text = "⏳ Untested"
+                    status_item = QtWidgets.QTableWidgetItem(status_text)
+            except:
+                status_text = "⏳ Untested"
+                status_item = QtWidgets.QTableWidgetItem(status_text)
+            
+            table.setItem(row, 5, status_item)
+            
+            # Select current model if it matches
+            if model['id'] == current_model_id:
+                table.selectRow(row)
+    
     def _on_fetch_error(self, error):
         """Handle model fetch error"""
         self.model_status_label.setText(f"Error: {error}")
         self.model_status_label.setStyleSheet(f"color: {self.colors['btn_danger']};")
-        self.fetch_models_btn.setEnabled(True) 
+        self.fetch_models_btn.setEnabled(True)
+        self.fetch_free_btn.setEnabled(True)
+    
+    def _fetch_all_models(self):
+        """Fetch all available models from OpenRouter"""
+        api_key = self.widgets['openrouter_api_key'].text().strip()
+        if not api_key:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No API Key", 
+                "Please enter your OpenRouter API key first."
+            )
+            return
+        
+        self.model_status_label.setText("Fetching all models...")
+        self.model_status_label.setStyleSheet(f"color: {self.colors['btn_warning']};")
+        self.fetch_models_btn.setEnabled(False)
+        self.fetch_free_btn.setEnabled(False)
+        self.widgets['favorite_model'].setRowCount(0)
+        
+        # Fetch models in separate thread
+        def fetch_all():
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import fetch_all_models
+                models = fetch_all_models(api_key, free_only=False)
+                
+                if models:
+                    import json
+                    models_json = json.dumps(models)
+                    self.models_fetched.emit(models_json)
+                else:
+                    self.fetch_error.emit("No models found")
+                    
+            except Exception as e:
+                self.fetch_error.emit(str(e))
+        
+        import threading
+        thread = threading.Thread(target=fetch_all, daemon=True)
+        thread.start()
+    
+    def _on_model_selection_changed(self):
+        """Handle model selection change"""
+        selected_rows = self.widgets['favorite_model'].selectionModel().selectedRows()
+        self.test_model_btn.setEnabled(len(selected_rows) > 0)
+    
+    def _test_selected_model(self):
+        """Test the selected model"""
+        selected_rows = self.widgets['favorite_model'].selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        
+        api_key = self.widgets['openrouter_api_key'].text().strip()
+        if not api_key:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No API Key", 
+                "Please enter your OpenRouter API key first."
+            )
+            return
+        
+        row = selected_rows[0].row()
+        model_item = self.widgets['favorite_model'].item(row, 0)
+        if not model_item:
+            return
+            
+        model_id = model_item.data(QtCore.Qt.UserRole)
+        model_name = model_item.text()
+        
+        self.test_model_btn.setEnabled(False)
+        self.test_model_btn.setText("🧪 Testing...")
+        
+        # Test model in separate thread
+        def test_model():
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import call_openrouter_api, save_openrouter_config
+                
+                # Temporarily save this model for testing
+                save_openrouter_config(api_key, model_id, model_name, False)
+                
+                # Test with a simple prompt
+                test_prompt = "Hello! Please respond with a simple 'OK' if you can process this request."
+                response = call_openrouter_api(test_prompt, max_tokens=50)
+                
+                if response and len(response.strip()) > 0:
+                    # Mark as tested
+                    save_openrouter_config(api_key, model_id, model_name, True)
+                    self.model_test_success.emit(model_id, model_name)
+                else:
+                    self.model_test_error.emit(model_id, "Empty response from model")
+                    
+            except Exception as e:
+                self.model_test_error.emit(model_id, str(e))
+        
+        import threading
+        thread = threading.Thread(target=test_model, daemon=True)
+        thread.start()
+    
+    def _on_model_test_success(self, model_id, model_name):
+        """Handle successful model test"""
+        self.test_model_btn.setEnabled(True)
+        self.test_model_btn.setText("🧪 Test Selected")
+        
+        # Update the status column in the table
+        for row in range(self.widgets['favorite_model'].rowCount()):
+            item = self.widgets['favorite_model'].item(row, 0)
+            if item and item.data(QtCore.Qt.UserRole) == model_id:
+                status_item = self.widgets['favorite_model'].item(row, 5)  # Status column
+                if status_item:
+                    status_item.setText("✅ Tested")
+                    status_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green
+                break
+        
+        QtWidgets.QMessageBox.information(
+            self,
+            "Model Test Successful",
+            f"Model '{model_name}' tested successfully!\nIt will be used for future AI operations."
+        )
+    
+    def _on_model_test_error(self, model_id, error_message):
+        """Handle model test error"""
+        self.test_model_btn.setEnabled(True)
+        self.test_model_btn.setText("🧪 Test Selected")
+        
+        # Update the status column in the table
+        for row in range(self.widgets['favorite_model'].rowCount()):
+            item = self.widgets['favorite_model'].item(row, 0)
+            if item and item.data(QtCore.Qt.UserRole) == model_id:
+                status_item = self.widgets['favorite_model'].item(row, 5)  # Status column
+                if status_item:
+                    status_item.setText("❌ Failed")
+                    status_item.setBackground(QtGui.QColor(255, 200, 200))  # Light red
+                break
+        
+        QtWidgets.QMessageBox.warning(
+            self,
+            "Model Test Failed",
+            f"Failed to test model:\n{error_message}"
+        )
+    
+    def _open_openrouter_website(self):
+        """Open OpenRouter website in default browser"""
+        import webbrowser
+        try:
+            webbrowser.open("https://openrouter.ai")
+        except Exception as e:
+            _LOGGER.error(f"Failed to open OpenRouter website: {e}")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Browser Error",
+                "Failed to open browser. Please visit https://openrouter.ai manually."
+            )
+    
+    def _filter_models(self):
+        """Filter models based on search criteria"""
+        if not hasattr(self, 'all_models') or not self.all_models:
+            return
+        
+        search_text = self.filter_input.text().lower()
+        free_only = self.free_only_check.isChecked()
+        reasoning_only = self.reasoning_check.isChecked()
+        
+        # Filter models
+        filtered_models = []
+        for model in self.all_models:
+            # Text search
+            if search_text and search_text not in model['name'].lower() and search_text not in model['provider'].lower():
+                continue
+            
+            # Free only filter
+            if free_only and not model['is_free']:
+                continue
+                
+            # Reasoning support filter
+            if reasoning_only and not model['supports_reasoning']:
+                continue
+            
+            filtered_models.append(model)
+        
+        # Update table with filtered models
+        self._populate_model_table(filtered_models) 

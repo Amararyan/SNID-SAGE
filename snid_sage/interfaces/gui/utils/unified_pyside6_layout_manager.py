@@ -38,6 +38,9 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.unified_layout')
 
+# Import platform configuration
+from snid_sage.shared.utils.config.platform_config import get_platform_config
+
 
 class LayoutSettings:
     """Centralized settings for all layout configuration"""
@@ -532,7 +535,11 @@ class UnifiedPySide6LayoutManager:
                 QtWidgets.QPushButton.mousePressEvent(gui_instance.preprocessing_btn, event)
         
         gui_instance.preprocessing_btn.mousePressEvent = preprocessing_context_menu
-        gui_instance.preprocessing_btn.setToolTip("Left-click: Open preprocessing dialog\nRight-click: Quick preprocessing with default settings")
+        # Get platform-appropriate click text
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text("right")
+        
+        gui_instance.preprocessing_btn.setToolTip(f"Left-click: Open preprocessing dialog\n{right_click_text}: Quick preprocessing with default settings")
         layout.addWidget(gui_instance.preprocessing_btn)
         
         # Preprocessing status label - add with reduced spacing
@@ -597,7 +604,11 @@ class UnifiedPySide6LayoutManager:
                 QtWidgets.QPushButton.mousePressEvent(gui_instance.analysis_btn, event)
         
         gui_instance.analysis_btn.mousePressEvent = analysis_context_menu
-        gui_instance.analysis_btn.setToolTip("Left-click: Open analysis dialog\nRight-click: Quick analysis with default settings")
+        # Get platform-appropriate click text
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text("right")
+        
+        gui_instance.analysis_btn.setToolTip(f"Left-click: Open analysis dialog\n{right_click_text}: Quick analysis with default settings")
         layout.addWidget(gui_instance.analysis_btn)
         
         # Configuration status label - add with reduced spacing

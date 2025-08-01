@@ -69,9 +69,9 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         
     def _setup_dialog(self):
         """Setup dialog window properties"""
-        self.setWindowTitle("🤖 SNID AI Assistant")
-        self.resize(1200, 900)
-        self.setMinimumSize(800, 600)
+        self.setWindowTitle("AI Assistant")
+        self.resize(1000, 700)
+        self.setMinimumSize(700, 500)
         
         # Apply dialog styling
         self.setStyleSheet(f"""
@@ -290,43 +290,78 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self._create_footer_buttons(layout)
         
     def _create_header(self, layout):
-        """Create header section"""
-        header_frame = QtWidgets.QFrame()
-        header_frame.setStyleSheet(f"""
-            QFrame {{
+        """Create header section with AI controls"""
+        header_layout = QtWidgets.QHBoxLayout()
+        
+        # Left side - Status indicator
+        self.status_label = QtWidgets.QLabel("Ready")
+        self.status_label.setStyleSheet(f"color: {self.colors['btn_success']}; font-weight: bold; font-size: 11pt;")
+        header_layout.addWidget(self.status_label)
+        
+        header_layout.addStretch()
+        
+        # Right side - AI Controls
+        ai_controls_group = QtWidgets.QGroupBox("🔧 AI Settings")
+        ai_controls_layout = QtWidgets.QGridLayout(ai_controls_group)
+        ai_controls_layout.setSpacing(8)
+        
+        # Model selection
+        ai_controls_layout.addWidget(QtWidgets.QLabel("Model:"), 0, 0)
+        self.model_combo = QtWidgets.QComboBox()
+        self.model_combo.setMinimumWidth(200)
+        self.model_combo.currentTextChanged.connect(self._on_model_changed)
+        ai_controls_layout.addWidget(self.model_combo, 0, 1)
+        
+        # Refresh models button
+        self.refresh_models_btn = QtWidgets.QPushButton("🔄")
+        self.refresh_models_btn.setMaximumWidth(30)
+        self.refresh_models_btn.setToolTip("Refresh available models")
+        self.refresh_models_btn.clicked.connect(self._refresh_models)
+        ai_controls_layout.addWidget(self.refresh_models_btn, 0, 2)
+        
+        # Temperature setting
+        ai_controls_layout.addWidget(QtWidgets.QLabel("Temperature:"), 1, 0)
+        self.temperature_spin = QtWidgets.QDoubleSpinBox()
+        self.temperature_spin.setRange(0.0, 2.0)
+        self.temperature_spin.setSingleStep(0.1)
+        self.temperature_spin.setValue(0.7)
+        self.temperature_spin.setDecimals(1)
+        self.temperature_spin.setMaximumWidth(80)
+        ai_controls_layout.addWidget(self.temperature_spin, 1, 1)
+        
+        # Max tokens setting
+        ai_controls_layout.addWidget(QtWidgets.QLabel("Max Tokens:"), 1, 2)
+        self.max_tokens_spin = QtWidgets.QSpinBox()
+        self.max_tokens_spin.setRange(100, 4000)
+        self.max_tokens_spin.setValue(2000)
+        self.max_tokens_spin.setMaximumWidth(80)
+        ai_controls_layout.addWidget(self.max_tokens_spin, 1, 3)
+        
+        # Style the group box
+        ai_controls_group.setStyleSheet(f"""
+            QGroupBox {{
+                font-weight: bold;
+                font-size: 9pt;
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                margin-top: 8px;
+                padding-top: 8px;
                 background: {self.colors['bg_secondary']};
-                border: 2px solid {self.colors['border']};
-                border-radius: 8px;
-                padding: 16px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                background: {self.colors['bg_secondary']};
             }}
         """)
         
-        header_layout = QtWidgets.QVBoxLayout(header_frame)
+        header_layout.addWidget(ai_controls_group)
         
-        # Title with icon
-        title_layout = QtWidgets.QHBoxLayout()
+        layout.addLayout(header_layout)
         
-        title_label = QtWidgets.QLabel("🤖 SNID AI Assistant")
-        title_label.setFont(QtGui.QFont("Segoe UI", 18, QtGui.QFont.Bold))
-        title_layout.addWidget(title_label)
-        
-        title_layout.addStretch()
-        
-        # Status indicator
-        self.status_label = QtWidgets.QLabel("Ready")
-        self.status_label.setStyleSheet(f"color: {self.colors['btn_success']}; font-weight: bold;")
-        title_layout.addWidget(self.status_label)
-        
-        header_layout.addLayout(title_layout)
-        
-        # Description
-        desc_label = QtWidgets.QLabel(
-            "Intelligent analysis and interpretation of SNID results using advanced AI"
-        )
-        desc_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 12pt;")
-        header_layout.addWidget(desc_label)
-        
-        layout.addWidget(header_frame)
+        # Load available models
+        self._load_available_models()
     
     def _create_summary_tab(self):
         """Create summary generation tab"""
@@ -335,12 +370,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
         
-        # Context information - simplified
-        context_group = QtWidgets.QGroupBox("📊 Analysis Status")
-        context_layout = QtWidgets.QVBoxLayout(context_group)
-        context_layout.setSpacing(6)
-        
-        # Results status
+        # Simple status indicator
         if self.current_snid_results:
             results_text = "✅ SNID results ready for AI analysis"
             results_color = self.colors['btn_success']
@@ -349,53 +379,47 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             results_color = self.colors['btn_warning']
         
         results_label = QtWidgets.QLabel(results_text)
-        results_label.setStyleSheet(f"color: {results_color}; font-weight: bold; padding: 6px;")
-        context_layout.addWidget(results_label)
+        results_label.setStyleSheet(f"color: {results_color}; font-weight: bold; padding: 8px; margin-bottom: 8px;")
+        layout.addWidget(results_label)
         
-        layout.addWidget(context_group)
-        
-        # User metadata input - more compact
-        metadata_group = QtWidgets.QGroupBox("👤 Optional Information")
-        metadata_layout = QtWidgets.QFormLayout(metadata_group)
-        metadata_layout.setVerticalSpacing(4)
+        # Compact metadata input
+        metadata_layout = QtWidgets.QHBoxLayout()
         
         self.observer_name_input = QtWidgets.QLineEdit()
-        self.observer_name_input.setPlaceholderText("Your name")
-        metadata_layout.addRow("Observer:", self.observer_name_input)
+        self.observer_name_input.setPlaceholderText("Observer name (optional)")
+        metadata_layout.addWidget(self.observer_name_input)
         
         self.telescope_input = QtWidgets.QLineEdit()
-        self.telescope_input.setPlaceholderText("Telescope/instrument")
-        metadata_layout.addRow("Telescope:", self.telescope_input)
+        self.telescope_input.setPlaceholderText("Telescope (optional)")
+        metadata_layout.addWidget(self.telescope_input)
         
         self.observation_date_input = QtWidgets.QLineEdit()
-        self.observation_date_input.setPlaceholderText("YYYY-MM-DD")
-        metadata_layout.addRow("Date:", self.observation_date_input)
+        self.observation_date_input.setPlaceholderText("Date (optional)")
+        metadata_layout.addWidget(self.observation_date_input)
         
-        layout.addWidget(metadata_group)
+        layout.addLayout(metadata_layout)
         
-        # Summary options - simplified
-        options_group = QtWidgets.QGroupBox("📋 Include in Summary")
-        options_layout = QtWidgets.QVBoxLayout(options_group)
-        options_layout.setSpacing(4)
+        # Simplified options in a single row
+        options_layout = QtWidgets.QHBoxLayout()
         
-        # Checkboxes for different analysis aspects - more compact labels
-        self.include_classification_cb = QtWidgets.QCheckBox("Classification analysis")
+        self.include_classification_cb = QtWidgets.QCheckBox("Classification")
         self.include_classification_cb.setChecked(True)
         options_layout.addWidget(self.include_classification_cb)
         
-        self.include_redshift_cb = QtWidgets.QCheckBox("Redshift & distance")
+        self.include_redshift_cb = QtWidgets.QCheckBox("Redshift")
         self.include_redshift_cb.setChecked(True)
         options_layout.addWidget(self.include_redshift_cb)
         
-        self.include_templates_cb = QtWidgets.QCheckBox("Template matching")
+        self.include_templates_cb = QtWidgets.QCheckBox("Templates")
         self.include_templates_cb.setChecked(True)
         options_layout.addWidget(self.include_templates_cb)
         
-        self.include_recommendations_cb = QtWidgets.QCheckBox("Observational recommendations")
+        self.include_recommendations_cb = QtWidgets.QCheckBox("Recommendations")
         self.include_recommendations_cb.setChecked(True)
         options_layout.addWidget(self.include_recommendations_cb)
         
-        layout.addWidget(options_group)
+        options_layout.addStretch()
+        layout.addLayout(options_layout)
         
         # Generate summary controls - simplified
         generate_layout = QtWidgets.QHBoxLayout()
@@ -413,17 +437,14 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         
         layout.addLayout(generate_layout)
         
-        # Summary output
-        summary_output_group = QtWidgets.QGroupBox("🤖 AI Analysis")
-        summary_output_layout = QtWidgets.QVBoxLayout(summary_output_group)
-        
+        # Summary output - no group box
         self.summary_text = QtWidgets.QTextEdit()
         self.summary_text.setPlaceholderText(
             "Your AI-generated analysis will appear here...\n\n"
             "Click 'Generate Summary' to start."
         )
-        self.summary_text.setMinimumHeight(250)
-        summary_output_layout.addWidget(self.summary_text)
+        self.summary_text.setMinimumHeight(300)
+        layout.addWidget(self.summary_text)
         
         # Summary controls
         summary_controls_layout = QtWidgets.QHBoxLayout()
@@ -439,9 +460,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         summary_controls_layout.addWidget(self.copy_summary_btn)
         
         summary_controls_layout.addStretch()
-        
-        summary_output_layout.addLayout(summary_controls_layout)
-        layout.addWidget(summary_output_group)
+        layout.addLayout(summary_controls_layout)
         
         layout.addStretch()
         self.tab_widget.addTab(summary_widget, "📊 Summary")
@@ -453,10 +472,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
         
-        # Chat history
-        chat_group = QtWidgets.QGroupBox("💬 Ask Questions")
-        chat_layout = QtWidgets.QVBoxLayout(chat_group)
-        
+        # Chat history - no group box
         self.chat_history = QtWidgets.QTextEdit()
         self.chat_history.setReadOnly(True)
         self.chat_history.setMinimumHeight(350)
@@ -469,118 +485,33 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             "• Should I follow up with more observations?\n\n"
             "What would you like to know?"
         )
-        chat_layout.addWidget(self.chat_history)
+        layout.addWidget(self.chat_history)
         
-        layout.addWidget(chat_group)
-        
-        # Input area - simplified
-        input_group = QtWidgets.QGroupBox("✍️ Your Question")
-        input_layout = QtWidgets.QVBoxLayout(input_group)
-        
+        # Input area - simplified, no group box
         self.chat_input = QtWidgets.QTextEdit()
         self.chat_input.setMaximumHeight(70)
         self.chat_input.setPlaceholderText("Type your question here...")
-        input_layout.addWidget(self.chat_input)
+        layout.addWidget(self.chat_input)
         
         # Send controls
         send_layout = QtWidgets.QHBoxLayout()
         
-        self.send_btn = QtWidgets.QPushButton("💬 Send Message")
+        self.send_btn = QtWidgets.QPushButton("💬 Send")
         self.send_btn.setObjectName("primary_btn")
         self.send_btn.clicked.connect(self._send_chat_message)
         send_layout.addWidget(self.send_btn)
         
-        self.clear_chat_btn = QtWidgets.QPushButton("🧹 Clear Chat")
+        self.clear_chat_btn = QtWidgets.QPushButton("🧹 Clear")
         self.clear_chat_btn.clicked.connect(self._clear_chat)
         send_layout.addWidget(self.clear_chat_btn)
         
         send_layout.addStretch()
         
-        input_layout.addLayout(send_layout)
-        layout.addWidget(input_group)
+        layout.addLayout(send_layout)
         
         self.tab_widget.addTab(chat_widget, "💬 Chat")
     
-    def _create_settings_tab(self):
-        """Create settings and configuration tab"""
-        settings_widget = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(settings_widget)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(12)
-        
-        # AI Model settings
-        model_group = QtWidgets.QGroupBox("AI Model Configuration")
-        model_layout = QtWidgets.QFormLayout(model_group)
-        
-        self.model_selection = QtWidgets.QComboBox()
-        self.model_selection.addItems([
-            "GPT-4 (Recommended)",
-            "GPT-3.5-Turbo",
-            "Claude-3",
-            "Local Model"
-        ])
-        model_layout.addRow("AI Model:", self.model_selection)
-        
-        self.temperature_spin = QtWidgets.QDoubleSpinBox()
-        self.temperature_spin.setRange(0.0, 2.0)
-        self.temperature_spin.setSingleStep(0.1)
-        self.temperature_spin.setValue(0.7)
-        self.temperature_spin.setDecimals(1)
-        model_layout.addRow("Temperature:", self.temperature_spin)
-        
-        self.max_tokens_spin = QtWidgets.QSpinBox()
-        self.max_tokens_spin.setRange(100, 4000)
-        self.max_tokens_spin.setValue(2000)
-        model_layout.addRow("Max Tokens:", self.max_tokens_spin)
-        
-        layout.addWidget(model_group)
-        
-        # API Configuration
-        api_group = QtWidgets.QGroupBox("API Configuration")
-        api_layout = QtWidgets.QFormLayout(api_group)
-        
-        self.api_key_input = QtWidgets.QLineEdit()
-        self.api_key_input.setEchoMode(QtWidgets.QLineEdit.Password)
-        self.api_key_input.setPlaceholderText("Enter your API key")
-        api_layout.addRow("API Key:", self.api_key_input)
-        
-        self.api_endpoint_input = QtWidgets.QLineEdit()
-        self.api_endpoint_input.setPlaceholderText("Custom API endpoint (optional)")
-        api_layout.addRow("Custom Endpoint:", self.api_endpoint_input)
-        
-        # Test connection button
-        test_connection_btn = QtWidgets.QPushButton("🔍 Test Connection")
-        test_connection_btn.clicked.connect(self._test_api_connection)
-        api_layout.addRow("", test_connection_btn)
-        
-        layout.addWidget(api_group)
-        
-        # Output preferences
-        output_group = QtWidgets.QGroupBox("Output Preferences")
-        output_layout = QtWidgets.QVBoxLayout(output_group)
-        
-        self.verbose_output_cb = QtWidgets.QCheckBox("Verbose explanations")
-        self.verbose_output_cb.setChecked(True)
-        output_layout.addWidget(self.verbose_output_cb)
-        
-        self.include_references_cb = QtWidgets.QCheckBox("Include scientific references")
-        self.include_references_cb.setChecked(True)
-        output_layout.addWidget(self.include_references_cb)
-        
-        self.technical_language_cb = QtWidgets.QCheckBox("Use technical language")
-        self.technical_language_cb.setChecked(True)
-        output_layout.addWidget(self.technical_language_cb)
-        
-        layout.addWidget(output_group)
-        
-        layout.addStretch()
-        
-        # Reset settings button
-        reset_btn = QtWidgets.QPushButton("🔄 Reset to Defaults")
-        reset_btn.clicked.connect(self._reset_settings)
-        layout.addWidget(reset_btn)
-        
-        self.tab_widget.addTab(settings_widget, "⚙️ Settings")
+
     
     def _create_footer_buttons(self, layout):
         """Create footer buttons"""
@@ -612,84 +543,53 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.status_label.setText("Generating...")
         self.status_label.setStyleSheet(f"color: {self.colors['btn_warning']}; font-weight: bold;")
         
-        # Simulate AI processing (in a real implementation, this would call the AI service)
-        def generate_mock_summary():
+        # Generate real AI summary using current settings
+        def generate_real_summary():
             try:
-                import time
-                time.sleep(3)  # Simulate processing time
+                # Get current AI settings
+                ai_settings = self._get_current_ai_settings()
                 
-                # Generate mock summary
-                observer = self.observer_name_input.text() or "Observer"
-                telescope = self.telescope_input.text() or "Unknown telescope"
-                obs_date = self.observation_date_input.text() or "Unknown date"
+                # Collect user metadata
+                user_metadata = {
+                    'observer_name': self.observer_name_input.text(),
+                    'telescope': self.telescope_input.text(),
+                    'observation_date': self.observation_date_input.text(),
+                    'specific_request': self.specific_request_input.toPlainText()
+                }
+                
+                # Generate summary using LLM integration
+                if hasattr(self.parent_gui, 'llm_integration') and self.parent_gui.llm_integration:
+                    summary_text = self.parent_gui.llm_integration.generate_summary(
+                        self.current_snid_results,
+                        user_metadata=user_metadata,
+                        max_tokens=ai_settings['max_tokens'],
+                        temperature=ai_settings['temperature']
+                    )
+                else:
+                    # Fallback if no LLM integration
+                    from snid_sage.interfaces.gui.features.results.llm_integration import LLMIntegration
+                    llm = LLMIntegration(self.current_snid_results)
+                    summary_text = llm.generate_summary(
+                        user_metadata=user_metadata,
+                        max_tokens=ai_settings['max_tokens'],
+                        temperature=ai_settings['temperature']
+                    )
                 
                 summary = f"""
 SNID AI ANALYSIS SUMMARY
 ========================
 
-Observer: {observer}
-Telescope: {telescope}
-Observation Date: {obs_date}
+Observer: {user_metadata.get('observer_name', 'Not specified')}
+Telescope: {user_metadata.get('telescope', 'Not specified')}  
+Observation Date: {user_metadata.get('observation_date', 'Not specified')}
 Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+AI Model: {self.model_combo.currentText().replace('✅ ', '').replace('⏳ ', '').replace('🆓 ', '').replace('🧠 ', '')}
 
 CLASSIFICATION ANALYSIS:
+{summary_text}
 """
                 
-                if self.current_snid_results:
-                    summary += """
-✅ Based on the SNID template matching analysis, this spectrum shows characteristics 
-consistent with a Type Ia supernova at moderate redshift. The template matches 
-indicate a well-sampled lightcurve phase around maximum light.
-
-KEY FINDINGS:
-• Strong correlation with SNe Ia templates
-• Estimated redshift: z ≈ 0.025 ± 0.005
-• Phase: Near maximum light (-5 to +10 days)
-• Host galaxy contamination: Minimal
-"""
-                else:
-                    summary += """
-⚠️  Limited analysis available - no SNID results provided.
-Please run SNID analysis first for comprehensive classification.
-"""
-                
-                if self.include_redshift_cb.isChecked():
-                    summary += """
-
-REDSHIFT & DISTANCE ANALYSIS:
-• Distance modulus: μ ≈ 32.5 mag
-• Luminosity distance: ~110 Mpc
-• Recession velocity: ~7,500 km/s
-"""
-                
-                if self.include_templates_cb.isChecked():
-                    summary += """
-
-TEMPLATE MATCHING DETAILS:
-• Best match: SN 1994D (Ia, +2d)
-• Secondary matches: SN 1992A, SN 1999by
-• Match quality: Excellent (rlap > 8.0)
-"""
-                
-                if self.include_recommendations_cb.isChecked():
-                    summary += """
-
-OBSERVATIONAL RECOMMENDATIONS:
-• Follow-up spectroscopy recommended within 1-2 weeks
-• Photometric monitoring suggested for lightcurve characterization
-• Consider late-time spectroscopy for nebular phase analysis
-"""
-                
-                summary += """
-
-CONFIDENCE ASSESSMENT:
-High confidence in Type Ia classification based on spectral features
-and template matching quality. Recommended for inclusion in SN Ia samples.
-
-Generated by SNID SAGE AI Assistant
-"""
-                
-                # Update UI from main thread
+                # Update UI from main thread  
                 QtCore.QMetaObject.invokeMethod(
                     self, "_update_summary_result", 
                     QtCore.Qt.QueuedConnection,
@@ -704,7 +604,7 @@ Generated by SNID SAGE AI Assistant
                 )
         
         # Start generation in background thread
-        thread = threading.Thread(target=generate_mock_summary, daemon=True)
+        thread = threading.Thread(target=generate_real_summary, daemon=True)
         thread.start()
     
     @QtCore.Slot(str)
@@ -744,17 +644,64 @@ Generated by SNID SAGE AI Assistant
         # Add user message to chat
         current_chat = self.chat_history.toPlainText()
         current_chat += f"\n\nYou: {message}"
-        
-        # Simulate AI response
-        ai_response = "AI Assistant: Thank you for your question. In a full implementation, " \
-                     "I would analyze your SNID results and provide detailed insights about " \
-                     "your supernova classification. This is a placeholder response."
-        
-        current_chat += f"\n\n{ai_response}"
-        
         self.chat_history.setPlainText(current_chat)
         self.chat_input.clear()
         
+        # Get AI response using current settings
+        def get_ai_response():
+            try:
+                ai_settings = self._get_current_ai_settings()
+                
+                # Use LLM integration to get real response
+                if hasattr(self.parent_gui, 'llm_integration') and self.parent_gui.llm_integration:
+                    ai_response = self.parent_gui.llm_integration.chat_with_llm(
+                        message,
+                        context=str(self.current_snid_results) if self.current_snid_results else "",
+                        max_tokens=ai_settings['max_tokens']
+                    )
+                else:
+                    # Fallback if no LLM integration
+                    from snid_sage.interfaces.gui.features.results.llm_integration import LLMIntegration
+                    llm = LLMIntegration(self.current_snid_results)
+                    ai_response = llm.chat_with_llm(
+                        message,
+                        context="",
+                        max_tokens=ai_settings['max_tokens']
+                    )
+                
+                # Update chat in main thread
+                current_chat = self.chat_history.toPlainText()
+                current_chat += f"\n\nAI Assistant: {ai_response}"
+                
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_update_chat",
+                    QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, current_chat)
+                )
+                
+            except Exception as e:
+                error_msg = f"Sorry, I encountered an error: {str(e)}"
+                current_chat = self.chat_history.toPlainText()
+                current_chat += f"\n\nAI Assistant: {error_msg}"
+                
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_update_chat",
+                    QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, current_chat)
+                )
+        
+        # Start chat response in background
+        thread = threading.Thread(target=get_ai_response, daemon=True)
+        thread.start()
+        
+        # Scroll to bottom
+        scrollbar = self.chat_history.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+    
+    @QtCore.Slot(str)
+    def _update_chat(self, chat_text):
+        """Update chat display in main thread"""
+        self.chat_history.setPlainText(chat_text)
         # Scroll to bottom
         scrollbar = self.chat_history.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
@@ -804,25 +751,7 @@ Generated by SNID SAGE AI Assistant
         self.status_label.setText("Copied to Clipboard")
         QtCore.QTimer.singleShot(2000, lambda: self.status_label.setText(original_text))
     
-    def _test_api_connection(self):
-        """Test API connection"""
-        QtWidgets.QMessageBox.information(
-            self, 
-            "API Test", 
-            "API connection test would be implemented here.\n\n"
-            "This would verify connectivity to the selected AI service."
-        )
-    
-    def _reset_settings(self):
-        """Reset settings to defaults"""
-        self.model_selection.setCurrentIndex(0)
-        self.temperature_spin.setValue(0.7)
-        self.max_tokens_spin.setValue(2000)
-        self.api_key_input.clear()
-        self.api_endpoint_input.clear()
-        self.verbose_output_cb.setChecked(True)
-        self.include_references_cb.setChecked(True)
-        self.technical_language_cb.setChecked(True)
+
     
     def _show_help(self):
         """Show help information"""
@@ -841,10 +770,8 @@ CHAT TAB:
 - Ask specific questions about classification, redshift, etc.
 - Chat history is maintained during the session
 
-SETTINGS TAB:
-- Configure AI model and parameters
-- Set up API credentials for external AI services
-- Customize output preferences
+SETTINGS:
+- Use the main application settings to configure AI options
 
 For best results, ensure SNID analysis has been completed
 before using the AI assistant.
@@ -854,4 +781,168 @@ before using the AI assistant.
         msg.setWindowTitle("AI Assistant Help")
         msg.setText(help_text)
         msg.setTextFormat(QtCore.Qt.PlainText)
-        msg.exec_() 
+        msg.exec_()
+    
+    def _load_available_models(self):
+        """Load available models from OpenRouter or saved config"""
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_config, get_openrouter_api_key
+            
+            config = get_openrouter_config()
+            api_key = get_openrouter_api_key()
+            
+            # Start with current model if available
+            current_model_id = config.get('model_id', '')
+            current_model_name = config.get('model_name', '')
+            
+            self.model_combo.clear()
+            
+            if current_model_name and current_model_id:
+                # Add current model first
+                status = "✅ " if config.get('model_tested', False) else "⏳ "
+                display_text = f"{status}{current_model_name}"
+                self.model_combo.addItem(display_text, current_model_id)
+            
+            # Add some popular fallback models
+            fallback_models = [
+                ("GPT-4o Mini", "openai/gpt-4o-mini"),
+                ("GPT-3.5 Turbo", "openai/gpt-3.5-turbo"),
+                ("Claude 3 Haiku", "anthropic/claude-3-haiku"),
+                ("Llama 3.1 8B", "meta-llama/llama-3.1-8b-instruct:free"),
+            ]
+            
+            for name, model_id in fallback_models:
+                if model_id != current_model_id:  # Don't duplicate current model
+                    self.model_combo.addItem(f"⏳ {name}", model_id)
+            
+            # Add option to refresh from API
+            self.model_combo.addItem("🔄 Load from API...", "refresh_from_api")
+            
+        except Exception as e:
+            _LOGGER.warning(f"Could not load models: {e}")
+            # Add basic fallback
+            self.model_combo.addItem("GPT-4o Mini", "openai/gpt-4o-mini")
+    
+    def _refresh_models(self):
+        """Refresh models from OpenRouter API"""
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_api_key, fetch_all_models
+            
+            api_key = get_openrouter_api_key()
+            if not api_key:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "No API Key",
+                    "Please configure your OpenRouter API key in Settings first."
+                )
+                return
+            
+            self.refresh_models_btn.setEnabled(False)
+            self.refresh_models_btn.setText("...")
+            
+            # Fetch models in background
+            def fetch_models():
+                try:
+                    models = fetch_all_models(api_key, free_only=False)
+                    if models:
+                        # Filter to tested and popular models
+                        priority_models = []
+                        other_models = []
+                        
+                        for model in models:
+                            if model['is_free'] or 'gpt' in model['name'].lower() or 'claude' in model['name'].lower():
+                                priority_models.append(model)
+                            else:
+                                other_models.append(model)
+                        
+                        # Update UI on main thread
+                        self._update_model_combo(priority_models + other_models[:10])  # Limit to avoid overwhelming
+                    else:
+                        self._on_model_refresh_error("No models found")
+                except Exception as e:
+                    self._on_model_refresh_error(str(e))
+            
+            import threading
+            thread = threading.Thread(target=fetch_models, daemon=True)
+            thread.start()
+            
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Refresh Error", 
+                f"Failed to refresh models: {str(e)}"
+            )
+    
+    def _update_model_combo(self, models):
+        """Update model combo box with fetched models"""
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_config
+            
+            config = get_openrouter_config()
+            current_model_id = config.get('model_id', '')
+            
+            self.model_combo.clear()
+            
+            # Add models with status indicators
+            for model in models:
+                status = "✅ " if model['id'] == current_model_id else "⏳ "
+                if model['is_free']:
+                    status += "🆓 "
+                if model['supports_reasoning']:
+                    status += "🧠 "
+                
+                display_text = f"{status}{model['name']}"
+                self.model_combo.addItem(display_text, model['id'])
+            
+            # Select current model if it exists
+            for i in range(self.model_combo.count()):
+                if self.model_combo.itemData(i) == current_model_id:
+                    self.model_combo.setCurrentIndex(i)
+                    break
+            
+            self.refresh_models_btn.setEnabled(True)
+            self.refresh_models_btn.setText("🔄")
+            
+        except Exception as e:
+            self._on_model_refresh_error(str(e))
+    
+    def _on_model_refresh_error(self, error_msg):
+        """Handle model refresh error"""
+        self.refresh_models_btn.setEnabled(True)
+        self.refresh_models_btn.setText("🔄")
+        QtWidgets.QMessageBox.warning(
+            self,
+            "Model Refresh Failed",
+            f"Could not refresh models: {error_msg}"
+        )
+    
+    def _on_model_changed(self):
+        """Handle model selection change"""
+        current_data = self.model_combo.currentData()
+        
+        if current_data == "refresh_from_api":
+            self._refresh_models()
+            return
+        
+        if current_data:
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import save_openrouter_config, get_openrouter_api_key
+                
+                api_key = get_openrouter_api_key()
+                model_name = self.model_combo.currentText()
+                # Clean up status indicators from display name
+                clean_name = model_name.replace("✅ ", "").replace("⏳ ", "").replace("🆓 ", "").replace("🧠 ", "")
+                
+                save_openrouter_config(api_key, current_data, clean_name, False)
+                _LOGGER.info(f"Selected model: {clean_name} ({current_data})")
+                
+            except Exception as e:
+                _LOGGER.error(f"Failed to save model selection: {e}")
+    
+    def _get_current_ai_settings(self):
+        """Get current AI settings from the controls"""
+        return {
+            'temperature': self.temperature_spin.value(),
+            'max_tokens': self.max_tokens_spin.value(),
+            'model_id': self.model_combo.currentData()
+        } 

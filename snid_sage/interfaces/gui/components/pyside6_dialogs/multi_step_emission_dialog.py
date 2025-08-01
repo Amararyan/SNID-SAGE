@@ -31,6 +31,9 @@ except ImportError:
 # Import supernova emission line constants
 from snid_sage.shared.constants.physical import SUPERNOVA_EMISSION_LINES, SN_LINE_CATEGORIES, SPEED_OF_LIGHT_KMS
 
+# Import platform configuration
+from snid_sage.shared.utils.config.platform_config import get_platform_config
+
 # Import refactored modules
 from .emission_dialog_events import EmissionDialogEventHandlers
 from .emission_dialog_ui import EmissionDialogUIBuilder
@@ -573,7 +576,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                         # Double-click: Find and add nearby line
                         self._find_and_add_nearby_line(click_wavelength)
                     elif event.button() == QtCore.Qt.RightButton:
-                        # Right-click: Remove closest line
+                        # Right-click/Two finger click: Remove closest line
                         self._remove_closest_line(click_wavelength)
                         # Accept the event to prevent context menu
                         event.accept()
@@ -596,7 +599,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             modifiers = QtWidgets.QApplication.keyboardModifiers()
             
             if event.button() == QtCore.Qt.RightButton:
-                # Right-click: Remove closest point
+                # Right-click/Two finger click: Remove closest point
                 self._remove_closest_manual_point(click_wavelength, click_flux)
             elif event.button() == QtCore.Qt.LeftButton:
                 # Left-click with modifiers
@@ -840,16 +843,38 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         except Exception as e:
             _LOGGER.error(f"Error switching to step 2 toolbar: {e}")
     
+    def _switch_to_step1_toolbar(self):
+        """Switch from step 2 analysis toolbar back to step 1 preset toolbar"""
+        try:
+            # Remove current toolbar
+            if self.current_toolbar:
+                self.toolbar_layout.removeWidget(self.current_toolbar)
+                self.current_toolbar.hide()
+                self.current_toolbar.deleteLater()
+            
+            # Create and add step 1 toolbar
+            self.current_toolbar = self.ui_builder.create_compact_preset_toolbar()
+            self.toolbar_layout.addWidget(self.current_toolbar)
+            
+            _LOGGER.debug("Switched to step 1 toolbar")
+            
+        except Exception as e:
+            _LOGGER.error(f"Error switching to step 1 toolbar: {e}")
+    
     def _create_simplified_step2_interface(self, layout):
         """Create simplified step 2 interface with main controls moved to toolbar"""
         
         # Manual Points Instructions (only show when relevant)
+        # Get platform-appropriate click text
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text("right")
+        
         self.manual_instructions = QtWidgets.QLabel(
             "Manual Selection Instructions:\n"
             "• Left Click: Smart peak detection\n"
             "• Ctrl+Click: Add free-floating point\n"
             "• Shift+Click: Add spectrum-snapped point\n" 
-            "• Right Click: Remove closest point"
+            f"• {right_click_text}: Remove closest point"
         )
         self.manual_instructions.setWordWrap(True)
         self.manual_instructions.setStyleSheet(f"color: {self.colors.get('text_secondary', '#666')}; padding: 5px;")
@@ -1330,11 +1355,14 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
 
     def _show_interaction_help(self):
         """Show help dialog for mouse interactions and shortcuts"""
-        help_text = """Mouse Interactions & Shortcuts
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text('right')
+        
+        help_text = f"""Mouse Interactions & Shortcuts
 
 🖱️ MOUSE INTERACTIONS:
 • Double-click on spectrum: Add nearest line from database
-• Right-click on line marker: Remove line from plot  
+• {right_click_text} on line marker: Remove line from plot  
 • Current mode (SN/Galaxy) determines line type
 
 ⌨️ KEYBOARD SHORTCUTS:
