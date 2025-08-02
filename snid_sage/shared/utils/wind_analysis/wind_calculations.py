@@ -396,7 +396,7 @@ def validate_wind_measurement(emission_wavelength, absorption_wavelength, rest_w
             )
             validation_result['quality_score'] *= 0.7
         
-        # Generate recommendations
+        
         if validation_result['quality_score'] < 0.8:
             validation_result['recommendations'].append(
                 "Consider remeasuring line positions for better accuracy"

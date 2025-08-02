@@ -265,7 +265,7 @@ class PySide6PreprocessingSelectionDialog(QtWidgets.QDialog):
         
         layout.addWidget(options_group)
         
-        # Add recommendation notice
+        
         notice_label = QtWidgets.QLabel(
             "💡 Tip: Quick preprocessing works well for most astronomical spectra. "
             "Use advanced mode only if you need specific parameter control."

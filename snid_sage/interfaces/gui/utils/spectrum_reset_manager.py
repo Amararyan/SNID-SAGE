@@ -570,7 +570,7 @@ class SpectrumResetManager:
             if hasattr(self.gui, 'emission_status_label'):
                 self.gui.emission_status_label.config(text="Not analyzed", fg=_secondary_color())
 
-            # 6. AI assistant helper/description label
+            
             if hasattr(self.gui, 'ai_status_label'):
                 self.gui.ai_status_label.config(text="Configuration • Summary • Chat", fg=_secondary_color())
 

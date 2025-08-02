@@ -132,11 +132,11 @@ def compute_rlap_cos_metric(
         logger.info(f"🔄 Computing RLAP-Cos metric for {len(matches)} matches")
     
     # ============================================================================
-    # CRITICAL: Use *exactly* the same input spectrum preparation as snid_enhanced_metrics.py
+    
     # ============================================================================
     
     # 1a) Choose the best version of the flattened input flux
-    #     CRITICAL: Always prefer tapered_flux (apodized) for consistency with SNID analysis
+    
     # snid_sage.snid.py:1145
     if "tapered_flux" in processed_spectrum and processed_spectrum["tapered_flux"] is not None:
         base_flux = processed_spectrum["tapered_flux"]  # Apodized flattened spectrum (what SNID uses)

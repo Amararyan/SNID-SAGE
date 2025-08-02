@@ -849,6 +849,24 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         # Merge defaults with current params
         params = {**self.default_params, **self.current_params}
         
+        # CRITICAL FIX: Check for existing forced redshift from redshift mode dialog
+        # This ensures that when users set forced redshift via the redshift mode dialog,
+        # it gets properly included in the configuration dialog
+        if (self.app_controller and 
+            hasattr(self.app_controller, 'redshift_mode_config') and 
+            self.app_controller.redshift_mode_config):
+            
+            mode_config = self.app_controller.redshift_mode_config
+            mode = mode_config.get('mode', 'search')
+            
+            if mode == 'force':
+                # Override with forced redshift from redshift mode dialog
+                forced_redshift = mode_config.get('redshift', 0.0)
+                params['forced_redshift'] = forced_redshift
+                _LOGGER.info(f"Configuration dialog: Using forced redshift from redshift mode dialog: z = {forced_redshift:.6f}")
+            else:
+                _LOGGER.debug(f"Configuration dialog: Redshift mode is '{mode}', not using forced redshift")
+        
         # Load basic parameters
         for key in ['zmin', 'zmax', 'lapmin', 'rlapmin', 'age_min', 'age_max', 
                    'max_output_templates', 'peak_window_size']:
@@ -1010,18 +1028,11 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
                     _LOGGER.info("Starting analysis from configuration dialog...")
                     # Close dialog first
                     self.accept()
-                    # Then run analysis
-                    success = self.app_controller.run_snid_analysis(result)
-                    if success:
-                        _LOGGER.info("Analysis started successfully from configuration dialog")
-                        self.analysis_started = True # Set flag
-                    else:
-                        _LOGGER.error("Failed to start analysis from configuration dialog")
-                        QtWidgets.QMessageBox.critical(
-                            self.parent(),
-                            "Analysis Error",
-                            "Failed to start SNID analysis.\nPlease check the logs for details."
-                        )
+                    
+                    # Add small delay to allow proper cleanup of any previously opened dialogs
+                    # This prevents crashes when PyQtGraph widgets are still being cleaned up
+                    QtCore.QTimer.singleShot(500, lambda: self._delayed_analysis_start(result))
+                    self.analysis_started = True  # Set flag to indicate analysis will be started
                 except Exception as e:
                     _LOGGER.error(f"Error running analysis from configuration dialog: {e}")
                     QtWidgets.QMessageBox.critical(
@@ -1044,6 +1055,35 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
     def was_analysis_started(self) -> bool:
         """Check if analysis was already started from the dialog"""
         return self.analysis_started
+    
+    def _delayed_analysis_start(self, result):
+        """Start analysis after a delay to allow for proper dialog cleanup"""
+        try:
+            # Force garbage collection to clean up any lingering PyQtGraph widgets
+            import gc
+            gc.collect()
+            
+            _LOGGER.info("Starting delayed analysis after dialog cleanup...")
+            success = self.app_controller.run_snid_analysis(result)
+            if success:
+                _LOGGER.info("Delayed analysis started successfully from configuration dialog")
+            else:
+                _LOGGER.error("Failed to start delayed analysis from configuration dialog")
+                # Show error message if parent still exists
+                if self.parent():
+                    QtWidgets.QMessageBox.critical(
+                        self.parent(),
+                        "Analysis Error",
+                        "Failed to start SNID analysis.\nPlease check the logs for details."
+                    )
+        except Exception as e:
+            _LOGGER.error(f"Error in delayed analysis start: {e}")
+            if self.parent():
+                QtWidgets.QMessageBox.critical(
+                    self.parent(),
+                    "Analysis Error", 
+                    f"Error starting analysis:\n{str(e)}"
+                )
 
 
 def show_configuration_dialog(parent, current_params=None, app_controller=None) -> Optional[Tuple[Dict[str, Any], bool]]:

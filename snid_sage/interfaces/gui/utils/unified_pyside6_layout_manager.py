@@ -79,7 +79,8 @@ class LayoutSettings:
         # === Window Configuration ===
         self.default_window_size = (900, 600)
         self.minimum_window_size = (700, 500)
-        self.maximum_window_size = (1400, 1000)
+        # Maximum window size removed to allow full maximization
+        # self.maximum_window_size = (1400, 1000)
         
         # === Advanced Options ===
         self.button_layout_style = "horizontal"
@@ -658,7 +659,7 @@ class UnifiedPySide6LayoutManager:
     
     def _create_chat_section(self, gui_instance, layout):
         """Create Chat section"""
-        # Create AI assistant button (matching original interface)
+        
         gui_instance.ai_assistant_btn = QtWidgets.QPushButton("AI Assistant")
         gui_instance.ai_assistant_btn.setObjectName("unified_ai_assistant_btn")
 
@@ -672,7 +673,7 @@ class UnifiedPySide6LayoutManager:
         gui_instance.ai_assistant_btn.setToolTip("AI-powered analysis assistant\nGet help interpreting classification results\n(Available after analysis)")
         layout.addWidget(gui_instance.ai_assistant_btn)
         
-        # AI assistant status label - add with reduced spacing
+        
         gui_instance.ai_status_label = QtWidgets.QLabel("Requires analysis results")
         gui_instance.ai_status_label.setObjectName("unified_ai_status_label")
         gui_instance.ai_status_label.setWordWrap(True)
@@ -850,6 +851,9 @@ class UnifiedPySide6LayoutManager:
             background-color: #e2e8f0 !important;
             border-color: #94a3b8 !important;
         }
+        QPushButton:focus {
+            outline: none !important;
+        }
         """
         
         flux_active_style = """
@@ -865,6 +869,9 @@ class UnifiedPySide6LayoutManager:
         }
         QPushButton:hover {
             background-color: #2563eb !important;
+        }
+        QPushButton:focus {
+            outline: none !important;
         }
         """
         
@@ -883,6 +890,9 @@ class UnifiedPySide6LayoutManager:
             background-color: #e2e8f0 !important;
             border-color: #94a3b8 !important;
         }
+        QPushButton:focus {
+            outline: none !important;
+        }
         """
         
         flat_active_style = """
@@ -898,6 +908,9 @@ class UnifiedPySide6LayoutManager:
         }
         QPushButton:hover {
             background-color: #2563eb !important;
+        }
+        QPushButton:focus {
+            outline: none !important;
         }
         """
         
@@ -976,8 +989,16 @@ class UnifiedPySide6LayoutManager:
             gui_instance.flux_btn.parent().repaint()
         
         # Process any pending events to ensure visual changes are applied immediately
+        # Use a safer approach to avoid Qt window activation warnings
         from PySide6 import QtCore
-        QtCore.QCoreApplication.processEvents()
+        try:
+            # Only process events if we have an active application instance
+            app = QtCore.QCoreApplication.instance()
+            if app and not app.closingDown():
+                QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+        except Exception:
+            # If processEvents fails, skip it - the visual update will happen anyway
+            pass
         
         _LOGGER.info("🎨 BUTTON STATES: Visual update forced to ensure immediate appearance changes")
     

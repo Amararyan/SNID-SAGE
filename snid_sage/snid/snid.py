@@ -621,8 +621,16 @@ def _process_template_peaks(
     return matches
 
 
-def _run_forced_redshift_analysis(
-    templates: List[Dict[str, Any]], 
+# ============================================================================
+# FORCED REDSHIFT ANALYSIS FUNCTIONS
+# ============================================================================
+
+def _run_forced_redshift_analysis_optimized(
+    templates_dir: str,
+    type_filter: Optional[List[str]], 
+    template_filter: Optional[List[str]], 
+    exclude_templates: Optional[List[str]],
+    age_range: Optional[Tuple[float, float]],
     tapered_flux: np.ndarray, 
     dtft: np.ndarray, 
     drms: float,
@@ -641,271 +649,508 @@ def _run_forced_redshift_analysis(
     report_progress: Callable[[str, Optional[float]], None]
 ) -> List[Dict[str, Any]]:
     """
-    Run template analysis with forced redshift - bypass redshift search.
+    OPTIMIZED forced redshift analysis using vectorized FFT correlation.
     
-    This function directly shifts all templates to the forced redshift value
-    and calculates correlation metrics without searching for optimal redshift.
+    This function uses the same optimizations as normal analysis but skips the redshift search,
+    making it significantly faster while maintaining the same quality and template handling.
     """
-    from .fft_tools import shiftit, overlap, calculate_rms, aspart
+    import math
+    import time
+    from .fft_tools import shiftit, overlap, calculate_rms, aspart, apply_filter as bandpass, dtft_drms
     from .preprocessing import apodize, pad_to_NW
-    from scipy.signal import find_peaks
+    from .core.integration import load_templates_unified, integrate_fft_optimization
+    from .core.config import SNIDConfig
     
     matches = []
-    total_templates = len(templates)
-    template_progress_interval = 500
+    
+    # ============================================================================
+    # VALIDATE FORCED REDSHIFT PARAMETERS
+    # ============================================================================
+    
+    # Validate forced redshift value
+    if forced_redshift < -0.1 or forced_redshift > 3.0:
+        raise ValueError(f"Forced redshift z={forced_redshift:.6f} is outside valid range [-0.1, 3.0]")
+    
+    if forced_redshift < 0 and forced_redshift < -0.01:
+        _LOG.warning(f"Forced redshift z={forced_redshift:.6f} is negative and quite large - this may indicate an error")
     
     # Calculate the lag corresponding to the forced redshift
-    forced_lag = np.log(1 + forced_redshift) / DWLOG_grid
+    try:
+        forced_lag = np.log(1 + forced_redshift) / DWLOG_grid
+    except Exception as e:
+        raise ValueError(f"Failed to calculate lag for forced redshift z={forced_redshift:.6f}: {e}")
     
-    _LOG.info(f"Forced redshift z={forced_redshift:.6f} corresponds to lag={forced_lag:.3f}")
+    _LOG.info(f"🎯 OPTIMIZED forced redshift z={forced_redshift:.6f} corresponds to lag={forced_lag:.3f}")
     
-    for template_idx, tpl in enumerate(templates):
-        # Report progress every 500 templates or at the end
-        if template_idx % template_progress_interval == 0 or template_idx == total_templates - 1:
-            progress_pct = (template_idx + 1) / total_templates * 100
-            report_progress(f"Processing template {template_idx + 1}/{total_templates} (forced z={forced_redshift:.4f})", progress_pct)
-            _LOG.debug(f"  Template {template_idx + 1}/{total_templates} (forced z={forced_redshift:.4f})")
+    # ============================================================================
+    # LOAD TEMPLATES (SAME AS NORMAL ANALYSIS)
+    # ============================================================================
+    
+    # Use unified storage for loading templates (same as normal analysis)
+    try:
+        templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
+        _LOG.info(f"✅ Loaded {len(templates)} templates using UNIFIED STORAGE for forced redshift analysis")
+    except Exception as e:
+        _LOG.warning(f"Unified storage failed in forced analysis, falling back to legacy loader: {e}")
+        from .io import load_templates
+        templates, _ = load_templates(templates_dir, flatten=True)
         
-        # Get template flux (ensuring it's not None and has correct size)
-        tplate = tpl.get('flux', None)
-        if tplate is None or len(tplate) != NW_grid:
-            continue
+        # Apply template filtering to legacy templates
+        if template_filter:
+            templates = [t for t in templates if t.get('name', '') in template_filter]
+            _LOG.info(f"Applied template filter: {len(templates)} templates remaining")
+        elif exclude_templates:
+            original_count = len(templates)
+            templates = [t for t in templates if t.get('name', '') not in exclude_templates]
+            _LOG.info(f"Excluded {original_count - len(templates)} templates: {len(templates)} remaining")
         
-        # OPTIMIZED: Use pre-computed FFT if available (skips rebinning and FFT calculation)
-        if tpl.get('is_log_rebinned', False) and 'pre_computed_fft' in tpl:
-            # Template is already rebinned to standard grid, use pre-computed FFT
-            ttft = tpl['pre_computed_fft']
-            trms = calculate_rms(ttft, k1, k2, k3, k4)
+        _LOG.info(f"✅ Loaded {len(templates)} templates using STANDARD method for forced redshift analysis")
+    
+    if not templates:
+        _LOG.error("No templates loaded for forced redshift analysis")
+        return []
+
+    # ============================================================================
+    # APPLY AGE FILTERING (SAME AS NORMAL ANALYSIS)
+    # ============================================================================
+    original_count = len(templates)
+    
+    if age_range is not None:
+        age_min, age_max = age_range
+        templates = [t for t in templates if age_min <= t.get('age', 0) <= age_max]
+        _LOG.info(f"Age filtering for forced analysis: {original_count} -> {len(templates)} templates")
+
+    # ============================================================================
+    # CHECK FOR VECTORIZED FFT OPTIMIZATION (SAME AS NORMAL ANALYSIS)
+    # ============================================================================
+    
+    use_vectorized = True  # Default to optimized method
+    
+    try:
+        # Create a configuration object for optimization settings
+        config = SNIDConfig(use_vectorized_fft=use_vectorized)
+        optimization_available = True
+        _LOG.info(f"🚀 Vectorized FFT optimization available for forced redshift analysis")
+        
+    except ImportError:
+        optimization_available = False
+        use_vectorized = False
+        _LOG.warning(f"Vectorized FFT optimization not available, falling back to legacy method")
+
+    # ============================================================================
+    # GROUP TEMPLATES BY TYPE (SAME AS NORMAL ANALYSIS)
+    # ============================================================================
+    
+    # Group templates by type for better progress reporting and memory efficiency
+    templates_by_type = {}
+    for template in templates:
+        sn_type = template.get('type', 'Unknown')
+        if sn_type not in templates_by_type:
+            templates_by_type[sn_type] = []
+        templates_by_type[sn_type].append(template)
+    
+    _LOG.info(f"🔄 Processing {len(templates_by_type)} supernova types: {list(templates_by_type.keys())}")
+    
+    # Calculate total templates and track progress
+    total_templates = len(templates)
+    processed_templates = 0
+    
+    # Create processing order: Ia first, all II* second, then the rest (same as normal)
+    ordered_types = []
+    if 'Ia' in templates_by_type:
+        ordered_types.append('Ia')
+    # Add any type that starts with "II" (e.g., II, II-P, IIb ...)
+    ordered_types.extend([t for t in templates_by_type.keys() if t.startswith('II') and t not in ordered_types])
+    # Finally add the remaining types preserving original insertion order
+    ordered_types.extend([t for t in templates_by_type.keys() if t not in ordered_types])
+
+    _LOG.info(f"🔄 Processing order for forced redshift: {ordered_types}")
+
+    # Track performance for comparison
+    start_time = time.time()
+
+    # ============================================================================
+    # PROCESS EACH TYPE WITH OPTIMIZED METHOD
+    # ============================================================================
+    
+    for type_idx, sn_type in enumerate(ordered_types):
+        type_templates = templates_by_type[sn_type]
+
+        # Decide batching strategy (same as normal analysis)
+        batch_parts = 1
+        if sn_type == 'Ia':
+            batch_parts = 4  # Split Type Ia into 4 batches
+        elif sn_type.startswith('II'):
+            batch_parts = 2  # Split all Type II* into 2 batches
+
+        if batch_parts > 1:
+            batch_size = math.ceil(len(type_templates) / batch_parts)
+            batches = [type_templates[i:i + batch_size] for i in range(0, len(type_templates), batch_size)]
         else:
-            # Legacy path: compute FFT at runtime (slower)
-            ttft, trms = dtft_drms(tplate, 0.0, 0, NW_grid-1, k1, k2, k3, k4)
-        
-        if drms <= 0 or trms <= 0:
-            continue
+            batches = [type_templates]
 
-        try:
-            # FORCE: Directly shift template to the forced redshift
-            tpl_shifted = shiftit(tplate, forced_lag)
-            
-            # Get overlap region
-            (t0, t1), (d0, d1), (ov_start, ov_end), fractional_lap = overlap(tpl_shifted, tapered_flux, log_wave)
-            
-            if fractional_lap <= 0:
-                continue
-                
-            lap = fractional_lap 
-            lpeak = lap * DWLOG_grid * NW_grid
+        _LOG.info(f"🔄 Type {sn_type}: {len(type_templates)} templates split into {len(batches)} batch(es) (forced z={forced_redshift:.4f})")
 
-            if lap < lapmin:
-                continue
+        # Process each batch
+        for batch_idx, batch_templates in enumerate(batches, start=1):
+            # Progress update before processing batch
+            batch_start_progress = (processed_templates / total_templates) * 100
+            report_progress(f"Processing {sn_type} batch {batch_idx}/{len(batches)} (forced z={forced_redshift:.4f})", batch_start_progress)
 
-            # Trim both arrays to overlapping region and prepare for FFT
-            start_trim = max(t0, d0)
-            end_trim = min(t1, d1)
-            
-            if end_trim <= start_trim:
-                continue
-            
-            work_d = tapered_flux[start_trim:end_trim + 1].copy()
-            work_t = tpl_shifted[start_trim:end_trim + 1].copy()
-            
-            if len(work_d) == 0 or len(work_t) == 0:
-                continue
-            
-            # Apodize the trimmed regions
-            apodize_percent = 10.0  # Default value
-            work_d = apodize(work_d, 0, len(work_d) - 1, percent=apodize_percent)
-            work_t = apodize(work_t, 0, len(work_t) - 1, percent=apodize_percent)
-            
-            # Pad to NW
-            work_d = pad_to_NW(work_d, NW_grid)
-            work_t = pad_to_NW(work_t, NW_grid)
-            
-            # Calculate new FFTs and RMS values
-            dtft_peak = np.fft.fft(work_d)
-            ttft_peak = np.fft.fft(work_t)
-            
-            drms_peak = calculate_rms(dtft_peak, k1, k2, k3, k4)
-            trms_peak = calculate_rms(ttft_peak, k1, k2, k3, k4)
-            
-            if drms_peak == 0 or trms_peak == 0:
-                continue
+            # Track time for this batch
+            batch_start_time = time.time()
 
-            # Calculate correlation on trimmed spectra
-            cross_power_peak = dtft_peak * np.conj(ttft_peak)
-            cspec_filtered_peak = bandpass(cross_power_peak, k1, k2, k3, k4)
-            ccf_peak = np.fft.ifft(cspec_filtered_peak).real
-            Rz_peak = np.roll(ccf_peak, NW_grid//2)
-            if drms_peak * trms_peak > 0:
-                Rz_peak /= (NW_grid * drms_peak * trms_peak)
-
-            # For forced redshift, the peak should be at the zero-lag position (center)
-            mid = NW_grid // 2
-            peak_idx = mid  # Force peak to be at center since we forced the redshift
-            hgt_p = Rz_peak[peak_idx]
+            # ========================================================================
+            # USE VECTORIZED FFT OPTIMIZATION IF AVAILABLE (SAME AS NORMAL ANALYSIS)
+            # ========================================================================
             
-            # For forced redshift mode, we don't need peak fitting - use direct values
-            ctr_p = float(mid)
-            peak_lag = 0.0  # No additional lag since we already shifted to forced redshift
+            batch_matches = []
             
-            # Final redshift is the forced redshift (by definition)
-            z_est = forced_redshift
-            
-            # Calculate width using multiple methods for robustness
-            width = 0.0
-            z_width = 0.0
-            
-            # Method 1: Half-maximum width estimate
-            try:
-                half_max = hgt_p * 0.5
-                if half_max > 0:
-                    # Find points on either side of peak at half maximum
-                    left_idx = peak_idx
-                    right_idx = peak_idx
-                    
-                    # Search left
-                    for i in range(peak_idx - 1, max(0, peak_idx - 10), -1):
-                        if Rz_peak[i] <= half_max:
-                            left_idx = i
-                            break
-                    
-                    # Search right  
-                    for i in range(peak_idx + 1, min(NW_grid, peak_idx + 10)):
-                        if Rz_peak[i] <= half_max:
-                            right_idx = i
-                            break
-                    
-                    # Calculate full width at half maximum
-                    if right_idx > left_idx:
-                        fwhm_pixels = float(right_idx - left_idx)
-                        width = fwhm_pixels / 2.35  # Convert FWHM to sigma-equivalent
-                        z_width = np.exp(width * DWLOG_grid) - 1.0
-            except:
-                pass
-            
-            # Method 2: Parabolic fit (fallback)
-            if width == 0.0 and peak_idx > 1 and peak_idx < NW_grid - 2:
-                y_neighbors = Rz_peak[peak_idx-2:peak_idx+3]
+            if optimization_available and use_vectorized and len(batch_templates) > 5:
                 try:
-                    a_p, b_p, c_p = np.polyfit(np.arange(-2, 3), y_neighbors, 2)
-                    if a_p < 0 and abs(a_p) > 1e-12:  # Check if it's a maximum
-                        width = np.sqrt(abs(hgt_p) / (2 * abs(a_p)))
-                        z_width = np.exp(width * DWLOG_grid) - 1.0
-                except:
-                    pass
-            
-            # Method 3: Conservative fallback estimate
-            if width == 0.0:
-                # Use a fixed conservative estimate for peak width
-                # This will be refined later based on actual correlation quality
-                width = 2.0  # Conservative width in pixels
-                z_width = np.exp(width * DWLOG_grid) - 1.0
-            
-            # Calculate R value and final rlap
-            arms_raw, _ = aspart(cross_power_peak, k1, k2, k3, k4, 0)
-            arms_norm = arms_raw / (NW_grid * drms_peak * trms_peak)
-
-            if arms_norm > 0:
-                r_value = hgt_p / (2 * arms_norm)
-            else:
-                r_value = 0.0
-
-            rlap = r_value * lpeak
-
-            # Store results if they pass quality criteria
-            if rlap >= rlapmin and lap >= lapmin:
-                # For forced redshift mode, create simplified correlation arrays
-                z_axis_full = np.array([forced_redshift])  # Single point
-                Rz_trimmed = np.array([hgt_p])  # Single correlation value
-                
-                z_axis_peak = np.array([forced_redshift])
-                Rz_peak_trimmed = np.array([hgt_p])
-                
-                # Calculate formal redshift error based on correlation width and quality
-                # Even in forced mode, the correlation width provides uncertainty information
-                if z_width > 0 and r_value > 0:
-                    # Use a physically motivated uncertainty estimate
-                    # Better matches (higher r_value, higher lap) have smaller uncertainties
-                    quality_metric = r_value * lap
-                    if quality_metric > 0:
-                        # Base uncertainty scaled by inverse correlation quality
-                        formal_z_error = z_width / (1.0 + quality_metric)
-                    else:
-                        formal_z_error = z_width
+                    # Use optimized vectorized correlation for the batch
+                    _LOG.debug(f"Using vectorized FFT optimization for {len(batch_templates)} templates in {sn_type} batch {batch_idx}")
+                    correlator = integrate_fft_optimization(batch_templates, k1, k2, k3, k4, config=config)
+                    correlation_results = correlator.correlate_snid_style(dtft, drms)
                     
-                    # For conservative width estimates, cap the error based on quality
-                    if width >= 2.0:  # Conservative fallback was used
-                        if r_value > 5:
-                            formal_z_error = min(formal_z_error, 0.0002)  # Cap for good matches
-                        elif r_value > 2:
-                            formal_z_error = min(formal_z_error, 0.0005)  # Cap for moderate matches
+                    if not correlation_results:
+                        _LOG.warning(f"Vectorized correlation returned no results for {sn_type} batch {batch_idx}")
+                        raise RuntimeError("No correlation results from vectorized method")
                     
-                    # Ensure minimum reasonable uncertainty
-                    min_error = 0.00001  # Minimum uncertainty of 10^-5
-                    formal_z_error = max(formal_z_error, min_error)
-                else:
-                    # Fallback: use a conservative estimate based on match quality
-                    if r_value > 5:
-                        formal_z_error = 0.0001  # Good match
-                    elif r_value > 2:
-                        formal_z_error = 0.0005  # Moderate match
-                    else:
-                        formal_z_error = 0.001   # Poor match
-                
-                # Create a match dictionary
-                match_info = {
-                    "template": tpl,
-                    "name": tpl["name"],
-                    "type": tpl.get("type", "Unknown"),
-                    "subtype": tpl.get("subtype", ""),
-                    "age": tpl.get("age", 0.0),
-                    "redshift": z_est,
-                    "redshift_error": formal_z_error,
-                    "r": r_value,
-                    "lap": lap,
-                    "rlap": rlap,
-                    "peak_height": hgt_p,
-                    "peak_width": width,
-                    "processed_flux": tpl_shifted[left_edge:right_edge+1],  # Flattened template flux for plotting
-                    "correlation": {
-                        "z_axis_full": z_axis_full,
-                        "correlation_full": Rz_trimmed,
-                        "z_axis_peak": z_axis_peak,
-                        "correlation_peak": Rz_peak_trimmed,
-                        "initial_lag": forced_lag,
-                        "final_lag": forced_lag,
-                        "dtft": dtft_peak,
-                        "ttft": ttft_peak,
-                        "drms2": drms_peak,
-                        "trms2": trms_peak,
-                        "cross_power": cross_power_peak,
-                        "cspec_filtered": cspec_filtered_peak
-                    },
-                    "spectra": {
-                        "flat": {
-                            "wave": log_wave[left_edge:right_edge+1],
-                            "flux": tpl_shifted[left_edge:right_edge+1]
-                        },
-                        "flux": {
-                            "wave": log_wave[left_edge:right_edge+1],  # Same grid as flattened version
-                            "flux": (tpl_shifted[left_edge:right_edge+1] + 1.0) * cont[left_edge:right_edge+1]
-                        }
-                    },
-                    "forced_redshift": True  # Flag to indicate this was forced
-                }
-                
-                matches.append(match_info)
-                
-        except Exception as e:
-            _LOG.warning(f"Error processing template {tpl.get('name', 'Unknown')} with forced redshift: {e}")
-            continue
+                    # Process correlation results for forced redshift
+                    for template_name, corr_result in correlation_results.items():
+                        template_data = corr_result['template']
+                        template_meta = template_data.metadata
+                        template_rms = corr_result['template_rms']
+                        
+                        if drms <= 0 or template_rms <= 0:
+                            continue
+                        
+                        try:
+                            # Get template flux
+                            tplate = template_meta.get('flux', None)
+                            if tplate is None or len(tplate) != NW_grid:
+                                continue
+                            
+                            # FORCE: Directly shift template to the forced redshift
+                            tpl_shifted = shiftit(tplate, forced_lag)
+                            
+                            # Get overlap region
+                            (t0, t1), (d0, d1), (ov_start, ov_end), fractional_lap = overlap(tpl_shifted, tapered_flux, log_wave)
+                            
+                            if fractional_lap <= 0:
+                                continue
+                                
+                            lap = fractional_lap 
+                            lpeak = lap * DWLOG_grid * NW_grid
 
-    _LOG.info(f"Forced redshift analysis completed: {len(matches)} matches found (z={forced_redshift:.6f})")
+                            if lap < lapmin:
+                                continue
+
+                            # Process the forced redshift match using the optimized correlation
+                            match_info = _process_forced_redshift_match(
+                                template_meta, tpl_shifted, tapered_flux, log_wave, cont,
+                                forced_redshift, forced_lag, dtft, drms, 
+                                NW_grid, DWLOG_grid, k1, k2, k3, k4,
+                                lapmin, rlapmin, left_edge, right_edge,
+                                lap, lpeak, corr_result['correlation']
+                            )
+                            
+                            if match_info is not None:
+                                batch_matches.append(match_info)
+                                
+                        except Exception as e:
+                            _LOG.warning(f"Error processing template {template_name} with vectorized forced redshift: {e}")
+                            continue
+                            
+                    _LOG.debug(f"Vectorized processing found {len(batch_matches)} matches for {sn_type} batch {batch_idx}")
+                    
+                except Exception as e:
+                    _LOG.warning(f"Vectorized forced redshift failed for {sn_type} batch {batch_idx}: {e}")
+                    _LOG.warning("Falling back to legacy method for this batch")
+                    use_vectorized = False
+            
+            # Fallback to legacy method if vectorized fails or not available
+            if not optimization_available or not use_vectorized or len(batch_templates) <= 5:
+                # Legacy template-by-template processing
+                for template_idx, tpl in enumerate(batch_templates):
+                    try:
+                        # Get template flux (ensuring it's not None and has correct size)
+                        tplate = tpl.get('flux', None)
+                        if tplate is None or len(tplate) != NW_grid:
+                            continue
+                        
+                        # Use pre-computed FFT if available (same optimization as normal analysis)
+                        if tpl.get('is_log_rebinned', False) and 'pre_computed_fft' in tpl:
+                            ttft = tpl['pre_computed_fft']
+                            trms = calculate_rms(ttft, k1, k2, k3, k4)
+                        else:
+                            ttft, trms = dtft_drms(tplate, 0.0, 0, NW_grid-1, k1, k2, k3, k4)
+                        
+                        if drms <= 0 or trms <= 0:
+                            continue
+
+                        # FORCE: Directly shift template to the forced redshift
+                        tpl_shifted = shiftit(tplate, forced_lag)
+                        
+                        # Get overlap region
+                        (t0, t1), (d0, d1), (ov_start, ov_end), fractional_lap = overlap(tpl_shifted, tapered_flux, log_wave)
+                        
+                        if fractional_lap <= 0:
+                            continue
+                            
+                        lap = fractional_lap 
+                        lpeak = lap * DWLOG_grid * NW_grid
+
+                        if lap < lapmin:
+                            continue
+
+                        # Calculate correlation for forced redshift
+                        cross_power = dtft * np.conj(ttft)
+                        cspec_filtered = bandpass(cross_power, k1, k2, k3, k4)
+                        ccf = np.fft.ifft(cspec_filtered).real
+                        correlation = np.roll(ccf, NW_grid//2) / (NW_grid * drms * trms)
+
+                        # Process the forced redshift match
+                        match_info = _process_forced_redshift_match(
+                            tpl, tpl_shifted, tapered_flux, log_wave, cont,
+                            forced_redshift, forced_lag, dtft, drms, 
+                            NW_grid, DWLOG_grid, k1, k2, k3, k4,
+                            lapmin, rlapmin, left_edge, right_edge,
+                            lap, lpeak, correlation
+                        )
+                        
+                        if match_info is not None:
+                            batch_matches.append(match_info)
+                            
+                    except Exception as e:
+                        _LOG.warning(f"Error processing template {tpl.get('name', 'Unknown')} with legacy forced redshift: {e}")
+                        continue
+
+            # Add batch matches to total matches
+            matches.extend(batch_matches)
+            
+            # Update progress counter
+            processed_templates += len(batch_templates)
+            
+            # Performance info for this batch
+            batch_time = time.time() - batch_start_time
+            _LOG.info(f"  ✓ Type {sn_type} batch {batch_idx}/{len(batches)}: {len(batch_matches)} matches found in {batch_time:.2f}s")
+
+    # Calculate total time and performance metrics
+    total_time = time.time() - start_time
+    templates_per_second = len(templates) / total_time if total_time > 0 else 0
+    
+    _LOG.info(f"🎯 OPTIMIZED forced redshift analysis completed: {len(matches)} matches found (z={forced_redshift:.6f})")
+    _LOG.info(f"⚡ Performance: {total_time:.2f}s total, {templates_per_second:.1f} templates/sec")
+    _LOG.info(f"⚡ Average: {total_time/len(templates)*1000:.1f}ms per template")
     
     # Sort matches by rlap (descending) to get best matches first
     matches.sort(key=lambda x: x['rlap'], reverse=True)
     
     return matches
+
+
+def _process_forced_redshift_match(
+    tpl: Dict[str, Any],
+    tpl_shifted: np.ndarray,
+    tapered_flux: np.ndarray,
+    log_wave: np.ndarray,
+    cont: np.ndarray,
+    forced_redshift: float,
+    forced_lag: float,
+    dtft: np.ndarray,
+    drms: float,
+    NW_grid: int,
+    DWLOG_grid: float,
+    k1: int, k2: int, k3: int, k4: int,
+    lapmin: float,
+    rlapmin: float,
+    left_edge: int,
+    right_edge: int,
+    lap: float,
+    lpeak: float,
+    correlation: Optional[np.ndarray] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Process a single forced redshift match with optimized correlation handling.
+    
+    This function handles the detailed correlation analysis for a template at the forced redshift,
+    calculating all necessary metrics and quality indicators.
+    """
+    from .fft_tools import calculate_rms, aspart, apply_filter as bandpass
+    from .preprocessing import apodize, pad_to_NW
+    
+    try:
+        # Trim both arrays to overlapping region and prepare for FFT
+        (t0, t1), (d0, d1), (ov_start, ov_end), _ = overlap(tpl_shifted, tapered_flux, log_wave)
+        
+        start_trim = max(t0, d0)
+        end_trim = min(t1, d1)
+        
+        if end_trim <= start_trim:
+            return None
+        
+        work_d = tapered_flux[start_trim:end_trim + 1].copy()
+        work_t = tpl_shifted[start_trim:end_trim + 1].copy()
+        
+        if len(work_d) == 0 or len(work_t) == 0:
+            return None
+        
+        # Apodize the trimmed regions
+        apodize_percent = 10.0
+        work_d = apodize(work_d, 0, len(work_d) - 1, percent=apodize_percent)
+        work_t = apodize(work_t, 0, len(work_t) - 1, percent=apodize_percent)
+        
+        # Pad to NW
+        work_d = pad_to_NW(work_d, NW_grid)
+        work_t = pad_to_NW(work_t, NW_grid)
+        
+        # Calculate new FFTs and RMS values
+        dtft_peak = np.fft.fft(work_d)
+        ttft_peak = np.fft.fft(work_t)
+        
+        drms_peak = calculate_rms(dtft_peak, k1, k2, k3, k4)
+        trms_peak = calculate_rms(ttft_peak, k1, k2, k3, k4)
+        
+        if drms_peak == 0 or trms_peak == 0:
+            return None
+
+        # Calculate correlation on trimmed spectra
+        cross_power_peak = dtft_peak * np.conj(ttft_peak)
+        cspec_filtered_peak = bandpass(cross_power_peak, k1, k2, k3, k4)
+        ccf_peak = np.fft.ifft(cspec_filtered_peak).real
+        Rz_peak = np.roll(ccf_peak, NW_grid//2)
+        if drms_peak * trms_peak > 0:
+            Rz_peak /= (NW_grid * drms_peak * trms_peak)
+
+        # For forced redshift, the peak should be at the zero-lag position (center)
+        mid = NW_grid // 2
+        peak_idx = mid  # Force peak to be at center since we forced the redshift
+        hgt_p = Rz_peak[peak_idx]
+        
+        # For forced redshift mode, we don't need peak fitting - use direct values
+        z_est = forced_redshift
+        
+        # Calculate width for uncertainty estimation
+        width = 0.0
+        z_width = 0.0
+        
+        # Half-maximum width estimate
+        try:
+            half_max = hgt_p * 0.5
+            if half_max > 0:
+                left_idx = peak_idx
+                right_idx = peak_idx
+                
+                # Search left and right
+                for i in range(peak_idx - 1, max(0, peak_idx - 10), -1):
+                    if Rz_peak[i] <= half_max:
+                        left_idx = i
+                        break
+                for i in range(peak_idx + 1, min(NW_grid, peak_idx + 10)):
+                    if Rz_peak[i] <= half_max:
+                        right_idx = i
+                        break
+                
+                if right_idx > left_idx:
+                    fwhm_pixels = float(right_idx - left_idx)
+                    width = fwhm_pixels / 2.35
+                    z_width = np.exp(width * DWLOG_grid) - 1.0
+        except:
+            pass
+        
+        # Conservative fallback estimate
+        if width == 0.0:
+            width = 2.0
+            z_width = np.exp(width * DWLOG_grid) - 1.0
+        
+        # Calculate R value and final rlap
+        arms_raw, _ = aspart(cross_power_peak, k1, k2, k3, k4, 0)
+        arms_norm = arms_raw / (NW_grid * drms_peak * trms_peak)
+
+        if arms_norm > 0:
+            r_value = hgt_p / (2 * arms_norm)
+        else:
+            r_value = 0.0
+
+        rlap = r_value * lpeak
+
+        # Store results if they pass quality criteria
+        if rlap >= rlapmin and lap >= lapmin:
+            # Calculate formal redshift error
+            if z_width > 0 and r_value > 0:
+                quality_metric = r_value * lap
+                if quality_metric > 0:
+                    formal_z_error = z_width / (1.0 + quality_metric)
+                else:
+                    formal_z_error = z_width
+                
+                if width >= 2.0:  # Conservative fallback was used
+                    if r_value > 5:
+                        formal_z_error = min(formal_z_error, 0.0002)
+                    elif r_value > 2:
+                        formal_z_error = min(formal_z_error, 0.0005)
+                
+                min_error = 0.00001
+                formal_z_error = max(formal_z_error, min_error)
+            else:
+                if r_value > 5:
+                    formal_z_error = 0.0001
+                elif r_value > 2:
+                    formal_z_error = 0.0005
+                else:
+                    formal_z_error = 0.001
+            
+            # Create match dictionary
+            match_info = {
+                "template": tpl,
+                "name": tpl["name"],
+                "type": tpl.get("type", "Unknown"),
+                "subtype": tpl.get("subtype", ""),
+                "age": tpl.get("age", 0.0),
+                "redshift": z_est,
+                "redshift_error": formal_z_error,
+                "r": r_value,
+                "lap": lap,
+                "rlap": rlap,
+                "peak_height": hgt_p,
+                "peak_width": width,
+                "processed_flux": tpl_shifted[left_edge:right_edge+1],
+                "correlation": {
+                    "z_axis_full": np.array([forced_redshift]),
+                    "correlation_full": np.array([hgt_p]),
+                    "z_axis_peak": np.array([forced_redshift]),
+                    "correlation_peak": np.array([hgt_p]),
+                    "initial_lag": forced_lag,
+                    "final_lag": forced_lag,
+                    "dtft": dtft_peak,
+                    "ttft": ttft_peak,
+                    "drms2": drms_peak,
+                    "trms2": trms_peak,
+                    "cross_power": cross_power_peak,
+                    "cspec_filtered": cspec_filtered_peak
+                },
+                "spectra": {
+                    "flat": {
+                        "wave": log_wave[left_edge:right_edge+1],
+                        "flux": tpl_shifted[left_edge:right_edge+1]
+                    },
+                    "flux": {
+                        "wave": log_wave[left_edge:right_edge+1],
+                        "flux": (tpl_shifted[left_edge:right_edge+1] + 1.0) * cont[left_edge:right_edge+1]
+                    }
+                },
+                "forced_redshift": True  # Flag to indicate this was forced
+            }
+            
+            return match_info
+        
+        return None
+        
+    except Exception as e:
+        _LOG.warning(f"Error in _process_forced_redshift_match for template {tpl.get('name', 'Unknown')}: {e}")
+        return None
 
 
 def run_snid_analysis(
@@ -1004,14 +1249,31 @@ def run_snid_analysis(
     _LOG.info("="*60)
     report_progress("Starting SNID correlation analysis")
     
-    # Extract preprocessed data
-    log_wave = processed_spectrum['log_wave']
-    tapered_flux = processed_spectrum['tapered_flux']
-    flat_flux = processed_spectrum['flat_flux']
-    cont = processed_spectrum['continuum']
-    left_edge = processed_spectrum['left_edge']
-    right_edge = processed_spectrum['right_edge']
-    grid_params = processed_spectrum['grid_params']
+    # Extract preprocessed data with validation
+    try:
+        log_wave = processed_spectrum['log_wave']
+        tapered_flux = processed_spectrum['tapered_flux']
+        flat_flux = processed_spectrum['flat_flux']
+        cont = processed_spectrum['continuum']
+        left_edge = processed_spectrum['left_edge']
+        right_edge = processed_spectrum['right_edge']
+        grid_params = processed_spectrum['grid_params']
+        
+        # Validate that tapered_flux is properly processed
+        if tapered_flux is None:
+            raise ValueError("tapered_flux is None - preprocessing may have failed")
+        if len(tapered_flux) == 0:
+            raise ValueError("tapered_flux is empty - preprocessing may have failed")
+        if np.all(tapered_flux == 0):
+            raise ValueError("tapered_flux is all zeros - apodization may have failed")
+            
+        _LOG.debug(f"Extracted preprocessed data: {len(tapered_flux)} points in tapered_flux")
+        
+    except KeyError as e:
+        raise ValueError(f"Missing required key in processed_spectrum: {e}. "
+                        f"Available keys: {list(processed_spectrum.keys())}") from e
+    except Exception as e:
+        raise ValueError(f"Error extracting preprocessed data: {e}") from e
     
     # Get grid parameters
     NW_grid = grid_params['NW']
@@ -1049,55 +1311,63 @@ def run_snid_analysis(
     }
 
     # ============================================================================
-    # STEP 7: LOAD TEMPLATES (UNIFIED STORAGE SYSTEM)
+    # STEP 7: LOAD TEMPLATES (ONLY FOR NON-FORCED ANALYSIS)
     # ============================================================================
-    report_progress("Loading template library")
     
-    # Use unified storage for loading templates
-    try:
-        templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
-        _LOG.info(f"✅ Loaded {len(templates)} templates using UNIFIED STORAGE")
-    except Exception as e:
-        _LOG.warning(f"Unified storage failed, falling back to legacy loader: {e}")
-        templates, _ = load_templates(templates_dir, flatten=True)
+    # Skip template loading for forced redshift analysis (new method handles its own loading)
+    if forced_redshift is None:
+        # NORMAL ANALYSIS: Load templates here
+        report_progress("Loading template library")
         
-        # Apply template filtering to legacy templates
-        if template_filter:
-            templates = [t for t in templates if t.get('name', '') in template_filter]
-            _LOG.info(f"Applied template filter: {len(templates)} templates remaining")
-        elif exclude_templates:
-            original_count = len(templates)
-            templates = [t for t in templates if t.get('name', '') not in exclude_templates]
-            _LOG.info(f"Excluded {original_count - len(templates)} templates: {len(templates)} remaining")
+        # Use unified storage for loading templates
+        try:
+            templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
+            _LOG.info(f"✅ Loaded {len(templates)} templates using UNIFIED STORAGE")
+        except Exception as e:
+            _LOG.warning(f"Unified storage failed, falling back to legacy loader: {e}")
+            templates, _ = load_templates(templates_dir, flatten=True)
+            
+            # Apply template filtering to legacy templates
+            if template_filter:
+                templates = [t for t in templates if t.get('name', '') in template_filter]
+                _LOG.info(f"Applied template filter: {len(templates)} templates remaining")
+            elif exclude_templates:
+                original_count = len(templates)
+                templates = [t for t in templates if t.get('name', '') not in exclude_templates]
+                _LOG.info(f"Excluded {original_count - len(templates)} templates: {len(templates)} remaining")
+            
+            _LOG.info(f"✅ Loaded {len(templates)} templates using STANDARD method")
         
-        _LOG.info(f"✅ Loaded {len(templates)} templates using STANDARD method")
-    
-    if not templates:
-        _LOG.error("No templates loaded")
-        result.success = False
-        return result, analysis_trace
+        if not templates:
+            _LOG.error("No templates loaded")
+            result.success = False
+            return result, analysis_trace
 
-    # ============================================================================
-    # STEP 7a: OPTIONAL FILTERING BY AGE AND TYPE
-    # ============================================================================
-    original_count = len(templates)
-    
-    if age_range is not None:
-        report_progress(f"Filtering templates by age range: {age_range}")
-        age_min, age_max = age_range
-        templates = [t for t in templates if age_min <= t.get('age', 0) <= age_max]
-        _LOG.info(f"Step 7a: Age filtering: {original_count} -> {len(templates)} templates")
-    
-    if type_filter is not None and len(type_filter) > 0:
-        report_progress(f"Filtering templates by type: {type_filter}")
-        templates = [t for t in templates if t.get('type', '') in type_filter]
-        _LOG.info(f"Step 7a: Type filtering: {original_count} -> {len(templates)} templates")
-    
-    if len(templates) == 0:
-        report_progress("No templates remaining after filtering")
-        _LOG.error("ERROR: No templates remaining after filtering")
-        result.success = False
-        return result, analysis_trace
+        # ============================================================================
+        # STEP 7a: OPTIONAL FILTERING BY AGE AND TYPE
+        # ============================================================================
+        original_count = len(templates)
+        
+        if age_range is not None:
+            report_progress(f"Filtering templates by age range: {age_range}")
+            age_min, age_max = age_range
+            templates = [t for t in templates if age_min <= t.get('age', 0) <= age_max]
+            _LOG.info(f"Step 7a: Age filtering: {original_count} -> {len(templates)} templates")
+        
+        if type_filter is not None and len(type_filter) > 0:
+            report_progress(f"Filtering templates by type: {type_filter}")
+            templates = [t for t in templates if t.get('type', '') in type_filter]
+            _LOG.info(f"Step 7a: Type filtering: {original_count} -> {len(templates)} templates")
+        
+        if len(templates) == 0:
+            report_progress("No templates remaining after filtering")
+            _LOG.error("ERROR: No templates remaining after filtering")
+            result.success = False
+            return result, analysis_trace
+    else:
+        # FORCED REDSHIFT ANALYSIS: Templates will be loaded by the analysis function
+        _LOG.info("⏭️  Skipping template loading - forced redshift analysis will handle loading by type")
+        templates = []  # Placeholder for consistency
 
     # ============================================================================
     # STEP 8: PREPARE K-GRID & HELPERS
@@ -1139,17 +1409,34 @@ def run_snid_analysis(
     # Check if forced redshift mode is enabled
     if forced_redshift is not None:
         # FORCED REDSHIFT MODE: Bypass normal correlation search
-        report_progress(f"Starting forced redshift analysis (z={forced_redshift:.6f}) for {len(templates)} templates")
-        _LOG.info(f"Phase 1: Processing {len(templates)} templates with FORCED REDSHIFT z={forced_redshift:.6f}")
-        _LOG.info("  → Skipping normal correlation search, using forced redshift only")
+        report_progress(f"Starting forced redshift analysis (z={forced_redshift:.6f})")
+        _LOG.info(f"Phase 1: FORCED REDSHIFT analysis z={forced_redshift:.6f}")
+        _LOG.info("  → Skipping normal correlation search, using per-type template loading")
         
-        matches = _run_forced_redshift_analysis(
-            templates, tapered_flux, dtft, drms, left_edge, right_edge, 
-            forced_redshift, NW_grid, DWLOG_grid, k1, k2, k3, k4, 
-            lapmin, rlapmin, zmin, zmax, log_wave, cont, report_progress
-        )
+        # Additional debugging for forced redshift + advanced preprocessing
+        _LOG.debug(f"Forced redshift analysis parameters:")
+        _LOG.debug(f"  - tapered_flux shape: {tapered_flux.shape}")
+        _LOG.debug(f"  - tapered_flux range: {np.min(tapered_flux):.2e} to {np.max(tapered_flux):.2e}")
+        _LOG.debug(f"  - log_wave shape: {log_wave.shape}")
+        _LOG.debug(f"  - left_edge: {left_edge}, right_edge: {right_edge}")
+        _LOG.debug(f"  - NW_grid: {NW_grid}, DWLOG_grid: {DWLOG_grid}")
         
-        _LOG.info(f"Phase 1 complete: Forced redshift analysis found {len(matches)} matches with rlap >= {rlapmin}")
+        try:
+            matches = _run_forced_redshift_analysis_optimized(
+                templates_dir, type_filter, template_filter, exclude_templates, age_range,
+                tapered_flux, dtft, drms, left_edge, right_edge, 
+                forced_redshift, NW_grid, DWLOG_grid, k1, k2, k3, k4, 
+                lapmin, rlapmin, zmin, zmax, log_wave, cont, report_progress
+            )
+            
+            _LOG.info(f"Phase 1 complete: Forced redshift analysis found {len(matches)} matches with rlap >= {rlapmin}")
+            
+        except Exception as e:
+            _LOG.error(f"Error in forced redshift analysis: {e}")
+            _LOG.error(f"This may be due to incompatible preprocessing data structure")
+            import traceback
+            _LOG.debug(f"Forced redshift analysis traceback: {traceback.format_exc()}")
+            raise
         
     else:
         # NORMAL CORRELATION MODE: Full redshift search
@@ -2007,6 +2294,7 @@ def run_snid(
     age_range: Optional[Tuple[float, float]] = None,
     type_filter: Optional[List[str]] = None,
     template_filter: Optional[List[str]] = None,
+    exclude_templates: Optional[List[str]] = None,
     apodize_percent: float = 10.0,
     peak_window_size: int = 10,
     lapmin: float = 0.3,

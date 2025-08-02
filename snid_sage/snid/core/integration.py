@@ -343,7 +343,16 @@ def load_templates_unified(template_dir: str,
     List[Dict[str, Any]]
         Templates in legacy format (already rebinned to standard grid)
     """
-    storage = get_unified_storage(template_dir)
+    try:
+        # Add defensive checks for widget cleanup issues
+        import gc
+        gc.collect()  # Clean up any lingering PyQtGraph widgets before template loading
+        
+        storage = get_unified_storage(template_dir)
+        
+    except Exception as e:
+        _LOG.error(f"Error initializing unified storage: {e}")
+        raise RuntimeError(f"Failed to initialize template storage: {e}")
     
     # Handle exclusive logic: if template_names is specified, exclude_templates is ignored
     final_template_names = template_names

@@ -157,7 +157,7 @@ class PySide6EventHandlers(QtCore.QObject):
                     flat_enabled=True
                 )
             
-            # IMPORTANT: Flux/Flat buttons should return to spectrum mode
+            
             from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PlotMode
             if self.main_window.plot_manager.current_plot_mode != PlotMode.SPECTRUM:
                 _LOGGER.info("Flux/Flat button pressed - returning to spectrum mode")
@@ -527,7 +527,7 @@ class PySide6EventHandlers(QtCore.QObject):
             self.app_controller.auto_select_best_cluster = False
     
     def on_reset_to_initial_state(self):
-        """Handle reset to initial state"""
+        """Handle reset to initial state - comprehensive reset that restores GUI to exact startup state"""
         try:
             reply = QtWidgets.QMessageBox.question(
                 self.main_window, 
@@ -538,13 +538,196 @@ class PySide6EventHandlers(QtCore.QObject):
             )
             
             if reply == QtWidgets.QMessageBox.Yes:
-                self.app_controller.reset_to_initial_state()
-                self.main_window.status_label.setText("Application reset to initial state")
-                self.main_window.plot_manager.plot_pyqtgraph_welcome_message()
+                # Perform comprehensive reset to true initial state
+                self._perform_comprehensive_reset()
                 _LOGGER.info("Application reset to initial state")
                 
         except Exception as e:
             _LOGGER.error(f"Error resetting application: {e}")
+    
+    def _perform_comprehensive_reset(self):
+        """
+        Perform a comprehensive reset that brings the GUI back to the exact state
+        it was in when first opened, removing all lingering status text and settings
+        """
+        try:
+            _LOGGER.info("🔄 Starting comprehensive reset to initial state...")
+            
+            # 1. Reset app controller data
+            self.app_controller.reset_to_initial_state()
+            
+            # 2. Clear additional persistent settings that the basic reset misses
+            self._clear_persistent_settings()
+            
+            # 3. Reset all status labels to their exact initial text and styling
+            self._reset_all_status_labels_to_initial()
+            
+            # 4. Reset view buttons to initial state
+            self._reset_view_buttons_to_initial()
+            
+            # 5. Clear the plot and show welcome message
+            self.main_window.plot_manager.plot_pyqtgraph_welcome_message()
+            
+            # 6. Reset main status to initial message
+            self.main_window.status_label.setText("Ready - Load a spectrum to begin analysis")
+            
+            # 7. Update button states to reflect initial state
+            self._update_buttons_for_initial_state()
+            
+            # 8. Force workflow state update to INITIAL (ensures everything is in sync)
+            self._force_workflow_state_to_initial()
+            
+            _LOGGER.info("✅ Comprehensive reset completed successfully")
+            
+        except Exception as e:
+            _LOGGER.error(f"❌ Error during comprehensive reset: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _clear_persistent_settings(self):
+        """Clear persistent settings that survive basic reset"""
+        try:
+            # Clear redshift mode configuration
+            if hasattr(self.app_controller, 'redshift_mode_config'):
+                self.app_controller.redshift_mode_config = None
+                
+            # Clear manual redshift
+            if hasattr(self.app_controller, 'manual_redshift'):
+                self.app_controller.manual_redshift = None
+                
+            # Clear any forced redshift settings
+            if hasattr(self.app_controller, 'forced_redshift'):
+                self.app_controller.forced_redshift = None
+                
+            # Clear analysis controller redshift config if it exists
+            if hasattr(self.main_window, 'analysis_controller') and self.main_window.analysis_controller:
+                if hasattr(self.main_window.analysis_controller, 'redshift_config'):
+                    self.main_window.analysis_controller.redshift_config = {}
+                    
+            _LOGGER.debug("  ✅ Persistent settings cleared")
+            
+        except Exception as e:
+            _LOGGER.warning(f"  ⚠️ Warning clearing persistent settings: {e}")
+    
+    def _reset_all_status_labels_to_initial(self):
+        """Reset all status labels to their exact initial text and styling"""
+        try:
+            # Define the initial styling for status labels
+            initial_status_style = (
+                "font-style: italic; color: #475569; font-size: 10px !important; "
+                "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                "line-height: 1.0 !important; margin-top: 0px;"
+            )
+            
+            # Reset file status label - CRITICAL: This was missing!
+            if hasattr(self.main_window, 'file_status_label'):
+                self.main_window.file_status_label.setText("No file loaded")
+                self.main_window.file_status_label.setStyleSheet(initial_status_style)
+            
+            # Reset redshift status label
+            if hasattr(self.main_window, 'redshift_status_label'):
+                self.main_window.redshift_status_label.setText("Optional: No redshift selected")
+                self.main_window.redshift_status_label.setStyleSheet(initial_status_style)
+            
+            # Reset preprocessing status label
+            if hasattr(self.main_window, 'preprocess_status_label'):
+                self.main_window.preprocess_status_label.setText("Not preprocessed")
+                self.main_window.preprocess_status_label.setStyleSheet(initial_status_style)
+            
+            # Reset configuration status label
+            if hasattr(self.main_window, 'config_status_label'):
+                self.main_window.config_status_label.setText("Default SNID parameters loaded")
+                self.main_window.config_status_label.setStyleSheet(initial_status_style)
+            
+            # Reset emission line status label
+            if hasattr(self.main_window, 'emission_status_label'):
+                self.main_window.emission_status_label.setText("Not analyzed")
+                self.main_window.emission_status_label.setStyleSheet(initial_status_style)
+            
+            # Reset AI status label
+            if hasattr(self.main_window, 'ai_status_label'):
+                self.main_window.ai_status_label.setText("Not analyzed")
+                self.main_window.ai_status_label.setStyleSheet(initial_status_style)
+            
+            _LOGGER.debug("  ✅ All status labels reset to initial state")
+            
+        except Exception as e:
+            _LOGGER.warning(f"  ⚠️ Warning resetting status labels: {e}")
+    
+    def _reset_view_buttons_to_initial(self):
+        """Reset view buttons (Flux/Flat) to their initial disabled state with proper styling"""
+        try:
+            # Reset current view to initial state
+            if hasattr(self.main_window, 'current_view'):
+                self.main_window.current_view = 'flux'  # Reset to default view
+            
+            # Use the layout manager to properly reset button states and styling
+            if hasattr(self.main_window, 'unified_layout_manager'):
+                self.main_window.unified_layout_manager.update_flux_flat_button_states(
+                    self.main_window,
+                    flux_active=False,    # Flux NOT active (gray, not blue)
+                    flat_active=False,    # Flat NOT active (gray, not blue)
+                    flux_enabled=False,   # Flux disabled until spectrum loaded
+                    flat_enabled=False    # Flat disabled until preprocessing
+                )
+                _LOGGER.debug("  ✅ Used layout manager to reset Flux/Flat button states")
+            else:
+                # Fallback: manually reset if layout manager not available
+                if hasattr(self.main_window, 'flux_btn'):
+                    self.main_window.flux_btn.setEnabled(False)
+                    self.main_window.flux_btn.setChecked(False)
+                    self.main_window.flux_btn.setToolTip("Flux view requires spectrum\nLoad a spectrum file first")
+                
+                if hasattr(self.main_window, 'flat_btn'):
+                    self.main_window.flat_btn.setEnabled(False)
+                    self.main_window.flat_btn.setChecked(False)
+                    self.main_window.flat_btn.setToolTip("Flat view requires preprocessing\nLoad a spectrum and run preprocessing first")
+                
+                _LOGGER.debug("  ✅ Manually reset Flux/Flat button states (fallback)")
+                
+            _LOGGER.debug("  ✅ View buttons reset to initial state")
+            
+        except Exception as e:
+            _LOGGER.warning(f"  ⚠️ Warning resetting view buttons: {e}")
+    
+    def _update_buttons_for_initial_state(self):
+        """Update all button states to reflect the initial application state"""
+        try:
+            # Update button states through the app controller
+            if hasattr(self.app_controller, 'update_button_states'):
+                self.app_controller.update_button_states()
+                
+            # Also update through the main window if available
+            if hasattr(self.main_window, 'app_controller') and self.main_window.app_controller:
+                self.main_window.app_controller.update_button_states()
+                
+            _LOGGER.debug("  ✅ Button states updated for initial state")
+            
+        except Exception as e:
+            _LOGGER.warning(f"  ⚠️ Warning updating button states: {e}")
+    
+    def _force_workflow_state_to_initial(self):
+        """Force workflow state to INITIAL and ensure all UI reflects this state"""
+        try:
+            # Import the WorkflowState enum
+            from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
+            
+            # Force workflow state through multiple pathways to ensure it sticks
+            if hasattr(self.app_controller, 'update_workflow_state'):
+                self.app_controller.update_workflow_state(WorkflowState.INITIAL)
+            
+            # Also force through main window if it has workflow management
+            if hasattr(self.main_window, '_update_workflow_state'):
+                self.main_window._update_workflow_state(WorkflowState.INITIAL)
+            
+            # Force through workflow integrator if available
+            if hasattr(self.main_window, 'workflow_integrator'):
+                self.main_window.workflow_integrator.workflow.update_workflow_state(WorkflowState.INITIAL)
+            
+            _LOGGER.debug("  ✅ Workflow state forced to INITIAL")
+            
+        except Exception as e:
+            _LOGGER.warning(f"  ⚠️ Warning forcing workflow state: {e}")
     
     def on_previous_template(self):
         """Handle previous template navigation"""

@@ -21,7 +21,7 @@ Based on the original Tkinter GUI and migration suggestions
 import os
 import sys
 
-# CRITICAL: Set environment variables for GUI compatibility
+
 # This must be set before ANY GUI imports happen anywhere in the codebase
 os.environ['SNID_SAGE_GUI_BACKEND'] = 'PySide6'
 
@@ -132,22 +132,22 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         # Initialize variables and state
         self._init_variables_and_state()
         
-        # CRITICAL: Log button states after creation but before stylesheet
+        
         _LOGGER.info("🔍 BEFORE STYLESHEET: Checking button states...")
         if hasattr(self, 'flux_btn'):
             _LOGGER.info(f"🔍 FLUX BUTTON: size={self.flux_btn.size()}, minimumSize={self.flux_btn.minimumSize()}, enabled={self.flux_btn.isEnabled()}, checked={self.flux_btn.isChecked()}")
         if hasattr(self, 'flat_btn'):
             _LOGGER.info(f"🔍 FLAT BUTTON: size={self.flat_btn.size()}, minimumSize={self.flat_btn.minimumSize()}, enabled={self.flat_btn.isEnabled()}, checked={self.flat_btn.isChecked()}")
         
-        # CRITICAL: Reapply stylesheet after buttons are created to ensure CSS selectors work
+        
         _LOGGER.info("🎨 APPLYING STYLESHEET: About to apply main stylesheet...")
         self._apply_qt_stylesheet()
         
-        # CRITICAL: Apply proper Flux/Flat button styling via layout manager
+        
         _LOGGER.info("🎨 APPLYING BUTTON STYLES: Delegating to layout manager...")
         self.unified_layout_manager.apply_flux_flat_button_styles(self)
         
-        # CRITICAL: Log button states after stylesheet application
+        
         _LOGGER.info("🔍 AFTER STYLESHEET: Checking button states...")
         if hasattr(self, 'flux_btn'):
             _LOGGER.info(f"🔍 FLUX BUTTON: size={self.flux_btn.size()}, minimumSize={self.flux_btn.minimumSize()}, enabled={self.flux_btn.isEnabled()}, checked={self.flux_btn.isChecked()}")
@@ -393,17 +393,18 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             settings = self.unified_layout_manager.settings
             default_size = settings.default_window_size
             min_size = settings.minimum_window_size
-            max_size = settings.maximum_window_size
+            # No maximum size to allow full maximization
         else:
             # Fallback to default values
             default_size = (900, 600)
             min_size = (700, 500)
-            max_size = (1400, 1000)
+            # No maximum size to allow full maximization
         
         # Set calculated sizes
         self.resize(*default_size)
         self.setMinimumSize(*min_size)
-        self.setMaximumSize(*max_size)
+        # Remove maximum size restriction to allow full maximization
+        # self.setMaximumSize(*max_size)  # Commented out to enable maximize button
         
         _LOGGER.debug(f"Window size set to {default_size[0]}x{default_size[1]} using unified layout settings")
         
@@ -451,7 +452,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         layout_settings = LayoutSettings()
         layout_settings.default_window_size = (900, 600)
         layout_settings.minimum_window_size = (700, 500)
-        layout_settings.maximum_window_size = (1400, 1000)
+        # layout_settings.maximum_window_size = (1400, 1000)  # Removed to allow maximization
         
         self.unified_layout_manager = get_unified_layout_manager(layout_settings)
         
@@ -550,7 +551,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         self.flux_btn.clicked.connect(lambda: self._on_view_change('flux'))
         self.flat_btn.clicked.connect(lambda: self._on_view_change('flat'))
         
-        # CRITICAL: Initialize both buttons as disabled until spectrum is loaded
+        
         self.flux_btn.setEnabled(False)
         self.flux_btn.setChecked(False)
         self.flux_btn.setToolTip("Flux view requires spectrum\nLoad a spectrum file first")
@@ -582,9 +583,9 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 'subtype_proportions_btn': self.subtype_proportions_btn,
                 'prev_btn': self.prev_btn,
                 'next_btn': self.next_btn,
-                # CRITICAL: flux_btn and flat_btn are NOT registered here because they have
+                
                 # special CSS-based toggle styling that would be overridden by workflow manager
-                # Note: mask_btn and clear_masks_btn removed from main window
+                
             }
             
             for button_name, button_widget in workflow_buttons.items():
@@ -749,7 +750,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             # Set current view to flux
             self.current_view = 'flux'
             _LOGGER.info(f"🔧 FILE_LOADED: Set current_view to '{self.current_view}'")
-            # Note: mask buttons removed from main window
+            
             
         elif new_state == WorkflowState.PREPROCESSED:
             self.analysis_btn.setEnabled(True)
@@ -814,9 +815,6 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         if hasattr(self, 'event_handlers'):
             self.event_handlers.on_reset_to_initial_state()
     
-
-            
-
     
     def open_redshift_dialog(self):
         """Open redshift selection dialog - delegate to dialog manager"""
@@ -831,26 +829,6 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             self.dialog_manager.open_settings_dialog()
         else:
             _LOGGER.error("Dialog manager not available")
-
-    def reset_to_initial_state(self):
-        """Reset application to initial state"""
-        try:
-            reply = QtWidgets.QMessageBox.question(
-                self, 
-                "Reset Application", 
-                "Are you sure you want to reset to initial state?\nThis will clear all data and analysis results.",
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                QtWidgets.QMessageBox.No
-            )
-            
-            if reply == QtWidgets.QMessageBox.Yes:
-                self.app_controller.reset_to_initial_state()
-                self.status_label.setText("Application reset to initial state")
-                self._plot_clean_welcome_message()
-                _LOGGER.info("Application reset to initial state")
-                
-        except Exception as e:
-            _LOGGER.error(f"Error resetting application: {e}")
 
     def open_emission_line_dialog(self):
         """Open emission line dialog - delegate to dialog manager"""
@@ -1130,13 +1108,35 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 self.config_status_label.setText("❌ Analysis Failed")
                 self.config_status_label.setStyleSheet("font-style: italic; color: #ef4444;")
                 
-                QtWidgets.QMessageBox.critical(
-                    self,
-                    "Analysis Failed",
-                    "SNID analysis failed to complete.\n\n"
-                    "Please check the analysis logs for detailed error information.\n"
-                    "You may need to verify your spectrum preprocessing or template configuration."
-                )
+                # Enhanced error messaging based on analysis type
+                error_info = getattr(self.app_controller, 'last_analysis_error', None)
+                
+                if error_info and error_info.get('type') == 'forced_redshift':
+                    # Specific messaging for forced redshift failures
+                    context = error_info.get('context', 'forced redshift analysis')
+                    error_msg = error_info.get('error', 'Unknown error')
+                    
+                    QtWidgets.QMessageBox.critical(
+                        self,
+                        "Forced Redshift Analysis Failed",
+                        f"The {context} failed to complete.\n\n"
+                        f"Error: {error_msg}\n\n"
+                        "Common solutions:\n"
+                        "• Check that the forced redshift value is reasonable (0 < z < 2)\n"
+                        "• Verify your spectrum preprocessing settings\n"
+                        "• Try using automatic redshift search instead\n"
+                        "• Check that templates are properly loaded\n\n"
+                        "Please check the analysis logs for detailed error information."
+                    )
+                else:
+                    # Standard error messaging for normal analysis
+                    QtWidgets.QMessageBox.critical(
+                        self,
+                        "Analysis Failed",
+                        "SNID analysis failed to complete.\n\n"
+                        "Please check the analysis logs for detailed error information.\n"
+                        "You may need to verify your spectrum preprocessing or template configuration."
+                    )
         except Exception as e:
             _LOGGER.error(f"Error handling analysis completion: {e}")
     
@@ -1256,7 +1256,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     flat_enabled=True
                 )
             
-            # IMPORTANT: Flux/Flat buttons should return to spectrum mode
+            
             if self.current_plot_mode != PlotMode.SPECTRUM:
                 _LOGGER.info("Flux/Flat button pressed - returning to spectrum mode")
                 self._switch_to_plot_mode(PlotMode.SPECTRUM)
@@ -2002,10 +2002,43 @@ def main(verbosity_args=None):
     # This can be used by other modules to avoid backend conflicts
     os.environ['SNID_SAGE_GUI_BACKEND'] = 'PySide6'
     
+    # Suppress Qt warnings before creating application
+    os.environ['QT_LOGGING_RULES'] = '*.debug=false;qt.qpa.windows.debug=false'
+    
     # Create Qt application
     app = QtWidgets.QApplication(sys.argv)
     
-    # Verify Qt rendering backend (important for WSL debugging)
+    # Install custom message handler to suppress specific Qt warnings
+    def qt_message_handler(mode, context, message):
+        # Suppress specific Qt warnings that are non-critical
+        if any(warning in message for warning in [
+            "No Qt Window found for event",
+            "WM_ACTIVATEAPP",
+            "QWindowsContext::windowsProc"
+        ]):
+            return  # Silently ignore these warnings
+        
+        # For other messages, use default behavior
+        if logger:
+            if mode == QtCore.QtMsgType.QtDebugMsg:
+                logger.debug(f"Qt: {message}")
+            elif mode == QtCore.QtMsgType.QtWarningMsg:
+                logger.warning(f"Qt: {message}")
+            elif mode == QtCore.QtMsgType.QtCriticalMsg:
+                logger.error(f"Qt: {message}")
+            elif mode == QtCore.QtMsgType.QtFatalMsg:
+                logger.critical(f"Qt: {message}")
+    
+    # Install the message handler
+    try:
+        QtCore.qInstallMessageHandler(qt_message_handler)
+        if logger:
+            logger.debug("Qt message handler installed to suppress non-critical warnings")
+    except Exception as e:
+        if logger:
+            logger.warning(f"Could not install Qt message handler: {e}")
+    
+    
     if logger:
         try:
             # Check what OpenGL backend Qt is using

@@ -440,7 +440,7 @@ class InteractiveContinuumWidget:
         if self.wave_grid is None or len(self.wave_grid) == 0:
             return None
         
-        # If we are in interactive mode we only want to consider the *visible*
+        
         # indices (i.e. those spaced by ``self._interactive_step``) when
         # determining which point a user is attempting to drag.  This avoids
         # selecting a hidden point that does not have a marker on the plot.

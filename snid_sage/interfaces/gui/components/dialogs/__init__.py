@@ -25,8 +25,7 @@ Available dialogs:
 # from .configuration_dialog import ModernSNIDOptionsDialog, show_snid_options_dialog
 # mask_manager_dialog moved to OLD_ - use PySide6 version instead
 # from .mask_manager_dialog import MaskManagerDialog
-# enhanced_ai_assistant_dialog moved to OLD_ - use PySide6 version instead
-# from .enhanced_ai_assistant_dialog import EnhancedAIAssistantDialog, AISummaryDialog
+
 # settings_dialog moved to OLD_ - use PySide6 version instead
 # from .settings_dialog import GUISettingsDialog, show_gui_settings_dialog
 # manual_redshift_dialog moved to OLD_ - use PySide6 version instead
@@ -44,7 +43,7 @@ __all__ = [
     # 'show_snid_options_dialog',  # Moved to OLD_ - use PySide6 version
     # 'MaskManagerDialog',  # Moved to OLD_ - use PySide6 version
     # 'AISummaryDialog',  # Moved to OLD_ - use PySide6 version
-    # 'EnhancedAIAssistantDialog',  # Moved to OLD_ - use PySide6 version
+    
     # 'GUISettingsDialog',  # Moved to OLD_ - use PySide6 version
     # 'show_gui_settings_dialog',  # Moved to OLD_ - use PySide6 version
     # 'ManualRedshiftDialog',  # Moved to OLD_ - use PySide6 version

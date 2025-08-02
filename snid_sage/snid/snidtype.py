@@ -275,10 +275,7 @@ class SNIDResult:
             if (self.best_subtype and self.best_subtype != "Unknown" and 
                 hasattr(self, 'subtype_confidence') and self.subtype_confidence > 0):
                 
-                # Format confidence with descriptive indicators
-                conf_pct = self.subtype_confidence * 100
-                
-                # Convert confidence to descriptive level
+                # Convert confidence to descriptive level (qualitative only like CLI)
                 if self.subtype_confidence > 0.7:
                     conf_icon = "🔒"
                     conf_desc = "High"
@@ -289,7 +286,7 @@ class SNIDResult:
                     conf_icon = "🔑"
                     conf_desc = "Low"
                 
-                type_str += f" / {self.best_subtype} ({conf_icon} {conf_desc}: {conf_pct:.0f}%)"
+                type_str += f" / {self.best_subtype} ({conf_icon} {conf_desc})"
             elif self.best_subtype and self.best_subtype != "Unknown":
                 type_str += f" / {self.best_subtype}"
             

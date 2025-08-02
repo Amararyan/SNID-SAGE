@@ -429,8 +429,14 @@ class UnifiedResultsFormatter:
         if s['consensus_subtype'] and s['consensus_subtype'] != 'Unknown':
             subtype_conf_text = ""
             if s['subtype_confidence'] > 0:
-                # Show confidence as decimal number to match old GUI format exactly
-                subtype_conf_text = f" (confidence: {s['subtype_confidence']:.2f})"
+                # Convert numeric confidence to qualitative level (like CLI)
+                if s['subtype_confidence'] > 0.7:
+                    confidence_level = "high"
+                elif s['subtype_confidence'] > 0.4:
+                    confidence_level = "medium"
+                else:
+                    confidence_level = "low"
+                subtype_conf_text = f" (confidence: {confidence_level})"
             
             lines.append(f"   Subtype: {s['consensus_subtype']}{subtype_conf_text}")
             

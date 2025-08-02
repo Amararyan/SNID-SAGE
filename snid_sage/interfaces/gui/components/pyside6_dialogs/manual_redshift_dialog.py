@@ -162,7 +162,9 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Create PyQtGraph plot widget
+        # Note: Global PyQtGraph configuration is already set at module level
         self.plot_widget = pg.PlotWidget()
+        
         self.plot_widget.setBackground('w')
         self.plot_widget.setLabel('left', 'Flux')
         self.plot_widget.setLabel('bottom', 'Wavelength (Å)')
@@ -400,6 +402,9 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         # Plot components
         self.main_plot = None
         self.zoom_plot = None
+        
+        # Timer tracking for proper cleanup
+        self._active_timers = []
         
         # Color scheme matching Advanced Preprocessing
         self.colors = {
@@ -884,6 +889,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                 progress_callback("Running quick preprocessing...", 10)
                 
                 # Run minimal preprocessing for galaxy analysis
+                # CRITICAL FIX: Use isolated preprocessing that doesn't affect main GUI state
                 try:
                     processed_spectrum, trace = preprocess_spectrum(
                         spectrum_path=file_path,
@@ -897,10 +903,9 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                         verbose=False
                     )
                     
-                    # Store for future use in both locations
-                    if hasattr(self.parent_gui, 'app_controller'):
-                        self.parent_gui.app_controller.processed_spectrum = processed_spectrum
-                    self.parent_gui.processed_spectrum = processed_spectrum
+                    # IMPORTANT: Do NOT store in main GUI to prevent contamination
+                    # This processed spectrum is ONLY for temporary redshift analysis
+                    # The main GUI's preprocessing state must remain unchanged
                     
                     progress_callback("Preprocessing complete...", 25)
                     
@@ -976,6 +981,11 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                     
                     _LOGGER.info(f"✅ Applied automatic galaxy redshift: z = {best_redshift:.6f} from template {template_name} (correlation: {rlap_score:.2f})")
                     
+                    # Clean up temporary data
+                    processed_spectrum = None
+                    results = None
+                    analysis_trace = None
+                    
                 else:
                     # Show match but ask for confirmation if correlation is weak
                     reply = QtWidgets.QMessageBox.question(self, "Weak Match Found",
@@ -995,6 +1005,11 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                                 f"Auto-detected redshift: z = {best_redshift:.6f}")
                         
                         _LOGGER.info(f"✅ Applied weak galaxy redshift match: z = {best_redshift:.6f} from template {template_name}")
+                    
+                    # Clean up temporary data
+                    processed_spectrum = None
+                    results = None
+                    analysis_trace = None
                 
             else:
                 progress.close()
@@ -1005,11 +1020,20 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                     "• The galaxy type is not in the template library\n"
                     "• The spectrum quality is too low\n\n"
                     "Try manual redshift adjustment instead.")
+                
+                # Clean up temporary data on no matches
+                processed_spectrum = None
+                results = None
+                analysis_trace = None
             
         except InterruptedError:
-            # User canceled
+            # User canceled - clean up temporary data
             if 'progress' in locals():
                 progress.close()
+            # Clean up any temporary processing data
+            processed_spectrum = None
+            results = None
+            analysis_trace = None
             
         except Exception as e:
             if 'progress' in locals():
@@ -1018,6 +1042,10 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                 f"❌ Error during automatic search:\n\n{str(e)}\n\n"
                 f"Please try manual redshift determination or check your spectrum file.")
             _LOGGER.error(f"Auto search error: {e}")
+            # Clean up any temporary processing data
+            processed_spectrum = None
+            results = None
+            analysis_trace = None
     
     def _show_help(self):
         """Show help dialog"""
@@ -1104,9 +1132,19 @@ How to use this tool:
         
         # Force zoom range update with a slight delay to ensure it takes effect
         if self.zoom_plot:
-            QtCore.QTimer.singleShot(10, self._update_zoom_plot)
+            # Create proper QTimer objects for tracking
+            timer1 = QtCore.QTimer(self)  # Set parent to dialog
+            timer1.setSingleShot(True)
+            timer1.timeout.connect(self._update_zoom_plot)
+            timer1.start(10)
+            self._active_timers.append(timer1)
+            
             # Also ensure proper Y-axis scaling
-            QtCore.QTimer.singleShot(20, lambda: self._ensure_zoom_y_scaling())
+            timer2 = QtCore.QTimer(self)  # Set parent to dialog
+            timer2.setSingleShot(True)
+            timer2.timeout.connect(self._safe_ensure_zoom_y_scaling)
+            timer2.start(20)
+            self._active_timers.append(timer2)
         
         self._update_redshift_display()
     
@@ -1174,6 +1212,92 @@ How to use this tool:
             self.redshift_display.setText(f"{self.overlay_redshift:.6f}")
         else:
             self.redshift_display.setText("0.000000")
+    
+    def _safe_ensure_zoom_y_scaling(self):
+        """Safely ensure zoom Y scaling with null checks"""
+        try:
+            if hasattr(self, 'zoom_plot') and self.zoom_plot:
+                self._ensure_zoom_y_scaling()
+        except Exception:
+            # Silently handle cleanup-related errors
+            pass
+    
+    def _cleanup_resources(self):
+        """Clean up PyQtGraph widgets and timers"""
+        try:
+            # Stop any active timers
+            for timer in getattr(self, '_active_timers', []):
+                if timer and hasattr(timer, 'stop'):
+                    try:
+                        timer.stop()
+                        timer.deleteLater()  # Properly delete the timer
+                    except:
+                        pass
+            self._active_timers = []
+            
+            # Clean up plot widgets
+            if hasattr(self, 'main_plot') and self.main_plot:
+                try:
+                    # Clear plot data
+                    plot_widget = getattr(self.main_plot, 'plot_widget', None)
+                    if plot_widget and hasattr(plot_widget, 'clear'):
+                        plot_widget.clear()
+                    # Disconnect any signals
+                    if hasattr(self.main_plot, 'disconnect'):
+                        self.main_plot.disconnect()
+                except:
+                    pass
+                self.main_plot = None
+            
+            if hasattr(self, 'zoom_plot') and self.zoom_plot:
+                try:
+                    # Clear plot data
+                    plot_widget = getattr(self.zoom_plot, 'plot_widget', None)
+                    if plot_widget and hasattr(plot_widget, 'clear'):
+                        plot_widget.clear()
+                    # Disconnect any signals
+                    if hasattr(self.zoom_plot, 'disconnect'):
+                        self.zoom_plot.disconnect()
+                except:
+                    pass
+                self.zoom_plot = None
+                
+        except Exception:
+            # Silently handle cleanup errors to prevent cascading failures
+            pass
+    
+    def closeEvent(self, event):
+        """Handle dialog closing with proper cleanup"""
+        try:
+            self._cleanup_resources()
+            super().closeEvent(event)
+        except Exception:
+            # Accept event even if cleanup fails
+            event.accept()
+    
+    def reject(self):
+        """Handle dialog rejection with cleanup"""
+        try:
+            self._cleanup_resources()
+            super().reject()
+        except Exception:
+            # Call parent reject even if cleanup fails
+            try:
+                super().reject()
+            except:
+                pass
+    
+    def accept(self):
+        """Handle dialog acceptance with cleanup"""
+        try:
+            self._cleanup_resources()
+            super().accept()
+        except Exception:
+            # Call parent accept even if cleanup fails
+            try:
+                super().accept()
+            except:
+                pass
     
     def get_result(self):
         """Get the determined redshift"""

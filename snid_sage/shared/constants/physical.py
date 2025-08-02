@@ -303,7 +303,7 @@ def _get_line_strength(line_data):
     if "flash-ionised" in note or category == "flash_ion":
         return "strong"
     
-    # Strong lines (important features)
+    
     if any(x in line_name for x in ["H-beta", "H-gamma", "Si II 5972", "Ca II", "Fe II", "[O III] 5007"]):
         return "strong"
     

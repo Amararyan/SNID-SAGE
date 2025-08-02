@@ -12,7 +12,7 @@ Part of the SNID SAGE GUI restructuring - Controllers Module
 from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
 # Use PySide6 mask manager dialog instead of tkinter
 # from snid_sage.interfaces.gui.components.dialogs import MaskManagerDialog
-# Use PySide6 AI assistant dialog instead of tkinter
+
 # from snid_sage.interfaces.gui.components.dialogs import AISummaryDialog
 from typing import Dict, Any
 

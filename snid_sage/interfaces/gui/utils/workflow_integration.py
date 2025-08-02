@@ -75,7 +75,7 @@ class WorkflowIntegrator:
             'gmm_btn': 'gmm_btn',
             'redshift_age_btn': 'redshift_age_btn',
             'subtype_proportions_btn': 'subtype_proportions_btn',
-            # Unified AI assistant button
+            
             'ai_assistant_btn': 'ai_assistant_btn'
         }
         

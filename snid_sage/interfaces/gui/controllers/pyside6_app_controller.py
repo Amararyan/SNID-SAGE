@@ -494,17 +494,35 @@ class PySide6AppController(QtCore.QObject):
             
             # Get templates directory from configuration
             progress_callback("Loading configuration and templates...", 20)
-            if not hasattr(self, 'current_config') or not self.current_config:
-                from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
-                config_manager = ConfigurationManager()
-                self.current_config = config_manager.load_config()
-            
-            templates_dir = self.current_config['paths']['templates_dir']
-            if not os.path.exists(templates_dir):
-                raise ValueError(f"Templates directory not found: {templates_dir}")
-            
-            progress_callback(f"Templates loaded from: {templates_dir}", 30)
-            _LOGGER.info(f"Running SNID analysis with templates from: {templates_dir}")
+            try:
+                # Force garbage collection before template loading to clean up any widget remnants
+                import gc
+                gc.collect()
+                
+                if not hasattr(self, 'current_config') or not self.current_config:
+                    from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
+                    config_manager = ConfigurationManager()
+                    self.current_config = config_manager.load_config()
+                
+                templates_dir = self.current_config['paths']['templates_dir']
+                if not os.path.exists(templates_dir):
+                    raise ValueError(f"Templates directory not found: {templates_dir}")
+                
+                # Additional defensive check: ensure template directory is accessible
+                try:
+                    test_files = os.listdir(templates_dir)
+                    if not any(f.endswith('.hdf5') for f in test_files):
+                        _LOGGER.warning(f"No HDF5 template files found in {templates_dir}")
+                except PermissionError:
+                    raise ValueError(f"Permission denied accessing templates directory: {templates_dir}")
+                
+                progress_callback(f"Templates loaded from: {templates_dir}", 30)
+                _LOGGER.info(f"Running SNID analysis with templates from: {templates_dir}")
+                
+            except Exception as e:
+                _LOGGER.error(f"Error during template loading setup: {e}")
+                progress_callback(f"Error loading templates: {str(e)}", 30)
+                raise
             
             # Run actual SNID analysis
             progress_callback("Starting SNID analysis engine...", 40)
@@ -613,12 +631,38 @@ class PySide6AppController(QtCore.QObject):
             self.analysis_running = False
             self.snid_results = None
             
-            # Emit signal for GUI update
-            self.analysis_completed.emit(False)
+            # Enhanced error handling with specific context
+            error_context = "analysis"
             
-            _LOGGER.error(f"Error in analysis thread: {e}")
+            # Check if this was a forced redshift error
+            if hasattr(self, 'redshift_mode_config') and self.redshift_mode_config:
+                mode_config = self.redshift_mode_config
+                if mode_config.get('mode') == 'force':
+                    forced_z = mode_config.get('redshift', 'unknown')
+                    error_context = f"forced redshift analysis (z={forced_z})"
+                    _LOGGER.error(f"Error in forced redshift analysis at z={forced_z}: {e}")
+                else:
+                    error_context = f"redshift search analysis"
+                    _LOGGER.error(f"Error in redshift search analysis: {e}")
+            elif analysis_kwargs.get('forced_redshift') is not None:
+                forced_z = analysis_kwargs.get('forced_redshift')
+                error_context = f"forced redshift analysis (z={forced_z})"
+                _LOGGER.error(f"Error in forced redshift analysis at z={forced_z}: {e}")
+            else:
+                _LOGGER.error(f"Error in analysis thread: {e}")
+            
+            # Store error context for better GUI messaging
+            self.last_analysis_error = {
+                'error': str(e),
+                'context': error_context,
+                'type': 'forced_redshift' if 'forced redshift' in error_context else 'normal'
+            }
+            
             import traceback
             _LOGGER.debug(f"Analysis error traceback: {traceback.format_exc()}")
+            
+            # Emit signal for GUI update
+            self.analysis_completed.emit(False)
     
     @QtCore.Slot(str, float)
     def _update_progress_from_thread(self, message: str, progress: float):
@@ -704,7 +748,7 @@ class PySide6AppController(QtCore.QObject):
     
     # Reset operations
     def reset_to_initial_state(self):
-        """Reset application to initial state"""
+        """Reset application to initial state - comprehensive reset including persistent settings"""
         # Clear data
         self.current_file_path = None
         self.original_wave = None
@@ -717,10 +761,36 @@ class PySide6AppController(QtCore.QObject):
         self.max_templates = 0
         self.mask_regions.clear()
         
-        # Reset workflow state
+        # Clear persistent settings that were previously missed
+        if hasattr(self, 'redshift_mode_config'):
+            self.redshift_mode_config = None
+            
+        if hasattr(self, 'manual_redshift'):
+            self.manual_redshift = None
+            
+        if hasattr(self, 'forced_redshift'):
+            self.forced_redshift = None
+            
+        # Clear auto cluster selection state
+        if hasattr(self, 'auto_select_best_cluster'):
+            self.auto_select_best_cluster = False
+        
+        # Reset current view state (important for button appearances)
+        if hasattr(self, 'current_view'):
+            self.current_view = 'flux'  # Reset to default view
+        
+        # Clear spectrum data variables that might persist
+        if hasattr(self, 'spectrum_data'):
+            self.spectrum_data = None
+            
+        # Clear any preprocessing state
+        if hasattr(self, 'is_preprocessed'):
+            self.is_preprocessed = False
+        
+        # Reset workflow state to INITIAL (this is critical)
         self.update_workflow_state(WorkflowState.INITIAL)
         
-        _LOGGER.info("Application reset to initial state")
+        _LOGGER.info("Application reset to initial state - all persistent settings and states cleared")
     
     # Clustering and cluster selection methods
     def _is_clustering_available(self, result):

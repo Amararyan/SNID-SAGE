@@ -76,7 +76,7 @@ class SecureStorage:
         machine_info = f"{os.environ.get('USERNAME', 'user')}-{os.environ.get('COMPUTERNAME', 'machine')}"
         password = f"{self.app_name}-{identifier}-{machine_info}".encode()
         
-        # Use a fixed salt for consistency (in production, consider storing salt separately)
+        
         salt = hashlib.sha256(f"{self.app_name}-{identifier}".encode()).digest()[:16]
         
         kdf = PBKDF2HMAC(

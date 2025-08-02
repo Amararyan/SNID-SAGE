@@ -117,7 +117,7 @@ class SNIDLogger:
         
         instance._log_file = log_file
         
-        # CRITICAL FIX: Disable Python's default logging and any existing root handlers
+        
         # This prevents double logging from Python's basicConfig or other sources
         python_root_logger = logging.getLogger()
         python_root_logger.handlers.clear()  # Remove all existing root handlers
@@ -126,7 +126,7 @@ class SNIDLogger:
         # Configure SNID's root logger
         root_logger = logging.getLogger('snid_sage')
         
-        # CRITICAL FIX: Set the root logger level based on verbosity and mode
+        
         # This ensures that loggers don't emit messages above the desired level
         if gui_mode:
             # In GUI mode, be more restrictive
@@ -211,7 +211,7 @@ class SNIDLogger:
         root_logger = logging.getLogger('snid_sage')
         root_logger.addHandler(instance._console_handler)
         
-        # CRITICAL FIX: Prevent propagation to Python's root logger to avoid duplicate messages
+        
         root_logger.propagate = False
     
     @classmethod
@@ -288,7 +288,7 @@ class SNIDLogger:
         
         instance._verbosity_level = level
         
-        # CRITICAL FIX: Update root logger level as well as handler level
+        
         root_logger = logging.getLogger('snid_sage')
         
         # Set root logger level using same logic as configure()

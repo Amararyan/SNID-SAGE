@@ -47,7 +47,7 @@ class StateManager:
             has_results = hasattr(self.gui, 'snid_results') and self.gui.snid_results is not None
             
             # Check if file is loaded - use has_spectrum_loaded() method instead of checking original_wave
-            # This is important because original_wave is cleared after preprocessing
+            
             if not self.gui.file_path or not self.gui.has_spectrum_loaded():
                 new_state = ApplicationState.INITIAL
             

@@ -287,6 +287,11 @@ class PySide6ThemeManager:
             border: 2px solid {colors['bg_disabled']};
         }}
         
+        /* Remove focus outline to prevent rectangle artifacts */
+        QPushButton:focus {{
+            outline: none;
+        }}
+        
         /* Navigation buttons */
         QPushButton#nav_btn {{
             background: {colors['btn_secondary']};
@@ -606,6 +611,11 @@ class PySide6ThemeManager:
             background-color: #f3f4f6 !important;
             border-color: #e5e7eb !important;
             color: #9ca3af !important;
+        }
+        
+        /* Remove focus outline for all buttons to prevent rectangle artifacts */
+        QPushButton:focus {
+            outline: none !important;
         }
         """
     

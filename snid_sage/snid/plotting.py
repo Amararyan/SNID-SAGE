@@ -450,7 +450,14 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
 
     
     if hasattr(result, 'type_confidence'):
-        info_text += f"Confidence: {result.type_confidence:.2f}\n"
+        # Convert numeric confidence to qualitative level (like CLI)
+        if result.type_confidence > 0.7:
+            confidence_level = "high"
+        elif result.type_confidence > 0.4:
+            confidence_level = "medium"
+        else:
+            confidence_level = "low"
+        info_text += f"Confidence: {confidence_level}\n"
     
     # Match statistics
     if hasattr(result, 'match_statistics'):
@@ -1082,7 +1089,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
         fig.tight_layout()
         return fig
     
-    # CRITICAL: Apply RLAP threshold filtering (as should be done everywhere)
+    
     rlapmin = getattr(result, 'rlapmin', 5.0)  # Get the threshold used in analysis
     matches = [m for m in matches if m.get('rlap', 0) >= rlapmin]
     
@@ -1520,7 +1527,7 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
     if hasattr(result, 'processed_spectrum') and result.processed_spectrum:
         input_wave = result.processed_spectrum['log_wave']
         
-        # CRITICAL: SNID analysis stores log_flux as the reconstructed flux from apodized flat spectrum
+        
         # This is: (tapered_flux[left_edge:right_edge+1] + 1.0) * cont[left_edge:right_edge+1]
         # So log_flux in result.processed_spectrum IS the correctly reconstructed apodized flux
         input_flux = result.processed_spectrum['log_flux']  # This IS the apodized reconstructed flux from SNID analysis
@@ -1728,7 +1735,7 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
     if hasattr(result, 'processed_spectrum') and result.processed_spectrum:
         input_wave = result.processed_spectrum['log_wave']
         
-        # CRITICAL: SNID analysis stores flat_flux as the apodized version (tapered_flux[left_edge:right_edge+1])
+        
         # This is different from the original preprocessing flat_flux which is non-apodized
         # The SNID analysis result.processed_spectrum contains the correctly trimmed and apodized data
         input_flux = result.processed_spectrum['flat_flux']  # This IS the apodized version from SNID analysis

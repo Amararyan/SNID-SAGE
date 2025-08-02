@@ -75,7 +75,7 @@ class LayoutConflictDetector:
             last_operation = existing_operations[-1]
             time_diff = current_time - last_operation.timestamp
             
-            # Consider it a conflict if applied within 1 second with different values
+            
             if time_diff < 1.0 and last_operation.value != value:
                 self.conflict_count += 1
                 _LOGGER.warning(

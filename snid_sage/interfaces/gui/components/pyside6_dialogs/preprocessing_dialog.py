@@ -23,6 +23,13 @@ from PySide6 import QtWidgets, QtCore, QtGui
 try:
     import pyqtgraph as pg
     PYQTGRAPH_AVAILABLE = True
+    # Configure PyQtGraph for complete software rendering (consistent with other dialogs)
+    pg.setConfigOptions(
+        useOpenGL=False,         # Disable OpenGL completely
+        antialias=True,          # Keep antialiasing for quality
+        enableExperimental=False, # Disable experimental features
+        crashWarning=False       # Reduce warnings
+    )
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
@@ -388,10 +395,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
     def _configure_plot_widget(self, plot_widget):
         """Configure a plot widget with proper theme and settings"""
         try:
-            # Configure PyQtGraph for software rendering
-            plot_widget.setConfigOption('useOpenGL', False)
-            plot_widget.setConfigOption('antialias', True)
-            
+            # Note: Global PyQtGraph configuration is already set at module level
             # Set background color
             plot_widget.setBackground('white')
             
@@ -544,6 +548,9 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         
         # Update step display
         self._update_step_display()
+        
+        # Initialize cleanup tracking
+        self._plot_widgets_initialized = True
     
     def _on_mask_updated(self):
         """Callback when mask regions are updated"""
@@ -1299,17 +1306,46 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             
             print(f"=== FINAL PROCESSED SPECTRUM ===")
             
+            # CRITICAL FIX: Apply proper apodization to create tapered_flux
+            # This matches what standard preprocessing does and is required for forced redshift analysis
+            nz = np.nonzero(flat_spectrum)[0]
+            if nz.size:
+                l1, l2 = nz[0], nz[-1]
+            else:
+                l1, l2 = 0, len(flat_spectrum) - 1
+                
+            # Import apodization function from SNID preprocessing
+            from snid_sage.snid.preprocessing import apodize
+            apodize_percent = 10.0  # Default apodization percentage
+            tapered_flux = apodize(flat_spectrum, l1, l2, percent=apodize_percent)
+            
+            print(f"Applied apodization: {apodize_percent}% taper to range {l1}-{l2}")
+            print(f"Tapered flux range: {np.min(tapered_flux):.2e} to {np.max(tapered_flux):.2e}")
+
+            # CRITICAL FIX: Update display versions to use apodized data like quick preprocessing
+            # Quick preprocessing uses: display_flat = tapered_flux (apodized continuum-removed)
+            # We need to match this behavior for consistency
+            if has_continuum_step and continuum is not None:
+                # For continuum case: display_flat should be the apodized flat spectrum (tapered_flux)
+                display_flat = tapered_flux  # Use apodized version like quick preprocessing
+                # display_flux should also be reconstructed from the apodized version
+                display_flux = (tapered_flux + 1.0) * continuum  # Reconstruct from apodized flat
+            else:
+                # For no-continuum case: both should use the apodized version
+                display_flat = tapered_flux  # Use apodized version
+                display_flux = tapered_flux  # Same data since no continuum
+
             # Create processed spectrum dictionary like old GUI with proper display versions
             processed_spectrum = {
                 'log_wave': final_wave,
                 'log_flux': log_flux,  # Scaled flux on log grid (or reconstructed if continuum was applied)
                 'flat_flux': flat_spectrum,  # Continuum-removed version (or same as log_flux if no continuum) - REQUIRED BY ANALYSIS
-                'tapered_flux': flat_spectrum,  # Final version for FFT correlation - REQUIRED BY ANALYSIS
+                'tapered_flux': tapered_flux,  # FIXED: Properly apodized final version for FFT correlation - REQUIRED BY ANALYSIS
                 'continuum': continuum,  # Stored or unity continuum
                 'nonzero_mask': slice(left_edge, right_edge + 1),  # Slice for non-zero region - REQUIRED BY ANALYSIS
-                # Generate display versions correctly
-                'display_flux': display_flux,  # For flux view - reconstructed or scaled flux
-                'display_flat': display_flat,  # For flat view - continuum-removed or same
+                # Generate display versions correctly - NOW CONSISTENT WITH QUICK PREPROCESSING
+                'display_flux': display_flux,  # For flux view - reconstructed from apodized data
+                'display_flat': display_flat,  # For flat view - apodized continuum-removed (like quick preprocessing)
                 'advanced_preprocessing': True,
                 'preprocessing_type': 'advanced',
                 'left_edge': left_edge,  # Proper edge information for zero filtering
@@ -1705,4 +1741,106 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 "PNG Files (*.png);;JPG Files (*.jpg);;PDF Files (*.pdf)"
             )
             if filename:
-                self.plot_manager.export_plots(filename) 
+                self.plot_manager.export_plots(filename)
+    
+    def _cleanup_resources(self):
+        """Clean up PyQtGraph widgets and interactive components"""
+        try:
+            _LOGGER.debug("Cleaning up preprocessing dialog resources...")
+            
+            # Clean up interactive widgets
+            if hasattr(self, 'masking_widget') and self.masking_widget:
+                try:
+                    if hasattr(self.masking_widget, 'cleanup'):
+                        self.masking_widget.cleanup()
+                    self.masking_widget = None
+                except Exception as e:
+                    _LOGGER.debug(f"Error cleaning up masking widget: {e}")
+            
+            if hasattr(self, 'continuum_widget') and self.continuum_widget:
+                try:
+                    if hasattr(self.continuum_widget, 'cleanup'):
+                        self.continuum_widget.cleanup()
+                    self.continuum_widget = None
+                except Exception as e:
+                    _LOGGER.debug(f"Error cleaning up continuum widget: {e}")
+            
+            # Clean up PyQtGraph plot widgets
+            if hasattr(self, 'top_plot_widget') and self.top_plot_widget:
+                try:
+                    self.top_plot_widget.clear()
+                    # Force close any OpenGL contexts
+                    if hasattr(self.top_plot_widget, 'close'):
+                        self.top_plot_widget.close()
+                    self.top_plot_widget = None
+                except Exception as e:
+                    _LOGGER.debug(f"Error cleaning up top plot widget: {e}")
+            
+            if hasattr(self, 'bottom_plot_widget') and self.bottom_plot_widget:
+                try:
+                    self.bottom_plot_widget.clear()
+                    # Force close any OpenGL contexts
+                    if hasattr(self.bottom_plot_widget, 'close'):
+                        self.bottom_plot_widget.close()
+                    self.bottom_plot_widget = None
+                except Exception as e:
+                    _LOGGER.debug(f"Error cleaning up bottom plot widget: {e}")
+            
+            # Clean up preview calculator
+            if hasattr(self, 'preview_calculator') and self.preview_calculator:
+                try:
+                    # Disconnect signals
+                    if hasattr(self.preview_calculator, 'stage_memory_updated'):
+                        self.preview_calculator.stage_memory_updated.disconnect()
+                    self.preview_calculator = None
+                except Exception as e:
+                    _LOGGER.debug(f"Error cleaning up preview calculator: {e}")
+            
+            # Clean up plot manager
+            if hasattr(self, 'plot_manager') and self.plot_manager:
+                try:
+                    if hasattr(self.plot_manager, 'cleanup'):
+                        self.plot_manager.cleanup()
+                    self.plot_manager = None
+                except Exception as e:
+                    _LOGGER.debug(f"Error cleaning up plot manager: {e}")
+            
+            _LOGGER.debug("Preprocessing dialog cleanup completed")
+            
+        except Exception as e:
+            _LOGGER.debug(f"Error during preprocessing dialog cleanup: {e}")
+    
+    def closeEvent(self, event):
+        """Handle dialog closing with proper cleanup"""
+        try:
+            _LOGGER.debug("Preprocessing dialog closing, cleaning up resources...")
+            self._cleanup_resources()
+            super().closeEvent(event)
+        except Exception as e:
+            _LOGGER.debug(f"Error during preprocessing dialog close: {e}")
+            # Accept event even if cleanup fails
+            event.accept()
+    
+    def reject(self):
+        """Handle dialog rejection with cleanup"""
+        try:
+            self._cleanup_resources()
+            super().reject()
+        except Exception:
+            # Call parent reject even if cleanup fails
+            try:
+                super().reject()
+            except:
+                pass
+    
+    def accept(self):
+        """Handle dialog acceptance with cleanup"""
+        try:
+            self._cleanup_resources()
+            super().accept()
+        except Exception:
+            # Call parent accept even if cleanup fails
+            try:
+                super().accept()
+            except:
+                pass 

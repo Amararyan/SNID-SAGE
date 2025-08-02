@@ -21,6 +21,10 @@ os.environ['LIBGL_ALWAYS_SOFTWARE'] = '1'
 os.environ['QT_DEBUG_PLUGINS'] = '0'
 os.environ['QT_LOGGING_RULES'] = 'qt.qpa.gl.debug=false'
 
+# Suppress Qt WM_ACTIVATEAPP warnings and other non-critical messages
+os.environ['QT_LOGGING_RULES'] += ';qt.qpa.windows.debug=false;*.debug=false'
+os.environ['QT_QUIET_WINDOWS_WARNINGS'] = '1'
+
 import argparse
 
 def parse_arguments():
