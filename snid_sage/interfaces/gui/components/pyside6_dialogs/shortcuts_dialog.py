@@ -95,17 +95,6 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
         scroll_area.setWidget(scroll_widget)
         layout.addWidget(scroll_area)
         
-        # Close button
-        button_layout = QtWidgets.QHBoxLayout()
-        button_layout.addStretch()
-        
-        close_btn = QtWidgets.QPushButton("Close")
-        close_btn.clicked.connect(self.accept)
-        close_btn.setDefault(True)
-        button_layout.addWidget(close_btn)
-        
-        layout.addLayout(button_layout)
-        
         # Set window icon and properties
         self.setModal(False)  # Allow window to be non-modal
         

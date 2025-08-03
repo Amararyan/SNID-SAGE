@@ -101,21 +101,32 @@ class TemplateFFTStorage:
         # Precompute standard wavelength grid
         self.standard_log_wave = self.W0 * np.exp((np.arange(self.NW) + 0.5) * self.DWLOG)
         
-        # Prefetching support
-        self._prefetch_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="template_prefetch")
+        # Prefetching support - LAZY INITIALIZATION (only when needed)
+        self._prefetch_executor = None
         self._prefetch_cache = {}
         self._prefetch_lock = threading.Lock()
         
         _LOG.info(f"Initialized TemplateFFTStorage: {template_dir}")
-        _LOG.info(f"Standard grid: NW={self.NW}, W0={self.W0:.1f}, W1={self.W1:.1f}, DWLOG={self.DWLOG:.6f}")
+        _LOG.debug(f"Standard grid: NW={self.NW}, W0={self.W0:.1f}, W1={self.W1:.1f}, DWLOG={self.DWLOG:.6f}")
         
     def __del__(self):
         """Clean up thread pool on destruction"""
-        if hasattr(self, '_prefetch_executor'):
+        if hasattr(self, '_prefetch_executor') and self._prefetch_executor:
             self._prefetch_executor.shutdown(wait=False)
+    
+    def _ensure_prefetch_executor(self):
+        """Lazily initialize prefetch executor only when needed"""
+        if self._prefetch_executor is None:
+            self._prefetch_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="template_prefetch")
+            _LOG.debug("Initialized prefetch executor on demand")
         
     def is_built(self) -> bool:
-        """Check if unified storage has been built."""
+        """Check if unified storage has been built - FAST startup version."""
+        # FAST CHECK: Only check for index file during startup
+        return self.index_file.exists() and self._index is not None
+    
+    def is_fully_built(self) -> bool:
+        """Check if unified storage is fully built with all files (slower validation)."""
         if not (self.index_file.exists() and self._index is not None):
             return False
         
@@ -129,23 +140,13 @@ class TemplateFFTStorage:
         return True
     
     def needs_rebuild(self) -> bool:
-        """Check if storage needs rebuilding due to template changes."""
+        """Check if storage needs rebuilding due to template changes - FAST startup version."""
         if not self.is_built():
             return True
         
-        # Check if any template file is newer than any storage file
-        newest_storage_mtime = 0
-        if self._index:
-            for sn_type in self._index.get('by_type', {}).keys():
-                storage_file = self._get_storage_file_for_type(sn_type)
-                if storage_file.exists():
-                    newest_storage_mtime = max(newest_storage_mtime, storage_file.stat().st_mtime)
-        
-        for template_file in self.template_dir.glob('*.lnw'):
-            if template_file.stat().st_mtime > newest_storage_mtime:
-                _LOG.info(f"Template {template_file.name} newer than storage, rebuild needed")
-                return True
-        
+        # FAST CHECK: If we have HDF5 storage files, we don't need to rebuild unless explicitly requested
+        # The storage is already built and should be used as-is. Full validation deferred to analysis time.
+        _LOG.debug("HDF5 storage index exists, assuming build is complete for startup")
         return False
     
     def _get_storage_file_for_type(self, sn_type: str) -> Path:
@@ -230,8 +231,8 @@ class TemplateFFTStorage:
         List[TemplateEntry]
             Templates with flux already rebinned to standard grid
         """
-        if not self.is_built():
-            _LOG.error("Storage not built. Call build_storage() first.")
+        if not self.is_fully_built():
+            _LOG.error("Storage not fully built. Call build_storage() first.")
             return []
         
         # Filter templates by metadata
@@ -262,7 +263,7 @@ class TemplateFFTStorage:
         np.ndarray or None
             Pre-computed FFT or None if not found
         """
-        if not self.is_built():
+        if not self.is_fully_built():
             return None
         
         try:
@@ -637,7 +638,8 @@ class TemplateFFTStorage:
         # Load from each storage file with prefetching
         file_futures = {}
         
-        # Start prefetching all files
+        # Start prefetching all files (lazy initialization)
+        self._ensure_prefetch_executor()
         for storage_file_path, file_template_names in templates_by_file.items():
             future = self._prefetch_executor.submit(
                 self._load_templates_from_single_file, 

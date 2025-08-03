@@ -58,6 +58,7 @@ class PySide6WorkflowManager:
             'load_btn': ButtonDefinition('load_btn', 'load', WorkflowState.INITIAL, always_enabled=True),
             'reset_btn': ButtonDefinition('reset_btn', 'reset', WorkflowState.INITIAL, always_enabled=True),
             'settings_btn': ButtonDefinition('settings_btn', 'settings', WorkflowState.INITIAL, always_enabled=True),
+            'info_btn': ButtonDefinition('info_btn', 'info', WorkflowState.INITIAL, always_enabled=True),
             
             # Workflow progression buttons
             'preprocessing_btn': ButtonDefinition('preprocessing_btn', 'redshift', WorkflowState.FILE_LOADED),
@@ -94,7 +95,11 @@ class PySide6WorkflowManager:
         # Get theme manager for consistent styling
         self.theme_manager = get_pyside6_theme_manager()
         
-        _LOGGER.info("PySide6 Workflow Manager initialized")
+        # Initialize enhanced button manager for smooth animations
+        self.enhanced_button_manager = self.theme_manager.create_enhanced_button_manager()
+        self.enhanced_button_manager.set_workflow_manager_reference(self)
+        
+        _LOGGER.info("PySide6 Workflow Manager initialized with enhanced button feedback")
     
     def register_button(self, button_name: str, button_widget: QtWidgets.QPushButton):
         """Register a button widget with the workflow system"""
@@ -110,6 +115,11 @@ class PySide6WorkflowManager:
             else:
                 self._set_button_state(button_widget, False, "disabled")
                 _LOGGER.debug(f"Button {button_name} configured: disabled")
+            
+            # Register with enhanced button manager for main workflow buttons
+            if self._is_main_workflow_button(button_name):
+                self.enhanced_button_manager.register_button(button_widget, definition.color_type)
+                _LOGGER.debug(f"Button {button_name} registered for enhanced feedback")
             
             _LOGGER.debug(f"Button {button_name} registered with workflow system")
         else:
@@ -256,4 +266,36 @@ class PySide6WorkflowManager:
     def force_state_transition(self, target_state: WorkflowState):
         """Force transition to a specific state (for testing/debugging)"""
         self.update_workflow_state(target_state)
-        _LOGGER.info(f"Forced state transition to: {target_state.value}") 
+        _LOGGER.info(f"Forced state transition to: {target_state.value}")
+    
+    def _is_main_workflow_button(self, button_name: str) -> bool:
+        """Determine if a button should receive enhanced feedback"""
+        # Main workflow buttons that should get enhanced animations
+        main_workflow_buttons = {
+            'load_btn',
+            'preprocessing_btn', 
+            'redshift_selection_btn',
+            'analysis_btn',
+            'emission_line_btn',
+            'chat_btn',  # AI assistant
+            # Always-enabled utility buttons
+            'reset_btn',
+            'settings_btn',
+            'info_btn',
+            # Navigation buttons
+            'prev_btn',
+            'next_btn',
+            # Analysis plot buttons
+            'cluster_summary_btn',
+            'gmm_btn',
+            'redshift_age_btn',
+            'subtype_proportions_btn',
+        }
+        
+        return button_name in main_workflow_buttons
+    
+    def cleanup(self):
+        """Clean up resources"""
+        if hasattr(self, 'enhanced_button_manager'):
+            self.enhanced_button_manager.cleanup()
+        _LOGGER.info("Workflow Manager cleaned up") 

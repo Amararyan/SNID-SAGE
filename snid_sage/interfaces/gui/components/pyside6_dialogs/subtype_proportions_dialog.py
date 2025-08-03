@@ -542,8 +542,18 @@ Please check your analysis results and try again.
             else:
                 colors.append(self.custom_palette[i % len(self.custom_palette)])
         
-        # Explode the largest slice
-        explode = [0.1 if i == 0 else 0 for i in range(len(labels))]
+        # Create explode parameter - explode the winning subtype based on result.best_subtype (like CLI)
+        winning_subtype = None
+        if (hasattr(self.analysis_results, 'best_subtype') and 
+            self.analysis_results.best_subtype):
+            winning_subtype = self.analysis_results.best_subtype
+            
+        explode = []
+        for i, label in enumerate(labels):
+            if winning_subtype and label == winning_subtype:
+                explode.append(0.1)  # Explode the winning subtype
+            else:
+                explode.append(0)    # Keep other subtypes normal
         
         # Create pie chart
         wedges, texts, autotexts = ax.pie(
@@ -556,10 +566,14 @@ Please check your analysis results and try again.
             textprops={'fontsize': 10}
         )
         
-        # Style the winning slice
-        if wedges:
-            wedges[0].set_edgecolor('black')
-            wedges[0].set_linewidth(2)
+        # Style winning slice - match CLI by highlighting the winning subtype
+        for i, (wedge, label) in enumerate(zip(wedges, labels)):
+            if winning_subtype and label == winning_subtype:
+                wedge.set_edgecolor('black')
+                wedge.set_linewidth(2)
+            else:
+                wedge.set_edgecolor('white')
+                wedge.set_linewidth(1)
         
         ax.set_title(f'Subtype Distribution\n{self.cluster_type} Cluster', 
                     fontsize=12, fontweight='bold', pad=15)

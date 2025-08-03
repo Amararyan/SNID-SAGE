@@ -1239,16 +1239,21 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 print(f"stored_continuum range: {np.min(continuum):.2e} to {np.max(continuum):.2e}")
                 print(f"stored_continuum mean: {np.mean(continuum):.2e}")
             
-            # Calculate edge information for zero padding filtering (like old GUI)
-            nonzero_mask = final_flux > 0
-            if np.any(nonzero_mask):
-                left_edge = np.argmax(nonzero_mask)
-                right_edge = len(final_flux) - 1 - np.argmax(nonzero_mask[::-1])
+            # Get edge information from preview calculator (properly tracked through steps)
+            left_edge, right_edge = self.preview_calculator.get_current_edges()
+            
+            # Fallback to calculation if edges weren't tracked properly
+            if left_edge is None or right_edge is None:
+                nonzero_mask = final_flux > 0
+                if np.any(nonzero_mask):
+                    left_edge = np.argmax(nonzero_mask)
+                    right_edge = len(final_flux) - 1 - np.argmax(nonzero_mask[::-1])
+                else:
+                    left_edge = 0
+                    right_edge = len(final_flux) - 1
+                print(f"FALLBACK edge calculation: left_edge={left_edge}, right_edge={right_edge}")
             else:
-                left_edge = 0
-                right_edge = len(final_flux) - 1
-                
-            print(f"Edge calculation: left_edge={left_edge}, right_edge={right_edge}")
+                print(f"TRACKED edge information: left_edge={left_edge}, right_edge={right_edge}")
             
             # Determine what the final_flux actually represents based on the applied steps
             has_continuum_step = any(step['type'] in ['continuum_fit', 'interactive_continuum'] 

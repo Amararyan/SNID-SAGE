@@ -23,6 +23,7 @@ Supported Step Types:
 """
 
 import numpy as np
+import logging
 from typing import Tuple, List, Dict, Any, Optional
 from PySide6 import QtCore
 
@@ -86,6 +87,10 @@ class PySide6PreviewCalculator(QtCore.QObject):
         self.stage_memory = {}  # Dict[step_index, StageMemory]
         self.current_stage_index = -1  # -1 means original spectrum
         
+        # Track edge information properly through preprocessing steps
+        self.current_left_edge = None
+        self.current_right_edge = None
+        
         self.reset()
     
     def reset(self):
@@ -101,6 +106,10 @@ class PySide6PreviewCalculator(QtCore.QObject):
         # Reset stage memory
         self.stage_memory = {}
         self.current_stage_index = -1
+        
+        # Reset edge tracking
+        self.current_left_edge = None
+        self.current_right_edge = None
         
         # Store initial state (original spectrum)
         self._store_stage_memory(-1, "Original Spectrum", {
@@ -289,6 +298,43 @@ class PySide6PreviewCalculator(QtCore.QObject):
         """Get current wavelength and flux arrays"""
         return self.current_wave.copy(), self.current_flux.copy()
     
+    def _update_edge_info_after_step(self, step_type: str):
+        """Update edge information after certain preprocessing steps"""
+        if step_type in ["masking", "clipping"]:
+            # Recalculate edges based on current data range after masking/clipping
+            # For masking/clipping, we track the actual wavelength range, not flux-based edges
+            if len(self.current_wave) > 0:
+                # Find the mapping from current indices to original indices
+                # This helps track which parts of the original spectrum are still valid
+                orig_wave_min, orig_wave_max = self.current_wave[0], self.current_wave[-1]
+                
+                # Find corresponding indices in original wavelength array
+                orig_left_idx = np.searchsorted(self.original_wave, orig_wave_min, side='left')
+                orig_right_idx = np.searchsorted(self.original_wave, orig_wave_max, side='right') - 1
+                
+                self.current_left_edge = orig_left_idx
+                self.current_right_edge = orig_right_idx
+                
+                _LOGGER.debug(f"Updated edges after {step_type}: left={self.current_left_edge}, right={self.current_right_edge}")
+                _LOGGER.debug(f"Wavelength range: {orig_wave_min:.1f} - {orig_wave_max:.1f}")
+        elif step_type in ["log_rebin", "log_rebin_with_scaling"]:
+            # After log rebinning, calculate edges based on nonzero flux regions
+            nonzero_mask = (self.current_flux > 0)
+            if np.any(nonzero_mask):
+                self.current_left_edge = np.argmax(nonzero_mask)
+                self.current_right_edge = len(self.current_flux) - 1 - np.argmax(nonzero_mask[::-1])
+            else:
+                self.current_left_edge = 0
+                self.current_right_edge = len(self.current_flux) - 1
+                
+            _LOGGER.debug(f"Updated edges after {step_type}: left={self.current_left_edge}, right={self.current_right_edge}")
+        # Note: For other steps like savgol_filter, continuum_fit, and apodization, 
+        # we don't need to update edges as they preserve the data structure
+    
+    def get_current_edges(self) -> Tuple[int, int]:
+        """Get current left and right edge indices"""
+        return self.current_left_edge or 0, self.current_right_edge or (len(self.current_flux) - 1)
+    
     def preview_step(self, step_type: str, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
         """
         Calculate preview for a step without applying it permanently
@@ -351,6 +397,9 @@ class PySide6PreviewCalculator(QtCore.QObject):
         preview_wave, preview_flux = self.preview_step(step_type, **kwargs)
         self.current_wave = preview_wave
         self.current_flux = preview_flux
+        
+        # Update edge information after applying the step
+        self._update_edge_info_after_step(step_type)
         
         # Store step info with step_index if provided
         step_kwargs = kwargs.copy()

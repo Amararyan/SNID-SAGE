@@ -157,17 +157,33 @@ class PySide6AnalysisPlotter:
             labels = [item[0] for item in sorted_subtypes]
             values = [item[1] for item in sorted_subtypes]
             colors = [color_mapping.get(label, self.subtype_colors['Unknown']) for label in labels]
-            explode = [0.1 if i == 0 else 0 for i in range(len(labels))]  # Explode largest
+            
+            # Create explode parameter - explode the winning subtype based on result.best_subtype (like CLI)
+            winning_subtype = None
+            result = self.app_controller.snid_results
+            if hasattr(result, 'best_subtype') and result.best_subtype:
+                winning_subtype = result.best_subtype
+                
+            explode = []
+            for i, label in enumerate(labels):
+                if winning_subtype and label == winning_subtype:
+                    explode.append(0.1)  # Explode the winning subtype
+                else:
+                    explode.append(0)    # Keep other subtypes normal
             
             wedges, texts, autotexts = ax1.pie(
                 values, labels=labels, autopct='%1.1f%%', colors=colors,
                 explode=explode, startangle=90, textprops={'fontsize': 9}
             )
             
-            # Style winning slice
-            if wedges:
-                wedges[0].set_edgecolor('black')
-                wedges[0].set_linewidth(2)
+            # Style winning slice - match CLI by highlighting the winning subtype
+            for i, (wedge, label) in enumerate(zip(wedges, labels)):
+                if winning_subtype and label == winning_subtype:
+                    wedge.set_edgecolor('black')
+                    wedge.set_linewidth(2)
+                else:
+                    wedge.set_edgecolor('white')
+                    wedge.set_linewidth(1)
             
             ax1.set_title(f'Subtype Distribution\n{cluster_type} Cluster', fontsize=11, fontweight='bold', pad=10)
             

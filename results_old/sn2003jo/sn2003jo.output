@@ -1,0 +1,186 @@
+SNID-SAGE Analysis Results
+Generated: 2025-07-13 15:05:15
+============================================================
+
+🔬 SNID CLASSIFICATION RESULTS
+==================================================
+
+🎯 FINAL CLASSIFICATION (Automatic Method):
+   Type: Ia (Quality: Low)
+   Confidence Level: High
+   └─ Winning type is 81.9% better than second best (Ia)
+   Subtype: Ia-norm (confidence: Medium)
+   └─ Winning subtype is 56.4% better than second best (Ia-91T)
+
+📏 MEASUREMENTS:
+   Redshift: 0.528793 ± 0.000373
+   └─ Weighted from 159 cluster templates (includes individual errors + cluster scatter τ)
+   Age: 5 ± 2 days
+
+📈 CLUSTERING OVERVIEW:
+   Total Clusters Found: 4
+   Active Cluster: Ia
+   Other Clusters: Ia (3), Ia (6), Ic (7)
+
+🏆 TEMPLATE MATCHES (from Best Cluster (Auto-Selected)):
+#   Template           Type     Subtype    RLAP-Cos     Redshift         ±Error         Age     
+---------------------------------------------------------------------------------------------------------
+1   sn2007kk_epoch_12  Ia       Ia-norm    4.6          0.532726         0.001289       5.9     
+2   sn2007kk_epoch_11  Ia       Ia-norm    4.0          0.535121         0.001494       5.0     
+3   sn2005cf_epoch_28  Ia       Ia-norm    3.9          0.527950         0.001145       4.5     
+4   sn2007kk_epoch_10  Ia       Ia-norm    3.9          0.534601         0.001380       4.1     
+5   sn2001ck_epoch_1   Ia       Ia-norm    3.8          0.527524         0.001337       5.8     
+6   sn2006et_epoch_1   Ia       Ia-norm    3.8          0.523836         0.001291       6.3     
+7   sn2006cf_epoch_4   Ia       Ia-norm    3.6          0.522068         0.001394       6.5     
+8   sn2005cf_epoch_30  Ia       Ia-norm    3.5          0.527325         0.001282       5.2     
+9   sn1999ee_epoch_6   Ia       Ia-norm    3.5          0.526348         0.001563       6.7     
+10  sn2005cf_epoch_31  Ia       Ia-norm    3.4          0.527548         0.001355       6.2     
+11  sn2007kk_epoch_9   Ia       Ia-norm    3.4          0.534583         0.001604       3.2     
+12  sn2005cf_epoch_32  Ia       Ia-norm    3.4          0.526723         0.001343       7.2     
+13  sn2007kk_epoch_14  Ia       Ia-norm    3.3          0.528881         0.001909       8.8     
+14  sn2005hc_epoch_0   Ia       Ia-norm    3.3          0.530916         0.001334       5.4     
+15  sn2003he_epoch_0   Ia       Ia-norm    3.3          0.529567         0.001359       2.7     
+16  sn2003du_epoch_10  Ia       Ia-norm    3.2          0.526308         0.001601       4.0     
+17  sn2008ar_epoch_3   Ia       Ia-norm    3.2          0.527710         0.001381       5.0     
+18  sn2007co_epoch_2   Ia       Ia-norm    3.1          0.528150         0.001573       5.7     
+19  sn2007kk_epoch_8   Ia       Ia-norm    3.1          0.536296         0.001637       2.1     
+20  sn1999ee_epoch_7   Ia       Ia-norm    3.1          0.525198         0.001748       10.6    
+21  sn2001ep_epoch_23  Ia       Ia-norm    3.1          0.525242         0.001624       2.8     
+22  sn2006cf_epoch_3   Ia       Ia-norm    3.1          0.522357         0.001414       4.7     
+23  sn1996C_epoch_2    Ia       Ia-norm    3.1          0.519526         0.001703       7.8     
+24  sn2002bo_epoch_9   Ia       Ia-norm    3.1          0.538315         0.001796       -1.7    
+25  sn2007co_epoch_16  Ia       Ia-norm    3.0          0.528441         0.001625       4.6     
+26  sn2006bu           Ia       Ia-norm    3.0          0.532268         0.001459       4.2     
+27  sn1981B_epoch_0    Ia       Ia-norm    2.9          0.534684         0.001669       -1.5    
+28  sn1995D_epoch_1    Ia       Ia-norm    2.9          0.525847         0.001648       5.5     
+29  sn2005hc_epoch_1   Ia       Ia-norm    2.9          0.531417         0.001236       6.3     
+30  sn2007co_epoch_15  Ia       Ia-norm    2.9          0.529682         0.001640       3.7     
+31  sn2007fs_epoch_1   Ia       Ia-norm    2.9          0.525650         0.001551       4.1     
+32  sn2008bf_epoch_7   Ia       Ia-norm    2.9          0.530918         0.001428       4.5     
+33  sn2007kk_epoch_7   Ia       Ia-norm    2.8          0.536608         0.001779       1.1     
+34  sn2006cf_epoch_2   Ia       Ia-norm    2.8          0.522769         0.001549       3.7     
+35  sn2006cp_epoch_5   Ia       Ia-norm    2.8          0.529632         0.001902       6.3     
+36  sn2007fs_epoch_2   Ia       Ia-norm    2.7          0.526529         0.001580       5.1     
+37  sn2007kk_epoch_1   Ia       Ia-norm    2.7          0.538934         0.001733       -0.8    
+38  sn2008ar_epoch_2   Ia       Ia-norm    2.7          0.528985         0.001584       4.1     
+39  sn2002er_epoch_23  Ia       Ia-norm    2.7          0.533962         0.001599       -4.0    
+40  sn2007co_epoch_14  Ia       Ia-norm    2.7          0.530572         0.001793       2.7     
+41  sn2004eo_epoch_1   Ia       Ia-norm    2.7          0.531176         0.001729       -5.6    
+42  sn2002bo_epoch_13  Ia       Ia-norm    2.7          0.533336         0.001729       -0.6    
+43  sn2001eh_epoch_12  Ia       Ia-91T     2.6          0.530203         0.001660       2.7     
+44  sn1995D_epoch_6    Ia       Ia-norm    2.6          0.524537         0.001876       7.5     
+45  sn2001eh_epoch_16  Ia       Ia-91T     2.6          0.528645         0.001160       8.6     
+46  sn2005cf_epoch_22  Ia       Ia-norm    2.6          0.530847         0.001699       1.5     
+47  sn2007kk_epoch_0   Ia       Ia-norm    2.6          0.539512         0.002011       -1.7    
+48  sn2007S_epoch_5    Ia       Ia-91T     2.6          0.523894         0.001575       8.1     
+49  sn1999ac_epoch_32  Ia       Ia-91T     2.6          0.517801         0.002316       2.7     
+50  sn2008bf_epoch_6   Ia       Ia-norm    2.5          0.531436         0.001541       3.6     
+51  sn2001el_epoch_2   Ia       Ia-norm    2.5          0.535689         0.001585       9.1     
+52  sn2007le_epoch_21  Ia       Ia-norm    2.5          0.533393         0.001573       5.4     
+53  sn2007co_epoch_3   Ia       Ia-norm    2.5          0.528136         0.002016       6.6     
+54  sn2008ar_epoch_4   Ia       Ia-norm    2.5          0.526787         0.001704       7.2     
+55  sn2006cp_epoch_6   Ia       Ia-norm    2.5          0.528105         0.002006       7.3     
+56  sn2006cz_epoch_2   Ia       Ia-91T     2.5          0.532988         0.001921       -1.0    
+57  sn2002er_epoch_20  Ia       Ia-norm    2.5          0.542400         0.001678       -7.0    
+58  sn1999ac_epoch_31  Ia       Ia-91T     2.5          0.519318         0.002512       0.4     
+59  sn2007co_epoch_12  Ia       Ia-norm    2.5          0.532669         0.001840       0.8     
+60  sn1999ef_epoch_0   Ia       Ia-norm    2.5          0.529439         0.001298       6.7     
+61  sn2007co_epoch_13  Ia       Ia-norm    2.5          0.530511         0.001852       1.7     
+62  sn2008ar_epoch_17  Ia       Ia-norm    2.5          0.529953         0.001662       3.1     
+63  sn2006le_epoch_18  Ia       Ia-norm    2.5          0.531516         0.001623       5.9     
+64  sn1998ab_epoch_4   Ia       Ia-91T     2.5          0.522031         0.002056       7.7     
+65  sn1999ee_epoch_4   Ia       Ia-norm    2.5          0.536277         0.002904       -0.2    
+66  sn1994ae_epoch_15  Ia       Ia-norm    2.4          0.518985         0.001552       8.0     
+67  sn2006cf_epoch_0   Ia       Ia-norm    2.4          0.523456         0.001804       1.8     
+68  sn1989B_epoch_1    Ia       Ia-norm    2.4          0.526519         0.001881       -1.3    
+69  sn2002er_epoch_2   Ia       Ia-norm    2.4          0.537882         0.002216       -2.1    
+70  sn1995E_epoch_4    Ia       Ia-norm    2.4          0.524474         0.001401       5.9     
+71  sn2002bo_epoch_14  Ia       Ia-norm    2.3          0.527954         0.002183       5.2     
+72  sn2008Z_epoch_11   Ia       Ia-norm    2.3          0.526482         0.002252       7.6     
+73  sn1999ee_epoch_5   Ia       Ia-norm    2.3          0.532240         0.002544       1.8     
+74  sn2002er_epoch_25  Ia       Ia-norm    2.3          0.539451         0.002205       -3.1    
+75  sn2001br_epoch_1   Ia       Ia-norm    2.3          0.534799         0.002014       2.5     
+76  sn2008bf_epoch_8   Ia       Ia-norm    2.3          0.530889         0.001767       7.5     
+77  sn2002ck_epoch_3   Ia       Ia-norm    2.3          0.525926         0.001236       4.2     
+78  sn2006cz_epoch_1   Ia       Ia-91T     2.3          0.535441         0.002129       -2.0    
+79  sn2001eh_epoch_15  Ia       Ia-91T     2.3          0.530797         0.001220       5.7     
+80  sn2006cz_epoch_0   Ia       Ia-91T     2.3          0.537287         0.001949       -3.9    
+81  sn2003hu_epoch_2   Ia       Ia-91T     2.3          0.523842         0.001459       8.4     
+82  sn2007co_epoch_11  Ia       Ia-norm    2.3          0.533470         0.001925       -0.2    
+83  sn2005eu_epoch_4   Ia       Ia-norm    2.3          0.523349         0.002069       10.3    
+84  sn2002ha_epoch_1   Ia       Ia-norm    2.3          0.527693         0.001897       1.7     
+85  sn2006gr_epoch_2   Ia       Ia-norm    2.3          0.530932         0.001674       9.4     
+86  sn2002er_epoch_8   Ia       Ia-norm    2.2          0.528039         0.002080       4.9     
+87  sn2006et_epoch_0   Ia       Ia-norm    2.2          0.524090         0.001841       2.4     
+88  sn2006le_epoch_17  Ia       Ia-norm    2.2          0.533278         0.001699       3.9     
+89  sn1989B_epoch_0    Ia       Ia-norm    2.2          0.530827         0.001983       -7.2    
+90  sn2007fs_epoch_0   Ia       Ia-norm    2.2          0.526907         0.001528       3.1     
+91  sn2006le_epoch_19  Ia       Ia-norm    2.2          0.531074         0.001820       6.9     
+92  sn2007ca_epoch_1   Ia       Ia-norm    2.2          0.524260         0.001893       5.5     
+93  sn1994ae_epoch_13  Ia       Ia-norm    2.2          0.524028         0.001839       5.0     
+94  sn1999ef_epoch_1   Ia       Ia-norm    2.2          0.528579         0.001428       7.7     
+95  sn2003cg_epoch_3   Ia       Ia-norm    2.2          0.531007         0.002012       -2.1    
+96  sn2005cf_epoch_18  Ia       Ia-norm    2.2          0.533807         0.001999       -1.2    
+97  sn2008bf_epoch_1   Ia       Ia-norm    2.1          0.531935         0.001753       2.6     
+98  sn2006cj_epoch_5   Ia       Ia-norm    2.1          0.525190         0.001779       8.2     
+99  sn2003fa_epoch_17  Ia       Ia-91T     2.1          0.527687         0.001392       8.7     
+100 sn2007ca_epoch_2   Ia       Ia-norm    2.1          0.523239         0.001998       6.4     
+101 sn2005eu_epoch_3   Ia       Ia-norm    2.1          0.525789         0.002084       8.3     
+102 sn2001ay_epoch_13  Ia       Ia-norm    2.1          0.535110         0.002043       3.3     
+103 sn2007S_epoch_4    Ia       Ia-91T     2.1          0.527781         0.001787       6.2     
+104 sn2006al_epoch_3   Ia       Ia-norm    2.1          0.524912         0.001745       5.4     
+105 sn2018bie_epoch_1  Ia       Ia-91T     2.1          0.531064         0.002417       -7.0    
+106 sn2006cj_epoch_6   Ia       Ia-norm    2.1          0.525467         0.002163       9.1     
+107 sn2003cg_epoch_14  Ia       Ia-norm    2.1          0.525634         0.001448       4.0     
+108 sn2006ak           Ia       Ia-norm    2.1          0.533255         0.002287       7.3     
+109 sn1992A_epoch_1    Ia       Ia-norm    2.1          0.538764         0.001729       -0.8    
+110 sn2006bq           Ia       Ia-norm    2.1          0.533740         0.002144       5.3     
+111 sn2003fa_epoch_16  Ia       Ia-91T     2.1          0.527995         0.001248       7.8     
+112 sn2006or_epoch_0   Ia       Ia-norm    2.1          0.532321         0.001883       -2.9    
+113 sn2002jy_epoch_5   Ia       Ia-norm    2.1          0.528403         0.001354       8.0     
+114 sn2006le_epoch_16  Ia       Ia-norm    2.1          0.533979         0.001802       2.9     
+115 sn2006cf_epoch_1   Ia       Ia-norm    2.1          0.523631         0.001923       2.7     
+116 sn2007ae_epoch_0   Ia       Ia-norm    2.1          0.529100         0.001387       2.3     
+117 sn2007A_epoch_2    Ia       Ia-norm    2.1          0.521969         0.001821       4.5     
+118 sn2003hu_epoch_1   Ia       Ia-91T     2.1          0.526003         0.001409       7.5     
+119 sn2007F_epoch_9    Ia       Ia-norm    2.0          0.525916         0.001868       3.0     
+120 sn1993ac           Ia       Ia-norm    2.0          0.529838         0.002013       6.9     
+121 sn2003ch_epoch_5   Ia       Ia-norm    2.0          0.525692         0.001791       1.8     
+122 sn2002jy_epoch_6   Ia       Ia-norm    2.0          0.527956         0.001489       9.9     
+123 sn2007bc_epoch_0   Ia       Ia-norm    2.0          0.525805         0.001650       -2.6    
+124 sn1999aa_epoch_5   Ia       Ia-91T     2.0          0.526671         0.001979       1.8     
+125 sn2007bd_epoch_4   Ia       Ia-norm    2.0          0.529738         0.001970       1.7     
+126 sn1998dx_epoch_4   Ia       Ia-norm    2.0          0.526538         0.001570       5.9     
+127 sn2005na_epoch_2   Ia       Ia-norm    2.0          0.524411         0.001850       3.4     
+128 sn2004bg_epoch_2   Ia       Ia-norm    1.9          0.525796         0.001433       5.7     
+129 sn2006cj_epoch_4   Ia       Ia-norm    1.9          0.522299         0.001399       5.4     
+130 sn2006X_epoch_1    Ia       Ia-norm    1.9          0.539447         0.001913       2.3     
+131 sn2001ck_epoch_0   Ia       Ia-norm    1.9          0.528790         0.001385       4.8     
+132 sn1992A_epoch_8    Ia       Ia-norm    1.8          0.535209         0.001563       6.9     
+133 sn2000cf_epoch_1   Ia       Ia-norm    1.8          0.520539         0.001489       3.9     
+134 sn2002hd_epoch_0   Ia       Ia-norm    1.8          0.524655         0.001457       1.4     
+135 sn2003it_epoch_14  Ia       Ia-norm    1.7          0.529160         0.001392       6.6     
+136 sn2006lf_epoch_16  Ia       Ia-norm    1.7          0.525051         0.001620       6.3     
+137 sn2003fa_epoch_15  Ia       Ia-91T     1.7          0.528447         0.001417       6.9     
+138 sn1996C_epoch_1    Ia       Ia-norm    1.7          0.524785         0.001610       4.8     
+139 sn2003ic_epoch_4   Ia       Ia-norm    1.7          0.527705         0.002160       5.3     
+140 sn2001eh_epoch_14  Ia       Ia-91T     1.7          0.531066         0.001528       4.7     
+141 sn2002jy_epoch_4   Ia       Ia-norm    1.7          0.528933         0.001518       7.0     
+142 sn2006al_epoch_4   Ia       Ia-norm    1.7          0.524086         0.001678       6.3     
+143 sn2003it_epoch_2   Ia       Ia-norm    1.6          0.528566         0.001515       7.6     
+144 sn2002fk_epoch_20  Ia       Ia-norm    1.6          0.522891         0.001479       8.3     
+145 sn2003hv_epoch_1   Ia       Ia-norm    1.6          0.522073         0.001640       8.2     
+146 sn2003iv_epoch_6   Ia       Ia-norm    1.6          0.521848         0.001592       7.2     
+147 sn1995E_epoch_3    Ia       Ia-norm    1.6          0.526683         0.001819       3.9     
+148 sn1999gp_epoch_5   Ia       Ia-91T     1.6          0.530671         0.001610       6.9     
+149 sn2007kk_epoch_13  Ia       Ia-norm    1.6          0.532556         0.002345       7.9     
+150 sn1996bo_epoch_0   Ia       Ia-norm    1.6          0.532902         0.001847       3.3     
+151 sn2003it_epoch_13  Ia       Ia-norm    1.5          0.529607         0.001543       5.7     
+152 sn2003ch_epoch_11  Ia       Ia-norm    1.5          0.521707         0.001360       6.7     
+153 sn2000dg_epoch_1   Ia       Ia-norm    1.5          0.528875         0.001565       0.2     
+154 sn2002eu_epoch_1   Ia       Ia-norm    1.5          0.524889         0.001569       3.0     
+155 sn2002he_epoch_3   Ia       Ia-norm    1.5          0.530556         0.001760       5.6     
+156 sn2003ch_epoch_9   Ia       Ia-norm    1.4          0.523965         0.001370       4.8     
+157 sn2003ch_epoch_8   Ia       Ia-norm    1.4          0.523697         0.001370       3.8     
+158 sn1994M_epoch_5    Ia       Ia-norm    1.4          0.531140         0.001684       6.6     
+159 sn1994M_epoch_4    Ia       Ia-norm    1.4          0.530374         0.001370       5.6     

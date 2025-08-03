@@ -200,7 +200,17 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
     def _setup_ui(self):
         """Setup the dialog UI"""
         self.setWindowTitle("GMM Cluster Selection")
-        self.setFixedSize(1200, 650)  # Made taller (was 580)
+        self.setMinimumSize(1100, 600)  # Set minimum size instead of fixed size
+        self.resize(1200, 650)  # Initial size - smaller than before
+        
+        # Enable minimize, maximize, and close buttons (normal window behavior)
+        self.setWindowFlags(
+            QtCore.Qt.Dialog | 
+            QtCore.Qt.WindowTitleHint | 
+            QtCore.Qt.WindowSystemMenuHint | 
+            QtCore.Qt.WindowMinMaxButtonsHint | 
+            QtCore.Qt.WindowCloseButtonHint
+        )
         
         # Apply modern styling (matching PySide6 theme)
         self.setStyleSheet("""
@@ -263,20 +273,20 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
         
-        # Main content (horizontal split - 65% left, 35% right) - no header, no footer
+        # Main content (horizontal split - 60% left, 40% right) - no header, no footer
         self._create_main_content(main_layout)
     
     def _create_main_content(self, layout):
-        """Create main content with horizontal split layout (70/30 split matching tkinter)"""
+        """Create main content with horizontal split layout (60/40 split with proper spacing)"""
         content_frame = QtWidgets.QFrame()
         content_layout = QtWidgets.QHBoxLayout(content_frame)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(10)
+        content_layout.setContentsMargins(5, 5, 5, 5)  # Add margins to frame
+        content_layout.setSpacing(8)  # Reduced spacing between panels
         
-        # Left panel (70% width) - cluster selection and 3D plot
+        # Left panel (60% width) - cluster selection and 3D plot
         self._create_left_panel(content_layout)
         
-        # Right panel (30% width) - template matches
+        # Right panel (40% width) - template matches
         self._create_right_panel(content_layout)
         
         layout.addWidget(content_frame)
@@ -284,10 +294,10 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
     def _create_left_panel(self, layout):
         """Create left panel with cluster dropdown and 3D matplotlib plot"""
         self.left_panel = QtWidgets.QWidget()
-        self.left_panel.setMinimumWidth(int(1200 * 0.55))  # 55% width (reduced from 65%)
+        # Remove fixed width constraints to allow resizing
         left_layout = QtWidgets.QVBoxLayout(self.left_panel)
-        left_layout.setContentsMargins(5, 5, 5, 5)
-        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(6, 6, 6, 6)  # Reduced margins
+        left_layout.setSpacing(10)  # Reduced spacing
         
         # Cluster selection dropdown
         selection_group = QtWidgets.QGroupBox("Select the best Type from GMM analysis")
@@ -353,17 +363,17 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             fallback.setAlignment(QtCore.Qt.AlignCenter)
             fallback.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 12pt;")
             fallback.setWordWrap(True)
-            fallback.setMinimumHeight(300)  # Reduced height for smaller dialog
+            fallback.setMinimumHeight(250)  # Smaller height for compact dialog
             plot_layout.addWidget(fallback)
         
         left_layout.addWidget(plot_group, 1)
         
-        layout.addWidget(self.left_panel)
+        layout.addWidget(self.left_panel, 3)  # Give left panel 3 parts of space (60%)
     
     def _create_matplotlib_3d_plot(self, layout):
         """Create matplotlib 3D scatter plot (matching tkinter implementation exactly)"""
         # Create matplotlib figure with white background (matching tkinter)
-        self.fig = Figure(figsize=(12, 8), facecolor='white')  # Reduced size for smaller dialog
+        self.fig = Figure(figsize=(8, 6), facecolor='white')  # Smaller initial size, will scale with window
         self.fig.patch.set_facecolor('white')
         
         # MAXIMIZE the plot area - use almost the entire window space (matching tkinter)
@@ -376,7 +386,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         # Create Qt canvas widget
         self.plot_widget = FigureCanvas(self.fig)
         self.plot_widget.setParent(self.parent())
-        self.plot_widget.setMinimumHeight(350)  # Reduced height for smaller dialog
+        self.plot_widget.setMinimumHeight(300)  # Smaller minimum height for initial size
         
         # Add canvas to layout
         layout.addWidget(self.plot_widget)
@@ -388,10 +398,10 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
     def _create_right_panel(self, layout):
         """Create right panel with template matches using matplotlib"""
         self.right_panel = QtWidgets.QWidget()
-        self.right_panel.setMinimumWidth(int(1200 * 0.45))  # 45% width (increased from 35%)
+        # Remove fixed width constraints to allow resizing
         right_layout = QtWidgets.QVBoxLayout(self.right_panel)
-        right_layout.setContentsMargins(5, 5, 5, 5)
-        right_layout.setSpacing(10)
+        right_layout.setContentsMargins(6, 6, 6, 6)  # Reduced margins
+        right_layout.setSpacing(10)  # Reduced spacing
         
         # Top 2 matches panel (matching tkinter version)
         matches_group = QtWidgets.QGroupBox("🔍 Top 2 Template Matches For Selected Cluster")
@@ -400,7 +410,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         
         if MATPLOTLIB_AVAILABLE:
             # Create matplotlib figure for matches (matching tkinter implementation)
-            self.matches_fig = Figure(figsize=(6, 8), dpi=100, facecolor='white')  # Reduced size for smaller dialog
+            self.matches_fig = Figure(figsize=(3.5, 5.5), dpi=100, facecolor='white')  # Even smaller to prevent label cutoff
             self.matches_fig.clear()
             
             # Create exactly 2 subplots vertically stacked (matching tkinter)
@@ -414,8 +424,8 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 ax.grid(True, alpha=0.3, linewidth=0.5)
                 self.matches_axes.append(ax)
             
-            # Optimize subplot parameters (matching tkinter)
-            self.matches_fig.subplots_adjust(left=0.12, right=0.98, top=0.94, bottom=0.06, hspace=0.25)  # Increased hspace from 0.15 to 0.25
+            # Optimize subplot parameters with more space for labels
+            self.matches_fig.subplots_adjust(left=0.15, right=0.95, top=0.92, bottom=0.08, hspace=0.35)  # More space for labels
             
             # Embed in Qt widget
             self.matches_canvas = FigureCanvas(self.matches_fig)
@@ -430,7 +440,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         
         right_layout.addWidget(matches_group, 1)
         
-        layout.addWidget(self.right_panel)
+        layout.addWidget(self.right_panel, 2)  # Give right panel 2 parts of space (40%)
     
     def _populate_data(self):
         """Populate dropdown and create 3D plot"""

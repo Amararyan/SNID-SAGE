@@ -415,6 +415,9 @@ def load_templates(template_dir: str, flatten: bool = True) -> Tuple[List[Dict[s
     """
     Load all template spectra from a directory.
     
+    This is a legacy fallback that should only be used if unified storage fails.
+    It now tries HDF5 files first, then falls back to .lnw files.
+    
     Parameters:
         template_dir (str): Directory containing template files
         flatten (bool): Whether to flatten non-flattened spectra
@@ -422,6 +425,24 @@ def load_templates(template_dir: str, flatten: bool = True) -> Tuple[List[Dict[s
     Returns:
         Tuple[List[Dict[str, Any]], Dict[str, int]]: List of templates and counts by type
     """
+    # First try to use unified storage directly as a fallback
+    try:
+        from .core.integration import load_templates_unified
+        templates = load_templates_unified(template_dir)
+        
+        # Build type statistics
+        type_counts = {}
+        for template in templates:
+            template_type = template.get('type', 'Unknown')
+            type_counts[template_type] = type_counts.get(template_type, 0) + 1
+        
+        _LOG.info(f"✅ Legacy fallback successfully used unified storage: {len(templates)} templates")
+        return templates, type_counts
+        
+    except Exception as e:
+        _LOG.warning(f"Unified storage failed in legacy fallback: {e}, trying .lnw files")
+    
+    # Original legacy behavior: look for .lnw files
     templates = []
     type_counts = {}
     

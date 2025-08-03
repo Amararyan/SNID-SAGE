@@ -1707,39 +1707,59 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                             # Get the original workflow button style
                             workflow_style = self.workflow_manager.theme_manager.get_workflow_button_style(button_def.color_type)
                             
-                            # Add red border to the workflow style
+                            # Add red border to the workflow style while maintaining Enhanced Button Manager sizing
                             blink_style = f"""
                             QPushButton#{object_name} {{
                                 {workflow_style}
                                 border: 2px solid #ef4444 !important;
+                                font-size: 12pt !important;
+                                font-weight: bold !important;
+                                padding: 2px 4px !important;
+                                min-height: 24px !important;
+                                border-radius: 4px !important;
                             }}
                             """
                         else:
-                            # Fallback with red border
+                            # Fallback with red border and consistent sizing
                             blink_style = f"""
                             QPushButton#{object_name} {{
                                 font-size: 12pt !important;
                                 font-weight: bold !important;
                                 border: 2px solid #ef4444 !important;
+                                padding: 2px 4px !important;
+                                min-height: 24px !important;
+                                border-radius: 4px !important;
+                                background-color: #58508D !important;
+                                color: white !important;
                             }}
                             """
                     except Exception as e:
                         _LOGGER.debug(f"Could not get workflow styling for blink: {e}")
-                        # Fallback with red border
+                        # Fallback with red border and consistent sizing
                         blink_style = f"""
                         QPushButton#{object_name} {{
                             font-size: 12pt !important;
                             font-weight: bold !important;
                             border: 2px solid #ef4444 !important;
+                            padding: 2px 4px !important;
+                            min-height: 24px !important;
+                            border-radius: 4px !important;
+                            background-color: #58508D !important;
+                            color: white !important;
                         }}
                         """
                 else:
-                    # No workflow manager - simple red border
+                    # No workflow manager - simple red border with consistent sizing
                     blink_style = f"""
                     QPushButton#{object_name} {{
                         font-size: 12pt !important;
                         font-weight: bold !important;
                         border: 2px solid #ef4444 !important;
+                        padding: 2px 4px !important;
+                        min-height: 24px !important;
+                        border-radius: 4px !important;
+                        background-color: #58508D !important;
+                        color: white !important;
                     }}
                     """
             else:
@@ -1754,11 +1774,17 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     except Exception as e:
                         _LOGGER.debug(f"Could not restore workflow styling: {e}")
                 
-                # Fallback to original style
+                # Fallback to original style with consistent sizing
                 blink_style = self.cluster_summary_original_style or f"""
                 QPushButton#{object_name} {{
                     font-size: 12pt !important;
                     font-weight: bold !important;
+                    padding: 2px 4px !important;
+                    min-height: 24px !important;
+                    border-radius: 4px !important;
+                    background-color: #58508D !important;
+                    color: white !important;
+                    border: 2px solid #58508D !important;
                 }}
                 """
             

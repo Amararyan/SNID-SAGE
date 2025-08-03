@@ -178,6 +178,9 @@ def _validate_templates_directory(templates_dir: Path) -> bool:
     """
     Validate that a directory contains valid SNID templates.
     
+    OPTIMIZED: Only checks for template_index.json instead of scanning all HDF5/LNW files
+    to avoid startup delays. Full validation happens during analysis when needed.
+    
     Args:
         templates_dir: Path to check
         
@@ -188,16 +191,22 @@ def _validate_templates_directory(templates_dir: Path) -> bool:
         if not templates_dir.exists() or not templates_dir.is_dir():
             return False
         
-        # Check for HDF5 template files (preferred format)
-        hdf5_files = list(templates_dir.glob('templates_*.hdf5'))
-        if hdf5_files:
-            logger.debug(f"Found {len(hdf5_files)} HDF5 template files in {templates_dir}")
+        # FAST CHECK: Only look for template index file (preferred for HDF5 storage)
+        index_file = templates_dir / 'template_index.json'
+        if index_file.exists():
+            logger.debug(f"Found template index file in {templates_dir}")
             return True
         
-        # Fallback: check for .lnw files (legacy format)
-        lnw_files = list(templates_dir.glob('*.lnw'))
-        if len(lnw_files) > 0:
-            logger.debug(f"Found {len(lnw_files)} LNW template files in {templates_dir}")
+        # FAST FALLBACK: Quick check for any template-like files without full enumeration
+        # Check if directory has potential template files without listing all
+        has_hdf5 = any(templates_dir.glob('templates_*.hdf5'))
+        if has_hdf5:
+            logger.debug(f"Found HDF5 template files in {templates_dir}")
+            return True
+        
+        has_lnw = any(templates_dir.glob('*.lnw'))
+        if has_lnw:
+            logger.debug(f"Found LNW template files in {templates_dir}")
             return True
         
         logger.debug(f"No template files found in {templates_dir}")

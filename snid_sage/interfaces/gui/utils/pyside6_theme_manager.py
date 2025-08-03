@@ -558,6 +558,26 @@ class PySide6ThemeManager:
             border: 2px solid #4c4577 !important;
         }
         
+        /* Navigation arrow buttons when disabled - add hover effects */
+        QPushButton[objectName="unified_prev_btn"]:disabled:hover,
+        QPushButton[objectName="unified_next_btn"]:disabled:hover {
+            background-color: #e5e7eb !important;
+            border: 2px solid #d1d5db !important;
+        }
+        
+        /* Navigation arrow buttons - pressed effects for click feedback */
+        QPushButton[objectName="unified_prev_btn"]:enabled:pressed,
+        QPushButton[objectName="unified_next_btn"]:enabled:pressed {
+            background-color: #3d3465 !important;
+            border: 2px solid #3d3465 !important;
+        }
+        
+        QPushButton[objectName="unified_prev_btn"]:disabled:pressed,
+        QPushButton[objectName="unified_next_btn"]:disabled:pressed {
+            background-color: #d1d5db !important;
+            border: 2px solid #9ca3af !important;
+        }
+        
         /* Removed: Micro navigation buttons - up/down arrows are no longer used */
         QPushButton[objectName="nav_btn"]:hover {
             background-color: #e2e8f0;
@@ -613,6 +633,183 @@ class PySide6ThemeManager:
             color: #9ca3af !important;
         }
         
+        /* Flux/Flat buttons when disabled - add hover effects */
+        QPushButton[objectName="flux_btn"]:disabled:hover, QPushButton[objectName="flat_btn"]:disabled:hover {
+            background-color: #e5e7eb !important;
+            border-color: #d1d5db !important;
+        }
+        
+        /* Flux/Flat buttons - pressed effects for click feedback */
+        QPushButton[objectName="flux_btn"]:pressed, QPushButton[objectName="flat_btn"]:pressed {
+            background-color: #d1d5db !important;
+            border-color: #9ca3af !important;
+        }
+        
+        QPushButton[objectName="flux_btn"]:checked:pressed, QPushButton[objectName="flat_btn"]:checked:pressed {
+            background-color: #1d4ed8 !important;
+            border-color: #1e40af !important;
+        }
+        
+        /* Analysis buttons - cluster summary, GMM, redshift age, subtype proportions */
+        QPushButton[objectName="unified_cluster_summary_btn"],
+        QPushButton[objectName="unified_gmm_btn"],
+        QPushButton[objectName="unified_redshift_age_btn"],
+        QPushButton[objectName="unified_subtype_proportions_btn"] {
+            background-color: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 4px;
+            color: #374151;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+            font-weight: bold;
+        }
+        
+        /* Analysis buttons emoji size variants */
+        QPushButton[objectName="unified_cluster_summary_btn"] {
+            font-size: 12pt;
+        }
+        
+        QPushButton[objectName="unified_gmm_btn"],
+        QPushButton[objectName="unified_redshift_age_btn"],
+        QPushButton[objectName="unified_subtype_proportions_btn"] {
+            font-size: 14pt;
+        }
+        
+        QPushButton[objectName="unified_cluster_summary_btn"]:enabled,
+        QPushButton[objectName="unified_gmm_btn"]:enabled,
+        QPushButton[objectName="unified_redshift_age_btn"]:enabled,
+        QPushButton[objectName="unified_subtype_proportions_btn"]:enabled {
+            background-color: #58508D !important;
+            border: 2px solid #58508D !important;
+            color: white !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        QPushButton[objectName="unified_cluster_summary_btn"]:enabled:hover,
+        QPushButton[objectName="unified_gmm_btn"]:enabled:hover,
+        QPushButton[objectName="unified_redshift_age_btn"]:enabled:hover,
+        QPushButton[objectName="unified_subtype_proportions_btn"]:enabled:hover {
+            background-color: #4c4577 !important;
+            border: 2px solid #4c4577 !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        /* Analysis buttons when disabled - add hover effects */
+        QPushButton[objectName="unified_cluster_summary_btn"]:disabled:hover,
+        QPushButton[objectName="unified_gmm_btn"]:disabled:hover,
+        QPushButton[objectName="unified_redshift_age_btn"]:disabled:hover,
+        QPushButton[objectName="unified_subtype_proportions_btn"]:disabled:hover {
+            background-color: #e5e7eb !important;
+            border: 2px solid #d1d5db !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        /* Analysis buttons - pressed effects for click feedback */
+        QPushButton[objectName="unified_cluster_summary_btn"]:enabled:pressed,
+        QPushButton[objectName="unified_gmm_btn"]:enabled:pressed,
+        QPushButton[objectName="unified_redshift_age_btn"]:enabled:pressed,
+        QPushButton[objectName="unified_subtype_proportions_btn"]:enabled:pressed {
+            background-color: #3d3465 !important;
+            border: 2px solid #3d3465 !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        QPushButton[objectName="unified_cluster_summary_btn"]:disabled:pressed,
+        QPushButton[objectName="unified_gmm_btn"]:disabled:pressed,
+        QPushButton[objectName="unified_redshift_age_btn"]:disabled:pressed,
+        QPushButton[objectName="unified_subtype_proportions_btn"]:disabled:pressed {
+            background-color: #d1d5db !important;
+            border: 2px solid #9ca3af !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        QPushButton[objectName="unified_cluster_summary_btn"]:disabled,
+        QPushButton[objectName="unified_gmm_btn"]:disabled,
+        QPushButton[objectName="unified_redshift_age_btn"]:disabled,
+        QPushButton[objectName="unified_subtype_proportions_btn"]:disabled {
+            background-color: #f3f4f6 !important;
+            border: 2px solid #e5e7eb !important;
+            color: #9ca3af !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        /* Reset and Settings buttons - utility buttons with consistent styling */
+        QPushButton[objectName="unified_reset_btn"],
+        QPushButton[objectName="unified_settings_btn"] {
+            background-color: #f8fafc !important;
+            border: 2px solid #e2e8f0 !important;
+            border-radius: 4px !important;
+            color: #374151 !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+            font-weight: bold !important;
+            font-size: 9pt !important;
+        }
+        
+        QPushButton[objectName="unified_reset_btn"]:enabled,
+        QPushButton[objectName="unified_settings_btn"]:enabled {
+            background-color: #6366f1 !important;
+            border: 2px solid #6366f1 !important;
+            color: white !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        QPushButton[objectName="unified_reset_btn"]:enabled:hover,
+        QPushButton[objectName="unified_settings_btn"]:enabled:hover {
+            background-color: #5448c8 !important;
+            border: 2px solid #5448c8 !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        QPushButton[objectName="unified_reset_btn"]:enabled:pressed,
+        QPushButton[objectName="unified_settings_btn"]:enabled:pressed {
+            background-color: #4338ca !important;
+            border: 2px solid #4338ca !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        QPushButton[objectName="unified_reset_btn"]:disabled,
+        QPushButton[objectName="unified_settings_btn"]:disabled {
+            background-color: #f3f4f6 !important;
+            border: 2px solid #e5e7eb !important;
+            color: #9ca3af !important;
+            padding: 2px 4px !important;
+            min-height: 24px !important;
+        }
+        
+        /* Info button - utility button with specific styling */
+        QPushButton[objectName="unified_info_btn"] {
+            background-color: #3b82f6 !important;
+            border: 1px solid #2563eb !important;
+            border-radius: 4px !important;
+            color: white !important;
+            padding: 2px 4px !important;
+            font-weight: bold !important;
+            font-family: "Segoe UI", "Arial", sans-serif !important;
+            font-size: 14px !important;
+            min-width: 24px !important;
+            max-width: 24px !important;
+        }
+        
+        QPushButton[objectName="unified_info_btn"]:hover {
+            background-color: #2563eb !important;
+            border: 1px solid #1d4ed8 !important;
+        }
+        
+        QPushButton[objectName="unified_info_btn"]:pressed {
+            background-color: #1d4ed8 !important;
+            border: 1px solid #1e40af !important;
+        }
+        
         /* Remove focus outline for all buttons to prevent rectangle artifacts */
         QPushButton:focus {
             outline: none !important;
@@ -629,6 +826,16 @@ class PySide6ThemeManager:
         base_stylesheet = self.generate_qt_stylesheet()
         cross_platform_styles = self.generate_cross_platform_styles()
         return base_stylesheet + cross_platform_styles
+    
+    def create_enhanced_button_manager(self):
+        """
+        Create an enhanced button manager instance with this theme manager
+        
+        Returns:
+            EnhancedButtonManager instance configured with this theme
+        """
+        from .enhanced_button_manager import EnhancedButtonManager
+        return EnhancedButtonManager(self)
 
 
 # Global theme manager instance

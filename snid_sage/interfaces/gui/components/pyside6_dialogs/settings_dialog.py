@@ -132,8 +132,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
     def setup_ui(self):
         """Setup the dialog UI"""
         self.setWindowTitle("⚙️ SNID SAGE Settings")
-        self.setMinimumSize(1000, 700)
-        self.resize(1200, 800)
+        self.setMinimumSize(700, 500)
+        self.resize(800, 600)
         self.setModal(True)
         
         # Apply colors
@@ -160,8 +160,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         
         # Main layout
         main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(10)
         
         # Header
         self._create_header(main_layout)
@@ -185,7 +185,7 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
                 background: {self.colors['bg_secondary']};
                 border: 1px solid {self.colors['border']};
                 border-radius: 6px;
-                padding: 12px;
+                padding: 8px;
             }}
         """)
         
@@ -239,8 +239,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         """Create appearance settings tab"""
         tab = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
         
         # Font settings group
         font_group = QtWidgets.QGroupBox("Font & Typography")
@@ -294,8 +294,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         """Create display settings tab"""
         tab = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
         
         # Window settings group
         window_group = QtWidgets.QGroupBox("Window & Display")
@@ -359,8 +359,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         """Create AI configuration tab"""
         tab = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
         
         # OpenRouter API configuration group
         api_group = QtWidgets.QGroupBox("🔑 OpenRouter API Configuration")
@@ -548,8 +548,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         """Create behavior settings tab"""
         tab = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
         
         # General behavior group
         general_group = QtWidgets.QGroupBox("General Behavior")
@@ -597,8 +597,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         """Create advanced settings tab"""
         tab = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(20)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
         
         # Performance group
         performance_group = QtWidgets.QGroupBox("Performance")

@@ -261,13 +261,13 @@ class UnifiedPySide6LayoutManager:
         gui_instance.info_btn = QtWidgets.QPushButton("ℹ")
         gui_instance.info_btn.setObjectName("unified_info_btn")
         gui_instance.info_btn.setToolTip("Show keyboard shortcuts\nView all available hotkeys and commands")
-        gui_instance.info_btn.setFixedWidth(35)  # Make it a few points wider
+        gui_instance.info_btn.setFixedWidth(24)  # Much narrower for compact info button
         gui_instance.info_btn.setStyleSheet("""
             QPushButton#unified_info_btn {
                 background-color: #3b82f6;
                 border: 1px solid #2563eb;
                 border-radius: 4px;
-                padding: 4px 8px;
+                padding: 2px 4px;
                 font-weight: bold;
                 font-family: "Segoe UI", "Arial", sans-serif;
                 font-size: 14px;
@@ -275,6 +275,10 @@ class UnifiedPySide6LayoutManager:
             }
             QPushButton#unified_info_btn:hover {
                 background-color: #2563eb;
+            }
+            QPushButton#unified_info_btn:pressed {
+                background-color: #1d4ed8;
+                border: 1px solid #1e40af;
             }
         """)
         # Connect to the correct method name based on the interface
@@ -810,11 +814,12 @@ class UnifiedPySide6LayoutManager:
             self._apply_button_size(button, 'small', attr_name)
             button.setToolTip(tooltip)
             
-            # Increase emoji size for specific buttons
+            # Increase emoji size for specific buttons - use object properties instead of inline styles
+            # This allows the CSS theme manager hover effects to work properly
             if attr_name in ['gmm_btn', 'redshift_age_btn', 'subtype_proportions_btn']:
-                button.setStyleSheet("font-size: 14pt; font-weight: bold;")
+                button.setProperty("emoji_size", "large")  # 14pt
             else:
-                button.setStyleSheet("font-size: 12pt; font-weight: bold;")
+                button.setProperty("emoji_size", "medium")  # 12pt
             
             # Connect to method if it exists
             if hasattr(gui_instance, method_name):
@@ -851,6 +856,10 @@ class UnifiedPySide6LayoutManager:
             background-color: #e2e8f0 !important;
             border-color: #94a3b8 !important;
         }
+        QPushButton:pressed {
+            background-color: #d1d5db !important;
+            border-color: #9ca3af !important;
+        }
         QPushButton:focus {
             outline: none !important;
         }
@@ -869,6 +878,10 @@ class UnifiedPySide6LayoutManager:
         }
         QPushButton:hover {
             background-color: #2563eb !important;
+        }
+        QPushButton:pressed {
+            background-color: #1d4ed8 !important;
+            border-color: #1e40af !important;
         }
         QPushButton:focus {
             outline: none !important;
@@ -890,6 +903,10 @@ class UnifiedPySide6LayoutManager:
             background-color: #e2e8f0 !important;
             border-color: #94a3b8 !important;
         }
+        QPushButton:pressed {
+            background-color: #d1d5db !important;
+            border-color: #9ca3af !important;
+        }
         QPushButton:focus {
             outline: none !important;
         }
@@ -908,6 +925,10 @@ class UnifiedPySide6LayoutManager:
         }
         QPushButton:hover {
             background-color: #2563eb !important;
+        }
+        QPushButton:pressed {
+            background-color: #1d4ed8 !important;
+            border-color: #1e40af !important;
         }
         QPushButton:focus {
             outline: none !important;
