@@ -1971,10 +1971,11 @@ def run_snid_analysis(
             # Use proper statistical redshift calculations instead of simple mean
             redshifts = [m['redshift'] for m in filtered_matches]
             if redshifts:
-                from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
-                redshift_errors = [0.01] * len(redshifts)  # Default errors
-                weighted_redshift, weighted_uncertainty, _ = calculate_hybrid_weighted_redshift(
-                    redshifts, redshift_errors, include_cluster_scatter=False
+                from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
+                # Use RLAP values as weights (assuming filtered_matches has rlap values)
+                weights = [m.get('rlap', 1.0) for m in filtered_matches]
+                weighted_redshift, weighted_uncertainty = calculate_weighted_redshift(
+                    redshifts, weights
                 )
             else:
                 weighted_redshift = result.initial_redshift
@@ -2124,7 +2125,10 @@ def run_snid_analysis(
         result.rlap = best_match['rlap']
         result.redshift = best_match['redshift']
         result.redshift_error = best_match.get('redshift_error', 0.0)
-        result.template_name = best_match['template'].get('name', 'Unknown')
+        raw_template_name = best_match['template'].get('name', 'Unknown')
+        # Clean template name to remove _epoch_X suffix
+        from snid_sage.shared.utils import clean_template_name
+        result.template_name = clean_template_name(raw_template_name)
         result.template_type = best_match['template'].get('type', 'Unknown')
         result.template_subtype = best_match['template'].get('subtype', '')
         result.template_age = best_match['template'].get('age', 0)

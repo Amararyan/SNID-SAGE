@@ -26,9 +26,13 @@ import PySide6.QtWidgets as QtWidgets
 try:
     import pyqtgraph as pg
     PYQTGRAPH_AVAILABLE = True
+    # Import enhanced and simple plot widgets
+    from snid_sage.interfaces.gui.components.plots.enhanced_plot_widget import EnhancedPlotWidget, SimplePlotWidget
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
+    EnhancedPlotWidget = None
+    SimplePlotWidget = None
 
 # Matplotlib for analysis plots
 try:
@@ -189,8 +193,8 @@ class PySide6PlotManager:
             )
             _LOGGER.debug("✅ PyQtGraph configured for software rendering")
             
-            # Create main plot widget with explicit software rendering
-            self.plot_widget = pg.PlotWidget()
+            # Create enhanced plot widget with save functionality and disabled context menus
+            self.plot_widget = EnhancedPlotWidget()
             
             # Force software rendering at widget level (WSL compatibility)
             try:
@@ -337,15 +341,15 @@ class PySide6PlotManager:
             bottom_axis = self.plot_item.getAxis('bottom')
             
             # Set axis text colors
-            left_axis.setTextPen(colors.get('plot_text', 'black'))
-            bottom_axis.setTextPen(colors.get('plot_text', 'black'))
+            left_axis.setTextPen(pg.mkPen(color='black'))
+            bottom_axis.setTextPen(pg.mkPen(color='black'))
             
             # Set axis line colors
-            left_axis.setPen(colors.get('border', 'black'))
-            bottom_axis.setPen(colors.get('border', 'black'))
-            
+            left_axis.setPen(pg.mkPen(color='black'))
+            bottom_axis.setPen(pg.mkPen(color='black'))
+                        
             # Set grid
-            self.plot_item.showGrid(x=True, y=True, alpha=0.3)
+            self.plot_item.showGrid(x=True, y=True, alpha=0.08)
             
             # Set labels
             self.plot_item.setLabels(left='Flux', bottom='Wavelength (Å)')
@@ -370,6 +374,10 @@ class PySide6PlotManager:
                 
             # Clear plot
             self.plot_item.clear()
+            
+            # Hide save button for welcome message (no data to save)
+            if hasattr(self.plot_widget, 'hide_save_button'):
+                self.plot_widget.hide_save_button()
             
             # Add welcome text without fake spectrum
             text_item = pg.TextItem(
@@ -462,6 +470,9 @@ class PySide6PlotManager:
             
             # Clear plot first
             self.plot_item.clear()
+            # Hide save button when clearing (will be shown again when data is plotted)
+            if hasattr(self.plot_widget, 'hide_save_button'):
+                self.plot_widget.hide_save_button()
             _LOGGER.debug("Plot cleared")
             
             # Check if we have SNID results for template overlays
@@ -503,7 +514,7 @@ class PySide6PlotManager:
                 y_label = 'Flux'
             else:  # flat view
                 flux_data = flux.copy()  # Already flat data from get_spectrum_for_view
-                y_label = 'Normalized Flux'
+                y_label = 'Flattened Flux'
             
             _LOGGER.debug(f"Using view: {view_type}, y_label: {y_label}")
             
@@ -547,6 +558,10 @@ class PySide6PlotManager:
             
             # Re-add any existing mask regions
             self.reapply_mask_regions()
+            
+            # Show save button now that we have actual spectrum data
+            if hasattr(self.plot_widget, 'show_save_button'):
+                self.plot_widget.show_save_button()
             
             _LOGGER.info(f"✅ Spectrum plotted successfully: {len(wave)} data points")
             
@@ -600,7 +615,7 @@ class PySide6PlotManager:
                 else:  # flat view
                     template_wave = current_match['spectra']['flat']['wave']
                     template_flux = current_match['spectra']['flat']['flux']
-                    y_label = 'Normalized Flux'
+                    y_label = 'Flattened Flux'
                 
                 # Clean template data
                 template_wave = np.asarray(template_wave, dtype=float)
@@ -651,7 +666,10 @@ class PySide6PlotManager:
             
             # Add template info text like the original implementation
             template = current_match.get('template', {})
-            template_name = current_match.get('name', 'Unknown')
+            raw_template_name = current_match.get('name', 'Unknown')
+            # Clean template name to remove _epoch_X suffix
+            from snid_sage.shared.utils import clean_template_name
+            template_name = clean_template_name(raw_template_name)
             subtype = template.get('subtype', current_match.get('type', 'Unknown'))
             redshift = current_match.get('redshift', 0.0)
             age = template.get('age', 0.0)
@@ -662,10 +680,25 @@ class PySide6PlotManager:
             current_index = getattr(app_controller, 'current_template', 0) + 1
             total_matches = len(app_controller.snid_results.best_matches) if hasattr(app_controller, 'snid_results') and app_controller.snid_results else 1
             
+            # Get redshift uncertainty if available
+            redshift_error = current_match.get('redshift_error', 0)
+            if redshift_error > 0:
+                redshift_text = f"z = {redshift:.5f} ±{redshift_error:.5f}"
+            else:
+                redshift_text = f"z = {redshift:.5f}"
+            
+            # Use RLAP-cos if available, otherwise RLAP
+            rlap_cos = current_match.get('rlap_cos')
+            if rlap_cos is not None:
+                metric_text = f"RLAP-cos = {rlap_cos:.2f}"
+            else:
+                metric_text = f"RLAP = {rlap:.2f}"
+            
             # Create multi-line info text like the original
             info_text = (f"Template {current_index}/{total_matches}: {template_name}\n"
                         f"Subtype: {subtype}, Age: {age:.1f}d\n"
-                        f"z = {redshift:.4f}, RLAP = {rlap:.2f}")
+                        f"{redshift_text}\n"
+                        f"{metric_text}")
             
             # Add info text to plot with proper positioning to fit within plot area
             from ...utils.plot_legend_utils import get_pyqtgraph_legend_position
@@ -688,6 +721,10 @@ class PySide6PlotManager:
             
             # Re-add any existing mask regions
             self.reapply_mask_regions()
+            
+            # Show save button now that we have actual spectrum data
+            if hasattr(self.plot_widget, 'show_save_button'):
+                self.plot_widget.show_save_button()
             
             _LOGGER.info(f"✅ Spectrum with template overlay plotted successfully")
             
@@ -799,21 +836,21 @@ class PySide6PlotManager:
                 _LOGGER.warning("PyQtGraph not available - cannot create dual plots")
                 return None, None
             
-            # Create top plot widget
-            top_plot_widget = pg.PlotWidget()
+            # Create top simple plot widget without save functionality (for preprocessing previews)
+            top_plot_widget = SimplePlotWidget()
             top_plot_widget.setLabel('left', 'Flux')
             top_plot_widget.setLabel('bottom', 'Wavelength (Å)')
-            top_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+            top_plot_widget.showGrid(x=True, y=True, alpha=0.08)
             
             # Apply theme if available
             if self.theme_colors:
                 self._apply_theme_to_plot_widget(top_plot_widget)
             
-            # Create bottom plot widget
-            bottom_plot_widget = pg.PlotWidget()
+            # Create bottom simple plot widget without save functionality (for preprocessing previews)
+            bottom_plot_widget = SimplePlotWidget()
             bottom_plot_widget.setLabel('left', 'Flux')
             bottom_plot_widget.setLabel('bottom', 'Wavelength (Å)')
-            bottom_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+            bottom_plot_widget.showGrid(x=True, y=True, alpha=0.08)
             
             # Apply theme if available
             if self.theme_colors:

@@ -108,7 +108,7 @@ class PySide6ThemeManager:
             
             # Plot colors (for PyQtGraph and matplotlib)
             'plot_bg': '#ffffff',
-            'plot_text': '#1e293b',
+            'plot_text': '#000000',
             'plot_grid': '#e2e8f0',
             'plot_line': '#3b82f6',
         }

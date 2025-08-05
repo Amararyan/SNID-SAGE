@@ -14,6 +14,38 @@ import numpy as np
 import re
 
 
+def clean_template_name(template_name: str) -> str:
+    """
+    Clean template name by removing _epoch_X suffix if present.
+    
+    Args:
+        template_name: The original template name that may contain _epoch_X suffix
+        
+    Returns:
+        Cleaned template name without the _epoch_X suffix
+        
+    Examples:
+        >>> clean_template_name("sn1999em_epoch_3")
+        "sn1999em"
+        >>> clean_template_name("sn2003jo_epoch_0")
+        "sn2003jo"
+        >>> clean_template_name("sn1999em")
+        "sn1999em"
+    """
+    if not template_name:
+        return template_name
+    
+    # Use regex to match _epoch_ followed by digits at the end of the string
+    import re
+    # This pattern matches _epoch_ followed by one or more digits at the end of the string
+    pattern = r'_epoch_\d+$'
+    
+    # Remove the _epoch_X suffix if it exists at the end
+    cleaned_name = re.sub(pattern, '', template_name)
+    
+    return cleaned_name
+
+
 class UnifiedResultsFormatter:
     """
     Unified formatter for SNID analysis results that ensures consistency
@@ -116,37 +148,84 @@ class UnifiedResultsFormatter:
         enhanced_age = getattr(result, 'consensus_age', 0)
         enhanced_age_error = getattr(result, 'consensus_age_error', 0)
         
+        # Store both subtype-specific and full cluster redshift/age for display options
+        subtype_redshift = None
+        subtype_redshift_error = None
+        subtype_template_count = 0
+        subtype_age = None
+        subtype_age_error = None
+        subtype_age_template_count = 0
+        full_cluster_redshift = None
+        full_cluster_redshift_error = None
+        full_cluster_age = enhanced_age
+        full_cluster_age_error = enhanced_age_error
+        
         if winning_cluster and cluster_matches:
-            # Use cluster-weighted estimates
-            enhanced_redshift = winning_cluster.get('enhanced_redshift', result.consensus_redshift)
-            enhanced_redshift_error = winning_cluster.get('weighted_redshift_uncertainty', result.consensus_redshift_error)
+            # Check if subtype-specific joint estimates are available
+            subtype_redshift = winning_cluster.get('subtype_redshift')
+            subtype_redshift_error = winning_cluster.get('subtype_redshift_error')
+            subtype_template_count = winning_cluster.get('subtype_template_count', 0)
+            subtype_age = winning_cluster.get('subtype_age')
+            subtype_age_error = winning_cluster.get('subtype_age_error')
+            subtype_age_template_count = winning_cluster.get('subtype_age_template_count', 0)
+            subtype_redshift_age_covariance = winning_cluster.get('subtype_redshift_age_covariance', np.nan)
             
-            # Calculate enhanced age from cluster matches
-            try:
-                from snid_sage.shared.utils.math_utils.weighted_statistics import calculate_rlap_weighted_age
-                ages = []
-                age_rlaps = []
-                for m in cluster_matches:
-                    template = m.get('template', {})
-                    age = template.get('age', 0.0) if template else 0.0
-                    if age > 0:
-                        ages.append(age)
-                        # Use RLAP-cos if available, otherwise RLAP
+            # Get full cluster joint estimates
+            full_cluster_redshift = winning_cluster.get('enhanced_redshift', result.consensus_redshift)
+            full_cluster_redshift_error = winning_cluster.get('weighted_redshift_uncertainty', result.consensus_redshift_error)
+            full_cluster_age = winning_cluster.get('cluster_age', enhanced_age)
+            full_cluster_age_error = winning_cluster.get('cluster_age_error', enhanced_age_error)
+            full_cluster_redshift_age_covariance = winning_cluster.get('cluster_redshift_age_covariance', np.nan)
+            
+            # Use subtype redshift as primary if available and valid, otherwise fall back to cluster redshift
+            if (subtype_redshift is not None and not np.isnan(subtype_redshift) and 
+                subtype_redshift_error is not None and not np.isnan(subtype_redshift_error) and
+                subtype_template_count > 0):
+                enhanced_redshift = subtype_redshift
+                enhanced_redshift_error = subtype_redshift_error
+            else:
+                # Fall back to full cluster redshift
+                enhanced_redshift = full_cluster_redshift
+                enhanced_redshift_error = full_cluster_redshift_error
+            
+            # Use subtype age as primary if available and valid, otherwise fall back to cluster age
+            if (subtype_age is not None and not np.isnan(subtype_age) and 
+                subtype_age_error is not None and not np.isnan(subtype_age_error) and
+                subtype_age_template_count > 0):
+                enhanced_age = subtype_age
+                enhanced_age_error = subtype_age_error
+            else:
+                # Calculate enhanced age from ALL cluster matches (fallback behavior)
+                try:
+                    from snid_sage.shared.utils.math_utils import calculate_weighted_age
+                    ages = []
+                    age_rlaps = []
+                    for m in cluster_matches:
+                        template = m.get('template', {})
+                        age = template.get('age', 0.0) if template else 0.0
+                        # Check for valid age (negative ages are valid for pre-peak)
+                        if age is not None and np.isfinite(age):
+                            ages.append(age)
+                            # Use RLAP-cos if available, otherwise RLAP
+                            from snid_sage.shared.utils.math_utils import get_best_metric_value
+                            age_rlaps.append(get_best_metric_value(m))
+                    
+                    if ages:
+                        ages = np.array(ages)
+                        # Use RLAP-cos instead of RLAP for age weighting
                         from snid_sage.shared.utils.math_utils import get_best_metric_value
-                        age_rlaps.append(get_best_metric_value(m))
-                
-                if ages:
-                    ages = np.array(ages)
-                    # Use RLAP-cos instead of RLAP for age weighting
-                    from snid_sage.shared.utils.math_utils import get_best_metric_value
-                    age_rlaps = np.array([get_best_metric_value(m) for m in cluster_matches if m.get('template', {}).get('age', 0.0) > 0])
-                    age_mean, _, age_total_error, _ = calculate_rlap_weighted_age(
-                        ages, age_rlaps, include_cluster_scatter=True
-                    )
-                    enhanced_age = age_mean
-                    enhanced_age_error = age_total_error
-            except ImportError:
-                pass  # Fall back to consensus values
+                        age_rlaps = np.array([get_best_metric_value(m) for m in cluster_matches 
+                                             if m.get('template', {}).get('age', 0.0) is not None and 
+                                             np.isfinite(m.get('template', {}).get('age', 0.0))])
+                        age_mean, age_total_error = calculate_weighted_age(
+                            ages, age_rlaps
+                        )
+                        full_cluster_age = age_mean
+                        full_cluster_age_error = age_total_error
+                        enhanced_age = age_mean
+                        enhanced_age_error = age_total_error
+                except ImportError:
+                    pass  # Fall back to consensus values
         
         # Calculate subtype information for the active cluster (not the original result)
         subtype_confidence = 0
@@ -228,6 +307,29 @@ class UnifiedResultsFormatter:
             'enhanced_redshift_error': enhanced_redshift_error,
             'enhanced_age': enhanced_age,
             'enhanced_age_error': enhanced_age_error,
+            
+            # Joint estimation breakdown for display options
+            'subtype_redshift': subtype_redshift,
+            'subtype_redshift_error': subtype_redshift_error,
+            'subtype_age': subtype_age,
+            'subtype_age_error': subtype_age_error,
+            'subtype_redshift_age_covariance': subtype_redshift_age_covariance,
+            'subtype_template_count': subtype_template_count,
+            'subtype_age_template_count': subtype_age_template_count,
+            'using_subtype_estimates': (subtype_redshift is not None and not np.isnan(subtype_redshift) and 
+                                      subtype_age is not None and not np.isnan(subtype_age) and 
+                                      subtype_age_template_count > 0),
+            
+            # Full cluster joint estimates
+            'full_cluster_redshift': full_cluster_redshift,
+            'full_cluster_redshift_error': full_cluster_redshift_error,
+            'full_cluster_age': full_cluster_age,
+            'full_cluster_age_error': full_cluster_age_error,
+            'full_cluster_redshift_age_covariance': full_cluster_redshift_age_covariance,
+            
+            # Legacy compatibility flags  
+            'using_subtype_redshift': (subtype_redshift is not None and not np.isnan(subtype_redshift) and subtype_template_count > 0),
+            'using_subtype_age': (subtype_age is not None and not np.isnan(subtype_age) and subtype_age_template_count > 0),
             
             # Security and confidence
             'subtype_confidence': subtype_confidence,  # Use recalculated confidence
@@ -431,11 +533,11 @@ class UnifiedResultsFormatter:
             if s['subtype_confidence'] > 0:
                 # Convert numeric confidence to qualitative level (like CLI)
                 if s['subtype_confidence'] > 0.7:
-                    confidence_level = "high"
+                    confidence_level = "High"
                 elif s['subtype_confidence'] > 0.4:
-                    confidence_level = "medium"
+                    confidence_level = "Medium"
                 else:
-                    confidence_level = "low"
+                    confidence_level = "Low"
                 subtype_conf_text = f" (confidence: {confidence_level})"
             
             lines.append(f"   Subtype: {s['consensus_subtype']}{subtype_conf_text}")
@@ -457,29 +559,69 @@ class UnifiedResultsFormatter:
         
         # Use enhanced (weighted) redshift if clustering was used, otherwise regular
         if s['has_clustering'] and s['enhanced_redshift'] != s['redshift']:
-            # Show the weighted redshift with combined uncertainty
-            redshift_text = f"   Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f}"
-            
-            # Optionally show components of uncertainty in parentheses
-            try:
-                # Try to get the separate uncertainty components if available
-                winning_cluster = self._get_active_cluster()
-                if winning_cluster:
-                    stat_error = winning_cluster.get('statistical_redshift_uncertainty', 0)
-                    sys_error = winning_cluster.get('systematic_redshift_uncertainty', 0)
-                    if stat_error > 0 and sys_error > 0:
-                        redshift_text += f" (stat: ±{stat_error:.6f}, sys: ±{sys_error:.6f})"
-            except:
-                pass  # If components not available, just show combined
-            
-            lines.append(redshift_text)
-            lines.append(f"   └─ Weighted from {s['cluster_size']} cluster templates (includes individual errors + cluster scatter τ)")
+            # Check if we're using subtype-specific redshift
+            if s.get('using_subtype_redshift', False):
+                # Show subtype-specific redshift as primary
+                redshift_text = f"   Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f}"
+                lines.append(redshift_text)
+                
+                # Show explanation for subtype redshift
+                subtype_name = s.get('consensus_subtype', 'Unknown')
+                template_count = s.get('subtype_template_count', 0)
+                lines.append(f"   └─ Weighted from {template_count} {subtype_name} subtype templates (winning subtype)")
+                
+                # Optionally show full cluster redshift if different and user wants to see it
+                full_cluster_z = s.get('full_cluster_redshift')
+                full_cluster_z_err = s.get('full_cluster_redshift_error')
+                if (full_cluster_z is not None and full_cluster_z_err is not None and 
+                    abs(full_cluster_z - s['enhanced_redshift']) > 0.0001):  # Only show if meaningfully different
+                    lines.append(f"   └─ Full cluster redshift: {full_cluster_z:.6f} ± {full_cluster_z_err:.6f} (from {s['cluster_size']} total templates)")
+            else:
+                # Fall back to full cluster redshift display
+                redshift_text = f"   Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f}"
+                
+                # Optionally show components of uncertainty in parentheses
+                try:
+                    # Try to get the separate uncertainty components if available
+                    winning_cluster = self._get_active_cluster()
+                    if winning_cluster:
+                        stat_error = winning_cluster.get('statistical_redshift_uncertainty', 0)
+                        sys_error = winning_cluster.get('systematic_redshift_uncertainty', 0)
+                        if stat_error > 0 and sys_error > 0:
+                            redshift_text += f" (stat: ±{stat_error:.6f}, sys: ±{sys_error:.6f})"
+                except:
+                    pass  # If components not available, just show combined
+                
+                lines.append(redshift_text)
+                lines.append(f"   └─ Weighted from {s['cluster_size']} cluster templates (includes individual errors + cluster scatter τ)")
         else:
             # Regular redshift from best template
             lines.append(f"   Redshift: {s['redshift']:.6f} ± {s['redshift_error']:.6f} (correlation fit uncertainty)")
         
-        if s['enhanced_age'] > 0:
-            lines.append(f"   Age: {s['enhanced_age']:.0f} ± {s['enhanced_age_error']:.0f} days")
+        # Display age information
+        if s['enhanced_age'] is not None and np.isfinite(s['enhanced_age']):
+            # Check if we're using subtype-specific age
+            if s.get('using_subtype_age', False):
+                # Show subtype-specific age as primary
+                lines.append(f"   Age: {s['enhanced_age']:.0f} ± {s['enhanced_age_error']:.0f} days")
+                
+                # Show explanation for subtype age
+                subtype_name = s.get('consensus_subtype', 'Unknown')
+                age_template_count = s.get('subtype_age_template_count', 0)
+                lines.append(f"   └─ Weighted from {age_template_count} {subtype_name} subtype templates (winning subtype)")
+                
+                # Optionally show full cluster age if different and meaningful
+                full_cluster_age = s.get('full_cluster_age')
+                full_cluster_age_err = s.get('full_cluster_age_error')
+                if (full_cluster_age is not None and np.isfinite(full_cluster_age) and full_cluster_age_err is not None and
+                    abs(full_cluster_age - s['enhanced_age']) > 5):  # Only show if meaningfully different (>5 days)
+                    # Count total templates with ages in cluster
+                    cluster_age_count = len([m for m in s.get('template_matches', []) 
+                                           if m.get('age_days', 0) is not None and np.isfinite(m.get('age_days', 0))])
+                    lines.append(f"   └─ Full cluster age: {full_cluster_age:.0f} ± {full_cluster_age_err:.0f} days (from {cluster_age_count} total templates)")
+            else:
+                # Fall back to standard age display
+                lines.append(f"   Age: {s['enhanced_age']:.0f} ± {s['enhanced_age_error']:.0f} days")
         
         lines.append("")
         

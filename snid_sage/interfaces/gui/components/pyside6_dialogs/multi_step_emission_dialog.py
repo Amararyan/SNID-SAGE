@@ -16,9 +16,12 @@ from PySide6 import QtWidgets, QtCore, QtGui
 try:
     import pyqtgraph as pg
     PYQTGRAPH_AVAILABLE = True
+    # Import enhanced plot widget
+    from snid_sage.interfaces.gui.components.plots.enhanced_plot_widget import EnhancedPlotWidget
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
+    EnhancedPlotWidget = None
 
 # Import logging
 try:
@@ -84,6 +87,10 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.plot_widget = None
             self.plot_item = None
             self.left_panel = None
+            
+            # Performance optimization: Cache for overlay lines
+            self._cached_overlay_lines = {}  # mode -> {redshift_key: [(name, wavelength, color), ...]}
+            self._last_redshift_params = {}  # Track redshift changes to invalidate cache
             
             # Simple color scheme
             self.colors = self._get_theme_colors()
@@ -214,9 +221,9 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         main_layout.addWidget(self.left_panel)
     
     def _create_plot_widget(self, layout):
-        """Create plot widget and add to layout"""
+        """Create enhanced plot widget with save functionality and add to layout"""
         if PYQTGRAPH_AVAILABLE:
-            self.plot_widget = pg.PlotWidget()
+            self.plot_widget = EnhancedPlotWidget()
             self.plot_item = self.plot_widget.getPlotItem()
             
             self.plot_widget.setLabel('left', 'Flux')
@@ -307,6 +314,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     
     def _set_sn_mode(self):
         """Set SN line mode"""
+        old_mode = self.current_mode
         self.current_mode = 'sn'
         if hasattr(self, 'sn_button'):
             self.sn_button.setChecked(True)
@@ -328,10 +336,16 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.galaxy_button.setChecked(False)
             # Reset to default styling for inactive state
             self.galaxy_button.setStyleSheet("")
+        
+        # OPTIMIZATION: Invalidate cache when mode changes
+        if old_mode != self.current_mode:
+            self._invalidate_overlay_cache()
+            
         self._update_status_display()  # Update status when mode changes
     
     def _set_galaxy_mode(self):
         """Set galaxy line mode"""
+        old_mode = self.current_mode
         self.current_mode = 'galaxy'
         if hasattr(self, 'sn_button'):
             self.sn_button.setChecked(False)
@@ -353,6 +367,11 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                     background-color: #2563eb;
                 }
             """)
+        
+        # OPTIMIZATION: Invalidate cache when mode changes
+        if old_mode != self.current_mode:
+            self._invalidate_overlay_cache()
+            
         self._update_status_display()  # Update status when mode changes
     
     def _update_status_display(self):
@@ -548,7 +567,18 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         """Update all line positions when redshift changes"""
         # This method would update line positions based on redshift changes
         # Implementation depends on how the line wavelengths are stored
+        
+        # OPTIMIZATION: Invalidate cache when redshift changes
+        self._invalidate_overlay_cache()
         pass
+    
+    def _invalidate_overlay_cache(self):
+        """Invalidate the overlay cache when redshift parameters change"""
+        try:
+            self._cached_overlay_lines.clear()
+            _LOGGER.debug("Overlay cache invalidated due to redshift change")
+        except Exception as e:
+            _LOGGER.error(f"Error invalidating overlay cache: {e}")
     
     def _on_plot_click(self, event):
         """Handle plot click events for line interaction"""
@@ -784,8 +814,32 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             # Create simplified step 2 interface (main controls moved to toolbar)
             self._create_simplified_step2_interface(step2_layout)
             
-            # Add back to step 1 button
+            # Add bottom control buttons (Help and Back to Step 1)
             step2_layout.addStretch()
+            
+            # Bottom buttons layout
+            bottom_buttons_layout = QtWidgets.QHBoxLayout()
+            
+            # Help button (bottom left)
+            help_btn = QtWidgets.QPushButton("Help")
+            help_btn.setToolTip("Show Step 2 analysis instructions and button explanations")
+            help_btn.clicked.connect(self._show_step2_help)
+            help_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3b82f6;
+                    color: white;
+                    border: 2px solid #2563eb;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #2563eb;
+                }
+            """)
+            bottom_buttons_layout.addWidget(help_btn)
+            
+            # Back to step 1 button (bottom right)
             back_btn = QtWidgets.QPushButton("← Back to Step 1")
             back_btn.clicked.connect(self._back_to_step_1)
             back_btn.setStyleSheet("""
@@ -801,7 +855,9 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                     background-color: #4b5563;
                 }
             """)
-            step2_layout.addWidget(back_btn)
+            bottom_buttons_layout.addWidget(back_btn)
+            
+            step2_layout.addLayout(bottom_buttons_layout)
             
             # Insert the new step 2 panel at the beginning of the main layout
             main_layout.insertWidget(0, self.step2_left_panel)
@@ -864,22 +920,6 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     def _create_simplified_step2_interface(self, layout):
         """Create simplified step 2 interface with main controls moved to toolbar"""
         
-        # Manual Points Instructions (only show when relevant)
-        # Get platform-appropriate click text
-        platform_config = get_platform_config()
-        right_click_text = platform_config.get_click_text("right")
-        
-        self.manual_instructions = QtWidgets.QLabel(
-            "Manual Selection Instructions:\n"
-            "• Left Click: Smart peak detection\n"
-            "• Ctrl+Click: Add free-floating point\n"
-            "• Shift+Click: Add spectrum-snapped point\n" 
-            f"• {right_click_text}: Remove closest point"
-        )
-        self.manual_instructions.setWordWrap(True)
-        self.manual_instructions.setStyleSheet(f"color: {self.colors.get('text_secondary', '#666')}; padding: 5px;")
-        layout.addWidget(self.manual_instructions)
-        
         # Manual point controls
         manual_controls = QtWidgets.QHBoxLayout()
         
@@ -934,7 +974,6 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         
         # Store control references for the step2_analysis module
         self.step2_panel_controls = {
-            'manual_instructions': self.manual_instructions,
             'clear_points_btn': self.clear_points_btn,
             'auto_contour_btn': self.auto_contour_btn,
             'point_counter_label': self.point_counter_label,
@@ -995,7 +1034,6 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 self.step2_analysis.current_result_text = self.step2_panel_controls['current_result_text']
                 self.step2_analysis.summary_text = self.step2_panel_controls['summary_text']
                 self.step2_analysis.point_counter_label = self.step2_panel_controls['point_counter_label']
-                self.step2_analysis.manual_instructions = self.step2_panel_controls['manual_instructions']
                 self.step2_analysis.clear_points_btn = self.step2_panel_controls['clear_points_btn']
                 self.step2_analysis.auto_contour_btn = self.step2_panel_controls['auto_contour_btn']
                 
@@ -1222,7 +1260,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         super().keyReleaseEvent(event)
     
     def _show_all_lines_overlay(self):
-        """Show overlay of all available lines when Shift is pressed"""
+        """Show overlay of all available lines when Shift is pressed - OPTIMIZED VERSION"""
         if not PYQTGRAPH_AVAILABLE or not self.plot_item:
             _LOGGER.debug("Overlay not available: PyQtGraph missing")
             return
@@ -1244,56 +1282,133 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             if not hasattr(self, 'overlay_items'):
                 self.overlay_items = []
             
-            # Get all available lines from comprehensive line database
-            overlay_lines = {}
+            # OPTIMIZATION 1: Use cached lines if redshift parameters haven't changed
+            overlay_lines = self._get_cached_overlay_lines(wave_min, wave_max)
+            if overlay_lines is None:
+                # Cache miss - calculate and cache
+                overlay_lines = self._calculate_overlay_lines(wave_min, wave_max)
+                
+            _LOGGER.debug(f"Found {len(overlay_lines)} {self.current_mode} lines in database range")
             
-            try:
-                # Import the comprehensive line database directly
-                from snid_sage.shared.constants.physical import LINE_DB
-                
-                # Convert all lines in database to observed wavelengths
-                for line_entry in LINE_DB:
-                    line_rest_wavelength = line_entry.get("wavelength_air", 0)
-                    if line_rest_wavelength <= 0:
-                        continue
-                    
-                    line_name = line_entry.get("key", f"Line {line_rest_wavelength:.1f}")
-                    
-                    # Filter by mode
-                    is_galaxy_line = " (gal)" in line_name
-                    if self.current_mode == 'sn' and is_galaxy_line:
-                        continue
-                    elif self.current_mode == 'galaxy' and not is_galaxy_line:
-                        continue
-                    
-                    # Clean up line name
-                    clean_name = line_name.replace(" (gal)", "")
-                    
-                    # Calculate observed wavelength
-                    if self.current_mode == 'sn':
-                        obs_wavelength = line_rest_wavelength * (1 + self._get_effective_sn_redshift())
-                    else:
-                        obs_wavelength = line_rest_wavelength * (1 + self.host_redshift)
-                    
-                    # Only include lines in spectrum range
-                    if wave_min <= obs_wavelength <= wave_max:
-                        overlay_lines[clean_name] = obs_wavelength
-                
-                _LOGGER.debug(f"Found {len(overlay_lines)} {self.current_mode} lines in database range")
-                
-            except ImportError:
-                _LOGGER.debug("LINE_DB not available")
-                return
+            # OPTIMIZATION 2: Batch creation of plot items to reduce overhead
+            self._create_overlay_plot_items_batch(overlay_lines)
             
-            # Add overlay lines to plot
-            for line_name, obs_wavelength in overlay_lines.items():
-                # Skip lines that are already added
-                if line_name in self.sn_lines or line_name in self.galaxy_lines:
+            _LOGGER.debug(f"Displayed {len(overlay_lines)} overlay lines")
+            
+        except Exception as e:
+            _LOGGER.error(f"Error showing line overlay: {e}")
+    
+    def _get_cached_overlay_lines(self, wave_min, wave_max):
+        """Get cached overlay lines if redshift parameters haven't changed"""
+        try:
+            # Create redshift key for cache lookup
+            if self.current_mode == 'sn':
+                redshift = self._get_effective_sn_redshift()
+            else:
+                redshift = self.host_redshift
+            
+            # Round redshift to avoid floating point precision issues
+            redshift_key = f"{redshift:.8f}_{wave_min:.1f}_{wave_max:.1f}"
+            
+            # Check if we have cached data for this mode and redshift
+            if (self.current_mode in self._cached_overlay_lines and 
+                redshift_key in self._cached_overlay_lines[self.current_mode]):
+                _LOGGER.debug(f"Using cached overlay lines for {self.current_mode} mode")
+                return self._cached_overlay_lines[self.current_mode][redshift_key]
+            
+            return None  # Cache miss
+            
+        except Exception as e:
+            _LOGGER.error(f"Error checking cached overlay lines: {e}")
+            return None
+    
+    def _calculate_overlay_lines(self, wave_min, wave_max):
+        """Calculate overlay lines and cache the result"""
+        try:
+            overlay_lines = []
+            
+            # Import the comprehensive line database directly
+            from snid_sage.shared.constants.physical import LINE_DB
+            
+            # Get redshift for current mode
+            if self.current_mode == 'sn':
+                redshift = self._get_effective_sn_redshift()
+            else:
+                redshift = self.host_redshift
+            
+            # OPTIMIZATION 3: Vectorized wavelength calculation and filtering
+            # Pre-filter lines by mode first
+            relevant_lines = []
+            for line_entry in LINE_DB:
+                line_rest_wavelength = line_entry.get("wavelength_air", 0)
+                if line_rest_wavelength <= 0:
                     continue
                 
-                # Get color based on element/type
-                line_color = self._get_line_color(line_name, self.current_mode)
+                line_name = line_entry.get("key", f"Line {line_rest_wavelength:.1f}")
                 
+                # Filter by mode
+                is_galaxy_line = " (gal)" in line_name
+                if self.current_mode == 'sn' and is_galaxy_line:
+                    continue
+                elif self.current_mode == 'galaxy' and not is_galaxy_line:
+                    continue
+                
+                relevant_lines.append((line_name, line_rest_wavelength))
+            
+            # Vectorized wavelength calculation
+            if relevant_lines:
+                line_names, rest_wavelengths = zip(*relevant_lines)
+                rest_wavelengths = np.array(rest_wavelengths)
+                obs_wavelengths = rest_wavelengths * (1 + redshift)
+                
+                # Vectorized range filtering
+                in_range_mask = (obs_wavelengths >= wave_min) & (obs_wavelengths <= wave_max)
+                
+                # Build result list with pre-calculated colors
+                for i, in_range in enumerate(in_range_mask):
+                    if in_range:
+                        clean_name = line_names[i].replace(" (gal)", "")
+                        # Skip lines that are already added
+                        if clean_name not in self.sn_lines and clean_name not in self.galaxy_lines:
+                            line_color = self._get_line_color(clean_name, self.current_mode)
+                            overlay_lines.append((clean_name, obs_wavelengths[i], line_color))
+            
+            # Cache the result
+            redshift_key = f"{redshift:.8f}_{wave_min:.1f}_{wave_max:.1f}"
+            if self.current_mode not in self._cached_overlay_lines:
+                self._cached_overlay_lines[self.current_mode] = {}
+            
+            # Limit cache size to prevent memory bloat (keep last 5 entries per mode)
+            if len(self._cached_overlay_lines[self.current_mode]) >= 5:
+                # Remove oldest entry
+                oldest_key = next(iter(self._cached_overlay_lines[self.current_mode]))
+                del self._cached_overlay_lines[self.current_mode][oldest_key]
+            
+            self._cached_overlay_lines[self.current_mode][redshift_key] = overlay_lines
+            
+            return overlay_lines
+            
+        except ImportError:
+            _LOGGER.debug("LINE_DB not available")
+            return []
+        except Exception as e:
+            _LOGGER.error(f"Error calculating overlay lines: {e}")
+            return []
+    
+    def _create_overlay_plot_items_batch(self, overlay_lines):
+        """Create overlay plot items in batch for better performance"""
+        try:
+            if not overlay_lines:
+                return
+            
+            # Get current plot view range once
+            y_range = self.plot_item.viewRange()[1]
+            text_y_pos = y_range[1] * 0.6
+            
+            # OPTIMIZATION 4: Batch add items to reduce plot update overhead
+            items_to_add = []
+            
+            for line_name, obs_wavelength, line_color in overlay_lines:
                 # Create faint overlay line with appropriate style
                 if self.current_mode == 'sn':
                     # SN lines - dashed, more transparent
@@ -1317,17 +1432,19 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                     fill=(255, 255, 255, 30),
                     anchor=(0, 1)
                 )
-                text_item.setPos(obs_wavelength, self.plot_item.viewRange()[1][1] * 0.6)
+                text_item.setPos(obs_wavelength, text_y_pos)
                 text_item.setRotation(90)  # Make text perpendicular
                 
-                self.plot_item.addItem(overlay_line)
-                self.plot_item.addItem(text_item)
-                self.overlay_items.extend([overlay_line, text_item])
+                items_to_add.extend([overlay_line, text_item])
             
-            _LOGGER.debug(f"Displayed {len(overlay_lines)} overlay lines")
+            # Batch add all items at once
+            for item in items_to_add:
+                self.plot_item.addItem(item)
+            
+            self.overlay_items.extend(items_to_add)
             
         except Exception as e:
-            _LOGGER.error(f"Error showing line overlay: {e}")
+            _LOGGER.error(f"Error creating overlay plot items: {e}")
     
     def _hide_all_lines_overlay(self):
         """Hide the overlay lines when Shift is released"""
@@ -1358,16 +1475,16 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         platform_config = get_platform_config()
         right_click_text = platform_config.get_click_text('right')
         
-        help_text = f"""Mouse Interactions & Shortcuts
+        help_text = f"""Emission Line Dialog Help
+
+⌨️ KEYBOARD SHORTCUTS:
+• Hold Shift: Show all available lines as overlay
+• This helps identify potential lines in your spectrum
 
 🖱️ MOUSE INTERACTIONS:
 • Double-click on spectrum: Add nearest line from database
 • {right_click_text} on line marker: Remove line from plot  
 • Current mode (SN/Galaxy) determines line type
-
-⌨️ KEYBOARD SHORTCUTS:
-• Hold Shift: Show all available lines as overlay
-• This helps identify potential lines in your spectrum
 
 🎯 QUICK PRESETS:
 • Type, Phase, Element work together for SN lines
@@ -1384,6 +1501,54 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Emission Line Dialog Help")
+        msg.setText(help_text)
+        msg.setTextFormat(QtCore.Qt.PlainText)
+        msg.exec()
+
+    def _show_step2_help(self):
+        """Show help dialog for Step 2 analysis controls and workflow"""
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text('right')
+        
+        help_text = f"""Step 2: Emission Line Analysis Help
+
+🎯 GOAL OF STEP 2:
+Analyze individual emission lines in detail using manual point selection to measure line properties like FWHM, equivalent width, and line centers.
+
+⌨️ KEYBOARD & MOUSE INTERACTIONS:
+• Left Click: Smart peak detection around click location
+• Ctrl+Click: Add free-floating point at exact position
+• Shift+Click: Add point snapped to nearest spectrum data
+• {right_click_text}: Remove closest manual point
+
+🔧 TOOLBAR CONTROLS:
+• Line Dropdown: Select which emission line to analyze
+• Previous/Next: Navigate between identified lines
+• Analyze Button: Process current line with selected points
+
+🔘 PANEL BUTTONS:
+• Clear Points: Remove all manual selection points
+• Auto Contour: Automatically detect line boundaries
+• Copy Summary: Copy analysis results to clipboard
+• Refresh: Update summary with latest results
+• Export Results: Save analysis to file
+
+💡 ANALYSIS WORKFLOW:
+1. Select a line from the dropdown (from Step 1)
+2. Add manual points around the line using mouse clicks
+3. Click 'Analyze' to calculate line properties
+4. Review results in the Current Line Results section
+5. Repeat for other lines or export final results
+
+📊 RESULTS INCLUDE:
+• Line center wavelength and flux
+• Full Width at Half Maximum (FWHM)
+• Equivalent width measurements
+• Signal-to-noise ratio estimates
+"""
+        
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle("Step 2 Analysis Help")
         msg.setText(help_text)
         msg.setTextFormat(QtCore.Qt.PlainText)
         msg.exec()

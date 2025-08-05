@@ -19,6 +19,8 @@ TKINTER_UTILS_AVAILABLE = False
 try:
     from .unified_pyside6_layout_manager import UnifiedPySide6LayoutManager, LayoutSettings
     from .pyside6_helpers import PySide6Helpers
+    from .enhanced_dialog_button_manager import EnhancedDialogButtonManager
+    from .dialog_button_enhancer import enhance_dialog_buttons, enhance_dialog_with_preset, setup_sensitivity_toggle_button, create_button_with_enhancement
     PYSIDE6_UTILS_AVAILABLE = True
 except ImportError:
     PYSIDE6_UTILS_AVAILABLE = False
@@ -30,5 +32,10 @@ if PYSIDE6_UTILS_AVAILABLE:
     __all__.extend([
         'UnifiedPySide6LayoutManager',
         'LayoutSettings',
-        'PySide6Helpers'
+        'PySide6Helpers',
+        'EnhancedDialogButtonManager',
+        'enhance_dialog_buttons',
+        'enhance_dialog_with_preset',
+        'setup_sensitivity_toggle_button',
+        'create_button_with_enhancement'
     ]) 

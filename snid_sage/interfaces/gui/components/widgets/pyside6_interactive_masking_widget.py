@@ -115,19 +115,7 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         self.toggle_button = QtWidgets.QPushButton("🎯 Start Interactive Masking")
         self.toggle_button.clicked.connect(self.toggle_masking_mode)
         self.toggle_button.setToolTip("Click on start and end points for selecting a region to mask.\nRed shading shows masked regions.")
-        self.toggle_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('accent', '#3b82f6')};
-                color: white;
-                font-weight: bold;
-                padding: 8px;
-                border: none;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {self.colors.get('accent_dark', '#2563eb')};
-            }}
-        """)
+        # Styling will be handled by enhanced button system
         interactive_layout.addWidget(self.toggle_button)
         
         # Instructions - REMOVED: Now using tooltip instead
@@ -242,19 +230,7 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         
         # Update button
         self.toggle_button.setText("🔴 Stop Interactive Masking")
-        self.toggle_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('danger', '#ef4444')};
-                color: white;
-                font-weight: bold;
-                padding: 8px;
-                border: none;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: #dc2626;
-            }}
-        """)
+        # Styling will be handled by enhanced button system
         
         # Connect mouse events
         self._connect_mouse_events()
@@ -270,19 +246,7 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         
         # Update button
         self.toggle_button.setText("🎯 Start Interactive Masking")
-        self.toggle_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('accent', '#3b82f6')};
-                color: white;
-                font-weight: bold;
-                padding: 8px;
-                border: none;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {self.colors.get('accent_dark', '#2563eb')};
-            }}
-        """)
+        # Styling will be handled by enhanced button system
         
         # Disconnect mouse events
         self._disconnect_mouse_events()

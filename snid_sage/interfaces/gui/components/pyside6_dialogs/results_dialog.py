@@ -384,7 +384,7 @@ Please try running the analysis again or check the logs for more details.
         
         if file_path:
             try:
-                with open(file_path, 'w') as f:
+                with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(self.summary_text.toPlainText())
                 
                 self._show_status_message(f"Results saved to {file_path}")

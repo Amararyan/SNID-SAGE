@@ -20,9 +20,12 @@ from ..utils.layout_manager import get_template_layout_manager
 try:
     import pyqtgraph as pg
     PYQTGRAPH_AVAILABLE = True
+    # Import enhanced plot widget
+    from snid_sage.interfaces.gui.components.plots.enhanced_plot_widget import EnhancedPlotWidget
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
+    EnhancedPlotWidget = None
 
 # Import logging
 try:
@@ -117,8 +120,8 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 crashWarning=False
             )
             
-            # Create PyQtGraph plot widget
-            self.plot_widget_pg = pg.PlotWidget()
+            # Create enhanced PyQtGraph plot widget with save functionality
+            self.plot_widget_pg = EnhancedPlotWidget()
             
             # Add to widget layout
             plot_layout = QtWidgets.QVBoxLayout(self.plot_widget)
@@ -159,8 +162,8 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             # Set axis colors
             for axis in ['left', 'bottom']:
                 ax = self.plot_item.getAxis(axis)
-                ax.setPen(pg.mkPen(color='#333333', width=1))
-                ax.setTextPen(pg.mkPen(color='#333333'))
+                ax.setPen(pg.mkPen(color='black', width=1))
+                ax.setTextPen(pg.mkPen(color='black'))
                 
         except Exception as e:
             _LOGGER.warning(f"Could not apply PyQtGraph theme: {e}")
@@ -185,8 +188,10 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             'info': template_info
         }
         
-        # Update template information display
-        self.info_name_label.setText(template_name)
+        # Update template information display - clean template name to remove _epoch_X suffix
+        from snid_sage.shared.utils import clean_template_name
+        clean_name = clean_template_name(template_name)
+        self.info_name_label.setText(clean_name)
         self.info_type_label.setText(f"{template_info.get('type', 'Unknown')}/{template_info.get('subtype', 'Unknown')}")
         self.info_age_label.setText(f"{template_info.get('age', 'Unknown')} days")
         self.info_epochs_label.setText(str(template_info.get('epochs', 1)))
@@ -284,8 +289,10 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             # Create a sample plot if no real data available
             self._create_sample_plot_pg()
             
-        # Set title
-        title = f"Template: {self.current_template['name']}"
+        # Set title - clean template name to remove _epoch_X suffix
+        from snid_sage.shared.utils import clean_template_name
+        clean_name = clean_template_name(self.current_template['name'])
+        title = f"Template: {clean_name}"
         self.plot_item.setTitle(title)
         
     def _plot_all_epochs_pg(self):
@@ -368,7 +375,7 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 legend_items.append((curve, f"Age: {age:.1f} days"))
                 
         # Update Y label for normalized plot
-        self.plot_item.setLabel('left', 'Normalized Flux')
+        self.plot_item.setLabel('left', 'Flattened Flux')
         
         # Add legend
         if legend_items:

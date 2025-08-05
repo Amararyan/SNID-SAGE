@@ -253,10 +253,15 @@ class SpectrumResetManager:
     def _update_button_states_after_reset(self):
         """Update button states to reflect the fresh state"""
         try:
-            if hasattr(self.gui, 'app_controller') and self.gui.app_controller:
-                self.gui.app_controller.update_button_states()
-            elif hasattr(self.gui, 'update_button_states'):
-                self.gui.update_button_states()
+            # Update button states through the workflow integrator system (PySide6 pattern)
+            if hasattr(self.gui, 'workflow_integrator') and self.gui.workflow_integrator:
+                self.gui.workflow_integrator._workflow_update_button_states()
+            else:
+                # Fallback for older pattern
+                if hasattr(self.gui, 'app_controller') and hasattr(self.gui.app_controller, 'update_button_states'):
+                    self.gui.app_controller.update_button_states()
+                elif hasattr(self.gui, 'update_button_states'):
+                    self.gui.update_button_states()
         except Exception as e:
             _LOGGER.warning(f"  ⚠️ Warning updating button states: {e}")
     
@@ -317,28 +322,31 @@ class SpectrumResetManager:
         _LOGGER.info("🔄 Starting complete GUI reset to initial state...")
         
         try:
-            # 1. Clear all data and analysis results
+            # 1. Stop any blinking effects before other resets
+            self._stop_all_blinking_effects()
+            
+            # 2. Clear all data and analysis results
             self.reset_for_new_spectrum(preserve_file_path=False)
             
-            # 2. Clear plot display completely
+            # 3. Clear plot display completely
             self._clear_all_plots_completely()
             
-            # 3. Reset view controller to initial view
+            # 4. Reset view controller to initial view
             self._reset_view_to_initial()
             
-            # 4. Reset state manager to initial state
+            # 5. Reset state manager to initial state
             self._reset_state_manager()
             
-            # 5. Clear header status
+            # 6. Clear header status
             self._reset_header_status()
             
-            # 6. Update GUI components to initial appearance
+            # 7. Update GUI components to initial appearance
             self._reset_gui_appearance_to_initial()
             
-            # 7. Force button state update to initial
+            # 8. Force button state update to initial
             self._force_initial_button_states()
             
-            # 8. Apply theme to ensure proper appearance
+            # 9. Apply theme to ensure proper appearance
             self._apply_theme_after_reset()
             
             _LOGGER.info("✅ Complete GUI reset to initial state completed successfully")
@@ -350,6 +358,31 @@ class SpectrumResetManager:
             _LOGGER.error(f"❌ Error during complete GUI reset: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _stop_all_blinking_effects(self):
+        """Stop all blinking effects that might be active"""
+        try:
+            # Stop cluster summary blinking
+            if hasattr(self.gui, 'stop_cluster_summary_blinking'):
+                self.gui.stop_cluster_summary_blinking()
+                _LOGGER.debug("  🔴 Stopped cluster summary blinking effect")
+            
+            # Reset cluster summary state variables explicitly
+            if hasattr(self.gui, 'cluster_summary_blinking'):
+                self.gui.cluster_summary_blinking = False
+            if hasattr(self.gui, 'cluster_summary_clicked_once'):
+                self.gui.cluster_summary_clicked_once = False
+            if hasattr(self.gui, 'cluster_summary_blink_timer'):
+                if self.gui.cluster_summary_blink_timer:
+                    self.gui.cluster_summary_blink_timer.stop()
+                    self.gui.cluster_summary_blink_timer = None
+            if hasattr(self.gui, 'cluster_summary_original_style'):
+                self.gui.cluster_summary_original_style = None
+                
+            _LOGGER.debug("  ✅ All blinking effects stopped and state variables reset")
+            
+        except Exception as e:
+            _LOGGER.warning(f"  ⚠️ Warning stopping blinking effects: {e}")
     
     def _clear_all_plots_completely(self):
         """Clear all plots and restore initial empty state"""
@@ -589,13 +622,17 @@ class SpectrumResetManager:
                 self.gui.workflow_integrator.reset_workflow()
                 _LOGGER.info("  🏠 Workflow integrator forced to initial state")
             
-            # Force app controller button update
-            if hasattr(self.gui, 'app_controller') and self.gui.app_controller:
-                self.gui.app_controller.update_button_states()
-            elif hasattr(self.gui, 'update_button_states'):
-                self.gui.update_button_states()
-            
-            _LOGGER.info("  🔘 Button states forced to initial configuration")
+            # Update button states through the workflow integrator system (PySide6 pattern)
+            if hasattr(self.gui, 'workflow_integrator') and self.gui.workflow_integrator:
+                self.gui.workflow_integrator._workflow_update_button_states()
+                _LOGGER.info("  🔘 Button states updated via workflow integrator")
+            else:
+                # Fallback for older pattern
+                if hasattr(self.gui, 'app_controller') and hasattr(self.gui.app_controller, 'update_button_states'):
+                    self.gui.app_controller.update_button_states()
+                elif hasattr(self.gui, 'update_button_states'):
+                    self.gui.update_button_states()
+                _LOGGER.info("  🔘 Button states updated via fallback method")
             
         except Exception as e:
             _LOGGER.warning(f"  ⚠️ Warning forcing button states: {e}")

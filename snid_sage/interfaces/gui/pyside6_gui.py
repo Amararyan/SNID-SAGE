@@ -452,8 +452,6 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         layout_settings = LayoutSettings()
         layout_settings.default_window_size = (900, 600)
         layout_settings.minimum_window_size = (700, 500)
-        # layout_settings.maximum_window_size = (1400, 1000)  # Removed to allow maximization
-        
         self.unified_layout_manager = get_unified_layout_manager(layout_settings)
         
         # Create central widget
@@ -464,10 +462,6 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         main_layout = self.unified_layout_manager.create_main_layout(self, central_widget)
         
         _LOGGER.debug("Interface layout created with unified layout manager - no conflicts")
-    
-    # Obsolete plotting methods removed - now handled by plot manager
-    
-    # PyQtGraph theming moved to plot manager
     
     def _plot_clean_welcome_message(self):
         """Show clean welcome message without demo spectrum - delegate to plot manager"""
@@ -516,7 +510,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         self.spectrum_data = None
         self.analysis_results = None
         
-        # Create placeholder attributes for removed mask buttons
+        # Placeholder attributes for mask buttons
         self.mask_btn = None
         self.clear_masks_btn = None
         
@@ -1174,17 +1168,15 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         """Handle progress update signal from app controller"""
         try:
             if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                # Determine stage based on progress percentage
-                if progress <= 10:
-                    stage = "Preprocessing"
-                elif progress <= 30:
-                    stage = "Loading Templates"
+                # Determine stage based on progress percentage - generic stages
+                if progress <= 25:
+                    stage = "Preparing Data"
                 elif progress <= 50:
-                    stage = "Initializing Analysis"
-                elif progress <= 90:
-                    stage = "Template Matching"
+                    stage = "Loading Resources"
+                elif progress <= 75:
+                    stage = "Running Analysis"
                 elif progress < 100:
-                    stage = "Processing Results"
+                    stage = "Finalizing Results"
                 else:
                     stage = "Complete"
                 
@@ -1476,7 +1468,6 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             
             # Do NOT automatically show the results dialog anymore
             # User can manually access results via the Analysis menu if needed
-            # self.show_analysis_results()  # REMOVED - this was auto-opening the results dialog
             
             # Just update the main window status to indicate completion
             cluster_info = ""

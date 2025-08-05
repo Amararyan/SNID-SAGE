@@ -23,6 +23,8 @@ from PySide6 import QtWidgets, QtCore, QtGui
 try:
     import pyqtgraph as pg
     PYQTGRAPH_AVAILABLE = True
+    # Import simple plot widget (without save functionality for preprocessing previews)
+    from snid_sage.interfaces.gui.components.plots.enhanced_plot_widget import SimplePlotWidget
     # Configure PyQtGraph for complete software rendering (consistent with other dialogs)
     pg.setConfigOptions(
         useOpenGL=False,         # Disable OpenGL completely
@@ -33,6 +35,7 @@ try:
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
+    SimplePlotWidget = None
 
 # Import logging
 try:
@@ -60,6 +63,13 @@ from snid_sage.interfaces.gui.features.preprocessing.pyside6_preview_calculator 
 from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PySide6PlotManager
 from snid_sage.interfaces.gui.components.widgets.pyside6_interactive_masking_widget import PySide6InteractiveMaskingWidget
 from snid_sage.interfaces.gui.components.widgets.pyside6_interactive_continuum_widget import PySide6InteractiveContinuumWidget
+
+# Enhanced button management
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except ImportError:
+    ENHANCED_BUTTONS_AVAILABLE = False
 
 
 class PySide6PreprocessingDialog(QtWidgets.QDialog):
@@ -347,7 +357,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             top_label.setStyleSheet("font-weight: bold; color: #1e293b; font-size: 12pt;")
             plots_layout.addWidget(top_label)
             
-            self.top_plot_widget = pg.PlotWidget()
+            self.top_plot_widget = SimplePlotWidget()
             self.top_plot_widget.setLabel('left', 'Flux')
             self.top_plot_widget.setLabel('bottom', 'Wavelength (Å)')
             self.top_plot_widget.showGrid(x=True, y=True, alpha=0.3)
@@ -359,7 +369,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             bottom_label.setStyleSheet("font-weight: bold; color: #1e293b; font-size: 12pt;")
             plots_layout.addWidget(bottom_label)
             
-            self.bottom_plot_widget = pg.PlotWidget()
+            self.bottom_plot_widget = SimplePlotWidget()
             self.bottom_plot_widget.setLabel('left', 'Flux')
             self.bottom_plot_widget.setLabel('bottom', 'Wavelength (Å)')
             self.bottom_plot_widget.showGrid(x=True, y=True, alpha=0.3)
@@ -490,32 +500,14 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         
         # Apply Step button (becomes "Finish" on final step)
         self.apply_btn = QtWidgets.QPushButton("Apply Step")
+        self.apply_btn.setObjectName("apply_btn")
         self.apply_btn.clicked.connect(self.apply_current_step)
-        self.apply_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('btn_success', '#22c55e')};
-                color: white;
-                font-weight: bold;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 9pt;
-            }}
-        """)
         action_layout.addWidget(self.apply_btn)
         
         # Revert button
         self.revert_btn = QtWidgets.QPushButton("↺ Revert")
+        self.revert_btn.setObjectName("revert_btn")
         self.revert_btn.clicked.connect(self.revert_to_previous_step)
-        self.revert_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('btn_warning', '#f59e0b')};
-                color: white;
-                font-weight: bold;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 9pt;
-            }}
-        """)
         action_layout.addWidget(self.revert_btn)
         
         button_layout.addLayout(action_layout)
@@ -551,6 +543,79 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         
         # Initialize cleanup tracking
         self._plot_widgets_initialized = True
+        
+        # Setup enhanced buttons
+        self._setup_enhanced_buttons()
+    
+    def _setup_enhanced_buttons(self):
+        """Setup enhanced button styling and animations"""
+        if not ENHANCED_BUTTONS_AVAILABLE:
+            _LOGGER.info("Enhanced buttons not available, using standard styling")
+            return
+
+        try:
+            # Use the preprocessing dialog preset
+            self.button_manager = enhance_dialog_with_preset(
+                self, 'preprocessing_dialog'
+            )
+
+            _LOGGER.info("Enhanced buttons successfully applied to preprocessing dialog")
+            
+            # Setup masking toggle button if available
+            self._setup_masking_toggle_button()
+            
+            # Initial button state update
+            self._update_button_states()
+
+        except Exception as e:
+            _LOGGER.error(f"Failed to setup enhanced buttons: {e}")
+    
+    def _setup_masking_toggle_button(self):
+        """Setup the interactive masking toggle button with enhanced styling"""
+        if hasattr(self, 'masking_widget') and self.masking_widget and hasattr(self, 'button_manager'):
+            masking_controls = self.masking_widget.controls_frame
+            if masking_controls:
+                # Find the toggle button and set object name
+                toggle_button = masking_controls.findChild(QtWidgets.QPushButton)
+                if toggle_button:
+                    toggle_button.setObjectName("masking_toggle_btn")
+                    
+                    # Register with enhanced button system
+                    self.button_manager.register_button(
+                        toggle_button, 
+                        'neutral',
+                        {
+                            'is_toggle': True,
+                            'toggle_state': False,
+                            'size_class': 'normal'
+                        }
+                    )
+                    
+                    # Store reference for state updates
+                    self.masking_toggle_button = toggle_button
+                    
+                    # Connect to masking state changes
+                    if hasattr(self.masking_widget, 'masking_mode_changed'):
+                        self.masking_widget.masking_mode_changed.connect(self._on_masking_mode_changed)
+    
+    def _on_masking_mode_changed(self, is_active: bool):
+        """Handle masking mode state changes"""
+        if hasattr(self, 'masking_toggle_button') and hasattr(self, 'button_manager'):
+            # Update the enhanced button system with the new toggle state
+            config = self.button_manager.button_configs.get('masking_toggle_btn', {})
+            config['toggle_state'] = is_active
+            
+            # Apply appropriate styling - red when active, normal when inactive
+            if is_active:
+                button_type = 'cancel'  # Use red color when active
+            else:
+                button_type = 'neutral'  # Use normal color when inactive
+                
+            self.button_manager._apply_button_styling(
+                self.masking_toggle_button, 
+                button_type, 
+                config
+            )
     
     def _on_mask_updated(self):
         """Callback when mask regions are updated"""
@@ -851,6 +916,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         gauss_layout.addWidget(self.gauss_sigma_spin)
         
         auto_sigma_btn = QtWidgets.QPushButton("Auto")
+        auto_sigma_btn.setObjectName("auto_sigma_btn")
         auto_sigma_btn.clicked.connect(self._set_auto_sigma)
         gauss_layout.addWidget(auto_sigma_btn)
         
@@ -1015,6 +1081,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         export_layout.addWidget(self.save_intermediate_cb)
         
         export_btn = QtWidgets.QPushButton("Export Plots")
+        export_btn.setObjectName("export_btn")
         export_btn.clicked.connect(self._export_plots)
         export_layout.addWidget(export_btn)
         
@@ -1470,17 +1537,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 except:
                     pass  # Ignore if no connections exist
                 self.apply_btn.clicked.connect(self.finish_preprocessing)
-                # Update styling for finish button
-                self.apply_btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {self.colors.get('accent_primary', '#8b5cf6')};
-                        color: white;
-                        font-weight: bold;
-                        padding: 6px 12px;
-                        border-radius: 4px;
-                        font-size: 9pt;
-                    }}
-                """)
+                # Update styling for finish button - enhanced buttons will handle styling
             else:
                 self.apply_btn.setText("Apply Step")
                 # Disconnect and reconnect signals properly
@@ -1489,22 +1546,26 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 except:
                     pass  # Ignore if no connections exist
                 self.apply_btn.clicked.connect(self.apply_current_step)
-                # Restore normal apply button styling
-                self.apply_btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {self.colors.get('btn_success', '#22c55e')};
-                        color: white;
-                        font-weight: bold;
-                        padding: 6px 12px;
-                        border-radius: 4px;
-                        font-size: 9pt;
-                    }}
-                """)
+                # Restore normal apply button styling - enhanced buttons will handle styling
         
-        # Revert button is always enabled when there are applied steps
-        if hasattr(self, 'revert_btn') and hasattr(self, 'preview_calculator'):
-            has_applied_steps = self.preview_calculator and len(self.preview_calculator.applied_steps) > 0
-            self.revert_btn.setEnabled(has_applied_steps)
+        # Revert button is enabled when we're on step 1 (Savitzky-Golay) or higher
+        if hasattr(self, 'revert_btn'):
+            # Button should be enabled if we're on step 1 or higher (after applying at least one step)
+            # Step 0 = Masking & Clipping (no revert available)
+            # Step 1+ = Savitzky-Golay filtering and beyond (revert available)
+            can_revert = self.current_step >= 1
+            
+            # Additional check: ensure we have a preview calculator with stage memory
+            if hasattr(self, 'preview_calculator') and self.preview_calculator:
+                # Check if we have any stages in memory (more reliable than applied_steps)
+                has_stages = hasattr(self.preview_calculator, 'stage_memory') and len(self.preview_calculator.stage_memory) > 0
+                can_revert = can_revert and has_stages
+            
+            # Use enhanced button state management if available
+            if hasattr(self, 'button_manager') and self.button_manager:
+                self.button_manager.update_button_state(self.revert_btn, can_revert)
+            else:
+                self.revert_btn.setEnabled(can_revert)
     
     # Stage Memory Background Processing (no UI)
     def _on_stage_memory_updated(self, current_stage_index, available_stages):

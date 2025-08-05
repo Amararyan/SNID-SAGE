@@ -269,7 +269,7 @@ class ResultsManager:
             filename (str): Output filename
         """
         result_dict = self._result_to_dict(self.current_result)
-        with open(filename, 'w') as f:
+        with open(filename, 'w', encoding='utf-8') as f:
             json.dump(result_dict, f, indent=2, default=str)
     
     def _export_to_csv(self, filename):
@@ -278,7 +278,7 @@ class ResultsManager:
         Args:
             filename (str): Output filename
         """
-        with open(filename, 'w', newline='') as f:
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             
             # Write header
@@ -306,7 +306,7 @@ class ResultsManager:
             filename (str): Output filename
         """
         results_text = self._format_results_text(self.current_result)
-        with open(filename, 'w') as f:
+        with open(filename, 'w', encoding='utf-8') as f:
             f.write(results_text)
     
     def _result_to_dict(self, result):
@@ -380,7 +380,7 @@ class ResultsManager:
             filename (str): Output filename
         """
         html_content = self._generate_html_report()
-        with open(filename, 'w') as f:
+        with open(filename, 'w', encoding='utf-8') as f:
             f.write(html_content)
     
     def _save_text_report(self, filename):
@@ -390,7 +390,7 @@ class ResultsManager:
             filename (str): Output filename
         """
         text_content = self._generate_text_report()
-        with open(filename, 'w') as f:
+        with open(filename, 'w', encoding='utf-8') as f:
             f.write(text_content)
     
     def _generate_html_report(self):

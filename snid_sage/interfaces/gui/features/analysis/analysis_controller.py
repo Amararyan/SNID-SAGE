@@ -131,7 +131,7 @@ class AnalysisController:
     def _create_progress_window(self):
         """Create progress window with integrated game area"""
         self.progress_window = tk.Toplevel(self.gui.master)
-        self.progress_window.title("SNID Analysis Progress 🎮")
+        self.progress_window.title("SNID-SAGE Analysis Progress 🎮")
         self.progress_window.geometry("900x700")  # Slightly taller window for more space
         self.progress_window.resizable(True, True)
         
@@ -157,7 +157,7 @@ class AnalysisController:
         progress_panel.pack_propagate(False)  # Maintain fixed width
         
         # Progress panel header
-        progress_header = tk.Label(progress_panel, text="📊 SNID Analysis Status",
+        progress_header = tk.Label(progress_panel, text="📊 SNID-SAGE Analysis Status",
                                  font=('Arial', 16, 'bold'),
                                  bg='#34495e', fg='#ecf0f1')
         progress_header.pack(pady=(10, 5))
@@ -421,7 +421,7 @@ class AnalysisController:
             forced_redshift = None
             if self.redshift_config['mode'] == 'forced' and self.redshift_config['forced_redshift'] is not None:
                 forced_redshift = self.redshift_config['forced_redshift']
-                self._update_progress(f"🎯 Using FORCED REDSHIFT: z = {forced_redshift:.6f}")
+                self._update_progress(f"🎯 Using FORCED REDSHIFT: z = {forced_redshift:.5f}")
             
             result, trace = run_snid_analysis(
                 processed_spectrum=self.gui.processed_spectrum,
@@ -936,21 +936,40 @@ class AnalysisController:
             
             # Plot spectra
             ax.plot(obs_wave, obs_flux, color='#0078d4', linewidth=2, alpha=0.9, label='Input Spectrum')
+            from snid_sage.shared.utils import clean_template_name
+            clean_name = clean_template_name(best_match['name'])
+            
+            # Get redshift uncertainty if available
+            redshift_error = best_match.get('redshift_error', 0)
+            if redshift_error > 0:
+                redshift_text = f"z={best_match['redshift']:.5f}±{redshift_error:.5f}"
+            else:
+                redshift_text = f"z={best_match['redshift']:.5f}"
+            
             ax.plot(template_wave, template_flux, color='#E74C3C', linewidth=2.5, alpha=0.8, 
-                   label=f"{best_match['name']} (z={best_match['redshift']:.4f})")
+                   label=f"{clean_name} ({redshift_text})")
             
             # Add labels and styling
             ax.set_xlabel('Wavelength (Å)', fontsize=12)
             ax.set_ylabel('Flux', fontsize=12)
-            ax.set_title(f"Flux View - Best Match: {best_match['name']}", fontsize=14)
+            ax.set_title(f"Flux View - Best Match: {clean_name}", fontsize=14)
             ax.legend(loc='upper right', fontsize=10)
             ax.grid(True, alpha=0.3)
             
             # Add info text
             template = best_match.get('template', {})
             subtype = template.get('subtype', best_match.get('type', 'Unknown'))
+            
+            # Use RLAP-cos if available, otherwise RLAP
+            rlap_cos = best_match.get('rlap_cos')
+            if rlap_cos is not None:
+                metric_text = f"RLAP-cos = {rlap_cos:.2f}"
+            else:
+                metric_text = f"RLAP = {best_match['rlap']:.2f}"
+            
             info_text = (f"Type: {subtype}, Age: {best_match['age']:.1f}d\n"
-                        f"z = {best_match['redshift']:.4f}, RLAP = {best_match['rlap']:.2f}")
+                        f"z = {best_match['redshift']:.5f}\n"
+                        f"{metric_text}")
             ax.text(0.02, 0.98, info_text, transform=ax.transAxes,
                    verticalalignment='top', fontsize=10,
                    bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
@@ -987,21 +1006,40 @@ class AnalysisController:
             
             # Plot spectra
             ax.plot(obs_wave, obs_flux, color='#0078d4', linewidth=2, alpha=0.9, label='Input Spectrum')
+            from snid_sage.shared.utils import clean_template_name
+            clean_name = clean_template_name(best_match['name'])
+            
+            # Get redshift uncertainty if available
+            redshift_error = best_match.get('redshift_error', 0)
+            if redshift_error > 0:
+                redshift_text = f"z={best_match['redshift']:.5f}±{redshift_error:.5f}"
+            else:
+                redshift_text = f"z={best_match['redshift']:.5f}"
+            
             ax.plot(template_wave, template_flux, color='#E74C3C', linewidth=2.5, alpha=0.8, 
-                   label=f"{best_match['name']} (z={best_match['redshift']:.4f})")
+                   label=f"{clean_name} ({redshift_text})")
             
             # Add labels and styling
             ax.set_xlabel('Wavelength (Å)', fontsize=12)
             ax.set_ylabel('Flattened Flux', fontsize=12)
-            ax.set_title(f"Flattened View - Best Match: {best_match['name']}", fontsize=14)
+            ax.set_title(f"Flattened View - Best Match: {clean_name}", fontsize=14)
             ax.legend(loc='upper right', fontsize=10)
             ax.grid(True, alpha=0.3)
             
             # Add info text
             template = best_match.get('template', {})
             subtype = template.get('subtype', best_match.get('type', 'Unknown'))
+            
+            # Use RLAP-cos if available, otherwise RLAP
+            rlap_cos = best_match.get('rlap_cos')
+            if rlap_cos is not None:
+                metric_text = f"RLAP-cos = {rlap_cos:.2f}"
+            else:
+                metric_text = f"RLAP = {best_match['rlap']:.2f}"
+            
             info_text = (f"Type: {subtype}, Age: {best_match['age']:.1f}d\n"
-                        f"z = {best_match['redshift']:.4f}, RLAP = {best_match['rlap']:.2f}")
+                        f"z = {best_match['redshift']:.5f}\n"
+                        f"{metric_text}")
             ax.text(0.02, 0.98, info_text, transform=ax.transAxes,
                    verticalalignment='top', fontsize=10,
                    bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
@@ -1173,7 +1211,7 @@ class AnalysisController:
             # Fallback if formatter not available
             summary_text = f"Analysis Results for {getattr(result, 'spectrum_name', 'Unknown')}\n"
             summary_text += f"Type: {result.consensus_type}\n"
-            summary_text += f"Redshift: {result.redshift:.6f}\n"
+            summary_text += f"Redshift: {result.redshift:.5f}\n"
             summary_text += f"RLAP: {result.rlap:.2f}\n"
         
         text_widget.insert('1.0', summary_text)
@@ -1419,7 +1457,8 @@ class AnalysisController:
                     template = best_cluster_match.get('template', {})
                     
                     # Update primary match properties
-                    result.template_name = best_cluster_match.get('name', 'Unknown')
+                    from snid_sage.shared.utils import clean_template_name
+                    result.template_name = clean_template_name(best_cluster_match.get('name', 'Unknown'))
                     result.redshift = best_cluster_match.get('redshift', 0.0)
                     result.redshift_error = best_cluster_match.get('redshift_error', 0.0)
                     result.rlap = best_cluster_match.get('rlap', 0.0)
@@ -1445,12 +1484,14 @@ class AnalysisController:
                 
                 _LOGGER.info(f"🎯 Filtered templates: {len(cluster_matches)} cluster matches -> "
                             f"{len(result.best_matches)} displayed templates")
-                _LOGGER.debug(f"   Top template from cluster: {result.best_matches[0].get('name', 'Unknown')} "
+                clean_top_name = clean_template_name(result.best_matches[0].get('name', 'Unknown'))
+                _LOGGER.debug(f"   Top template from cluster: {clean_top_name} "
                              f"(RLAP: {result.best_matches[0].get('rlap', 0):.2f})")
                 
                 # Show template names for better debugging
                 if _LOGGER.isEnabledFor(logging.DEBUG) and len(result.best_matches) > 1:
-                    template_names = [f"{match.get('name', 'Unknown')} (RLAP: {match.get('rlap', 0):.2f})" 
+                    from snid_sage.shared.utils import clean_template_name
+                    template_names = [f"{clean_template_name(match.get('name', 'Unknown'))} (RLAP: {match.get('rlap', 0):.2f})" 
                                     for match in result.best_matches[:5]]  # Show first 5
                     _LOGGER.debug(f"   Displayed templates: {', '.join(template_names)}")
                     if len(result.best_matches) > 5:

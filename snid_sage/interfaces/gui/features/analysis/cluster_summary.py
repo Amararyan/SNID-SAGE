@@ -14,21 +14,26 @@ except ImportError:
 # Import all needed math utility functions
 try:
     from snid_sage.shared.utils.math_utils import (
-        calculate_hybrid_weighted_redshift,
+        calculate_joint_weighted_estimates,
+        calculate_weighted_redshift,  # Still needed for fallback cases
+        calculate_weighted_age,  # Still needed for fallback cases
         calculate_weighted_median,
-        calculate_rlap_weighted_age,
         get_best_metric_value,
         get_metric_name_for_match
     )
+    _MATH_UTILS_AVAILABLE = True
 except ImportError as e:
     _LOGGER.error(f"Failed to import math utilities: {e}")
+    _MATH_UTILS_AVAILABLE = False
     # Create dummy functions to prevent crashes
-    def calculate_hybrid_weighted_redshift(*args, **kwargs):
-        return 0.0, 0.01, 0.01
+    def calculate_joint_weighted_estimates(*args, **kwargs):
+        return 0.0, 0.0, 0.01, 1.0, 0.0
+    def calculate_weighted_redshift(*args, **kwargs):
+        return 0.0, 0.01
+    def calculate_weighted_age(*args, **kwargs):
+        return 0.0, 1.0
     def calculate_weighted_median(values, weights):
         return np.median(values) if len(values) > 0 else 0.0
-    def calculate_rlap_weighted_age(*args, **kwargs):
-        return 0.0, 0.0, 0.0, 0.0
     def get_best_metric_value(match):
         return match.get('rlap', 0.0)
     def get_metric_name_for_match(match):
@@ -122,6 +127,7 @@ def weighted_median(values, weights):
     weights = np.array(weights, dtype=float)
     
     # Filter out NaN values and their corresponding weights
+    # Weights should be > 0 (RLAP, cosine similarity, or RLAP-cos are all positive metrics)
     valid_mask = np.isfinite(values) & np.isfinite(weights) & (weights > 0)
     if not np.any(valid_mask):
         return 0.0
@@ -152,14 +158,26 @@ def weighted_median(values, weights):
 
 def weighted_mean_with_uncertainty(values, weights):
     """
-    DEPRECATED: Use enhanced calculation methods instead.
+    Calculate weighted mean and uncertainty using the new weighted statistics.
     
-    This function exists only for backwards compatibility.
+    This function provides backwards compatibility with updated implementation.
     """
     import numpy as np
-    # For backwards compatibility only
-    result = calculate_hybrid_weighted_redshift(values, np.zeros_like(values), include_cluster_scatter=False)
-    return result[0], result[1]
+    if _MATH_UTILS_AVAILABLE:
+        # Use new weighted redshift calculation for single-variable estimation
+        weighted_mean, uncertainty = calculate_weighted_redshift(values, weights)
+        return weighted_mean, uncertainty
+    else:
+        # Fallback calculation
+        values = np.asarray(values)
+        weights = np.asarray(weights)
+        if len(values) == 0 or np.sum(weights) == 0:
+            return 0.0, 0.0
+        weighted_mean = np.sum(values * weights) / np.sum(weights)
+        # Simple uncertainty estimate
+        variance = np.sum(weights * (values - weighted_mean)**2) / np.sum(weights)
+        uncertainty = np.sqrt(variance / len(values))
+        return float(weighted_mean), float(uncertainty)
 
 
 class AnalysisResultsAnalyzer:
@@ -185,15 +203,48 @@ class AnalysisResultsAnalyzer:
         redshifts = np.array([m['redshift'] for m in self.matches])
         rlaps = np.array([m['rlap'] for m in self.matches])
         
-        # Calculate hybrid weighted redshift statistics
-        redshift_errors = np.array([m.get('redshift_error', 0) for m in self.matches])
+        # First collect all redshift and age data for joint estimation
+        all_redshifts = []
+        all_ages = []
+        all_weights = []
         
-        # Hybrid weighted redshift estimation with cluster scatter
-        z_weighted_mean, z_weighted_uncertainty, cluster_scatter = calculate_hybrid_weighted_redshift(
-            redshifts=redshifts, 
-            redshift_errors=redshift_errors,
-            include_cluster_scatter=True
-        )
+        for m in self.matches:
+            template = m.get('template', {})
+            age = extract_age(m, template)
+            redshift = m['redshift']
+            weight = get_best_metric_value(m)
+            
+            # For joint estimation, we need both redshift and age
+            if age is not None:
+                all_redshifts.append(redshift)
+                all_ages.append(age)
+                all_weights.append(weight)
+        
+        # Use joint estimation when we have both redshift and age data
+        if len(all_redshifts) > 0 and _MATH_UTILS_AVAILABLE:
+            z_weighted_mean, age_weighted_mean, z_weighted_uncertainty, age_weighted_uncertainty, redshift_age_covariance = calculate_joint_weighted_estimates(
+                all_redshifts, all_ages, all_weights
+            )
+            cluster_scatter = 0.0  # The joint method handles uncertainty internally
+            age_stat_error = age_weighted_uncertainty
+            age_total_error = age_weighted_uncertainty
+            age_scatter = 0.0
+        else:
+            # Fallback to separate calculations if joint estimation not possible
+            redshift_weights = rlaps  # Use RLAP values as weights
+            if _MATH_UTILS_AVAILABLE:
+                z_weighted_mean, z_weighted_uncertainty = calculate_weighted_redshift(redshifts, redshift_weights)
+            else:
+                z_weighted_mean = np.average(redshifts, weights=redshift_weights)
+                z_weighted_uncertainty = 0.01
+            cluster_scatter = 0.0
+            
+            # Age fallback
+            age_weighted_mean = 0.0
+            age_weighted_uncertainty = 0.0
+            age_stat_error = 0.0
+            age_total_error = 0.0
+            age_scatter = 0.0
         
         rlap_weighted_mean = np.mean(rlaps)  # For RLAP, just use mean since weighting by itself doesn't add value
         rlap_weighted_median = calculate_weighted_median(rlaps, rlaps)
@@ -201,7 +252,7 @@ class AnalysisResultsAnalyzer:
         # Calculate subtype statistics
         subtype_stats = self._calculate_subtype_statistics()
         
-        # Age statistics (only for templates with valid ages)
+        # Age statistics (using joint estimation results or separate calculation for all ages)
         ages = []
         age_weights = []
         for m in self.matches:
@@ -209,26 +260,40 @@ class AnalysisResultsAnalyzer:
             age = extract_age(m, template)
             if age is not None:
                 ages.append(age)
-                # Use RLAP-cos if available, otherwise RLAP
                 age_weights.append(get_best_metric_value(m))
         
         age_stats = {}
-        if ages:
-            ages = np.array(ages)
-            age_weights = np.array(age_weights)
-            age_weighted_mean, age_stat_error, age_total_error, age_scatter = calculate_rlap_weighted_age(
-                ages, age_weights, include_cluster_scatter=True
-            )
+        if len(all_redshifts) > 0:
+            # Use joint estimation results
+            age_stats = {
+                'min': np.min(ages) if ages else 0.0,
+                'max': np.max(ages) if ages else 0.0,
+                'weighted_mean': age_weighted_mean,
+                'weighted_uncertainty': age_total_error,
+                'statistical_uncertainty': age_stat_error,
+                'total_uncertainty': age_total_error,
+                'cluster_scatter': age_scatter,
+                'count': len(ages) if ages else 0,
+                'redshift_age_covariance': redshift_age_covariance if len(all_redshifts) > 0 and _MATH_UTILS_AVAILABLE else 0.0
+            }
+        elif ages:
+            # Fallback for age-only calculation when no joint data available
+            if _MATH_UTILS_AVAILABLE:
+                age_weighted_mean_fallback, age_weighted_uncertainty_fallback = calculate_weighted_age(ages, age_weights)
+            else:
+                age_weighted_mean_fallback = np.average(ages, weights=age_weights)
+                age_weighted_uncertainty_fallback = 1.0
             
             age_stats = {
                 'min': np.min(ages),
                 'max': np.max(ages),
-                'weighted_mean': age_weighted_mean,
-                'weighted_uncertainty': age_total_error,  # Use consistent key name
-                'statistical_uncertainty': age_stat_error,
-                'total_uncertainty': age_total_error,
-                'cluster_scatter': age_scatter,
-                'count': len(ages)
+                'weighted_mean': age_weighted_mean_fallback,
+                'weighted_uncertainty': age_weighted_uncertainty_fallback,
+                'statistical_uncertainty': age_weighted_uncertainty_fallback,
+                'total_uncertainty': age_weighted_uncertainty_fallback,
+                'cluster_scatter': 0.0,
+                'count': len(ages),
+                'redshift_age_covariance': 0.0
             }
         
         return {
@@ -300,26 +365,38 @@ class AnalysisResultsAnalyzer:
             laps = np.array(data['laps'])
             ages = np.array(data['ages']) if data['ages'] else np.array([])
             
-            # Hybrid weighted redshift statistics
-            z_weighted_mean, z_weighted_uncertainty, _ = calculate_hybrid_weighted_redshift(
-                redshifts, redshift_errors, include_cluster_scatter=True
+            # Weighted redshift statistics
+            # Get quality weights for this specific subtype
+            subtype_rlap_weights = []
+            for match in self.matches:
+                template = match.get('template', {})
+                match_subtype = template.get('subtype', 'Unknown')
+                if match_subtype == subtype:
+                    subtype_rlap_weights.append(get_best_metric_value(match))
+            
+            subtype_rlap_weights = np.array(subtype_rlap_weights[:len(redshifts)])  # Ensure matching length
+            
+            from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
+            z_weighted_mean, z_weighted_uncertainty = calculate_weighted_redshift(
+                redshifts, subtype_rlap_weights
             )
             
-            # Age-weighted statistics (only for templates with valid ages)
+            # Weighted age statistics (only for templates with valid ages)
             if len(ages) > 0:
-                # Get RLAP-cos values for templates that have valid ages
+                # Get quality values for templates that have valid ages in this subtype
                 age_rlaps = []
                 for match in self.matches:
                     template = match.get('template', {})
-                    age = extract_age(match, template)
-                    if age is not None:
-                        # Use RLAP-cos if available, otherwise RLAP
-                        age_rlaps.append(get_best_metric_value(match))
-                age_rlaps = np.array(age_rlaps[:len(ages)])  # Match length
+                    match_subtype = template.get('subtype', 'Unknown')
+                    if match_subtype == subtype:
+                        age = extract_age(match, template)
+                        if age is not None and np.isfinite(age):
+                            age_rlaps.append(get_best_metric_value(match))
                 
                 if len(age_rlaps) == len(ages) and len(ages) > 0:
-                    age_weighted_mean, _, age_weighted_uncertainty, _ = calculate_rlap_weighted_age(
-                        ages, age_rlaps, include_cluster_scatter=True
+                    from snid_sage.shared.utils.math_utils import calculate_weighted_age
+                    age_weighted_mean, age_weighted_uncertainty = calculate_weighted_age(
+                        ages, np.array(age_rlaps)
                     )
                 else:
                     age_weighted_mean, age_weighted_uncertainty = 0.0, 0.0
@@ -452,7 +529,7 @@ class AnalysisResultsAnalyzer:
                 age = template.get('age', 0) if template else 0
             
             # Format age for display - show raw values including -999
-            if age is not None and age != 0:
+            if age is not None and np.isfinite(age):
                 age_str = f"{age:.1f}"
             else:
                 age_str = "N/A"

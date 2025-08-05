@@ -20,6 +20,9 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.spectrum_plotter')
 
+# Import template name cleaning utility
+from snid_sage.shared.utils import clean_template_name
+
 
 class SpectrumPlotter:
     """
@@ -76,7 +79,7 @@ class SpectrumPlotter:
             current_match = self.gui.snid_results.best_matches[self.gui.current_template]
             
             # Use standardized styling
-            title = f'Flux View - {current_match["name"]} (z={current_match["redshift"]:.4f})'
+            title = f'Flux View - {current_match["name"]} (z={current_match["redshift"]:.5f})'
             bg_color, text_color, grid_color = self.gui._standardize_plot_styling(
                 title=title,
                 ylabel='Flux'
@@ -121,10 +124,26 @@ class SpectrumPlotter:
             # Add template info text (using subtype from template object)
             template = current_match.get('template', {})
             subtype = template.get('subtype', current_match.get('type', 'Unknown'))
+            
+            # Get redshift uncertainty if available
+            redshift_error = current_match.get('redshift_error', 0)
+            if redshift_error > 0:
+                redshift_text = f"z = {current_match['redshift']:.5f} ±{redshift_error:.5f}"
+            else:
+                redshift_text = f"z = {current_match['redshift']:.5f}"
+            
+            # Use RLAP-cos if available, otherwise RLAP
+            rlap_cos = current_match.get('rlap_cos')
+            if rlap_cos is not None:
+                metric_text = f"RLAP-cos = {rlap_cos:.2f}"
+            else:
+                metric_text = f"RLAP = {current_match['rlap']:.2f}"
+            
             info_text = (f"Template {self.gui.current_template + 1}/{len(self.gui.snid_results.best_matches)}: "
-                        f"{current_match['name']}\n"
+                        f"{clean_template_name(current_match['name'])}\n"
                         f"Subtype: {subtype}, Age: {current_match['age']:.1f}d\n"
-                        f"z = {current_match['redshift']:.4f}, RLAP = {current_match['rlap']:.2f}")
+                        f"{redshift_text}\n"
+                        f"{metric_text}")
             
             # Use adaptive positioning for template info
             from ...utils.plot_legend_utils import add_adaptive_template_info
@@ -173,7 +192,7 @@ class SpectrumPlotter:
             current_match = self.gui.snid_results.best_matches[self.gui.current_template]
             
             # Use standardized styling
-            title = f'Flattened View - {current_match["name"]} (z={current_match["redshift"]:.4f})'
+            title = f'Flattened View - {current_match["name"]} (z={current_match["redshift"]:.5f})'
             bg_color, text_color, grid_color = self.gui._standardize_plot_styling(
                 title=title,
                 ylabel='Flattened Flux'
@@ -216,10 +235,26 @@ class SpectrumPlotter:
             # Add template info text (using subtype from template object)
             template = current_match.get('template', {})
             subtype = template.get('subtype', current_match.get('type', 'Unknown'))
+            
+            # Get redshift uncertainty if available
+            redshift_error = current_match.get('redshift_error', 0)
+            if redshift_error > 0:
+                redshift_text = f"z = {current_match['redshift']:.5f} ±{redshift_error:.5f}"
+            else:
+                redshift_text = f"z = {current_match['redshift']:.5f}"
+            
+            # Use RLAP-cos if available, otherwise RLAP
+            rlap_cos = current_match.get('rlap_cos')
+            if rlap_cos is not None:
+                metric_text = f"RLAP-cos = {rlap_cos:.2f}"
+            else:
+                metric_text = f"RLAP = {current_match['rlap']:.2f}"
+            
             info_text = (f"Template {self.gui.current_template + 1}/{len(self.gui.snid_results.best_matches)}: "
-                        f"{current_match['name']}\n"
+                        f"{clean_template_name(current_match['name'])}\n"
                         f"Subtype: {subtype}, Age: {current_match['age']:.1f}d\n"
-                        f"z = {current_match['redshift']:.4f}, RLAP = {current_match['rlap']:.2f}")
+                        f"{redshift_text}\n"
+                        f"{metric_text}")
             
             # Use adaptive positioning for template info
             from ...utils.plot_legend_utils import add_adaptive_template_info

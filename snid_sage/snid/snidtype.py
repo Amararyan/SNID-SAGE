@@ -335,7 +335,7 @@ def weighted_mean(vals: np.ndarray, w: np.ndarray) -> Tuple[float, float]:
     LEGACY FUNCTION - DEPRECATED
     
     This function is deprecated and should not be used for new code.
-    Use calculate_hybrid_weighted_redshift or calculate_rlap_weighted_age instead.
+    Use calculate_weighted_redshift or calculate_weighted_age instead.
     
     Maintained only for backwards compatibility with legacy template type analysis.
     """
@@ -350,9 +350,15 @@ def weighted_mean(vals: np.ndarray, w: np.ndarray) -> Tuple[float, float]:
         return float(vals[0]), 0.0
     
     # Basic weighted calculation for backwards compatibility only
-    from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
-    result = calculate_hybrid_weighted_redshift(vals, np.zeros_like(vals), include_cluster_scatter=False)
-    return result[0], result[1]
+    try:
+        from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
+        # Use uniform weights since this is legacy compatibility
+        weights = np.ones_like(vals)
+        result_mean, result_uncertainty = calculate_weighted_redshift(vals, weights)
+        return result_mean, result_uncertainty
+    except ImportError:
+        # Ultimate fallback
+        return float(np.mean(vals)), float(np.std(vals) / np.sqrt(len(vals)))
 
 
 def weighted_median(values: np.ndarray, weights: np.ndarray) -> float:

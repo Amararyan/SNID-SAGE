@@ -1,14 +1,8 @@
 """
-Statistically rigorous weighted calculations for redshift estimation in SNID SAGE.
+Statistically rigorous weighted calculations for redshift and age estimation in SNID SAGE.
 
-This module implements both pure inverse variance weighting and hybrid methods that
-include cluster-level scatter, following improved statistical recommendations for optimal
-redshift and age estimation in the winning cluster.
-
-The weighting schemes supported:
-- Pure inverse variance weighting: Weight = 1 / (redshift_uncertainty^2)  
-- Hybrid weighting: Weight = 1 / (redshift_uncertainty^2 + τ^2) where τ^2 is cluster scatter
-- RLAP weighting for age estimates with optional cluster scatter addition
+This module implements RLAP-Cos weighted estimation methods for optimal redshift 
+and age estimation with full covariance analysis.
 """
 
 import numpy as np
@@ -18,278 +12,259 @@ import logging
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
-def calculate_hybrid_weighted_redshift(
+
+def calculate_joint_weighted_estimates(
     redshifts: Union[np.ndarray, List[float]], 
-    redshift_errors: Union[np.ndarray, List[float]],
-    include_cluster_scatter: bool = True,
-    min_error: float = 1e-6,
-    default_error: float = 0.01
-) -> Tuple[float, float, float]:
+    ages: Union[np.ndarray, List[float]],
+    weights: Union[np.ndarray, List[float]]
+) -> Tuple[float, float, float, float, float]:
     """
-    Calculate hybrid weighted redshift estimate using inverse variance weighting with cluster scatter.
+    Calculate joint weighted estimates for redshift and age with full covariance.
     
-    This implements the statistically rigorous two-step approach:
-    1. Pure inverse variance weighting using individual template uncertainties
-    2. Hybrid method that incorporates cluster-level scatter (τ²) in quadrature
+    This implements a statistically robust joint estimation approach that:
+    1. Uses RLAP-Cos values as quality-based weights
+    2. Computes weighted centroids in (redshift, age) space  
+    3. Estimates the full 2×2 weighted covariance matrix
+    4. Extracts marginal uncertainties and correlation from the covariance matrix
     
     Parameters
     ----------
     redshifts : array-like
-        Redshift values from winning cluster
-    redshift_errors : array-like  
-        Individual redshift uncertainties from correlation peak fits
-    include_cluster_scatter : bool, default=True
-        Whether to include cluster-level scatter (τ²) term
-    min_error : float, default=1e-6
-        Minimum allowed error to prevent division by zero
-    default_error : float, default=0.01
-        Default error for missing/invalid uncertainties
+        Redshift values from templates
+    ages : array-like  
+        Age values from templates (in days)
+    weights : array-like
+        RLAP-Cos quality weights for each template
         
     Returns
     -------
-    Tuple[float, float, float]
-        (final_redshift, final_uncertainty, cluster_scatter)
+    Tuple[float, float, float, float, float]
+        (weighted_redshift, weighted_age, redshift_uncertainty, age_uncertainty, redshift_age_covariance)
         
     Notes
     -----
     Statistical Method:
-    - Calculate preliminary unweighted mean for cluster scatter estimation
-    - Estimate excess variance: τ² = max(0, S² - σ̄²)
-    - Apply hybrid weighting: w_i = 1/(σ_i² + τ²)
+    - Weighted mean: μ = Σ(wᵢ xᵢ) / Σ(wᵢ)
+    - Weighted covariance: Cov = Σ(wᵢ (xᵢ-μ)(yᵢ-ν)ᵀ) / Σ(wᵢ) × N_eff/(N_eff-1)
+    - Effective sample size: N_eff = (Σwᵢ)² / Σ(wᵢ²)
+    - Standard errors: σ_x = √(Var(x)/N_eff), σ_y = √(Var(y)/N_eff) 
     """
     redshifts = np.asarray(redshifts, dtype=float)
-    redshift_errors = np.asarray(redshift_errors, dtype=float)
+    ages = np.asarray(ages, dtype=float)
+    weights = np.asarray(weights, dtype=float)
     
-    if len(redshifts) == 0:
-        return np.nan, np.nan, np.nan
+    # Validate inputs
+    if len(redshifts) == 0 or len(ages) == 0 or len(weights) == 0:
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
-    if len(redshifts) == 1:
-        error = float(redshift_errors[0]) if len(redshift_errors) > 0 else default_error
-        return float(redshifts[0]), error, 0.0
+    if not (len(redshifts) == len(ages) == len(weights)):
+        logger.error("Mismatched input lengths for joint estimation")
+        return np.nan, np.nan, np.nan, np.nan, np.nan
     
-    # Handle missing or invalid errors
-    if len(redshift_errors) != len(redshifts):
-        logger.warning(f"Redshift errors length ({len(redshift_errors)}) != redshifts length ({len(redshifts)}). Using default errors.")
-        redshift_errors = np.full(len(redshifts), default_error)
-    
-    # Ensure minimum error to prevent division by zero
-    redshift_errors = np.maximum(redshift_errors, min_error)
-    
-    # Remove any invalid data
-    valid_mask = np.isfinite(redshifts) & np.isfinite(redshift_errors) & (redshift_errors > 0)
+    # Remove invalid data points
+    valid_mask = (np.isfinite(redshifts) & np.isfinite(ages) & 
+                  np.isfinite(weights) & (weights > 0))
     
     if not np.any(valid_mask):
-        logger.warning("No valid redshift/error pairs found")
-        return np.nan, np.nan, np.nan
+        logger.warning("No valid (redshift, age, weight) triplets found")
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
-    valid_redshifts = redshifts[valid_mask]
-    valid_errors = redshift_errors[valid_mask]
-    N = len(valid_redshifts)
+    valid_z = redshifts[valid_mask]
+    valid_t = ages[valid_mask]
+    valid_w = weights[valid_mask]
+    N = len(valid_z)
     
     if N == 1:
-        return float(valid_redshifts[0]), float(valid_errors[0]), 0.0
+        return float(valid_z[0]), float(valid_t[0]), 0.0, 0.0, 0.0
     
-    # Method 1: Pure inverse variance weighting (baseline)
-    weights_iv = 1.0 / (valid_errors ** 2)
-    z_iv = np.sum(weights_iv * valid_redshifts) / np.sum(weights_iv)
-    sigma_iv = 1.0 / np.sqrt(np.sum(weights_iv))
+    # Calculate weighted means (centroids)
+    sum_w = np.sum(valid_w)
+    z_mean = np.sum(valid_w * valid_z) / sum_w
+    t_mean = np.sum(valid_w * valid_t) / sum_w
     
-    if not include_cluster_scatter:
-        return float(z_iv), float(sigma_iv), 0.0
+    # Calculate effective sample size (handles clustering effects)
+    sum_w_sq = np.sum(valid_w ** 2)
+    N_eff = (sum_w ** 2) / sum_w_sq
     
-    # Method 2: Hybrid method with cluster scatter
+    # Calculate weighted covariance matrix elements
+    z_dev = valid_z - z_mean
+    t_dev = valid_t - t_mean
     
-    # Step 1: Preliminary unweighted mean for scatter estimation
-    z_tilde = np.mean(valid_redshifts)
+    # Weighted variances and covariance (population estimates)
+    var_z_pop = np.sum(valid_w * z_dev ** 2) / sum_w
+    var_t_pop = np.sum(valid_w * t_dev ** 2) / sum_w  
+    cov_zt_pop = np.sum(valid_w * z_dev * t_dev) / sum_w
     
-    # Step 2: Sample variance of the cluster  
-    S_squared = np.var(valid_redshifts, ddof=1) if N > 1 else 0.0
+    # Apply bias correction for finite sample size to get sample estimates
+    if N_eff > 1:
+        bias_correction = N_eff / (N_eff - 1)
+        var_z_sample = var_z_pop * bias_correction
+        var_t_sample = var_t_pop * bias_correction  
+        cov_zt_sample = cov_zt_pop * bias_correction
+    else:
+        var_z_sample = var_z_pop
+        var_t_sample = var_t_pop
+        cov_zt_sample = cov_zt_pop
     
-    # Step 3: Mean individual variance
-    sigma_bar_squared = np.mean(valid_errors ** 2)
+    # Standard errors of the weighted means (uncertainty in the means themselves)
+    se_z = np.sqrt(var_z_sample / N_eff) if N_eff > 0 else np.inf
+    se_t = np.sqrt(var_t_sample / N_eff) if N_eff > 0 else np.inf
     
-    # Step 4: Excess (between-template) variance
-    tau_squared = max(0.0, S_squared - sigma_bar_squared)
+    # Covariance of the means
+    cov_means = cov_zt_sample / N_eff if N_eff > 0 else 0.0
     
-    # Step 5: Total variance and new weights
-    total_variances = valid_errors ** 2 + tau_squared
-    weights_hybrid = 1.0 / total_variances
+    logger.info(f"Joint weighted estimates: "
+                f"z={z_mean:.6f}±{se_z:.6f}, age={t_mean:.1f}±{se_t:.1f} days, "
+                f"cov(z,t)={cov_means:.8f}, N_eff={N_eff:.1f}")
     
-    # Step 6: Final combined redshift and uncertainty
-    z_final = np.sum(weights_hybrid * valid_redshifts) / np.sum(weights_hybrid)
-    sigma_final = 1.0 / np.sqrt(np.sum(weights_hybrid))
-    
-    logger.info(f"Enhanced redshift estimate: pure IV: {z_iv:.6f}±{sigma_iv:.6f}, "
-                f"hybrid: {z_final:.6f}±{sigma_final:.6f}, τ={np.sqrt(tau_squared):.6f}")
-    
-    return float(z_final), float(sigma_final), float(np.sqrt(tau_squared))
+    result = (float(z_mean), float(t_mean), float(se_z), float(se_t), float(cov_means))
+    return result
 
 
-def calculate_metric_weighted_age(
-    ages: Union[np.ndarray, List[float]], 
-    metric_weights: Union[np.ndarray, List[float]],
-    include_cluster_scatter: bool = True
-) -> Tuple[float, float, float, float]:
+def calculate_weighted_redshift(
+    redshifts: Union[np.ndarray, List[float]], 
+    weights: Union[np.ndarray, List[float]]
+) -> Tuple[float, float]:
     """
-    Calculate metric-weighted age estimate with optional cluster scatter modeling.
+    Calculate weighted redshift estimate.
     
-    This function uses the best available metric (RLAP-cos if available, otherwise RLAP)
-    for weighting age estimates. This implements statistical age estimation methods:
-    1. Metric-weighted mean age with effective sample size uncertainty
-    2. Hybrid error that incorporates cluster scatter in quadrature
+    Parameters
+    ----------
+    redshifts : array-like
+        Redshift values from templates
+    weights : array-like
+        RLAP-Cos quality weights for each template
+        
+    Returns
+    -------
+    Tuple[float, float]
+        (weighted_redshift, redshift_uncertainty)
+    """
+    redshifts = np.asarray(redshifts, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    
+    if len(redshifts) == 0 or len(weights) == 0:
+        return np.nan, np.nan
+        
+    if len(redshifts) != len(weights):
+        logger.error("Mismatched input lengths for redshift estimation")
+        return np.nan, np.nan
+    
+    # Remove invalid data points  
+    # Weights should be > 0 (RLAP, cosine similarity, or RLAP-cos are all positive metrics)
+    valid_mask = (np.isfinite(redshifts) & np.isfinite(weights) & (weights > 0))
+    
+    if not np.any(valid_mask):
+        logger.warning("No valid (redshift, weight) pairs found")
+        return np.nan, np.nan
+        
+    valid_z = redshifts[valid_mask]
+    valid_w = weights[valid_mask]
+    N = len(valid_z)
+    
+    if N == 1:
+        return float(valid_z[0]), 0.0
+    
+    # Calculate weighted mean
+    sum_w = np.sum(valid_w)
+    z_mean = np.sum(valid_w * valid_z) / sum_w
+    
+    # Calculate effective sample size and uncertainty
+    sum_w_sq = np.sum(valid_w ** 2)
+    N_eff = (sum_w ** 2) / sum_w_sq
+    
+    # Weighted variance with bias correction
+    z_dev = valid_z - z_mean
+    var_z = np.sum(valid_w * z_dev ** 2) / sum_w
+    
+    if N_eff > 1:
+        bias_correction = N_eff / (N_eff - 1)
+        var_z *= bias_correction
+    
+    # Standard error of the weighted mean
+    se_z = np.sqrt(var_z / N_eff) if N_eff > 0 else np.inf
+    
+    logger.info(f"Weighted redshift: {z_mean:.6f}±{se_z:.6f}, N_eff={N_eff:.1f}")
+    
+    return float(z_mean), float(se_z)
+
+
+def calculate_weighted_age(
+    ages: Union[np.ndarray, List[float]], 
+    weights: Union[np.ndarray, List[float]]
+) -> Tuple[float, float]:
+    """
+    Calculate weighted age estimate.
     
     Parameters
     ----------
     ages : array-like
-        Age values in days (already filtered for valid ages)
-    metric_weights : array-like
-        Metric values (RLAP-cos or RLAP) to use as weights
-    include_cluster_scatter : bool, default=True
-        Whether to include cluster scatter term
+        Age values in days
+    weights : array-like
+        RLAP-Cos quality weights for each template
         
     Returns
     -------
-    Tuple[float, float, float, float]
-        (final_age, metric_only_error, total_error_with_scatter, cluster_scatter)
-        
-    Notes
-    -----
-    Statistical Methods:
-    - Metric-weighted mean with effective sample size uncertainty
-    - Cluster scatter added in quadrature for total error
+    Tuple[float, float]
+        (weighted_age, age_uncertainty)
     """
     ages = np.asarray(ages, dtype=float)
-    metric_weights = np.asarray(metric_weights, dtype=float)
-    
-    if len(ages) == 0:
-        return np.nan, np.nan, np.nan, np.nan
-        
-    if len(ages) == 1:
-        return float(ages[0]), 0.0, 0.0, 0.0
-    
-    # Remove invalid data
-    valid_mask = np.isfinite(ages) & np.isfinite(metric_weights) & (metric_weights > 0)
-    
-    if not np.any(valid_mask):
-        logger.warning("No valid age/metric pairs found")
-        return np.nan, np.nan, np.nan, np.nan
-        
-    valid_ages = ages[valid_mask]
-    valid_weights = metric_weights[valid_mask]
-    N = len(valid_ages)
-    
-    if N == 1:
-        return float(valid_ages[0]), 0.0, 0.0, 0.0
-    
-    # Method 1: Metric-weighted mean age
-    w_i = valid_weights  # Metric weights (RLAP-cos or RLAP)
-    t_bar_metric = np.sum(w_i * valid_ages) / np.sum(w_i)
-    
-    # Metric-weighted uncertainty
-    N_eff = (np.sum(w_i) ** 2) / np.sum(w_i ** 2)  # Effective number of templates
-    
-    # Weighted variance
-    weighted_variance = np.sum(w_i * (valid_ages - t_bar_metric) ** 2) / np.sum(w_i)
-    
-    # Statistical uncertainty (metric-only)
-    sigma_metric = np.sqrt(weighted_variance / N_eff)
-    
-    if not include_cluster_scatter:
-        return float(t_bar_metric), float(sigma_metric), float(sigma_metric), 0.0
-    
-    # Method 2: Hybrid error with cluster scatter
-    
-    # Cluster scatter in age space
-    s_tc_squared = weighted_variance  # This is the metric-weighted scatter
-    s_tc = np.sqrt(s_tc_squared)
-    
-    # Total error combining statistical and systematic components
-    sigma_total = np.sqrt(sigma_metric ** 2 + s_tc_squared)
-    
-    logger.info(f"Enhanced age estimate: {t_bar_metric:.1f} days, "
-                f"metric-only error: ±{sigma_metric:.1f}, "
-                f"total error: ±{sigma_total:.1f}, cluster scatter: {s_tc:.1f}")
-    
-    return float(t_bar_metric), float(sigma_metric), float(sigma_total), float(s_tc)
-
-
-# Keep the old function name for backward compatibility
-def calculate_rlap_weighted_age(
-    ages: Union[np.ndarray, List[float]], 
-    rlaps: Union[np.ndarray, List[float]],
-    include_cluster_scatter: bool = True
-) -> Tuple[float, float, float, float]:
-    """
-    DEPRECATED: Use calculate_metric_weighted_age instead.
-    
-    This function is kept for backward compatibility but now internally
-    uses the new calculate_metric_weighted_age function.
-    """
-    return calculate_metric_weighted_age(ages, rlaps, include_cluster_scatter)
-
-
-def calculate_inverse_variance_weighted_redshift(
-    redshifts: Union[np.ndarray, List[float]], 
-    redshift_errors: Union[np.ndarray, List[float]],
-    min_error: float = 1e-6,
-    default_error: float = 0.01
-) -> Tuple[float, float]:
-    """
-    LEGACY: Calculate inverse variance weighted redshift using only redshift uncertainties.
-    
-    This is maintained for backwards compatibility. New code should use
-    calculate_hybrid_weighted_redshift() for better statistical accuracy.
-    """
-    result = calculate_hybrid_weighted_redshift(
-        redshifts, redshift_errors, include_cluster_scatter=False, 
-        min_error=min_error, default_error=default_error
-    )
-    return result[0], result[1]  # Return only redshift and uncertainty
-
-
-def calculate_weighted_redshift_with_uncertainty(
-    redshifts: Union[np.ndarray, List[float]], 
-    weights: Union[np.ndarray, List[float]],
-    redshift_errors: Optional[Union[np.ndarray, List[float]]] = None
-) -> Tuple[float, float]:
-    """
-    DEPRECATED: This function is obsolete. Use calculate_hybrid_weighted_redshift() instead.
-    
-    This legacy function is maintained only for backwards compatibility.
-    All new code should use the enhanced methods that implement improved
-    statistical recommendations.
-    """
-    logger.warning("Using deprecated function. Switch to calculate_hybrid_weighted_redshift()")
-    
-    if redshift_errors is not None:
-        result = calculate_hybrid_weighted_redshift(redshifts, redshift_errors, include_cluster_scatter=False)
-        return result[0], result[1]
-    
-    # Legacy RLAP-only fallback 
-    redshifts = np.asarray(redshifts, dtype=float)
     weights = np.asarray(weights, dtype=float)
     
-    if len(redshifts) == 0:
+    if len(ages) == 0 or len(weights) == 0:
         return np.nan, np.nan
         
-    valid_mask = np.isfinite(redshifts) & np.isfinite(weights) & (weights > 0)
+    if len(ages) != len(weights):
+        logger.error("Mismatched input lengths for age estimation")
+        return np.nan, np.nan
+    
+    # Remove invalid data points
+    # Note: Ages can be negative (before peak), so no age > 0 filter
+    # Weights should be > 0 (RLAP, cosine similarity, or RLAP-cos are all positive metrics)
+    valid_mask = (np.isfinite(ages) & np.isfinite(weights) & (weights > 0))
+    
     if not np.any(valid_mask):
+        # Count different types of invalid data for better diagnostics
+        invalid_ages = np.sum(~np.isfinite(ages))  # Only non-finite ages are invalid
+        invalid_weights = np.sum(~np.isfinite(weights) | (weights <= 0))  # Non-finite or non-positive weights
+        total_pairs = len(ages)
+        
+        logger.warning(
+            f"No valid (age, weight) pairs found from {total_pairs} templates. "
+            f"Invalid ages: {invalid_ages} (non-finite), invalid weights: {invalid_weights} (≤0 or non-finite). "
+            f"Note: Negative ages are valid (pre-peak). This typically means templates have low quality scores."
+        )
         return np.nan, np.nan
         
-    valid_redshifts = redshifts[valid_mask]
-    valid_weights = weights[valid_mask]
+    valid_t = ages[valid_mask]
+    valid_w = weights[valid_mask]
+    N = len(valid_t)
     
-    if len(valid_redshifts) <= 1:
-        return float(valid_redshifts[0]) if len(valid_redshifts) == 1 else np.nan, 0.0
+    if N == 1:
+        return float(valid_t[0]), 0.0
     
-    # Simple weighted calculation for legacy compatibility
-    normalized_weights = valid_weights / np.sum(valid_weights)
-    weighted_mean = np.sum(normalized_weights * valid_redshifts)
-    weighted_variance = np.sum(normalized_weights * (valid_redshifts - weighted_mean)**2)
-    N_eff = (np.sum(valid_weights))**2 / np.sum(valid_weights**2)
-    weighted_uncertainty = np.sqrt(weighted_variance / N_eff)
+    # Calculate weighted mean
+    sum_w = np.sum(valid_w)
+    t_mean = np.sum(valid_w * valid_t) / sum_w
     
-    return float(weighted_mean), float(weighted_uncertainty)
+    # Calculate effective sample size and uncertainty
+    sum_w_sq = np.sum(valid_w ** 2)
+    N_eff = (sum_w ** 2) / sum_w_sq
+    
+    # Weighted variance with bias correction
+    t_dev = valid_t - t_mean
+    var_t = np.sum(valid_w * t_dev ** 2) / sum_w
+    
+    if N_eff > 1:
+        bias_correction = N_eff / (N_eff - 1)
+        var_t *= bias_correction
+    
+    # Standard error of the weighted mean
+    se_t = np.sqrt(var_t / N_eff) if N_eff > 0 else np.inf
+    
+    logger.info(f"Weighted age: {t_mean:.1f}±{se_t:.1f} days, N_eff={N_eff:.1f}")
+    
+    return float(t_mean), float(se_t)
 
 
 def calculate_weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
@@ -344,8 +319,89 @@ def calculate_weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
             return float(sorted_values[idx-1] + alpha * (sorted_values[idx] - sorted_values[idx-1]))
 
 
+def validate_joint_result(
+    redshifts: np.ndarray,
+    ages: np.ndarray, 
+    weights: np.ndarray,
+    result: Tuple[float, float, float, float, float]
+) -> bool:
+    """
+    Validate a joint weighted calculation result.
+    
+    Parameters
+    ----------
+    redshifts : np.ndarray
+        Input redshift values
+    ages : np.ndarray
+        Input age values
+    weights : np.ndarray
+        Input weights
+    result : Tuple[float, float, float, float, float]
+        (z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance)
+        
+    Returns
+    -------
+    bool
+        True if result is valid, False otherwise
+    """
+    z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance = result
+    
+    # Check for finite values
+    if not all(np.isfinite([z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance])):
+        # Allow NaN if inputs are empty
+        if len(redshifts) == 0 or len(ages) == 0:
+            return all(np.isnan([z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance]))
+        return False
+    
+    # Empty input case
+    if len(redshifts) == 0 or len(ages) == 0:
+        return all(np.isnan([z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance]))
+    
+    # Check if means are within input bounds
+    min_z, max_z = np.min(redshifts), np.max(redshifts)
+    min_t, max_t = np.min(ages), np.max(ages)
+    
+    if not (min_z <= z_mean <= max_z):
+        return False
+    if not (min_t <= t_mean <= max_t):
+        return False
+        
+    # Check if uncertainties are positive and reasonable
+    z_range = max_z - min_z if len(redshifts) > 1 else 1.0
+    t_range = max_t - min_t if len(ages) > 1 else 1.0
+    
+    if z_uncertainty < 0 or z_uncertainty > z_range:
+        return False
+    if t_uncertainty < 0 or t_uncertainty > t_range:
+        return False
+    
+    # Check for single-template case (uncertainties should be 0)
+    if len(redshifts) == 1 or len(ages) == 1:
+        return z_uncertainty == 0.0 and t_uncertainty == 0.0 and zt_covariance == 0.0
+        
+    # Check correlation coefficient constraint: |ρ| ≤ 1
+    if z_uncertainty > 0 and t_uncertainty > 0:
+        correlation = zt_covariance / (z_uncertainty * t_uncertainty)
+        if abs(correlation) > 1.0 + 1e-10:  # Allow small numerical errors
+            logger.debug(f"Invalid correlation coefficient: ρ={correlation:.3f}")
+            return False
+        
+    # Check covariance matrix positive semidefinite constraint
+    z_var = z_uncertainty**2
+    t_var = t_uncertainty**2
+    determinant = z_var * t_var - zt_covariance**2
+    
+    # Allow small numerical errors (relative to the matrix scale)
+    tolerance = 1e-10 * max(z_var * t_var, 1e-20)
+    if determinant < -tolerance:
+        logger.debug(f"Covariance matrix not positive semidefinite")
+        return False
+        
+    return True
+
+
 def validate_weighted_calculation(
-    redshifts: np.ndarray, 
+    values: np.ndarray, 
     weights: np.ndarray, 
     result: Tuple[float, float]
 ) -> bool:
@@ -355,28 +411,27 @@ def validate_weighted_calculation(
     if not np.isfinite(weighted_mean) or not np.isfinite(uncertainty):
         return False
         
-    if len(redshifts) == 0:
+    if len(values) == 0:
         return np.isnan(weighted_mean) and np.isnan(uncertainty)
         
     # Check if result is within reasonable bounds
-    min_z, max_z = np.min(redshifts), np.max(redshifts)
-    if not (min_z <= weighted_mean <= max_z):
+    min_val, max_val = np.min(values), np.max(values)
+    if not (min_val <= weighted_mean <= max_val):
         return False
         
     # Check if uncertainty is positive and reasonable
-    if uncertainty < 0 or uncertainty > (max_z - min_z):
+    if uncertainty < 0 or uncertainty > (max_val - min_val):
         return False
         
     return True
 
 
-# Backwards compatibility exports
+# Exports
 __all__ = [
-    'calculate_hybrid_weighted_redshift',
-    'calculate_metric_weighted_age',
-    'calculate_rlap_weighted_age',
-    'calculate_inverse_variance_weighted_redshift',
-    'calculate_weighted_redshift_with_uncertainty',
+    'calculate_joint_weighted_estimates',
+    'calculate_weighted_redshift', 
+    'calculate_weighted_age',
     'calculate_weighted_median',
+    'validate_joint_result',
     'validate_weighted_calculation'
-] 
+]

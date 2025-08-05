@@ -31,7 +31,62 @@ class EnhancedButtonManager(QtCore.QObject):
     
     This class adds smooth hover and click animations to workflow buttons
     while preserving all existing functionality and styling systems.
+    Uses predefined colors for optimal performance.
     """
+    
+    # Predefined color states for all button types (faster than runtime calculations)
+    BUTTON_COLOR_STATES = {
+        'load': {
+            'base': '#6E6E6E',
+            'hover': '#656565', 
+            'pressed': '#585858'
+        },
+        'preprocessing': {
+            'base': '#FFA600',
+            'hover': '#E89500',
+            'pressed': '#CC8400'
+        },
+        'redshift': {
+            'base': '#FF6361',
+            'hover': '#E85A58',
+            'pressed': '#CC514F'
+        },
+        'analysis': {
+            'base': '#BC5090',
+            'hover': '#A84981',
+            'pressed': '#944272'
+        },
+        'advanced': {
+            'base': '#58508D',
+            'hover': '#4F477E',
+            'pressed': '#463E6F'
+        },
+        'ai': {
+            'base': '#003F5C',
+            'hover': '#003A54',
+            'pressed': '#00344B'
+        },
+        'settings': {
+            'base': '#7A8585',
+            'hover': '#6E7777',
+            'pressed': '#626969'
+        },
+        'reset': {
+            'base': '#A65965',
+            'hover': '#95515C',
+            'pressed': '#844953'
+        },
+        'info': {
+            'base': '#3b82f6',
+            'hover': '#2563eb',
+            'pressed': '#1d4ed8'
+        },
+        'neutral': {
+            'base': '#9ca3af',
+            'hover': '#6b7280',
+            'pressed': '#4b5563'
+        }
+    }
     
     def __init__(self, theme_manager):
         """Initialize the enhanced button manager"""
@@ -156,9 +211,10 @@ class EnhancedButtonManager(QtCore.QObject):
         if not base_color:
             return
         
-        # Subtle hover effect that keeps button shape consistent
-        hover_color_1 = self._lighten_color(base_color, 0.08)  # Subtle lightening
-        hover_color_2 = base_color  # Original bottom
+        # Get predefined hover color for optimal performance (no runtime calculations)
+        color_states = self.BUTTON_COLOR_STATES.get(color_type, self.BUTTON_COLOR_STATES['neutral'])
+        hover_color_1 = color_states['hover']  # Predefined hover color
+        hover_color_2 = base_color  # Original bottom for gradient
         
         object_name = button.objectName()
         
@@ -313,8 +369,10 @@ class EnhancedButtonManager(QtCore.QObject):
         # We'll rely on color changes only for visual feedback
         
         # Enhanced pressed styling - keep same shape but change colors only
-        pressed_color_1 = self._darken_color(base_color, 0.15)  # Moderately darker
-        pressed_color_2 = self._darken_color(base_color, 0.05)  # Slightly darker gradient
+        # Use predefined pressed colors for optimal performance and consistency
+        color_states = self.BUTTON_COLOR_STATES.get(color_type, self.BUTTON_COLOR_STATES['neutral'])
+        pressed_color_1 = color_states['pressed']  # Predefined pressed color
+        pressed_color_2 = color_states['hover']    # Slightly lighter gradient bottom
         
         # Determine button size based on object name
         if self._is_small_button(object_name):
@@ -371,46 +429,11 @@ class EnhancedButtonManager(QtCore.QObject):
         self._animate_hover_enter(button)
     
     def _get_color_for_type(self, color_type: str) -> Optional[str]:
-        """Get color from theme manager for button type"""
-        color_map = {
-            'load': 'btn_load',
-            'preprocessing': 'btn_preprocessing', 
-            'redshift': 'btn_redshift',
-            'analysis': 'btn_analysis',
-            'advanced': 'btn_advanced',
-            'ai': 'btn_ai',
-            'settings': 'btn_settings',
-            'reset': 'btn_reset',
-            'info': 'btn_info',
-            'neutral': 'btn_neutral',
-        }
-        
-        theme_key = color_map.get(color_type)
-        if theme_key:
-            return self.theme_manager.get_color(theme_key)
-        return None
+        """Get base color for button type using predefined colors"""
+        color_states = self.BUTTON_COLOR_STATES.get(color_type, self.BUTTON_COLOR_STATES['neutral'])
+        return color_states['base']
     
-    def _lighten_color(self, hex_color: str, factor: float) -> str:
-        """Lighten a hex color by a factor (0-1)"""
-        try:
-            color = QtGui.QColor(hex_color)
-            h, s, l, a = color.getHsl()
-            l = min(255, int(l + (255 - l) * factor))
-            color.setHsl(h, s, l, a)
-            return color.name()
-        except:
-            return hex_color
-    
-    def _darken_color(self, hex_color: str, factor: float) -> str:
-        """Darken a hex color by a factor (0-1)"""
-        try:
-            color = QtGui.QColor(hex_color)
-            h, s, l, a = color.getHsl()
-            l = max(0, int(l * (1 - factor)))
-            color.setHsl(h, s, l, a)
-            return color.name()
-        except:
-            return hex_color
+    # Color calculation methods removed - now using predefined colors for better performance
     
     def set_workflow_manager_reference(self, workflow_manager):
         """Set reference to workflow manager for proper style restoration"""

@@ -48,7 +48,7 @@ class ThemePlotManager:
         return {
             'light': {
                 'plot_bg': '#ffffff',
-                'plot_text': '#1e293b',
+                'plot_text': '#000000',
                 'plot_grid': '#cbd5e1',
                 'plot_line': '#1f77b4',
                 'plot_accent': '#667eea',
@@ -114,7 +114,7 @@ class ThemePlotManager:
             
             # Grid styling
             'grid.color': colors['plot_grid'],
-            'grid.alpha': 0.3,
+            'grid.alpha': 0.08,
             'grid.linestyle': '-',
             'grid.linewidth': 0.5,
             'axes.axisbelow': True,

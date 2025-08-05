@@ -245,34 +245,14 @@ class EmissionDialogUIBuilder:
         layout.addWidget(history_group)
     
     def create_info_section(self, layout):
-        """Create a simple info button section"""
+        """Create a simple info section with basic guidance"""
         info_layout = QtWidgets.QHBoxLayout()
         
-        # Info label
-        info_label = QtWidgets.QLabel("ℹ️ Need help?")
-        info_label.setStyleSheet("font-weight: bold; color: #2563eb; font-size: 11px;")
+        # Info label with basic guidance text
+        info_label = QtWidgets.QLabel("ℹ️ Set redshift, choose SN/Galaxy mode, use presets or double-click spectrum")
+        info_label.setStyleSheet("font-weight: normal; color: #2563eb; font-size: 10px;")
+        info_label.setWordWrap(True)
         info_layout.addWidget(info_label)
-        
-        # Help button
-        help_btn = QtWidgets.QPushButton("Show Instructions")
-        help_btn.setFixedSize(120, 30)
-        help_btn.setToolTip("Show mouse interaction shortcuts and controls")
-        help_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #3b82f6;
-                border: 1px solid #2563eb;
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 10px;
-                color: white;
-                padding: 5px 10px;
-            }
-            QPushButton:hover {
-                background-color: #2563eb;
-            }
-        """)
-        help_btn.clicked.connect(self.dialog._show_interaction_help)
-        info_layout.addWidget(help_btn)
         
         info_layout.addStretch()
         layout.addLayout(info_layout)
@@ -376,9 +356,24 @@ class EmissionDialogUIBuilder:
         """Create control buttons"""
         controls_layout = QtWidgets.QHBoxLayout()
         
-        clear_btn = QtWidgets.QPushButton("Clear Lines")
-        clear_btn.clicked.connect(self.dialog._clear_all_lines)
-        controls_layout.addWidget(clear_btn)
+        # Help button (replaces Clear Lines which is already available as "Clear All" at top right)
+        help_btn = QtWidgets.QPushButton("Help")
+        help_btn.setToolTip("Show mouse interaction shortcuts and controls")
+        help_btn.clicked.connect(self.dialog._show_interaction_help)
+        help_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3b82f6;
+                color: white;
+                border: 2px solid #2563eb;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2563eb;
+            }
+        """)
+        controls_layout.addWidget(help_btn)
         
         step2_btn = QtWidgets.QPushButton("→ Step 2: Analysis")
         step2_btn.clicked.connect(self.dialog._proceed_to_step_2)

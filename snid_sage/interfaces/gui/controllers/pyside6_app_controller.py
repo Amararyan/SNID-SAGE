@@ -246,7 +246,7 @@ class PySide6AppController(QtCore.QObject):
                     flux_data = self.processed_spectrum['log_flux']
                     _LOGGER.debug(f"Fallback to log_flux for flux view")
             
-            # CRITICAL: Apply zero padding filtering like the old GUI
+            # Apply zero padding filtering
             try:
                 filtered_wave, filtered_flux = self._apply_zero_padding_filter(log_wave, flux_data, self.processed_spectrum)
                 return filtered_wave, filtered_flux
@@ -395,7 +395,7 @@ class PySide6AppController(QtCore.QObject):
                 if self.main_window and (not hasattr(self.main_window, 'progress_dialog') or not self.main_window.progress_dialog):
                     self.main_window.progress_dialog = show_analysis_progress_dialog(
                         self.main_window, 
-                        "SNID Analysis Progress"
+                        "SNID-SAGE Analysis Progress"
                     )
                     self.main_window.progress_dialog.add_progress_line("Initializing SNID analysis...", "info")
                     _LOGGER.info("Progress dialog created for analysis")
@@ -455,8 +455,7 @@ class PySide6AppController(QtCore.QObject):
         try:
             self.analysis_running = True
             
-            # Note: Removed matplotlib backend forcing to prevent OpenGL context issues in PySide6
-            # The analysis runs purely with PyQtGraph for all plotting needs
+            # Use PyQtGraph for all plotting needs to prevent OpenGL context issues
             
             # Create progress callback function that safely updates GUI from thread
             def progress_callback(message: str, progress: float = None):
@@ -495,7 +494,7 @@ class PySide6AppController(QtCore.QObject):
             # Get templates directory from configuration
             progress_callback("Loading configuration and templates...", 20)
             try:
-                # Force garbage collection before template loading to clean up any widget remnants
+                # Force garbage collection before template loading
                 import gc
                 gc.collect()
                 
@@ -508,7 +507,7 @@ class PySide6AppController(QtCore.QObject):
                 if not os.path.exists(templates_dir):
                     raise ValueError(f"Templates directory not found: {templates_dir}")
                 
-                # Additional defensive check: ensure template directory is accessible
+                # Ensure template directory is accessible
                 try:
                     test_files = os.listdir(templates_dir)
                     if not any(f.endswith('.hdf5') for f in test_files):
@@ -749,6 +748,9 @@ class PySide6AppController(QtCore.QObject):
     # Reset operations
     def reset_to_initial_state(self):
         """Reset application to initial state - comprehensive reset including persistent settings"""
+        # Stop any blinking effects first (prevents UI conflicts during reset)
+        self._stop_blinking_effects()
+        
         # Clear data
         self.current_file_path = None
         self.original_wave = None
@@ -791,6 +793,31 @@ class PySide6AppController(QtCore.QObject):
         self.update_workflow_state(WorkflowState.INITIAL)
         
         _LOGGER.info("Application reset to initial state - all persistent settings and states cleared")
+    
+    def _stop_blinking_effects(self):
+        """Stop any blinking effects that might be active"""
+        try:
+            # Stop cluster summary blinking via main window
+            main_window = getattr(self, 'main_window', None)
+            if main_window and hasattr(main_window, 'stop_cluster_summary_blinking'):
+                main_window.stop_cluster_summary_blinking()
+                _LOGGER.debug("Stopped cluster summary blinking effect via app controller")
+            
+            # Reset cluster summary state variables if accessible
+            if main_window:
+                if hasattr(main_window, 'cluster_summary_blinking'):
+                    main_window.cluster_summary_blinking = False
+                if hasattr(main_window, 'cluster_summary_clicked_once'):
+                    main_window.cluster_summary_clicked_once = False
+                if hasattr(main_window, 'cluster_summary_blink_timer'):
+                    if main_window.cluster_summary_blink_timer:
+                        main_window.cluster_summary_blink_timer.stop()
+                        main_window.cluster_summary_blink_timer = None
+                if hasattr(main_window, 'cluster_summary_original_style'):
+                    main_window.cluster_summary_original_style = None
+                    
+        except Exception as e:
+            _LOGGER.warning(f"Warning stopping blinking effects from app controller: {e}")
     
     # Clustering and cluster selection methods
     def _is_clustering_available(self, result):

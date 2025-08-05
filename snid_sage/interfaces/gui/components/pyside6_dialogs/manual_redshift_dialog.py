@@ -17,21 +17,35 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Any
 import math
 
+# Enhanced button management
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import (
+        enhance_dialog_with_preset, setup_sensitivity_toggle_button
+    )
+    ENHANCED_BUTTONS_AVAILABLE = True
+except ImportError:
+    ENHANCED_BUTTONS_AVAILABLE = False
+
 # PyQtGraph for plotting
 try:
     import pyqtgraph as pg
     PYQTGRAPH_AVAILABLE = True
+    # Import enhanced plot widget
+    from snid_sage.interfaces.gui.components.plots.enhanced_plot_widget import EnhancedPlotWidget
     # Set PyQtGraph to use PySide6
     # Configure PyQtGraph for complete software rendering (WSL compatibility)
     pg.setConfigOptions(
         useOpenGL=False,         # Disable OpenGL completely
         antialias=True,          # Keep antialiasing for quality
         enableExperimental=False, # Disable experimental features
+        background='w',          # White background
+        foreground='k',          # Black foreground for text
         crashWarning=False       # Reduce warnings
     )
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
+    EnhancedPlotWidget = None
 
 # Import logging
 try:
@@ -161,9 +175,9 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create PyQtGraph plot widget
+        # Create enhanced PyQtGraph plot widget with save functionality
         # Note: Global PyQtGraph configuration is already set at module level
-        self.plot_widget = pg.PlotWidget()
+        self.plot_widget = EnhancedPlotWidget()
         
         self.plot_widget.setBackground('w')
         self.plot_widget.setLabel('left', 'Flux')
@@ -427,6 +441,9 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         self._setup_dialog()
         self._create_interface()
         
+        # Enhanced button styling and animations
+        self._setup_enhanced_buttons()
+        
         # Initial plot
         if self.spectrum_data:
             self._update_plots()
@@ -595,19 +612,10 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         
         group_layout.addLayout(input_layout)
         
-        # Precision mode toggle
+        # Precision mode toggle - styling will be handled by enhanced button system
         self.precision_button = QtWidgets.QPushButton("Sensitivity: Normal")
-        self.precision_button.clicked.connect(self._toggle_precision_mode)
-        self.precision_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['btn_load']};
-                color: white;
-                font-weight: bold;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 9pt;
-            }}
-        """)
+        self.precision_button.setObjectName("precision_button")
+        # Note: click handler will be overridden by enhanced button system
         group_layout.addWidget(self.precision_button)
         
         layout.addWidget(group)
@@ -623,17 +631,9 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         group_layout.addWidget(desc)
         
         auto_btn = QtWidgets.QPushButton("Auto Search")
+        auto_btn.setObjectName("auto_btn")
         auto_btn.clicked.connect(self._perform_auto_search)
-        auto_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['btn_danger']};
-                color: white;
-                font-weight: bold;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 9pt;
-            }}
-        """)
+        # Styling will be handled by enhanced button system
         group_layout.addWidget(auto_btn)
         
         layout.addWidget(group)
@@ -642,39 +642,18 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         """Create dialog control buttons"""
         button_layout = QtWidgets.QHBoxLayout()
         
-        # Help button
+        # Help button - styling will be handled by enhanced button system
         help_btn = QtWidgets.QPushButton("Help")
+        help_btn.setObjectName("help_btn")
         help_btn.clicked.connect(self._show_help)
-        help_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['btn_primary']};
-                color: white;
-                font-weight: bold;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 9pt;
-            }}
-            QPushButton:hover {{
-                background-color: #2563eb;
-            }}
-        """)
         button_layout.addWidget(help_btn)
         
         button_layout.addStretch()
         
-        # Accept button
+        # Accept button - styling will be handled by enhanced button system
         accept_btn = QtWidgets.QPushButton("Accept Redshift")
+        accept_btn.setObjectName("accept_btn")
         accept_btn.clicked.connect(self._accept_redshift)
-        accept_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['btn_success']};
-                color: white;
-                font-weight: bold;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 9pt;
-            }}
-        """)
         button_layout.addWidget(accept_btn)
         
         layout.addLayout(button_layout)
@@ -1302,6 +1281,50 @@ How to use this tool:
     def get_result(self):
         """Get the determined redshift"""
         return self.result
+    
+    def _setup_enhanced_buttons(self):
+        """Setup enhanced button styling and animations"""
+        if not ENHANCED_BUTTONS_AVAILABLE:
+            _LOGGER.info("Enhanced buttons not available, using standard styling")
+            return
+        
+        try:
+            # Use the manual redshift dialog preset
+            self.button_manager = enhance_dialog_with_preset(
+                self, 'manual_redshift_dialog'
+            )
+            
+            # Setup the special sensitivity toggle button
+            if hasattr(self, 'precision_button'):
+                setup_sensitivity_toggle_button(
+                    self.button_manager,
+                    self.precision_button,
+                    self._toggle_precision_mode_enhanced,
+                    initial_state=self.precision_mode
+                )
+            
+            _LOGGER.info("Enhanced buttons successfully applied to manual redshift dialog")
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to setup enhanced buttons: {e}")
+    
+    def _toggle_precision_mode_enhanced(self, new_state: bool):
+        """Enhanced precision mode toggle with proper state management"""
+        self.precision_mode = new_state
+        
+        # Update both plots
+        if self.main_plot:
+            self.main_plot.set_precision_mode(self.precision_mode)
+        if self.zoom_plot:
+            self.zoom_plot.set_precision_mode(self.precision_mode)
+        
+        # Update spin box step size
+        if self.precision_mode:
+            self.redshift_input.setSingleStep(0.001)  # Precision step
+            _LOGGER.info("Precision mode activated - Ultra-fine sensitivity")
+        else:
+            self.redshift_input.setSingleStep(0.1)  # Normal step
+            _LOGGER.info("Normal mode activated - Standard sensitivity")
 
 
 def show_manual_redshift_dialog(parent, spectrum_data, current_redshift=0.0, 

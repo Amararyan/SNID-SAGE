@@ -68,12 +68,7 @@ class PreprocessingController:
                         self.gui._update_segmented_control_buttons()
                         _LOGGER.debug("✅ Segmented control buttons updated for Flat view")
                 
-                # CRITICAL: Debug the processed spectrum state
-                _LOGGER.info(f"🔍 DEBUG: processed_spectrum keys: {list(processed_spectrum.keys()) if processed_spectrum else 'None'}")
-                _LOGGER.info(f"🔍 DEBUG: has_spectrum_loaded(): {self.gui.has_spectrum_loaded()}")
-                _LOGGER.info(f"🔍 DEBUG: gui.processed_spectrum is not None: {hasattr(self.gui, 'processed_spectrum') and self.gui.processed_spectrum is not None}")
-                
-                # CRITICAL: Trigger state transition to PREPROCESSED
+                # Trigger state transition to PREPROCESSED
                 # This will enable SNID configuration and analysis buttons
                 if hasattr(self.gui, 'workflow_integrator') and self.gui.workflow_integrator:
                     # Use the workflow integrator to trigger PREPROCESSED state
@@ -89,7 +84,7 @@ class PreprocessingController:
                 else:
                     _LOGGER.error("❌ No workflow integrator available - buttons will not update correctly!")
                 
-                # CRITICAL: Switch to Flat view to show the continuum-removed spectrum
+                # Switch to Flat view to show the continuum-removed spectrum
                 if hasattr(self.gui, 'view_style') and self.gui.view_style:
                     self.gui.view_style.set("Flat")
                     # Trigger the view change through the plot controller
@@ -139,12 +134,7 @@ class PreprocessingController:
                         self.gui._update_segmented_control_buttons()
                         _LOGGER.debug("✅ Segmented control buttons updated for Flat view")
                 
-                # CRITICAL: Debug the processed spectrum state
-                _LOGGER.info(f"🔍 DEBUG: processed_spectrum keys: {list(processed_spectrum.keys()) if processed_spectrum else 'None'}")
-                _LOGGER.info(f"🔍 DEBUG: has_spectrum_loaded(): {self.gui.has_spectrum_loaded()}")
-                _LOGGER.info(f"🔍 DEBUG: gui.processed_spectrum is not None: {hasattr(self.gui, 'processed_spectrum') and self.gui.processed_spectrum is not None}")
-                
-                # CRITICAL: Trigger state transition to PREPROCESSED
+                # Trigger state transition to PREPROCESSED
                 # This will enable SNID configuration and analysis buttons
                 if hasattr(self.gui, 'workflow_integrator') and self.gui.workflow_integrator:
                     # Use the workflow integrator to trigger PREPROCESSED state
@@ -160,7 +150,7 @@ class PreprocessingController:
                 else:
                     _LOGGER.error("❌ No workflow integrator available - buttons will not update correctly!")
                 
-                # CRITICAL: Switch to Flat view to show the continuum-removed spectrum
+                # Switch to Flat view to show the continuum-removed spectrum
                 if hasattr(self.gui, 'view_style') and self.gui.view_style:
                     self.gui.view_style.set("Flat")
                     # Trigger the view change through the plot controller

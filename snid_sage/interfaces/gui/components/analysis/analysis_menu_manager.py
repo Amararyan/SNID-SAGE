@@ -467,10 +467,22 @@ class AnalysisMenuManager:
         try:
             from snid_sage.interfaces.gui.components.pyside6_dialogs.cluster_selection_dialog import show_cluster_selection_dialog
             
+            # Store the current winning cluster before opening the dialog
+            current_winning_cluster = None
+            if hasattr(snid_results, 'clustering_results') and snid_results.clustering_results:
+                current_winning_cluster = (
+                    snid_results.clustering_results.get('user_selected_cluster') or
+                    snid_results.clustering_results.get('winning_cluster') or
+                    snid_results.clustering_results.get('best_cluster')
+                )
+            
             def on_cluster_selected(selected_cluster, selected_index):
                 """Callback when user selects a cluster"""
                 try:
                     _LOGGER.info(f"User selected cluster {selected_index + 1}: {selected_cluster.get('type', 'Unknown')}")
+                    
+                    # Check if the cluster actually changed
+                    cluster_changed = self._has_cluster_changed(current_winning_cluster, selected_cluster)
                     
                     # Update the clustering results with the new winning cluster
                     if hasattr(snid_results, 'clustering_results'):
@@ -484,7 +496,7 @@ class AnalysisMenuManager:
                             cluster['is_winning'] = False
                         selected_cluster['is_winning'] = True
                     
-                    # CRITICAL: Update best_matches to only contain cluster templates (like app controller does)
+                    # Update best_matches to only contain cluster templates
                     if hasattr(snid_results, 'best_matches') and selected_cluster.get('matches'):
                         cluster_matches = selected_cluster.get('matches', [])
                         
@@ -528,7 +540,7 @@ class AnalysisMenuManager:
                                         f"z={snid_results.redshift:.4f}, RLAP={snid_results.rlap:.2f}")
                     
                     # Update the main GUI display with the new results
-                    self._update_gui_after_cluster_selection(snid_results, selected_cluster)
+                    self._update_gui_after_cluster_selection(snid_results, selected_cluster, cluster_changed)
                     
                     _LOGGER.info("✅ Cluster selection completed and GUI updated")
                     
@@ -558,7 +570,7 @@ class AnalysisMenuManager:
             self._show_gmm_visualization_dialog(snid_results)
     
     def _show_gmm_visualization_dialog(self, snid_results):
-        """Show GMM clustering visualization dialog (original behavior)"""
+        """Show GMM clustering visualization dialog"""
         try:
             from snid_sage.interfaces.gui.components.pyside6_dialogs.gmm_clustering_dialog import PySide6GMMClusteringDialog
             
@@ -577,14 +589,14 @@ class AnalysisMenuManager:
         except Exception as e:
             _LOGGER.error(f"Error opening GMM clustering visualization dialog: {e}")
     
-    def _update_gui_after_cluster_selection(self, snid_results, selected_cluster):
+    def _update_gui_after_cluster_selection(self, snid_results, selected_cluster, cluster_changed=True):
         """Update GUI state after user selects a different cluster"""
         try:
             # Update app controller results
             if hasattr(self.app_controller, 'snid_results'):
                 self.app_controller.snid_results = snid_results
             
-            # CRITICAL: Also update the main window's stored results
+            # Update the main window's stored results
             if hasattr(self.main_window, 'snid_results'):
                 self.main_window.snid_results = snid_results
             if hasattr(self.main_window, 'analysis_results'):
@@ -594,7 +606,7 @@ class AnalysisMenuManager:
             if hasattr(self.app_controller, 'current_template'):
                 self.app_controller.current_template = 0
             
-            # CRITICAL: Call update_results_display to refresh the entire display
+            # Call update_results_display to refresh the entire display
             if hasattr(self.main_window, 'update_results_display'):
                 self.main_window.update_results_display(snid_results)
                 _LOGGER.debug("Main GUI results display updated after cluster selection")
@@ -610,18 +622,68 @@ class AnalysisMenuManager:
                 self.main_window.refresh_results_displays()
                 _LOGGER.debug("Results displays refreshed after cluster selection")
             
-            # Show confirmation message
-            cluster_type = selected_cluster.get('type', 'Unknown')
-            cluster_size = selected_cluster.get('size', 0)
-            
-            QtWidgets.QMessageBox.information(
-                self.main_window,
-                "Cluster Selection Updated",
-                f"Successfully updated winning cluster to:\n\n"
-                f"Type: {cluster_type}\n"
-                f"Matches: {cluster_size}\n\n"
-                f"The main display has been updated with the new results."
-            )
+            # Only show confirmation message if the cluster actually changed
+            if cluster_changed:
+                cluster_type = selected_cluster.get('type', 'Unknown')
+                cluster_size = selected_cluster.get('size', 0)
+                
+                QtWidgets.QMessageBox.information(
+                    self.main_window,
+                    "Cluster Selection Updated",
+                    f"Successfully updated winning cluster to:\n\n"
+                    f"Type: {cluster_type}\n"
+                    f"Matches: {cluster_size}\n\n"
+                    f"The main display has been updated with the new results."
+                )
+            else:
+                _LOGGER.debug("Cluster selection unchanged - no update message shown")
             
         except Exception as e:
-            _LOGGER.error(f"Error updating GUI after cluster selection: {e}") 
+            _LOGGER.error(f"Error updating GUI after cluster selection: {e}")
+    
+    def _has_cluster_changed(self, current_cluster, selected_cluster):
+        """
+        Check if the selected cluster is different from the current winning cluster.
+        
+        Args:
+            current_cluster: The currently winning cluster (or None)
+            selected_cluster: The newly selected cluster
+            
+        Returns:
+            bool: True if the cluster changed, False if it's the same
+        """
+        if current_cluster is None:
+            # If no current cluster, any selection is a change
+            return True
+        
+        if selected_cluster is None:
+            # If no selected cluster, it's a change if we had a current cluster
+            return current_cluster is not None
+        
+        # Compare clusters by their identifying characteristics
+        current_type = current_cluster.get('type', '')
+        current_id = current_cluster.get('cluster_id', -1)
+        current_size = current_cluster.get('size', 0)
+        
+        selected_type = selected_cluster.get('type', '')
+        selected_id = selected_cluster.get('cluster_id', -1)
+        selected_size = selected_cluster.get('size', 0)
+        
+        # Check if they are the same cluster
+        is_same_cluster = (
+            current_type == selected_type and
+            current_id == selected_id and
+            current_size == selected_size
+        )
+        
+        # Also check if they are the exact same object (for safety)
+        is_same_object = (current_cluster is selected_cluster)
+        
+        # Return True if the cluster changed (i.e., they are NOT the same)
+        cluster_changed = not (is_same_cluster or is_same_object)
+        
+        _LOGGER.debug(f"Cluster comparison: current={current_type}#{current_id}({current_size}) "
+                     f"vs selected={selected_type}#{selected_id}({selected_size}) "
+                     f"-> changed={cluster_changed}")
+        
+        return cluster_changed 

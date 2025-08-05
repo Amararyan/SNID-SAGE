@@ -202,7 +202,10 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         template_type = template_info.get('type', 'Unknown')
         subtype = template_info.get('subtype', 'Unknown')
         epochs = template_info.get('epochs', 1)
-        self.statusBar().showMessage(f"Selected: {template_name} ({template_type}/{subtype}, {epochs} epochs)")
+        # Clean template name to remove _epoch_X suffix
+        from snid_sage.shared.utils import clean_template_name
+        clean_name = clean_template_name(template_name)
+        self.statusBar().showMessage(f"Selected: {clean_name} ({template_type}/{subtype}, {epochs} epochs)")
     
     def get_current_template(self) -> Optional[tuple]:
         """Get the currently selected template"""

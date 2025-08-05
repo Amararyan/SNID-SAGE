@@ -46,6 +46,13 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_config')
 
+# Enhanced button management
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except ImportError:
+    ENHANCED_BUTTONS_AVAILABLE = False
+
 
 class PySide6ConfigurationDialog(QtWidgets.QDialog):
     """
@@ -298,6 +305,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         
         # Reset to defaults button
         reset_btn = QtWidgets.QPushButton("🔄 Reset to Defaults")
+        reset_btn.setObjectName("reset_btn")
         reset_btn.clicked.connect(self._reset_to_defaults)
         button_layout.addWidget(reset_btn)
         
@@ -305,6 +313,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         
         # Cancel button
         cancel_btn = QtWidgets.QPushButton("❌ Cancel")
+        cancel_btn.setObjectName("cancel_btn")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
         
@@ -316,6 +325,9 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         button_layout.addWidget(apply_btn)
         
         layout.addLayout(button_layout)
+        
+        # Enhanced button styling and animations
+        self._setup_enhanced_buttons()
     
     def _create_basic_parameters_tab(self):
         """Create basic parameters tab"""
@@ -1084,6 +1096,23 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
                     "Analysis Error", 
                     f"Error starting analysis:\n{str(e)}"
                 )
+    
+    def _setup_enhanced_buttons(self):
+        """Setup enhanced button styling and animations"""
+        if not ENHANCED_BUTTONS_AVAILABLE:
+            _LOGGER.info("Enhanced buttons not available, using standard styling")
+            return
+        
+        try:
+            # Use the configuration dialog preset
+            self.button_manager = enhance_dialog_with_preset(
+                self, 'configuration_dialog'
+            )
+            
+            _LOGGER.info("Enhanced buttons successfully applied to configuration dialog")
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to setup enhanced buttons: {e}")
 
 
 def show_configuration_dialog(parent, current_params=None, app_controller=None) -> Optional[Tuple[Dict[str, Any], bool]]:

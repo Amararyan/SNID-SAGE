@@ -323,8 +323,8 @@ class LineDetectionController:
                                         'redshift': match.get('redshift', 0.0),
                                         'redshift_error': match.get('redshift_error', 0.0),
                                         'rlap': match.get('rlap', 0.0),
-                                        'confidence': 'high' if match.get('rlap', 0.0) >= 8.0 else 
-                                                     'medium' if match.get('rlap', 0.0) >= 5.0 else 'low'
+                                        'confidence': 'High' if match.get('rlap', 0.0) >= 8.0 else 
+                                                     'Medium' if match.get('rlap', 0.0) >= 5.0 else 'Low'
                                     }
                                     galaxy_matches.append(galaxy_match)
                                     _LOGGER.debug(f"✅ Added galaxy match: {galaxy_match['template_name']} (RLAP: {galaxy_match['rlap']:.2f})")

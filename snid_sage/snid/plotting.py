@@ -444,7 +444,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
         info_text += f" {template_subtype}"
     info_text += "\n"
     
-    if template_age != 0:
+    if template_age is not None and np.isfinite(template_age):
         info_text += f"Age: {template_age:.1f} days\n"
     
 
@@ -452,11 +452,11 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
     if hasattr(result, 'type_confidence'):
         # Convert numeric confidence to qualitative level (like CLI)
         if result.type_confidence > 0.7:
-            confidence_level = "high"
+            confidence_level = "High"
         elif result.type_confidence > 0.4:
-            confidence_level = "medium"
+            confidence_level = "Medium"
         else:
-            confidence_level = "low"
+            confidence_level = "Low"
         info_text += f"Confidence: {confidence_level}\n"
     
     # Match statistics
@@ -900,7 +900,10 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
     
     # Get best match info
     best_match = result.best_matches[0]
-    template_name = best_match['template'].get('name', 'Unknown')
+    raw_template_name = best_match['template'].get('name', 'Unknown')
+    # Clean template name to remove _epoch_X suffix
+    from snid_sage.shared.utils import clean_template_name
+    template_name = clean_template_name(raw_template_name)
     template_type = best_match['template'].get('type', 'Unknown')
     template_subtype = best_match['template'].get('subtype', '')
     template_age = best_match['template'].get('age', 0)
@@ -979,7 +982,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
             template_info += f" {template_subtype}"
         template_info += "\n"
     
-    if template_age != 0:
+    if template_age is not None and np.isfinite(template_age):
         template_info += f"Age: {template_age:.1f} days\n"
     template_info += f"z = {redshift:.4f}\n"
     template_info += f"RLAP = {rlap:.1f}"
@@ -1302,7 +1305,8 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
                     for match in matches:
                         template = match.get('template', {})
                         age = template.get('age', 0.0) if template else 0.0
-                        if age > 0:
+                        # Check for valid age (negative ages are valid for pre-peak)
+                        if age is not None and np.isfinite(age):
                             ages.append(age)
                             age_weights.append(get_best_metric_value(match))
                     
@@ -1314,7 +1318,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
                                   label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
                     else:
                         # Fallback to consensus age if available, otherwise median
-                        if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                        if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
                             weighted_age = result.consensus_age
                             ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
                                       label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
@@ -1324,7 +1328,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
                                       label=f'Cluster median age = {weighted_age:.1f}d')
                 except ImportError:
                     # Fallback to consensus age if available, otherwise median
-                    if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                    if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
                         weighted_age = result.consensus_age
                         ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
                                   label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
@@ -1356,7 +1360,8 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
                     for match in matches:
                         template = match.get('template', {})
                         age = template.get('age', 0.0) if template else 0.0
-                        if age > 0:
+                        # Check for valid age (negative ages are valid for pre-peak)
+                        if age is not None and np.isfinite(age):
                             ages.append(age)
                             age_weights.append(get_best_metric_value(match))
                     
@@ -1368,7 +1373,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
                                   label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
                     else:
                         # Fallback to consensus age if available, otherwise median
-                        if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                        if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
                             weighted_age = result.consensus_age
                             ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
                                       label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
@@ -1378,7 +1383,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
                                       label=f'Global median age = {weighted_age:.1f}d')
                 except ImportError:
                     # Fallback to consensus age if available, otherwise median
-                    if hasattr(result, 'consensus_age') and result.consensus_age > 0:
+                    if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
                         weighted_age = result.consensus_age
                         ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
                                   label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
@@ -1958,7 +1963,7 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
             template_info += f" {template_subtype}"
         template_info += "\n"
     
-    if template_age != 0:
+    if template_age is not None and np.isfinite(template_age):
         template_info += f"Age: {template_age:.1f} days\n"
     template_info += f"z = {z_template:.4f}\n"
     template_info += f"RLAP = {rlap_value:.1f}"
@@ -2208,7 +2213,8 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
         subtype_redshifts[subtype].append(match.get('redshift', 0))
         
         age = template.get('age', 0)
-        if age > 0:  # Only include valid ages
+        # Check for valid age (negative ages are valid for pre-peak)
+        if age is not None and np.isfinite(age):
             subtype_ages[subtype].append(age)
     
     # Plot 1: Subtype pie chart
@@ -2313,7 +2319,7 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
                 f"{percentage:.1f}",
                 f"{avg_rlap_cos:.1f}",
                 f"{avg_z:.4f}",
-                f"{avg_age:.1f}" if avg_age > 0 else "N/A"
+                f"{avg_age:.1f}" if avg_age is not None and np.isfinite(avg_age) else "N/A"
             ])
         
         # Create table

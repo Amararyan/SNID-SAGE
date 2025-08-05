@@ -274,11 +274,11 @@ def _assess_spectral_quality(flux: np.ndarray) -> Dict[str, Any]:
     # Signal-to-noise estimation
     snr = abs(fluxes.mean()) / fluxes.std() if fluxes.std() > 0 else 0
     if snr > 10:
-        quality['signal_to_noise'] = 'high'
+        quality['signal_to_noise'] = 'High'
     elif snr > 5:
-        quality['signal_to_noise'] = 'moderate'
+        quality['signal_to_noise'] = 'Moderate'
     else:
-        quality['signal_to_noise'] = 'low'
+        quality['signal_to_noise'] = 'Low'
     
     # Spectral resolution estimate (rough)
     resolution = len(wavelengths) / coverage if coverage > 0 else 0
@@ -331,13 +331,13 @@ def _assess_match_confidence(template: Dict) -> str:
         lap = getattr(template, 'lap', 0.0)
     
     if rlap > 10 and lap > 5:
-        return 'high'
+        return 'High'
     elif rlap > 5 and lap > 3:
-        return 'moderate'
+        return 'Moderate'
     elif rlap > 2:
-        return 'low'
+        return 'Low'
     else:
-        return 'very_low'
+        return 'Very Low'
 
 def _calculate_match_statistics(templates: List[Dict]) -> Dict[str, Any]:
     """Calculate statistics across template matches."""
@@ -398,11 +398,23 @@ def _check_redshift_consistency(templates: List[Dict]) -> Dict[str, Any]:
         else:
             redshifts.append(getattr(t, 'z', 0))
     
-    # Use hybrid weighted redshift estimate instead of simple mean
+    # Use weighted redshift estimate if weights available, otherwise simple mean
     try:
-        from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift
-        redshift_errors = [0.01] * len(redshifts)  # Default errors for templates
-        z_mean, _, _ = calculate_hybrid_weighted_redshift(redshifts, redshift_errors, include_cluster_scatter=True)
+        # Try to get RLAP values as weights if available in the template data
+        weights = []
+        for t in templates[:5]:
+            if isinstance(t, dict):
+                weights.append(t.get('rlap', 1.0))  # Default weight of 1.0 if no RLAP
+            else:
+                weights.append(getattr(t, 'rlap', 1.0))
+        
+        # If we have meaningful weights (not all 1.0), use weighted calculation
+        if any(w != 1.0 for w in weights):
+            from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
+            z_mean, _ = calculate_weighted_redshift(redshifts, weights)
+        else:
+            # No meaningful weights available, use simple mean
+            z_mean = np.mean(redshifts)
     except ImportError:
         # Fallback to simple mean if function not available
         z_mean = np.mean(redshifts)
@@ -593,13 +605,13 @@ def _assess_classification_confidence(templates: List[Dict]) -> str:
     redshift_consistency = _check_redshift_consistency(templates)
     
     if rlap > 10 and type_consistency and redshift_consistency.get('consistent', False):
-        return 'high'
+        return 'High'
     elif rlap > 5 and type_consistency:
-        return 'moderate'
+        return 'Moderate'
     elif rlap > 3:
-        return 'low'
+        return 'Low'
     else:
-        return 'very_low'
+        return 'Very Low'
 
 def _analyze_continuum_shape(flat_spectrum: np.ndarray) -> Dict[str, Any]:
     """Analyze the shape of the continuum from flattened spectrum."""

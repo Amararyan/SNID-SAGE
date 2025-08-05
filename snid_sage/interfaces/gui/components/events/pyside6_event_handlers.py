@@ -553,28 +553,31 @@ class PySide6EventHandlers(QtCore.QObject):
         try:
             _LOGGER.info("🔄 Starting comprehensive reset to initial state...")
             
-            # 1. Reset app controller data
+            # 1. Stop any blinking effects (must be done early to prevent UI conflicts)
+            self._stop_all_blinking_effects()
+            
+            # 2. Reset app controller data
             self.app_controller.reset_to_initial_state()
             
-            # 2. Clear additional persistent settings that the basic reset misses
+            # 3. Clear additional persistent settings that the basic reset misses
             self._clear_persistent_settings()
             
-            # 3. Reset all status labels to their exact initial text and styling
+            # 4. Reset all status labels to their exact initial text and styling
             self._reset_all_status_labels_to_initial()
             
-            # 4. Reset view buttons to initial state
+            # 5. Reset view buttons to initial state
             self._reset_view_buttons_to_initial()
             
-            # 5. Clear the plot and show welcome message
+            # 6. Clear the plot and show welcome message
             self.main_window.plot_manager.plot_pyqtgraph_welcome_message()
             
-            # 6. Reset main status to initial message
+            # 7. Reset main status to initial message
             self.main_window.status_label.setText("Ready - Load a spectrum to begin analysis")
             
-            # 7. Update button states to reflect initial state
+            # 8. Update button states to reflect initial state
             self._update_buttons_for_initial_state()
             
-            # 8. Force workflow state update to INITIAL (ensures everything is in sync)
+            # 9. Force workflow state update to INITIAL (ensures everything is in sync)
             self._force_workflow_state_to_initial()
             
             _LOGGER.info("✅ Comprehensive reset completed successfully")
@@ -583,6 +586,31 @@ class PySide6EventHandlers(QtCore.QObject):
             _LOGGER.error(f"❌ Error during comprehensive reset: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _stop_all_blinking_effects(self):
+        """Stop all blinking effects that might be active"""
+        try:
+            # Stop cluster summary blinking
+            if hasattr(self.main_window, 'stop_cluster_summary_blinking'):
+                self.main_window.stop_cluster_summary_blinking()
+                _LOGGER.debug("  🔴 Stopped cluster summary blinking effect")
+            
+            # Reset cluster summary state variables explicitly
+            if hasattr(self.main_window, 'cluster_summary_blinking'):
+                self.main_window.cluster_summary_blinking = False
+            if hasattr(self.main_window, 'cluster_summary_clicked_once'):
+                self.main_window.cluster_summary_clicked_once = False
+            if hasattr(self.main_window, 'cluster_summary_blink_timer'):
+                if self.main_window.cluster_summary_blink_timer:
+                    self.main_window.cluster_summary_blink_timer.stop()
+                    self.main_window.cluster_summary_blink_timer = None
+            if hasattr(self.main_window, 'cluster_summary_original_style'):
+                self.main_window.cluster_summary_original_style = None
+                
+            _LOGGER.debug("  ✅ All blinking effects stopped and state variables reset")
+            
+        except Exception as e:
+            _LOGGER.warning(f"  ⚠️ Warning stopping blinking effects: {e}")
     
     def _clear_persistent_settings(self):
         """Clear persistent settings that survive basic reset"""
@@ -693,16 +721,18 @@ class PySide6EventHandlers(QtCore.QObject):
     def _update_buttons_for_initial_state(self):
         """Update all button states to reflect the initial application state"""
         try:
-            # Update button states through the app controller
-            if hasattr(self.app_controller, 'update_button_states'):
-                self.app_controller.update_button_states()
+            # Update button states through the workflow integrator system (PySide6 pattern)
+            if hasattr(self.main_window, 'workflow_integrator') and self.main_window.workflow_integrator:
+                self.main_window.workflow_integrator._workflow_update_button_states()
+                _LOGGER.debug("  ✅ Button states updated via workflow integrator")
+            else:
+                # Fallback for older pattern
+                if hasattr(self.app_controller, 'update_button_states'):
+                    self.app_controller.update_button_states()
+                elif hasattr(self.main_window, 'app_controller') and hasattr(self.main_window.app_controller, 'update_button_states'):
+                    self.main_window.app_controller.update_button_states()
+                _LOGGER.debug("  ✅ Button states updated via fallback method")
                 
-            # Also update through the main window if available
-            if hasattr(self.main_window, 'app_controller') and self.main_window.app_controller:
-                self.main_window.app_controller.update_button_states()
-                
-            _LOGGER.debug("  ✅ Button states updated for initial state")
-            
         except Exception as e:
             _LOGGER.warning(f"  ⚠️ Warning updating button states: {e}")
     

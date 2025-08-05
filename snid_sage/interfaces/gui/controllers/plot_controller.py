@@ -242,7 +242,7 @@ class PlotController:
                     
                     # Ensure grid is properly styled and visible
                     grid_color = colors.get('plot_grid', '#cccccc')
-                    self.gui.ax.grid(True, alpha=0.4, color=grid_color, linestyle='--', linewidth=0.7)
+                    self.gui.ax.grid(True, alpha=0.08, color=grid_color, linestyle='--', linewidth=0.7)
                     self.gui.ax.set_axisbelow(True)  # Ensure grid appears behind data
                     
                     # Update spines (plot borders)
@@ -369,7 +369,7 @@ class PlotController:
                         if UNIFIED_SYSTEMS_AVAILABLE:
                             apply_no_title_styling(self.gui.fig, self.gui.ax, "Wavelength (Å)", "Flux", 
                                                  getattr(self.gui, 'theme_manager', None))
-                        self.gui.ax.grid(True, alpha=0.3)
+                        self.gui.ax.grid(True, alpha=0.08)
                         # Place legend in upper right for consistency
                         self._safe_add_legend(self.gui.ax, loc='upper right')
                         
@@ -400,7 +400,7 @@ class PlotController:
                     if UNIFIED_SYSTEMS_AVAILABLE:
                         apply_no_title_styling(self.gui.fig, self.gui.ax, "Wavelength (Å)", "Flux", 
                                              getattr(self.gui, 'theme_manager', None))
-                    self.gui.ax.grid(True, alpha=0.3)
+                    self.gui.ax.grid(True, alpha=0.08)
                     # Place legend in upper right for consistency
                     self._safe_add_legend(self.gui.ax, loc='upper right')
                 else:
@@ -526,7 +526,7 @@ class PlotController:
                         if UNIFIED_SYSTEMS_AVAILABLE:
                             apply_no_title_styling(self.gui.fig, self.gui.ax, "Wavelength (Å)", "Flattened Flux", 
                                                  getattr(self.gui, 'theme_manager', None))
-                        self.gui.ax.grid(True, alpha=0.3)
+                        self.gui.ax.grid(True, alpha=0.08)
                         # Place legend in upper right for consistency
                         self._safe_add_legend(self.gui.ax, loc='upper right')
                         
@@ -596,7 +596,7 @@ class PlotController:
                 if UNIFIED_SYSTEMS_AVAILABLE:
                     apply_no_title_styling(self.gui.fig, self.gui.ax, "Wavelength (Å)", "Flux", 
                                          getattr(self.gui, 'theme_manager', None))
-                self.gui.ax.grid(True, alpha=0.3)
+                self.gui.ax.grid(True, alpha=0.08)
                 # Place legend in upper right for consistency
                 self._safe_add_legend(self.gui.ax, loc='upper right')
                 
@@ -702,7 +702,7 @@ class PlotController:
             if UNIFIED_SYSTEMS_AVAILABLE:
                 apply_no_title_styling(self.gui.fig, self.gui.ax, "Wavelength (Å)", "Flux", 
                                      getattr(self.gui, 'theme_manager', None))
-            self.gui.ax.grid(True, alpha=0.3)
+            self.gui.ax.grid(True, alpha=0.08)
             
             # Apply theme styling
             self._apply_plot_theme()
@@ -770,7 +770,10 @@ class PlotController:
             
             # Get current template info for logging
             current_match = self.gui.snid_results.best_matches[self.gui.current_template]
-            template_name = current_match.get('name', 'Unknown')
+            raw_template_name = current_match.get('name', 'Unknown')
+            # Clean template name to remove _epoch_X suffix
+            from snid_sage.shared.utils import clean_template_name
+            template_name = clean_template_name(raw_template_name)
             template = current_match.get('template', {})
             template_subtype = template.get('subtype', current_match.get('type', 'Unknown'))
             redshift = current_match.get('redshift', 0.0)

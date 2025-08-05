@@ -22,7 +22,12 @@ import time
 import numpy as np
 
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
-from snid_sage.shared.utils.math_utils import calculate_hybrid_weighted_redshift, calculate_rlap_weighted_age
+from snid_sage.shared.utils.math_utils import (
+    calculate_joint_weighted_estimates,
+    calculate_weighted_redshift,
+    calculate_weighted_age,
+    get_best_metric_value
+)
 
 # Import and apply centralized font configuration for consistent plotting
 try:
@@ -492,35 +497,40 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
             rlaps = np.array([m['rlap'] for m in cluster_matches])
             redshift_errors = np.array([m.get('redshift_error', 0) for m in cluster_matches])
             
-            # Calculate cluster-level statistics using proper statistical methods
-            z_final, z_final_err, cluster_scatter = calculate_hybrid_weighted_redshift(
-                redshifts, redshift_errors, include_cluster_scatter=True
-            )
+            # Collect joint redshift-age data for enhanced estimation
+            joint_redshifts = []
+            joint_ages = []
+            joint_weights = []
             
-            summary['cluster_redshift_weighted'] = z_final
-            summary['cluster_redshift_weighted_uncertainty'] = z_final_err
-            summary['cluster_redshift_scatter'] = cluster_scatter
-            summary['cluster_rlap_mean'] = np.mean(rlaps)
-            
-            # Enhanced age estimation if available
-            ages = []
-            age_rlaps = []
             for m in cluster_matches:
                 template = m.get('template', {})
                 age = template.get('age', 0.0) if template else 0.0
-                if age > 0:
-                    ages.append(age)
-                    # Use RLAP-cos if available, otherwise RLAP
-                    from snid_sage.shared.utils.math_utils import get_best_metric_value
-                    age_rlaps.append(get_best_metric_value(m))
+                # Check for valid age (negative ages are valid for pre-peak)
+                if age is not None and np.isfinite(age):
+                    joint_redshifts.append(m['redshift'])
+                    joint_ages.append(age)
+                    joint_weights.append(get_best_metric_value(m))
             
-            if ages:
-                age_mean, age_stat_error, age_total_error, age_scatter = calculate_rlap_weighted_age(
-                    np.array(ages), np.array(age_rlaps), include_cluster_scatter=True
+            # Use joint estimation if we have both redshift and age data
+            if joint_redshifts:
+                z_final, age_mean, z_final_err, age_uncertainty, redshift_age_covariance = calculate_joint_weighted_estimates(
+                    joint_redshifts, joint_ages, joint_weights
                 )
+                summary['cluster_redshift_weighted'] = z_final
+                summary['cluster_redshift_weighted_uncertainty'] = z_final_err
+                summary['cluster_redshift_scatter'] = 0.0  # Joint method handles scatter internally
                 summary['cluster_age_weighted'] = age_mean
-                summary['cluster_age_uncertainty'] = age_total_error
-                summary['cluster_age_scatter'] = age_scatter
+                summary['cluster_age_uncertainty'] = age_uncertainty
+                summary['cluster_age_scatter'] = 0.0
+                summary['redshift_age_covariance'] = redshift_age_covariance
+            else:
+                # Fallback to redshift-only calculation if no age data available
+                z_final, z_final_err = calculate_weighted_redshift(redshifts, rlaps)
+                summary['cluster_redshift_weighted'] = z_final
+                summary['cluster_redshift_weighted_uncertainty'] = z_final_err
+                summary['cluster_redshift_scatter'] = 0.0
+            
+            summary['cluster_rlap_mean'] = np.mean(rlaps)
             
             # Subtype composition within cluster (GUI-style)
             from collections import Counter
@@ -1013,11 +1023,11 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         # Classification confidence (using cluster-based metrics)
         cluster_count = sum(1 for _, _, _, s in successful_results if s.get('has_clustering', False))
         high_confidence = sum(1 for _, _, _, s in successful_results 
-                             if s.get('cluster_confidence_level') == 'high')
+                             if s.get('cluster_confidence_level') == 'High')
         medium_confidence = sum(1 for _, _, _, s in successful_results 
-                               if s.get('cluster_confidence_level') == 'medium')
+                               if s.get('cluster_confidence_level') == 'Medium')
         low_confidence = sum(1 for _, _, _, s in successful_results 
-                            if s.get('cluster_confidence_level') == 'low')
+                            if s.get('cluster_confidence_level') == 'Low')
         
         report.append(f"\n🔒 CLASSIFICATION CONFIDENCE:")
         if cluster_count > 0:

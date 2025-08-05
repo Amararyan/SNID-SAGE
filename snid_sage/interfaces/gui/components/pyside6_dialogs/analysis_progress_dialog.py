@@ -19,6 +19,14 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_analysis_progress')
 
+# Enhanced button management
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except ImportError:
+    _LOGGER.debug("Enhanced button system not available")
+    ENHANCED_BUTTONS_AVAILABLE = False
+
 
 class AnalysisProgressDialog(QtWidgets.QDialog):
     """
@@ -37,7 +45,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
     cancel_requested = QtCore.Signal()
     hide_requested = QtCore.Signal()
     
-    def __init__(self, parent, title="SNID Analysis Progress"):
+    def __init__(self, parent, title="SNID-SAGE Analysis Progress"):
         """
         Initialize analysis progress dialog.
         
@@ -54,6 +62,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         self._setup_dialog()
         self._create_interface()
         self._setup_initial_state()
+        self._setup_enhanced_buttons()
         
     def _setup_dialog(self):
         """Setup dialog properties"""
@@ -188,15 +197,16 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         header_layout = QtWidgets.QVBoxLayout()
         
         # Title
-        self.title_label = QtWidgets.QLabel("SNID Analysis in Progress")
+        self.title_label = QtWidgets.QLabel("SNID-SAGE Analysis in Progress")
         self.title_label.setObjectName("title_label")
         self.title_label.setAlignment(QtCore.Qt.AlignCenter)
         header_layout.addWidget(self.title_label)
         
-        # Current stage indicator
+        # Current stage indicator (hidden - redundant with progress bar text)
         self.stage_label = QtWidgets.QLabel("Initializing analysis...")
         self.stage_label.setObjectName("stage_label")
         self.stage_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.stage_label.setVisible(False)  # Hide the redundant stage header
         header_layout.addWidget(self.stage_label)
         
         layout.addLayout(header_layout)
@@ -207,7 +217,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("Step %v of %m (%p%)")
+        self.progress_bar.setFormat("%p%")
         progress_layout.addWidget(self.progress_bar)
         
         # Time elapsed label
@@ -272,6 +282,23 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         """Setup initial state"""
         self.set_stage("Initialization", 0)
     
+    def _setup_enhanced_buttons(self):
+        """Setup enhanced button styling and animations"""
+        if not ENHANCED_BUTTONS_AVAILABLE:
+            _LOGGER.info("Enhanced buttons not available, using standard styling")
+            return
+        
+        try:
+            # Use the analysis progress dialog preset
+            self.button_manager = enhance_dialog_with_preset(
+                self, 'analysis_progress_dialog'
+            )
+            
+            _LOGGER.info("Enhanced buttons successfully applied to analysis progress dialog")
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to setup enhanced buttons: {e}")
+    
     def set_stage(self, stage_name: str, progress_percent: int):
         """
         Set the current analysis stage.
@@ -283,6 +310,8 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         try:
             self.stage_label.setText(f"📋 {stage_name}")
             self.progress_bar.setValue(progress_percent)
+            # Update progress bar format to show stage name with percentage
+            self.progress_bar.setFormat(f"{stage_name} - %p%")
             QtWidgets.QApplication.processEvents()
         except Exception as e:
             _LOGGER.warning(f"Error setting stage: {e}")
@@ -355,7 +384,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
                 progress_percent = int((current / maximum) * 100)
                 self.progress_bar.setRange(0, maximum)
                 self.progress_bar.setValue(current)
-                self.progress_bar.setFormat(f"Step {current} of {maximum} ({progress_percent}%)")
+                self.progress_bar.setFormat(f"{progress_percent}%")
                 
                 if message:
                     self.add_progress_line(message)
@@ -541,7 +570,7 @@ class AnalysisProgressManager(QtCore.QObject):
         self.dialog.add_progress_line(message, level)
 
 
-def show_analysis_progress_dialog(parent, title="SNID Analysis Progress") -> AnalysisProgressDialog:
+def show_analysis_progress_dialog(parent, title="SNID-SAGE Analysis Progress") -> AnalysisProgressDialog:
     """
     Show analysis progress dialog and return the dialog instance.
     
