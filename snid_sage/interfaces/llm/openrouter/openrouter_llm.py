@@ -8,9 +8,7 @@ import os
 import re
 import json
 import requests
-import tkinter as tk
 from datetime import datetime
-from tkinter import ttk, messagebox
 
 # Import centralized logging system
 try:
@@ -493,24 +491,30 @@ def configure_openrouter_dialog(parent):
 
 def _configure_openrouter_dialog_tkinter(parent):
     """Fallback tkinter implementation"""
+    try:
+        import tkinter as tk
+    except Exception:
+        # If tkinter is unavailable, fail closed but non-fatally
+        return False
+
     dialog = tk.Toplevel(parent)
     dialog.title("Configure OpenRouter")
     dialog.transient(parent)
     dialog.grab_set()
     dialog.geometry("800x600")
-    
+
     # Simple implementation for compatibility
     result = tk.BooleanVar(value=False)
-    
+
     def save_and_close():
         result.set(True)
         dialog.destroy()
-    
+
     tk.Label(dialog, text="OpenRouter Configuration", font=('Arial', 16, 'bold')).pack(pady=10)
     tk.Label(dialog, text="Please use the main settings dialog to configure OpenRouter.").pack(pady=20)
-    
+
     tk.Button(dialog, text="OK", command=save_and_close).pack(pady=10)
-    
+
     dialog.wait_window()
     return result.get()
 

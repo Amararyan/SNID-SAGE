@@ -593,11 +593,11 @@ class SpectrumResetManager:
 
             # 3. Redshift status label (below Redshift Selection)
             if hasattr(self.gui, 'redshift_status_label'):
-                self.gui.redshift_status_label.config(text="Optional: no redshift selected", fg=_secondary_color())
+                self.gui.redshift_status_label.config(text="Redshift not set (optional)", fg=_secondary_color())
 
             # 4. Pre-processing status label (below Preprocess Spectrum)
             if hasattr(self.gui, 'preprocess_status_label'):
-                self.gui.preprocess_status_label.config(text="Not preprocessed", fg=_secondary_color())
+                self.gui.preprocess_status_label.config(text="Preprocessing not run", fg=_secondary_color())
 
             # 5. Emission-line analysis status label
             if hasattr(self.gui, 'emission_status_label'):

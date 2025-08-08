@@ -159,6 +159,9 @@ class UnifiedResultsFormatter:
         full_cluster_redshift_error = None
         full_cluster_age = enhanced_age
         full_cluster_age_error = enhanced_age_error
+        # Initialize covariance terms to safe defaults so downstream access is always defined
+        subtype_redshift_age_covariance = np.nan
+        full_cluster_redshift_age_covariance = np.nan
         
         if winning_cluster and cluster_matches:
             # Check if subtype-specific joint estimates are available

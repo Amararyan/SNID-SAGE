@@ -86,18 +86,18 @@ class CLIProgressIndicator:
             if self.show_bar:
                 bar_width = 40
                 filled_width = int(bar_width * progress)
-                bar = "█" * filled_width + "░" * (bar_width - filled_width)
+                bar = "#" * filled_width + "-" * (bar_width - filled_width)
                 
                 # Format the progress line
-                progress_line = f"\r🔍 [{bar}] {self.current_template}/{self.total_templates} ({percent:.1f}%) ETA: {eta_str}"
+                progress_line = f"\r[{bar}] {self.current_template}/{self.total_templates} ({percent:.1f}%) ETA: {eta_str}"
             else:
-                progress_line = f"\r🔍 Template {self.current_template}/{self.total_templates} ({percent:.1f}%) ETA: {eta_str}"
+                progress_line = f"\rTemplate {self.current_template}/{self.total_templates} ({percent:.1f}%) ETA: {eta_str}"
             
             # Print progress (overwrite previous line)
             print(progress_line, end="", flush=True)
         else:
             # No total count, just show current
-            print(f"\r🔍 {message}", end="", flush=True)
+            print(f"\r{message}", end="", flush=True)
     
     def finish(self, message: str = "Complete"):
         """Finish the progress indicator"""
@@ -110,9 +110,9 @@ class CLIProgressIndicator:
             else:
                 time_str = f"{elapsed/3600:.1f}h"
             
-            print(f"\r[SUCCESS] {message} ({self.total_templates} templates in {time_str})")
+            print(f"\r{message} ({self.total_templates} templates in {time_str})")
         else:
-            print(f"\r[SUCCESS] {message}")
+            print(f"\r{message}")
 
 
 def _extract_spectrum_name(spectrum_path: str) -> str:
@@ -179,12 +179,11 @@ Examples:
         help="Complete mode: All outputs including comprehensive GUI-style plots (like batch --complete)"
     )
     
-    # Output options
+    # Output options (optional; default comes from unified config)
     output_group = parser.add_argument_group("Output Options")
     output_group.add_argument(
         "--output-dir", "-o", 
-        required=True,
-        help="Directory for output files (required)"
+        help="Directory for output files (defaults to ./results or configured paths.output_dir)"
     )
     
     # Analysis parameters
@@ -321,10 +320,19 @@ Examples:
         help="Maximum number of templates to output"
     )
 
-    advanced_group.add_argument(
-        "--save-plots", 
-        action="store_true", 
-        help="Save plots to files"
+    # Display options
+    display_group = parser.add_argument_group("Display Options")
+    display_group.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress bar/output (auto-disabled when stdout is not a TTY)"
+    )
+
+    # Plot control: default is to save plots; allow disabling
+    output_group.add_argument(
+        "--no-plots",
+        action="store_true",
+        help="Do not generate plots (by default plots are saved)"
     )
     
     # General options
@@ -752,19 +760,13 @@ def _validate_and_fix_templates_dir(templates_dir: Optional[str]) -> str:
 def main(args: argparse.Namespace) -> int:
     """Main entry point for spectrum identification."""
     try:
-        # Use centralized logging system instead of creating our own handler
-        from snid_sage.shared.utils.logging import configure_logging, get_logger, VerbosityLevel
-        
-        # Configure logging based on verbosity
-        # For CLI mode, default to QUIET (warnings/errors only) unless verbose is requested
-        if args.verbose:
-            verbosity = VerbosityLevel.VERBOSE
-        else:
-            verbosity = VerbosityLevel.QUIET  # Only show warnings and errors, not INFO messages
-            
-        configure_logging(verbosity=verbosity, gui_mode=False)
+        # Use centralized logging system (already configured at top-level); get logger
+        from snid_sage.shared.utils.logging import get_logger
         logger = get_logger('cli.identify')
         
+        # Resolve quiet/silent flags (from global logging args)
+        is_quiet = bool(getattr(args, 'quiet', False) or getattr(args, 'silent', False))
+
         # Validate inputs
         if not os.path.exists(args.spectrum_path):
             print(f"[ERROR] Spectrum file not found: {args.spectrum_path}", file=sys.stderr)
@@ -822,13 +824,14 @@ def main(args: argparse.Namespace) -> int:
         if args.age_min is not None or args.age_max is not None:
             age_range = (args.age_min, args.age_max)
         
-        # Create progress indicator - show by default unless verbose mode
-        if args.verbose:
+        # Create progress indicator - show only when not verbose/quiet, not disabled and TTY
+        is_tty = sys.stdout.isatty()
+        if getattr(args, 'verbose', False) or is_quiet or getattr(args, 'no_progress', False) or not is_tty:
             # Verbose mode: no progress bar (relies on detailed logging)
             progress_callback = None
         else:
             # Default: show nice progress bar for all modes (minimal, normal, complete)
-            print("🔍 Starting SNID analysis...")
+            print("Starting SNID analysis...")
             progress_indicator = CLIProgressIndicator(total_templates=0, show_bar=True)
             
             def progress_callback(message: str, template_count: Optional[int] = None):
@@ -861,6 +864,15 @@ def main(args: argparse.Namespace) -> int:
                 else:
                     progress_indicator.update(message)
         
+        # Determine output directory from CLI arg or unified config
+        if not args.output_dir:
+            try:
+                from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
+                cfg = ConfigurationManager().load_config()
+                args.output_dir = cfg.get('paths', {}).get('output_dir') or str(Path.cwd() / 'results')
+            except Exception:
+                args.output_dir = str(Path.cwd() / 'results')
+
         # Run SNID analysis
         result, analysis_trace = run_snid_analysis(
             processed_spectrum,
@@ -879,21 +891,21 @@ def main(args: argparse.Namespace) -> int:
             max_output_templates=args.max_output_templates,
                 verbose=args.verbose,
             show_plots=False,  # CLI mode - no interactive plots
-            save_plots=args.save_plots,
-            plot_dir=args.output_dir if args.save_plots else None,
+            save_plots=False,  # Avoid internal saving to prevent duplicates; CLI handles all plots
+            plot_dir=None,
             progress_callback=progress_callback  # Add progress callback
         )
         
         # Finish progress indicator
-        if not args.verbose:  # Both minimal and normal modes have progress indicators
+        if not args.verbose and not is_quiet:
             if result and result.success:
                 progress_indicator.finish("Analysis complete")
             else:
                 progress_indicator.finish("Analysis failed")
-            print()  # Add newline after progress
+            print()
         
         if not result or not result.success:
-            print(f"\n[ERROR] SNID analysis failed for {spectrum_name}")
+            print(f"\nSNID analysis failed for {spectrum_name}")
             if hasattr(result, 'error_message'):
                 print(f"   Error: {result.error_message}")
             return 1
@@ -924,39 +936,76 @@ def main(args: argparse.Namespace) -> int:
             
             # Save outputs
             _save_spectrum_outputs(result, args.spectrum_path, output_dir_path, args)
+
+            # Default behavior: ensure summary (.output) and plots are generated when not minimal
+            # For default mode (neither minimal nor complete), we already save main result in _save_spectrum_outputs.
+            # Here we trigger plots generation if not disabled and not using complete (where plots are already generated).
+            if (not args.minimal) and (not args.complete) and (not getattr(args, 'no_plots', False)):
+                try:
+                    from snid_sage.snid.plotting import (
+                        plot_redshift_age, plot_flux_comparison, plot_flat_comparison
+                    )
+                    from snid_sage.shared.utils.math_utils import get_best_metric_value
+                    import matplotlib.pyplot as plt
+                    spectrum_name = Path(args.spectrum_path).stem
+                    # Redshift vs Age (cluster-aware inside the function)
+                    redshift_age_file = output_dir_path / f"{spectrum_name}_redshift_age.png"
+                    fig = plot_redshift_age(result, save_path=str(redshift_age_file))
+                    plt.close(fig)
+
+                    # Choose the same match the GUI would show: winning cluster → filtered → best
+                    plot_matches = []
+                    winning_cluster = _get_winning_cluster(result)
+                    if winning_cluster and winning_cluster.get('matches'):
+                        plot_matches = winning_cluster['matches']
+                    elif hasattr(result, 'filtered_matches') and result.filtered_matches:
+                        plot_matches = result.filtered_matches
+                    elif hasattr(result, 'best_matches') and result.best_matches:
+                        plot_matches = result.best_matches
+
+                    if plot_matches:
+                        plot_matches = sorted(plot_matches, key=get_best_metric_value, reverse=True)
+                        top_match = plot_matches[0]
+                        flux_file = output_dir_path / f"{spectrum_name}_flux_spectrum.png"
+                        fig = plot_flux_comparison(top_match, result, save_path=str(flux_file))
+                        plt.close(fig)
+                        flat_file = output_dir_path / f"{spectrum_name}_flattened_spectrum.png"
+                        fig = plot_flat_comparison(top_match, result, save_path=str(flat_file))
+                        plt.close(fig)
+                except Exception as e:
+                    import logging
+                    logging.getLogger('snid_sage.snid.identify').debug(f"Default plot generation failed: {e}")
         
         # ============================================================================
         # UNIFIED RESULTS SUMMARY: Using unified formatter for consistency with GUI
         # ============================================================================
         if result.success:
-            try:
-                from snid_sage.shared.utils.results_formatter import create_unified_formatter
-                formatter = create_unified_formatter(result, spectrum_name, args.spectrum_path)
-                
-                # Show unified display summary (same as GUI)
-                print("\n" + "="*80)
-                print(formatter.get_display_summary())
-                print("="*80)
-                
-            except ImportError:
-                # Fallback to basic summary if formatter not available
-                print(f"\n📄 {spectrum_name}: {result.consensus_type} z={result.redshift:.4f} RLAP={result.rlap:.1f}")
-                print("-"*80)
+            if not is_quiet:
+                try:
+                    from snid_sage.shared.utils.results_formatter import create_unified_formatter
+                    formatter = create_unified_formatter(result, spectrum_name, args.spectrum_path)
+                    print("\n" + "="*80)
+                    print(formatter.get_display_summary())
+                    print("="*80)
+                except ImportError:
+                    print(f"\n{spectrum_name}: {result.consensus_type} z={result.redshift:.4f} RLAP={result.rlap:.1f}")
+                    print("-"*80)
             
 
             
             # Show what was created
-            if not args.minimal:
-                print(f"\n📁 Results saved to: {args.output_dir}/")
-                if args.complete:
-                    print(f"   📊 3D Plots: Static PNG files with optimized viewing angle")
-                    print(f"   📈 Top 5 templates: Sorted by RLAP (highest quality first)")
-            else:
-                print(f"📁 Main result file saved to: {args.output_dir}/")
+            if not is_quiet:
+                if not args.minimal:
+                    print(f"\nResults saved to: {args.output_dir}/")
+                    if args.complete:
+                        print(f"   3D Plots: Static PNG files with optimized viewing angle")
+                        print(f"   Top 5 templates: Sorted by RLAP (highest quality first)")
+                else:
+                    print(f"Main result file saved to: {args.output_dir}/")
             
             return 0
         else:
-            print(f"\n[ERROR] {spectrum_name}: No good matches found")
+            print(f"\n{spectrum_name}: No good matches found")
             return 1
             
     except FileNotFoundError as e:

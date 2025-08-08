@@ -382,7 +382,7 @@ def show_redshift_mode_dialog(parent, redshift_value: float) -> Optional[Dict[st
         Dictionary with mode configuration or None if cancelled
     """
     dialog = PySide6RedshiftModeDialog(parent, redshift_value)
-    result = dialog.exec_()
+    result = dialog.exec()
     
     if result == QtWidgets.QDialog.Accepted:
         return dialog.get_result()

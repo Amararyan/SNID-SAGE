@@ -107,20 +107,20 @@ class PlatformConfig:
         """Get platform-specific dependency configuration"""
         config = {
             'numpy_version': '>=1.20.0',
-            'matplotlib_backend': 'TkAgg',
+            'matplotlib_backend': 'QtAgg',
             'use_system_fonts': True,
         }
         
         if self.is_macos:
             config.update({
-                'matplotlib_backend': 'MacOSX',
+                'matplotlib_backend': 'QtAgg',
                 'use_system_fonts': True,
                 'font_smoothing': True,
                 'retina_support': True,
             })
         elif self.is_windows:
             config.update({
-                'matplotlib_backend': 'TkAgg',
+                'matplotlib_backend': 'QtAgg',
                 'use_system_fonts': False,
                 'font_smoothing': False,
                 'high_dpi_support': True,
@@ -174,55 +174,8 @@ class PlatformConfig:
     def _apply_macos_fixes(self):
         """Apply macOS-specific fixes"""
         try:
-            # Fix for macOS Tkinter appearance
-            import tkinter as tk
-            
-            # Set macOS-specific appearance
-            try:
-                # Try to set native appearance
-                import subprocess
-                subprocess.run(['defaults', 'write', '-g', 'NSRequiresAquaSystemAppearance', '-bool', 'No'], 
-                             check=False, capture_output=True)
-            except:
-                pass
-            
-            # Configure Tkinter for better button color control on macOS
-            try:
-                # Set Tkinter-specific macOS options for better custom styling
-                root = tk._default_root
-                if root is None:
-                    # Create a temporary root to access Tkinter settings
-                    root = tk.Tk()
-                    root.withdraw()
-                    temp_root = True
-                else:
-                    temp_root = False
-                
-                # Configure macOS-specific Tkinter options
-                try:
-                    # Enable custom button colors by disabling native appearance
-                    root.call('tk', 'scaling', 1.0)
-                    # Force Tkinter to use custom colors instead of system colors
-                    root.option_add('*Button.highlightBackground', '#ffffff', 'startupFile')
-                    root.option_add('*Button.background', '#ffffff', 'startupFile')
-                    root.option_add('*Button.activeBackground', '#e0e0e0', 'startupFile')
-                except:
-                    pass
-                
-                if temp_root:
-                    root.destroy()
-                    
-            except Exception as e:
-                _LOGGER.debug(f"Could not apply Tkinter macOS configuration: {e}")
-            
-            # Configure matplotlib for macOS
-            try:
-                import matplotlib
-                matplotlib.use('TkAgg')  # Use TkAgg instead of MacOSX for better integration
-            except ImportError:
-                pass
-            
-            _LOGGER.info("Applied macOS-specific fixes")
+            # No Tkinter-specific fixes required for PySide6/Qt backend
+            _LOGGER.info("Applied macOS-specific fixes (Qt backend)")
         except Exception as e:
             _LOGGER.warning(f"Failed to apply macOS fixes: {e}")
     

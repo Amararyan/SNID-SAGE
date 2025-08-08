@@ -19,19 +19,21 @@ logger = logging.getLogger(__name__)
 
 
 def _common_checks(spec1: np.ndarray, spec2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Ensure equal length, finite values, remove padded zeros, and L2-normalise arrays."""
+    """Ensure equal length, finite values, exclude near-zeros in BOTH arrays, and L2-normalise."""
     n = min(len(spec1), len(spec2))
     if n == 0:
         return np.array([]), np.array([])
     s1, s2 = spec1[:n], spec2[:n]
-    # Exclude padded / empty parts: assume padding is zero or very close to zero.
-    non_zero_mask = np.abs(s1) > 1e-12  # tolerance for floating-point noise
-    mask = np.isfinite(s1) & np.isfinite(s2) & non_zero_mask
+    # Joint mask: finite in both and above tolerance in both (avoid biasing toward one array)
+    tol = 1e-12
+    finite_mask = np.isfinite(s1) & np.isfinite(s2)
+    non_zero_both = (np.abs(s1) > tol) & (np.abs(s2) > tol)
+    mask = finite_mask & non_zero_both
     if not np.any(mask):
         return np.array([]), np.array([])
     a = s1[mask].astype(float)
     b = s2[mask].astype(float)
-    # L2 normalisation — avoids scale bias for cosine, SID, etc.
+    # L2 normalisation — avoids scale bias
     a_norm = np.linalg.norm(a)
     b_norm = np.linalg.norm(b)
     if a_norm == 0 or b_norm == 0:
@@ -201,7 +203,29 @@ def compute_rlap_cos_metric(
             continue
         
         # Compute cosine similarity
-        cos_sim = cosine_similarity(input_flux, tpl_flux)
+        # Use RLAP-like trimmed overlap window: contiguous region where BOTH are non-zero/finite
+        try:
+            a = np.asarray(input_flux, dtype=float)
+            b = np.asarray(tpl_flux, dtype=float)
+            n = min(len(a), len(b))
+            if n == 0:
+                cos_sim = 0.0
+            else:
+                a = a[:n]
+                b = b[:n]
+                tol = 1e-12
+                joint_mask = np.isfinite(a) & np.isfinite(b) & (np.abs(a) > tol) & (np.abs(b) > tol)
+                if not np.any(joint_mask):
+                    cos_sim = 0.0
+                else:
+                    idx = np.flatnonzero(joint_mask)
+                    start_idx = int(idx[0])
+                    end_idx = int(idx[-1]) + 1
+                    a_window = a[start_idx:end_idx]
+                    b_window = b[start_idx:end_idx]
+                    cos_sim = cosine_similarity(a_window, b_window)
+        except Exception:
+            cos_sim = 0.0
         
         # Cap cosine similarity to [0, 1] (negative similarities are bad)
         cos_sim_capped = max(0.0, cos_sim)

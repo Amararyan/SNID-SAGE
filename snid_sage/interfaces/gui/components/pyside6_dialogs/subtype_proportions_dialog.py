@@ -39,6 +39,12 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_subtype_proportions')
 
+# Enhanced dialog button styling
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except Exception:
+    ENHANCED_BUTTONS_AVAILABLE = False
 try:
     from snid_sage.shared.utils.math_utils import get_best_metric_value
     MATH_UTILS_AVAILABLE = True
@@ -225,12 +231,14 @@ class PySide6SubtypeProportionsDialog(QtWidgets.QDialog):
         button_layout = QtWidgets.QHBoxLayout()
         
         # Export plot button
-        export_plot_btn = QtWidgets.QPushButton("📊 Export Plot")
+        export_plot_btn = QtWidgets.QPushButton("Export Plot")
+        export_plot_btn.setObjectName("export_plot_btn")
         export_plot_btn.clicked.connect(self._export_plot)
         button_layout.addWidget(export_plot_btn)
         
         # Export data button
-        export_data_btn = QtWidgets.QPushButton("📋 Export Data")
+        export_data_btn = QtWidgets.QPushButton("Export Data")
+        export_data_btn.setObjectName("export_data_btn")
         export_data_btn.clicked.connect(self._export_data)
         button_layout.addWidget(export_data_btn)
         
@@ -238,11 +246,19 @@ class PySide6SubtypeProportionsDialog(QtWidgets.QDialog):
         
         # Close button
         close_btn = QtWidgets.QPushButton("Close")
+        close_btn.setObjectName("close_btn")
         close_btn.clicked.connect(self.accept)
         close_btn.setDefault(True)
         button_layout.addWidget(close_btn)
         
         layout.addLayout(button_layout)
+
+        # Apply enhanced styles
+        try:
+            if ENHANCED_BUTTONS_AVAILABLE:
+                self.button_manager = enhance_dialog_with_preset(self, 'subtype_proportions_dialog')
+        except Exception as e:
+            _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
     
     def _extract_cluster_data(self):
         """Extract cluster data from analysis results"""

@@ -39,10 +39,10 @@ class EnhancedDialogButtonManager(QtCore.QObject):
     
     # Color definitions by button meaning - Updated to reuse main GUI colors
     BUTTON_COLORS = {
-        # Primary actions - using bright green color scheme for Apply/Accept actions
-        'apply': '#22c55e',           # Apply, Accept, Continue, Proceed - bright green
-        'apply_hover': '#16a34a',
-        'apply_pressed': '#15803d',
+        # Primary actions - updated green per user preference
+        'apply': '#048c36',           # Apply, Accept, Continue, Proceed
+        'apply_hover': '#037a2f',
+        'apply_pressed': '#026a2a',
         
         # Secondary actions - using main GUI analysis color (magenta)  
         'secondary': '#BC5090',       # OK, Confirm, Yes - matches analysis button
@@ -59,15 +59,15 @@ class EnhancedDialogButtonManager(QtCore.QObject):
         'utility_hover': '#4F477E',
         'utility_pressed': '#463E6F',
         
-        # Info/Help actions - using main GUI info color (indigo/blue)
-        'info': '#6366f1',           # Help, Info, Show - matches main GUI info button
-        'info_hover': '#4f46e5',
-        'info_pressed': '#4338ca',
+        # Info/Help actions - use same blue as main GUI top-left info button
+        'info': '#3b82f6',           # Help, Info, Show
+        'info_hover': '#2563eb',
+        'info_pressed': '#1d4ed8',
         
-        # Reset/Refresh actions - using main GUI load color (grey)
-        'reset': '#6E6E6E',          # Reset, Restart, Refresh, Clear - matches load button
-        'reset_hover': '#656565',
-        'reset_pressed': '#585858',
+        # Reset/Refresh actions - match Cancel styling per request
+        'reset': '#A65965',          # Reset, Restart, Refresh, Clear
+        'reset_hover': '#95515C',
+        'reset_pressed': '#844953',
         
         # Navigation actions - using main GUI redshift color (coral)
         'navigation': '#FF6361',      # Previous, Next, Back - matches redshift button
@@ -79,10 +79,10 @@ class EnhancedDialogButtonManager(QtCore.QObject):
         'neutral_hover': '#003A54',
         'neutral_pressed': '#00344B',
         
-        # Accent actions - using bright green color scheme for Accept/Apply actions
-        'accent': '#22c55e',          # Special actions like Accept Redshift, Run Analysis - bright green
-        'accent_hover': '#16a34a',
-        'accent_pressed': '#15803d',
+        # Accent actions - same green as apply per user preference
+        'accent': '#048c36',          # Special actions
+        'accent_hover': '#037a2f',
+        'accent_pressed': '#026a2a',
         
         # Toggle button states - using main GUI colors
         'toggle_inactive': '#6E6E6E',  # Using load button color for inactive
@@ -283,12 +283,19 @@ class EnhancedDialogButtonManager(QtCore.QObject):
         
         # Determine colors based on type and state
         if is_toggle:
+            # Allow per-button override colors; fall back to global palette
             if toggle_state:
-                base_color = self.BUTTON_COLORS['toggle_active']
-                hover_color = self.BUTTON_COLORS['toggle_active_hover']
+                base_color = (
+                    config.get('active_color')
+                    or self.BUTTON_COLORS['toggle_active']
+                )
             else:
-                base_color = self.BUTTON_COLORS['toggle_inactive']
-                hover_color = self.BUTTON_COLORS['toggle_inactive_hover']
+                base_color = (
+                    config.get('inactive_color')
+                    or self.BUTTON_COLORS['toggle_inactive']
+                )
+            # For hover, use a gradient derived from the base color
+            hover_color = base_color
         else:
             base_color = self.BUTTON_COLORS.get(button_type, self.BUTTON_COLORS['neutral'])
             hover_color = self.BUTTON_COLORS.get(f"{button_type}_hover", self.BUTTON_COLORS['neutral_hover'])

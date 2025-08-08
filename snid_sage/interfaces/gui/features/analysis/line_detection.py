@@ -2,14 +2,12 @@
 SNID SAGE - Line Detection and Galaxy Redshift Analysis
 ======================================================
 
-Handles spectral line detection, NIST database searches, and automatic
+Handles spectral line detection and automatic
 galaxy redshift detection using SNID analysis with galaxy templates.
 """
 
 import os
-import glob
-import tkinter as tk
-from tkinter import messagebox, ttk
+from PySide6 import QtWidgets
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis
 import numpy as np
 import traceback
@@ -49,40 +47,19 @@ class LineDetectionController:
         """Auto-detect spectral lines in the current spectrum"""
         try:
             if not hasattr(self.gui, 'snid_results') or not self.gui.snid_results:
-                messagebox.showwarning("No Data", "Please run SNID analysis first to detect lines.")
+                QtWidgets.QMessageBox.warning(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                              "No Data", "Please run SNID analysis first to detect lines.")
                 return
-            
-            # For now, show a placeholder message
-            # In the future, this could integrate with actual line detection
-            messagebox.showinfo("Line Detection", 
-                              "Auto line detection feature is not yet implemented.\n\n"
-                              "This would:\n"
-                              "• Detect absorption/emission lines in the spectrum\n"
-                              "• Compare with template line positions\n"
-                              "• Highlight line matches on the plot\n"
-                              "• Provide line identification results")
-            
+            # Remove temporary placeholder: no-op for now
+            return
         except Exception as e:
-            messagebox.showerror("Line Detection Error", f"Failed to run line detection: {str(e)}")
+            QtWidgets.QMessageBox.critical(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                           "Line Detection Error", f"Failed to run line detection: {str(e)}")
     
     def search_nist_for_lines(self):
-        """Search NIST database for spectral lines"""
-        try:
-            if not hasattr(self.gui, 'snid_results') or not self.gui.snid_results:
-                messagebox.showwarning("No Data", "Please run SNID analysis first.")
-                return
-            
-            # For now, show a placeholder message
-            messagebox.showinfo("NIST Search", 
-                              "NIST database search feature is not yet implemented.\n\n"
-                              "This would:\n"
-                              "• Search NIST atomic spectra database\n"
-                              "• Identify potential line matches\n"
-                              "• Show line species and transitions\n"
-                              "• Mark identified lines on the plot")
-            
-        except Exception as e:
-            messagebox.showerror("NIST Search Error", f"Failed to search NIST database: {str(e)}")
+        """Search NIST database for spectral lines (removed in new GUI)"""
+        # Functionality removed in the new GUI
+        return
     
     def clear_line_markers(self):
         """Clear all line markers from the plot"""
@@ -131,13 +108,14 @@ class LineDetectionController:
     def open_combined_redshift_selection(self):
         """Open the combined redshift selection dialog with both manual and automatic options"""
         if not show_manual_redshift_dialog:
-            messagebox.showerror("Feature Unavailable", 
-                               "Manual redshift dialog is not available.\n"
-                               "Please check your installation.")
+            QtWidgets.QMessageBox.critical(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                           "Feature Unavailable",
+                                           "Manual redshift dialog is not available.\nPlease check your installation.")
             return
         
         if not self.gui.file_path:
-            messagebox.showwarning("No Spectrum", "Please load a spectrum first.")
+            QtWidgets.QMessageBox.warning(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                          "No Spectrum", "Please load a spectrum first.")
             return
         
         try:
@@ -148,8 +126,9 @@ class LineDetectionController:
             # Get current spectrum data 
             spectrum_data = self._get_current_spectrum_data()
             if not spectrum_data:
-                messagebox.showerror("Spectrum Error", 
-                                   "Could not access current spectrum data.")
+                QtWidgets.QMessageBox.critical(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                               "Spectrum Error",
+                                               "Could not access current spectrum data.")
                 return
 
             # Get current redshift estimate if available
@@ -207,8 +186,9 @@ class LineDetectionController:
 
         except Exception as e:
             _LOGGER.error(f"Error in combined redshift selection: {e}")
-            messagebox.showerror("Redshift Selection Error", 
-                               f"Failed to start redshift selection:\n{str(e)}")
+            QtWidgets.QMessageBox.critical(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                           "Redshift Selection Error",
+                                           f"Failed to start redshift selection:\n{str(e)}")
     
     def _perform_automatic_redshift_search(self, progress_callback=None):
         """Perform automatic redshift search using already preprocessed spectrum"""
@@ -482,10 +462,14 @@ class LineDetectionController:
                     'confidence': 'user_determined'
                 }
             
-            # Update redshift entry field if it exists
+            # Update redshift entry field if it exists (skip tkinter-specific code in PySide6)
             if hasattr(self.gui, 'redshift_entry'):
-                self.gui.redshift_entry.delete(0, tk.END)
-                self.gui.redshift_entry.insert(0, f"{redshift:.4f}")
+                try:
+                    # If redshift_entry is a Qt widget with setText
+                    if hasattr(self.gui.redshift_entry, 'setText'):
+                        self.gui.redshift_entry.setText(f"{redshift:.4f}")
+                except Exception:
+                    pass
             
             # Compose status text with additional context (range or forced)
             status_text = None
@@ -536,140 +520,88 @@ class LineDetectionController:
             
         except Exception as e:
             _LOGGER.error(f"Error applying manual redshift: {e}")
-            messagebox.showerror("Error", f"Failed to apply redshift: {str(e)}")
+            QtWidgets.QMessageBox.critical(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                           "Error", f"Failed to apply redshift: {str(e)}")
     
     def _show_no_results_dialog(self, progress_window):
         """Show dialog when no galaxy results are found"""
         progress_window.destroy()
         
-        # Show options including manual redshift determination
-        response = messagebox.askyesnocancel("No Results", 
-                                           "No galaxy redshift matches found.\n\n"
-                                           "This could mean:\n"
-                                           "• The spectrum is not a galaxy\n"
-                                           "• The redshift is outside the search range\n"
-                                           "• The signal-to-noise is too low\n"
-                                           "• Galaxy templates don't match this type\n\n"
-                                           "Would you like to try manual redshift determination?\n\n"
-                                           "Yes = Manual redshift\n"
-                                           "No = Close\n"
-                                           "Cancel = Try different parameters")
+        # Show options including manual redshift determination using Qt
+        msg = QtWidgets.QMessageBox(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None)
+        msg.setWindowTitle("No Results")
+        msg.setIcon(QtWidgets.QMessageBox.Information)
+        msg.setText(
+            "No galaxy redshift matches found.\n\n"
+            "This could mean:\n"
+            "• The spectrum is not a galaxy\n"
+            "• The redshift is outside the search range\n"
+            "• The signal-to-noise is too low\n"
+            "• Galaxy templates don't match this type\n\n"
+            "Would you like to try manual redshift determination?"
+        )
+        msg.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
+        res = msg.exec()
         
-        if response is True:  # Yes - manual redshift
+        if res == QtWidgets.QMessageBox.Yes:  # Yes - manual redshift
             self.open_combined_redshift_selection()
-        elif response is None:  # Cancel - show help
-            messagebox.showinfo("Try Different Parameters", 
-                              "Suggestions for improving galaxy redshift detection:\n\n"
-                              "• Check if the spectrum is actually a galaxy\n"
-                              "• Try adjusting the redshift range (zmin/zmax)\n"
-                              "• Use different preprocessing parameters\n"
-                              "• Consider manual redshift determination\n"
-                              "• Check if the spectrum has sufficient quality")
+        elif res == QtWidgets.QMessageBox.Cancel:  # Cancel - show help
+            QtWidgets.QMessageBox.information(self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+                                              "Try Different Parameters",
+                                              "Suggestions for improving galaxy redshift detection:\n\n"
+                                              "• Check if the spectrum is actually a galaxy\n"
+                                              "• Try adjusting the redshift range (zmin/zmax)\n"
+                                              "• Use different preprocessing parameters\n"
+                                              "• Consider manual redshift determination\n"
+                                              "• Check if the spectrum has sufficient quality")
     
     def _show_error_dialog(self, progress_window, error_msg):
         """Show dialog when an error occurs"""
         progress_window.destroy()
         
-        # Show error with manual redshift option
-        response = messagebox.askyesno("Analysis Error", 
-                                     f"Galaxy redshift detection failed:\n\n{error_msg}\n\n"
-                                     f"Would you like to try manual redshift determination instead?")
-        
-        if response:
+        # Show error with manual redshift option via Qt
+        res = QtWidgets.QMessageBox.question(
+            self.gui if isinstance(self.gui, QtWidgets.QWidget) else None,
+            "Analysis Error",
+            f"Galaxy redshift detection failed:\n\n{error_msg}\n\nWould you like to try manual redshift determination instead?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+        if res == QtWidgets.QMessageBox.Yes:
             self.open_combined_redshift_selection()
     
     def _show_results_dialog(self, progress_window, best_z, best_rlap, best_template, confidence, 
                             redshifts, rlaps, template_names, snid_result):
-        """Show dialog with galaxy redshift results"""
+        """Show dialog with galaxy redshift results (Qt minimal dialog)"""
         progress_window.destroy()
-        
-        # Create results dialog
-        results_window = tk.Toplevel(self.gui.master)
-        results_window.title("Galaxy Redshift Results")
-        results_window.geometry("700x700")  # Increased height for more buttons
-        results_window.transient(self.gui.master)
-        results_window.grab_set()
-        
-        # Center the window
-        results_window.update_idletasks()
-        x = (results_window.winfo_screenwidth() // 2) - (700 // 2)
-        y = (results_window.winfo_screenheight() // 2) - (700 // 2)
-        results_window.geometry(f"700x700+{x}+{y}")
-        
-        # Main frame
-        main_frame = ttk.Frame(results_window, padding="20")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Title
-        title_label = ttk.Label(main_frame, text="🎯 Galaxy Redshift Detection Results", 
-                              font=('Arial', 16, 'bold'))
-        title_label.pack(pady=(0, 20))
-        
-        # Best result summary
-        summary_frame = ttk.LabelFrame(main_frame, text="Best Match", padding="10")
-        summary_frame.pack(fill='x', pady=(0, 15))
-        
-        best_text = (f"Redshift (z): {best_z:.6f}\n"
-                     f"Correlation (rlap): {best_rlap:.1f}\n"
-                     f"Template: {best_template}\n"
-                     f"Confidence: {confidence}%")
-        
-        best_label = ttk.Label(summary_frame, text=best_text, font=('Arial', 12))
-        best_label.pack(anchor='w')
-        
-        # Results table
-        table_frame = ttk.LabelFrame(main_frame, text="Top Matches", padding="10")
-        table_frame.pack(fill='both', expand=True, pady=(0, 15))
-        
-        # Create treeview for results
-        columns = ('Rank', 'Redshift', 'Rlap', 'Template')
-        tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=8)
-        
-        # Configure columns
-        tree.heading('Rank', text='Rank')
-        tree.heading('Redshift', text='Redshift (z)')
-        tree.heading('Rlap', text='Correlation')
-        tree.heading('Template', text='Template')
-        
-        tree.column('Rank', width=50)
-        tree.column('Redshift', width=100)
-        tree.column('Rlap', width=100)
-        tree.column('Template', width=200)
-        
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(table_frame, orient='vertical', command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        
-        # Pack tree and scrollbar
-        tree.pack(side='left', fill='both', expand=True)
-        scrollbar.pack(side='right', fill='y')
-        
-        # Populate table with top 10 results
-        for i in range(min(10, len(redshifts))):
-            tree.insert('', 'end', values=(
-                i+1, f"{redshifts[i]:.6f}", f"{rlaps[i]:.1f}", template_names[i]
-            ))
-        
-        # Buttons frame
-        buttons_frame = ttk.Frame(main_frame)
-        buttons_frame.pack(fill='x', pady=(15, 0))
-        
-        def accept_redshift():
-            # Update SNID parameters with detected redshift
-            if hasattr(self.gui, 'redshift_entry'):
-                self.gui.redshift_entry.delete(0, tk.END)
-                self.gui.redshift_entry.insert(0, f"{best_z:.6f}")
-            
+        parent = self.gui if isinstance(self.gui, QtWidgets.QWidget) else None
+        summary = (
+            f"Redshift (z): {best_z:.6f}\n"
+            f"Correlation (rlap): {best_rlap:.1f}\n"
+            f"Template: {best_template}\n"
+            f"Confidence: {confidence}%\n\n"
+            f"Accept this redshift?"
+        )
+        msg = QtWidgets.QMessageBox(parent)
+        msg.setWindowTitle("Galaxy Redshift Results")
+        msg.setIcon(QtWidgets.QMessageBox.Information)
+        msg.setText(summary)
+        msg.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
+        msg.button(QtWidgets.QMessageBox.Yes).setText("Accept")
+        msg.button(QtWidgets.QMessageBox.No).setText("Manual...")
+        msg.button(QtWidgets.QMessageBox.Cancel).setText("Close")
+        res = msg.exec()
+
+        if res == QtWidgets.QMessageBox.Yes:
             # Update any redshift-related parameters
             self.gui.params['redshift'] = best_z
-            
-            # Update redshift status label without accessing theme manager
+
+            # Update redshift status label
             if hasattr(self.gui, 'redshift_status_label'):
-                self.gui.redshift_status_label.configure(
-                    text=f"✅ z = {best_z:.6f} (auto, rlap {best_rlap:.1f})",
-                    fg=self.gui.theme_manager.get_color('text_primary') if hasattr(self.gui, 'theme_manager') else 'black'
-                )
-            
+                try:
+                    self.gui.redshift_status_label.setText(f"✅ z = {best_z:.6f} (auto, rlap {best_rlap:.1f})")
+                except Exception:
+                    pass
+
             # Store auto redshift result
             self.gui.galaxy_redshift_result = {
                 'redshift': best_z,
@@ -678,114 +610,18 @@ class LineDetectionController:
                 'rlap': best_rlap,
                 'template': best_template
             }
-            
-            # Show confirmation
-            messagebox.showinfo("Redshift Accepted", 
-                              f"Galaxy redshift z = {best_z:.6f} has been set.\n\n"
-                              f"SNID analysis will now search in a tight range around this redshift.\n"
-                              f"Search range: z = {max(-0.01, best_z-0.05):.6f} to {best_z+0.05:.6f}")
-            
-            results_window.destroy()
-        
-        def reject_redshift():
-            results_window.destroy()
-        
-        def try_manual_redshift():
-            # Close this dialog and start manual redshift determination
-            results_window.destroy()
+
+            QtWidgets.QMessageBox.information(
+                parent,
+                "Redshift Accepted",
+                (
+                    f"Galaxy redshift z = {best_z:.6f} has been set.\n\n"
+                    f"SNID analysis will now search in a tight range around this redshift.\n"
+                    f"Search range: z = {max(-0.01, best_z-0.05):.6f} to {best_z+0.05:.6f}"
+                )
+            )
+        elif res == QtWidgets.QMessageBox.No:
             self.open_combined_redshift_selection()
-        
-        def view_detailed_results():
-            # Expand the results window to show detailed plots
-            results_window.geometry("1000x700")
-            
-            # Create notebook for different views
-            notebook = ttk.Notebook(main_frame)
-            notebook.pack(fill='both', expand=True, pady=(10, 0))
-            
-            # Results plot tab
-            plot_frame = ttk.Frame(notebook)
-            notebook.add(plot_frame, text="📊 Correlation Plot")
-            
-            # Create simple plot showing redshift vs correlation
-            try:
-                import matplotlib.pyplot as plt
-                from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-                
-                fig, ax = plt.subplots(figsize=(8, 4))
-                ax.scatter(redshifts[:min(20, len(redshifts))], rlaps[:min(20, len(rlaps))])
-                ax.axhline(y=5.0, color='r', linestyle='--', alpha=0.5, label='Min Rlap')
-                ax.set_xlabel('Redshift (z)')
-                ax.set_ylabel('Correlation (rlap)')
-                ax.set_title('Galaxy Redshift Detection Results')
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-                
-                canvas = FigureCanvasTkAgg(fig, plot_frame)
-                canvas.get_tk_widget().pack(fill='both', expand=True)
-                canvas.draw()
-                
-            except ImportError:
-                error_label = ttk.Label(plot_frame, text="Matplotlib not available for plotting")
-                error_label.pack(expand=True)
-            
-            # Raw results tab
-            raw_frame = ttk.Frame(notebook)
-            notebook.add(raw_frame, text="📄 Raw Results")
-            
-            raw_text = tk.Text(raw_frame, wrap=tk.WORD)
-            raw_scrollbar = ttk.Scrollbar(raw_frame, orient='vertical', command=raw_text.yview)
-            raw_text.configure(yscrollcommand=raw_scrollbar.set)
-            
-            # Add raw SNID results
-            raw_content = "Galaxy Redshift Detection - Raw SNID Results\n"
-            raw_content += "=" * 50 + "\n\n"
-            
-            for i in range(min(20, len(redshifts))):
-                raw_content += f"Match {i+1}:\n"
-                raw_content += f"  Redshift: {redshifts[i]:.6f}\n"
-                raw_content += f"  Rlap: {rlaps[i]:.1f}\n"
-                raw_content += f"  Template: {template_names[i]}\n\n"
-            
-            raw_text.insert('1.0', raw_content)
-            raw_text.pack(side='left', fill='both', expand=True)
-            raw_scrollbar.pack(side='right', fill='y')
-            
-            def go_back_to_results():
-                # Restore the original layout
-                notebook.destroy()
-                results_window.geometry("700x700")
-                # Re-create buttons (they were packed before notebook)
-                buttons_frame.pack(fill='x', pady=(15, 0))
-            
-            # Add back button to plot tab
-            back_button = ttk.Button(plot_frame, text="← Back to Results", command=go_back_to_results)
-            back_button.pack(side='bottom', pady=10)
-        
-        # Button layout: three rows for better organization
-        # Row 1: Primary actions
-        primary_frame = ttk.Frame(buttons_frame)
-        primary_frame.pack(fill='x', pady=(0, 5))
-        
-        accept_button = ttk.Button(primary_frame, text="✅ Accept This Redshift", 
-                                 command=accept_redshift)
-        accept_button.pack(side='left', padx=(0, 10))
-        
-        manual_button = ttk.Button(primary_frame, text="🌌 Try Manual Redshift", 
-                                 command=try_manual_redshift)
-        manual_button.pack(side='left', padx=(0, 10))
-        
-        # Row 2: Secondary actions
-        secondary_frame = ttk.Frame(buttons_frame)
-        secondary_frame.pack(fill='x', pady=(0, 5))
-        
-        detailed_button = ttk.Button(secondary_frame, text="📊 View Detailed Results", 
-                                   command=view_detailed_results)
-        detailed_button.pack(side='left', padx=(0, 10))
-        
-        reject_button = ttk.Button(secondary_frame, text="❌ Reject & Close", 
-                                 command=reject_redshift)
-        reject_button.pack(side='right')
     
     def _safe_float(self, value, default=0.0):
         """Safely convert value to float"""

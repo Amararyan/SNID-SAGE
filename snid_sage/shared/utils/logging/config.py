@@ -55,6 +55,13 @@ def add_logging_arguments(parser: argparse.ArgumentParser) -> None:
         action='store_true', 
         help='Enable debug output (full debugging information)'
     )
+    # Convenience alias: -vv behaves like --debug
+    verbosity_group.add_argument(
+        '-vv',
+        dest='debug',
+        action='store_true',
+        help='Very verbose (alias for --debug)'
+    )
     verbosity_group.add_argument(
         '--quiet', '-q',
         action='store_true',

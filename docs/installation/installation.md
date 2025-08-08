@@ -16,7 +16,7 @@ This guide provides comprehensive instructions for installing SNID SAGE on your 
 - **Storage**: 5GB+ for templates and results
 - **GPU**: CUDA-compatible for local LLM support (optional)
 
-## Quick Installation
+## Quick Installation (v0.3.0)
 
 Install the latest stable release from PyPI:
 
@@ -24,11 +24,7 @@ Install the latest stable release from PyPI:
 pip install snid-sage
 ```
 
-For optional extras (GUI, LLM, development tools):
-
-```bash
-pip install "snid-sage[all]"
-```
+ 
 
 ### Virtual Environment Setup
 
@@ -44,6 +40,7 @@ snid_env\Scripts\activate
 
 # Install SNID SAGE
 pip install snid-sage
+ 
 
 # Verify installation
 python -c "import snid_sage; print('SNID SAGE installed successfully!')"
@@ -62,6 +59,7 @@ source snid_env/bin/activate
 
 # Install SNID SAGE
 pip install snid-sage
+ 
 
 # Verify installation
 python -c "import snid_sage; print('SNID SAGE installed successfully!')"
@@ -101,8 +99,7 @@ cd SNID_SAGE
 # Install in development mode
 pip install -e .
 
-# For all optional features
-pip install -e ".[all]"
+ 
 ```
 
 ## Platform-Specific Instructions
@@ -144,7 +141,7 @@ pip install -e ".[all]"
 sudo apt update
 
 # Install Python and pip
-sudo apt install python3.10 python3-pip python3-tk
+sudo apt install python3.10 python3-pip
 
 # Install SNID SAGE
 pip3 install snid-sage
@@ -153,8 +150,8 @@ pip3 install snid-sage
 **Fedora/CentOS/RHEL:**
 ```bash
 # Install Python and pip
-sudo dnf install python3.10 python3-pip python3-tkinter  # Fedora
-# sudo yum install python3 python3-pip python3-tkinter   # CentOS/RHEL
+sudo dnf install python3.10 python3-pip  # Fedora
+# sudo yum install python3 python3-pip   # CentOS/RHEL
 
 # Install SNID SAGE
 pip3 install snid-sage
@@ -171,6 +168,8 @@ snid-sage
 snid-gui
 ```
 
+ 
+
 ### Command Line Interface
 ```bash
 snid --help
@@ -178,11 +177,20 @@ snid --help
 
 ### Quick Analysis Example
 ```bash
-# Analyze a spectrum
+# Analyze a spectrum (default saves summary + plots)
 snid spectrum.dat -o results
 
 # Or with explicit templates directory
 snid identify spectrum.dat templates/ -o results
+
+# Minimal mode (summary only, no plots)
+snid identify spectrum.dat -o results --minimal
+
+# Complete mode (summary, plots, and all additional files)
+snid identify spectrum.dat -o results --complete
+
+# Disable plots explicitly
+snid identify spectrum.dat -o results --no-plots
 ```
 
 ## Installation Verification
@@ -218,9 +226,7 @@ snid identify data/sn2003jo.dat templates/ --output-dir test_results/
 - Try reinstalling: `pip install snid-sage --force-reinstall`
 
 **GUI doesn't launch:**
-- Linux: Install tkinter: `sudo apt install python3-tk`
-- macOS: Ensure XQuartz is installed for X11 support
-- Windows: Tkinter should be included with Python
+- On Linux desktops, ensure an X11/Wayland session is available
 
 **Permission errors:**
 - Use `--user` flag: `pip install --user snid-sage`

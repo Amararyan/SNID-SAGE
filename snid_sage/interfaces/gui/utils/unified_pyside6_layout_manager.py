@@ -548,7 +548,7 @@ class UnifiedPySide6LayoutManager:
         layout.addWidget(gui_instance.preprocessing_btn)
         
         # Preprocessing status label - add with reduced spacing
-        gui_instance.preprocess_status_label = QtWidgets.QLabel("Not preprocessed")
+        gui_instance.preprocess_status_label = QtWidgets.QLabel("Preprocessing not run")
         gui_instance.preprocess_status_label.setObjectName("unified_preprocess_status_label")
         gui_instance.preprocess_status_label.setWordWrap(True)
         gui_instance.preprocess_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important; margin-top: 0px;")
@@ -568,11 +568,11 @@ class UnifiedPySide6LayoutManager:
             gui_instance.redshift_selection_btn.clicked.connect(gui_instance.open_redshift_dialog)
         else:
             gui_instance.redshift_selection_btn.clicked.connect(lambda: _LOGGER.info("Redshift dialog not available"))
-        gui_instance.redshift_selection_btn.setToolTip("Host redshift analysis and host galaxy subtraction\nDetermine redshift manually or automatically")
+        gui_instance.redshift_selection_btn.setToolTip("Redshift analysis and host-galaxy subtraction\nDetermine redshift manually or automatically")
         layout.addWidget(gui_instance.redshift_selection_btn)
         
         # Galaxy/redshift status label - add with reduced spacing
-        gui_instance.redshift_status_label = QtWidgets.QLabel("Optional: No redshift selected")
+        gui_instance.redshift_status_label = QtWidgets.QLabel("Redshift not set (optional)")
         gui_instance.redshift_status_label.setObjectName("unified_redshift_status_label")
         gui_instance.redshift_status_label.setWordWrap(True)
         gui_instance.redshift_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important; margin-top: 0px;")
@@ -672,13 +672,13 @@ class UnifiedPySide6LayoutManager:
         elif hasattr(gui_instance, 'open_chat_dialog'):
             gui_instance.ai_assistant_btn.clicked.connect(gui_instance.open_chat_dialog)
         else:
-            gui_instance.ai_assistant_btn.clicked.connect(lambda: _LOGGER.info("AI assistant dialog not available"))
+            gui_instance.ai_assistant_btn.clicked.connect(lambda: _LOGGER.info("AI Assistant dialog not available"))
         gui_instance.ai_assistant_btn.setEnabled(False)  # Initially disabled
         gui_instance.ai_assistant_btn.setToolTip("AI-powered analysis assistant\nGet help interpreting classification results\n(Available after analysis)")
         layout.addWidget(gui_instance.ai_assistant_btn)
         
         
-        gui_instance.ai_status_label = QtWidgets.QLabel("Requires analysis results")
+        gui_instance.ai_status_label = QtWidgets.QLabel("Run analysis to enable")
         gui_instance.ai_status_label.setObjectName("unified_ai_status_label")
         gui_instance.ai_status_label.setWordWrap(True)
         gui_instance.ai_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important; margin-top: 0px;")

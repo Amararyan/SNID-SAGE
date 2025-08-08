@@ -27,6 +27,12 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_games_dialog')
 
+# Enhanced dialog button styling
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except Exception:
+    ENHANCED_BUTTONS_AVAILABLE = False
 
 class PySide6GamesDialog(QtWidgets.QDialog):
     """
@@ -52,7 +58,7 @@ class PySide6GamesDialog(QtWidgets.QDialog):
     
     def _setup_dialog(self):
         """Setup dialog properties"""
-        self.setWindowTitle("🎮 Play Games While Analyzing")
+        self.setWindowTitle("Play Games While Analyzing")
         self.setModal(True)
         self.setFixedSize(480, 520)
         
@@ -84,7 +90,7 @@ class PySide6GamesDialog(QtWidgets.QDialog):
     def _create_header(self, layout):
         """Create dialog header"""
         # Title
-        title_label = QtWidgets.QLabel("🎮 Entertainment Center")
+        title_label = QtWidgets.QLabel("Entertainment Center")
         title_label.setObjectName("games_title")
         title_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(title_label)
@@ -110,7 +116,7 @@ class PySide6GamesDialog(QtWidgets.QDialog):
         game_layout.setContentsMargins(20, 20, 20, 20)
         
         # Game title
-        game_title = QtWidgets.QLabel("🛰️ Space Debris Cleanup")
+        game_title = QtWidgets.QLabel("Space Debris Cleanup")
         game_title.setObjectName("game_title")
         game_title.setAlignment(QtCore.Qt.AlignCenter)
         game_layout.addWidget(game_title)
@@ -118,13 +124,13 @@ class PySide6GamesDialog(QtWidgets.QDialog):
         # Game description
         description_text = (
             "Advanced space simulation with realistic spacecraft and satellite debris!\n\n"
-            "🚀 Pilot a detailed spacecraft with wings and thrusters\n"
-            "🛰️ Clean up 4 types of realistic satellite debris\n"
+            "Pilot a detailed spacecraft with wings and thrusters\n"
+            "Clean up 4 types of realistic satellite debris\n"
             "⚡ Energy bullets with particle trail effects\n"
-            "🌌 Deep space background with twinkling stars\n"
-            "🌍 Earth visible in the background\n"
-            "📡 Satellites with solar panels and antennas\n"
-            "🖥️ Full-screen gameplay in 1024x768 window"
+            "Deep space background with twinkling stars\n"
+            "Earth visible in the background\n"
+            "Satellites with solar panels and antennas\n"
+            "Full-screen gameplay in 1024x768 window"
         )
         
         description_label = QtWidgets.QLabel(description_text)
@@ -169,18 +175,25 @@ class PySide6GamesDialog(QtWidgets.QDialog):
         button_layout.setSpacing(12)
         
         # Play game button
-        self.play_button = QtWidgets.QPushButton("🛰️ Start Space Debris Cleanup")
+        self.play_button = QtWidgets.QPushButton("Start Space Debris Cleanup")
         self.play_button.setObjectName("play_button")
         self.play_button.clicked.connect(self._start_game)
         button_layout.addWidget(self.play_button)
         
         # Cancel button
-        cancel_button = QtWidgets.QPushButton("❌ No Thanks")
+        cancel_button = QtWidgets.QPushButton("No Thanks")
         cancel_button.setObjectName("cancel_button")
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
         
         layout.addLayout(button_layout)
+
+        # Apply enhanced styles
+        try:
+            if ENHANCED_BUTTONS_AVAILABLE:
+                self.button_manager = enhance_dialog_with_preset(self, 'games_dialog')
+        except Exception as e:
+            _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
     
     def _check_pygame_availability(self):
         """Check if pygame is available and update UI accordingly"""
@@ -188,20 +201,20 @@ class PySide6GamesDialog(QtWidgets.QDialog):
             from snid_sage.snid.games import PYGAME_AVAILABLE
             
             if PYGAME_AVAILABLE:
-                self.availability_label.setText("✅ Ready to play!")
+                self.availability_label.setText("Ready to play!")
                 self.availability_label.setStyleSheet("color: #059669; font-weight: bold;")
                 self.play_button.setEnabled(True)
             else:
-                self.availability_label.setText("❌ Pygame not installed")
+                self.availability_label.setText("Pygame not installed")
                 self.availability_label.setStyleSheet("color: #dc2626; font-weight: bold;")
                 self.play_button.setEnabled(False)
-                self.play_button.setText("❌ Install Pygame First")
+                self.play_button.setText("Install Pygame First")
                 
         except ImportError:
-            self.availability_label.setText("❌ Games module not available")
+            self.availability_label.setText("Games module not available")
             self.availability_label.setStyleSheet("color: #dc2626; font-weight: bold;")
             self.play_button.setEnabled(False)
-            self.play_button.setText("❌ Games Not Available")
+            self.play_button.setText("Games Not Available")
     
     def _start_game(self):
         """Start the selected game"""

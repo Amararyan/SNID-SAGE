@@ -1,58 +1,12 @@
 """
-Spectral line analysis utilities
+Legacy NIST utilities removed in new GUI.
+This module is retained only to avoid import errors if referenced.
 """
-import numpy as np
-from astroquery.nist import Nist
-from astroquery.exceptions import TableParseError
 
-def search_nist_database(wavelength, species=None, delta=5.0):
-    """
-    Search NIST atomic database for lines near the given wavelength
-    
-    Args:
-        wavelength: Wavelength to search for in Angstroms
-        species: Optional list of atomic species to restrict search to
-        delta: Search range around wavelength in Angstroms
-        
-    Returns:
-        Astropy table with matching lines
-    """
-    try:
-        # Convert wavelength to nm for NIST (which uses nm)
-        wavelength_nm = wavelength / 10.0
-        
-        # Calculate search range
-        lower_wl = (wavelength - delta) / 10.0  # nm
-        upper_wl = (wavelength + delta) / 10.0  # nm
-        
-        # Perform NIST search
-        if species:
-            # If species are specified, search for each one separately
-            result = Nist.query(
-                wavelength_min=lower_wl,
-                wavelength_max=upper_wl,
-                wavelength_type='vacuum',
-                linename=species
-            )
-        else:
-            # If no species specified, search all elements
-            result = Nist.query(
-                wavelength_min=lower_wl,
-                wavelength_max=upper_wl,
-                wavelength_type='vacuum'
-            )
-        
-        # Convert wavelengths back to Angstroms for consistency
-        if 'Wavelength' in result.colnames:
-            result['Wavelength'] = result['Wavelength'] * 10.0
-        
-        return result
-    except TableParseError:
-        # No results found
-        return None
-    except Exception as e:
-        print(f"NIST search error: {str(e)}")
-        return None
+import numpy as np
+
+def search_nist_database(*args, **kwargs):
+    return None
 
 def compare_spectral_lines(obs_lines, tmpl_lines, velocity_threshold=200.0):
     """

@@ -15,7 +15,6 @@ import glob
 import logging
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
-import concurrent.futures
 from datetime import datetime
 import json
 import time
@@ -218,10 +217,7 @@ def process_single_spectrum_optimized(
     args: argparse.Namespace
 ) -> Tuple[str, bool, str, Dict[str, Any]]:
     """
-    Process a single spectrum using pre-loaded templates.
-    
-    This optimized version uses the BatchTemplateManager to avoid
-    reloading templates for each spectrum.
+    Process a single spectrum using pre-loaded templates via first-class API.
     """
     spectrum_name = Path(spectrum_path).stem
     spectrum_output_dir = Path(output_dir) / spectrum_name
@@ -269,17 +265,17 @@ def process_single_spectrum_optimized(
                 'error': 'No templates after filtering'
             }
         
-        # STEP 3: Run SNID analysis with pre-loaded templates
-        # Pass the templates directory to the analysis function
-        _run_optimized_snid_analysis._templates_dir = template_manager.templates_dir
-        
-        result = _run_optimized_snid_analysis(
+        # STEP 3: Run SNID analysis using first-class API with preloaded templates
+        result, _ = run_snid_analysis(
             processed_spectrum=processed_spectrum,
-            templates=filtered_templates,
+            templates_dir=template_manager.templates_dir,
             zmin=args.zmin,
             zmax=args.zmax,
             forced_redshift=args.forced_redshift,
-            verbose=False
+            verbose=False,
+            show_plots=False,
+            save_plots=False,  # Avoid internal saving to prevent duplicates; CLI handles all plots
+            preloaded_templates=filtered_templates
         )
         
         # STEP 4: Generate outputs if requested
@@ -290,6 +286,50 @@ def process_single_spectrum_optimized(
                 output_dir=spectrum_output_dir if create_dir else output_dir,
                 args=args
             )
+
+        # Default behavior: for default mode (not minimal/complete) also generate plots unless disabled
+        if (not args.minimal) and (not args.complete) and result.success and (not getattr(args, 'no_plots', False)):
+            try:
+                from snid_sage.snid.plotting import (
+                    plot_redshift_age, plot_flux_comparison, plot_flat_comparison
+                )
+                from snid_sage.shared.utils.math_utils import get_best_metric_value
+                import matplotlib.pyplot as plt
+                sdir = spectrum_output_dir if create_dir else Path(output_dir)
+                spectrum_name = Path(spectrum_path).stem
+                # Redshift vs Age (already cluster-aware inside the function)
+                redshift_age_file = sdir / f"{spectrum_name}_redshift_age.png"
+                fig = plot_redshift_age(result, save_path=str(redshift_age_file))
+                plt.close(fig)
+
+                # Choose the same match the GUI would show: winning cluster → filtered → best
+                plot_matches = []
+                winning_cluster = None
+                if (hasattr(result, 'clustering_results') and result.clustering_results and
+                    result.clustering_results.get('success')):
+                    cr = result.clustering_results
+                    if cr.get('user_selected_cluster'):
+                        winning_cluster = cr['user_selected_cluster']
+                    elif cr.get('best_cluster'):
+                        winning_cluster = cr['best_cluster']
+                if winning_cluster and winning_cluster.get('matches'):
+                    plot_matches = winning_cluster['matches']
+                elif hasattr(result, 'filtered_matches') and result.filtered_matches:
+                    plot_matches = result.filtered_matches
+                elif hasattr(result, 'best_matches') and result.best_matches:
+                    plot_matches = result.best_matches
+
+                if plot_matches:
+                    plot_matches = sorted(plot_matches, key=get_best_metric_value, reverse=True)
+                    top_match = plot_matches[0]
+                    flux_file = sdir / f"{spectrum_name}_flux_spectrum.png"
+                    fig = plot_flux_comparison(top_match, result, save_path=str(flux_file))
+                    plt.close(fig)
+                    flat_file = sdir / f"{spectrum_name}_flattened_spectrum.png"
+                    fig = plot_flat_comparison(top_match, result, save_path=str(flat_file))
+                    plt.close(fig)
+            except Exception as e:
+                logging.getLogger('snid_sage.snid.batch').debug(f"Default plot generation failed: {e}")
         
         if result.success:
             # Create GUI-style summary with cluster-aware analysis
@@ -309,102 +349,7 @@ def process_single_spectrum_optimized(
             'success': False,
             'error': str(e)
         }
-
-
-def _run_optimized_snid_analysis(
-    processed_spectrum: Dict[str, Any],
-    templates: List[Dict[str, Any]],
-    zmin: float = -0.01,
-    zmax: float = 1.0,
-    forced_redshift: Optional[float] = None,
-    verbose: bool = False
-) -> SNIDResult:
-    """
-    Run SNID analysis using pre-loaded templates.
-    
-    This bypasses the template loading in run_snid_analysis by monkey-patching
-    the template loading functions to return our pre-loaded templates.
-    """
-    try:
-        # Import required modules
-        from snid_sage.snid.snid import SNIDResult
-        
-        # We need to pass a valid templates directory to avoid TemplateFFTStorage errors
-        # Get the templates directory from the global template manager if possible
-        templates_dir = getattr(_run_optimized_snid_analysis, '_templates_dir', None)
-        if not templates_dir:
-            # Fallback to a dummy directory - the monkey-patch will handle the actual loading
-            templates_dir = "dummy_templates_dir"
-        
-        # Import the functions we need to patch
-        import snid_sage.snid.core.integration
-        import snid_sage.snid.io
-        
-        # Store original functions
-        original_load_templates_unified = snid_sage.snid.core.integration.load_templates_unified
-        original_load_templates = snid_sage.snid.io.load_templates
-        
-        # Create mock functions that return our pre-loaded templates
-        def mock_load_templates_unified(template_dir, type_filter=None, template_names=None, exclude_templates=None):
-            # Apply filtering to our pre-loaded templates
-            filtered_templates = templates[:]
-            
-            if type_filter:
-                filtered_templates = [t for t in filtered_templates if t.get('type', '') in type_filter]
-            
-            if template_names:
-                filtered_templates = [t for t in filtered_templates if t.get('name', '') in template_names]
-            
-            if exclude_templates:
-                filtered_templates = [t for t in filtered_templates if t.get('name', '') not in exclude_templates]
-            
-            return filtered_templates
-        
-        def mock_load_templates(template_dir, flatten=True):
-            return templates, {}
-        
-        try:
-            # Apply the monkey patches
-            snid_sage.snid.core.integration.load_templates_unified = mock_load_templates_unified
-            snid_sage.snid.io.load_templates = mock_load_templates
-            
-            # Temporarily suppress some logging during individual spectrum processing
-            import logging
-            snid_pipeline_logger = logging.getLogger('snid_sage.snid.pipeline')
-            original_pipeline_level = snid_pipeline_logger.level
-            
-            # Set to ERROR level to suppress "No templates loaded" messages
-            snid_pipeline_logger.setLevel(logging.ERROR)
-            
-            try:
-                # Now call run_snid_analysis with the mocked functions
-                result, _ = run_snid_analysis(
-                    processed_spectrum=processed_spectrum,
-                    templates_dir=templates_dir,
-                    zmin=zmin,
-                    zmax=zmax,
-                    forced_redshift=forced_redshift,
-                    verbose=verbose,
-                    show_plots=False,
-                    save_plots=False
-                )
-                
-                return result
-                
-            finally:
-                # Restore logging level
-                snid_pipeline_logger.setLevel(original_pipeline_level)
-                
-        finally:
-            # Restore original functions
-            snid_sage.snid.core.integration.load_templates_unified = original_load_templates_unified
-            snid_sage.snid.io.load_templates = original_load_templates
-            
-    except Exception as e:
-        # Return failed result
-        result = SNIDResult(success=False)
-        result.error_message = str(e)
-        return result
+ 
 
 
 def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectrum_path: str) -> Dict[str, Any]:
@@ -815,8 +760,7 @@ Examples:
     )
     parser.add_argument(
         "--output-dir", "-o", 
-        required=True,
-        help="Directory for output files"
+        help="Directory for output files (defaults to ./results or configured paths.output_dir)"
     )
     
     # Processing modes (mutually exclusive)
@@ -861,14 +805,17 @@ Examples:
         nargs="+", 
         help="Only use specific templates (by name)"
     )
+
+    # Display options
+    display_group = parser.add_argument_group("Display Options")
+    display_group.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress output (auto-disabled when stdout is not a TTY)"
+    )
     
     # Processing options
-    parser.add_argument(
-        "--max-workers", 
-        type=int, 
-        default=1,
-        help="Number of parallel workers"
-    )
+    # Parallelism removed to avoid unsafe shared state; always sequential
     parser.add_argument(
         "--stop-on-error", 
         action="store_true",
@@ -878,6 +825,12 @@ Examples:
         "--verbose", "-v", 
         action="store_true", 
         help="Print detailed processing information"
+    )
+    # Default behavior: generate plots unless disabled
+    parser.add_argument(
+        "--no-plots",
+        action="store_true",
+        help="Do not generate plots (by default plots are saved)"
     )
 
 
@@ -894,12 +847,12 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     # Generate report
     report = []
     report.append("="*80)
-    report.append("🔬 SNID SAGE BATCH ANALYSIS REPORT")
+    report.append("SNID SAGE BATCH ANALYSIS REPORT")
     report.append("="*80)
     report.append("")
     
     # Summary
-    report.append("📊 BATCH PROCESSING SUMMARY")
+    report.append("BATCH PROCESSING SUMMARY")
     report.append("-"*50)
     report.append(f"Input Pattern: {args.input_pattern}")
     report.append(f"Templates Directory: {args.templates_dir}")
@@ -907,13 +860,13 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     report.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     report.append("")
     
-    report.append(f"📈 PROCESSING RESULTS:")
+    report.append(f"PROCESSING RESULTS:")
     report.append(f"   Total Spectra Processed: {total_count}")
     report.append(f"   Successful Analyses: {success_count} ({success_count/total_count*100:.1f}%)")
     report.append(f"   Failed Analyses: {failure_count} ({failure_count/total_count*100:.1f}%)")
     report.append("")
     
-    report.append(f"⚙️ ANALYSIS PARAMETERS:")
+    report.append(f"ANALYSIS PARAMETERS:")
     report.append(f"   Redshift Search Range: {args.zmin:.3f} ≤ z ≤ {args.zmax:.3f}")
     if args.forced_redshift is not None:
         report.append(f"   Forced Redshift: z = {args.forced_redshift:.6f}")
@@ -926,7 +879,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     
     if successful_results:
         # Results table - focus on individual objects, not aggregated science
-        report.append("📋 INDIVIDUAL SPECTRUM RESULTS")
+        report.append("INDIVIDUAL SPECTRUM RESULTS")
         report.append("-"*50)
         report.append("Each spectrum represents a different astronomical object.")
         report.append("Results are sorted by analysis quality (RLAP-Cos) - highest quality first.")
@@ -936,7 +889,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         header = f"{'Spectrum':<25} {'Type':<8} {'Subtype':<10} {'Template':<18} {'z':<8} {'RLAP-Cos':<8} {'C':<1}"
         report.append(header)
         report.append("-" * len(header))
-        report.append("Legend: 🎯 = Cluster-based analysis, z = redshift")
+        report.append("Legend: * = Cluster-based analysis, z = redshift")
         
         # Sort results by RLAP-Cos descending (highest quality first)
         from snid_sage.shared.utils.math_utils import get_best_metric_value
@@ -959,7 +912,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             # Use RLAP-Cos if available, otherwise RLAP
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             rlap_cos = f"{get_best_metric_value(summary):.1f}"
-            cluster_marker = "🎯" if summary.get('has_clustering', False) else " "
+            cluster_marker = "*" if summary.get('has_clustering', False) else " "
             
             row = f"{spectrum:<25} {cons_type:<8} {cons_subtype:<10} {template:<18} {redshift:<8} {rlap_cos:<8} {cluster_marker}"
             report.append(row)
@@ -967,7 +920,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         report.append("")
         
         # Detailed analysis (sorted by RLAP-Cos - highest quality first)
-        report.append("🎯 DETAILED INDIVIDUAL ANALYSIS")
+        report.append("DETAILED INDIVIDUAL ANALYSIS")
         report.append("-"*50)
         report.append("Detailed results for each spectrum (sorted by analysis quality):")
         
@@ -978,7 +931,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             
             # Show cluster information if available
             if summary.get('has_clustering'):
-                report.append(f"   🎯 CLUSTER ANALYSIS ({summary.get('cluster_method', 'Unknown')}):")
+                report.append(f"   CLUSTER ANALYSIS ({summary.get('cluster_method', 'Unknown')}):")
                 report.append(f"      Cluster Type: {summary.get('cluster_type', 'Unknown')}")
                 report.append(f"      Cluster Size: {summary.get('cluster_size', 0)} template matches")
                 
@@ -1018,7 +971,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
                     report.append(f"      {i}. {subtype_name}: {fraction*100:.1f}%")
         
         # Analysis quality statistics (these ARE meaningful to aggregate)  
-        report.append(f"\n\n📊 BATCH PROCESSING QUALITY STATISTICS")
+        report.append(f"\n\nBATCH PROCESSING QUALITY STATISTICS")
         report.append("-"*50)
         report.append("These statistics describe the quality of the batch processing, not the science.")
         report.append("")
@@ -1034,7 +987,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         # Determine metric name (RLAP-Cos if available, otherwise RLAP)
         metric_name = "RLAP-Cos" if any('rlap_cos' in summary for _, _, _, summary in successful_results) else "RLAP"
         
-        report.append(f"🎯 ANALYSIS QUALITY ({metric_name} Distribution):")
+        report.append(f"ANALYSIS QUALITY ({metric_name} Distribution):")
         report.append(f"   Average {metric_name}: {avg_metric:.2f}")
         report.append(f"   High Quality ({metric_name} ≥ 10): {high_quality}/{success_count} ({high_quality/success_count*100:.1f}%)")
         report.append(f"   Medium Quality (5 ≤ {metric_name} < 10): {medium_quality}/{success_count} ({medium_quality/success_count*100:.1f}%)")
@@ -1049,7 +1002,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         low_confidence = sum(1 for _, _, _, s in successful_results 
                             if s.get('cluster_confidence_level') == 'Low')
         
-        report.append(f"\n🔒 CLASSIFICATION CONFIDENCE:")
+        report.append(f"\nCLASSIFICATION CONFIDENCE:")
         if cluster_count > 0:
             report.append(f"   High Confidence: {high_confidence}/{success_count} ({high_confidence/success_count*100:.1f}%)")
             report.append(f"   Medium Confidence: {medium_confidence}/{success_count} ({medium_confidence/success_count*100:.1f}%)")
@@ -1061,7 +1014,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         cluster_count = sum(1 for _, _, _, s in successful_results if s.get('has_clustering', False))
         total_cluster_size = sum(s.get('cluster_size', 0) for _, _, _, s in successful_results if s.get('has_clustering', False))
         
-        report.append(f"\n🎯 CLUSTERING EFFECTIVENESS:")
+        report.append(f"\nCLUSTERING EFFECTIVENESS:")
         report.append(f"   Spectra with GMM clustering: {cluster_count}/{success_count} ({cluster_count/success_count*100:.1f}%)")
         report.append(f"   Spectra with basic analysis: {success_count-cluster_count}/{success_count} ({(success_count-cluster_count)/success_count*100:.1f}%)")
         if cluster_count > 0:
@@ -1073,7 +1026,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         if all_runtimes:
             avg_runtime = sum(all_runtimes) / len(all_runtimes)
             total_runtime = sum(all_runtimes)
-            report.append(f"\n⏱️ PERFORMANCE STATISTICS:")
+            report.append(f"\nPERFORMANCE STATISTICS:")
             report.append(f"   Average analysis time: {avg_runtime:.1f} seconds per spectrum")
             report.append(f"   Total analysis time: {total_runtime:.1f} seconds")
             report.append(f"   Throughput: {success_count/total_runtime*60:.1f} spectra per minute")
@@ -1085,7 +1038,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             type_counts[cons_type] = type_counts.get(cons_type, 0) + 1
         
         if len(type_counts) > 1:  # Only show if there's variety
-            report.append(f"\n📋 TYPE DISTRIBUTION (For Reference Only):")
+            report.append(f"\nTYPE DISTRIBUTION (For Reference Only):")
             report.append("Note: Each spectrum is a different object - this is just a summary of what was found.")
             sorted_types = sorted(type_counts.items(), key=lambda x: x[1], reverse=True)
             for type_name, count in sorted_types:
@@ -1104,7 +1057,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     
     # No matches section (normal outcome)
     if no_match_results:
-        report.append(f"\n\n📝 NO MATCHES FOUND ({len(no_match_results)} spectra)")
+        report.append(f"\n\nNO MATCHES FOUND ({len(no_match_results)} spectra)")
         report.append("-"*50)
         report.append("These spectra had no good template matches - this is a normal analysis outcome.")
         for spectrum_name, error_message in no_match_results:
@@ -1113,7 +1066,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     
     # Actual failures section (real errors)
     if actual_failed_results:
-        report.append(f"\n\n❌ ACTUAL FAILURES ({len(actual_failed_results)} spectra)")
+        report.append(f"\n\nACTUAL FAILURES ({len(actual_failed_results)} spectra)")
         report.append("-"*50)
         report.append("These spectra failed due to processing errors:")
         for spectrum_name, error_message in actual_failed_results:
@@ -1127,17 +1080,8 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
 def main(args: argparse.Namespace) -> int:
     """Main function for the simplified batch command."""
     try:
-        # Use centralized logging system instead of manual configuration
-        from snid_sage.shared.utils.logging import configure_logging, VerbosityLevel
-        
-        # Configure logging based on verbosity
-        # For CLI mode, default to QUIET (warnings/errors only) unless verbose is requested
-        if args.verbose:
-            verbosity = VerbosityLevel.VERBOSE
-        else:
-            verbosity = VerbosityLevel.QUIET  # Only show warnings and errors, not INFO messages
-            
-        configure_logging(verbosity=verbosity, gui_mode=False)
+        # Logging already configured at top-level; proceed
+        is_quiet = bool(getattr(args, 'quiet', False) or getattr(args, 'silent', False))
         
         # Additional suppression for CLI mode - silence specific noisy loggers
         if not args.verbose:
@@ -1168,178 +1112,137 @@ def main(args: argparse.Namespace) -> int:
             mode = "Standard (main outputs)"
         
         # Simple startup message
-        print(f"🔬 SNID Batch Analysis - CLUSTER-AWARE & OPTIMIZED")
-        print(f"   Files: {len(input_files)} spectra")
-        print(f"   Mode: {mode}")
-        print(f"   Analysis: GUI-style cluster-aware (winning cluster)")
-        print(f"   Sorting: All results/plots sorted by RLAP-Cos (highest quality first)")
-        print(f"   Output: {args.output_dir}")
-        print(f"   Redshift Range: {args.zmin:.3f} ≤ z ≤ {args.zmax:.3f}")
-        if args.forced_redshift:
-            print(f"   Forced Redshift: {args.forced_redshift:.6f}")
-        print(f"   Error Handling: {'Stop on first failure' if args.stop_on_error else 'Continue on failures (default)'}")
-        print("")
+        if not is_quiet:
+            print("SNID Batch Analysis - Cluster-aware & optimized")
+            print(f"   Files: {len(input_files)} spectra")
+            print(f"   Mode: {mode}")
+            print(f"   Analysis: GUI-style cluster-aware (winning cluster)")
+            print(f"   Sorting: All results/plots sorted by RLAP-Cos (highest quality first)")
+            print(f"   Output: {args.output_dir}")
+            print(f"   Redshift Range: {args.zmin:.3f} to {args.zmax:.3f}")
+            if args.forced_redshift:
+                print(f"   Forced Redshift: {args.forced_redshift:.6f}")
+            print(f"   Error Handling: {'Stop on first failure' if args.stop_on_error else 'Continue on failures (default)'}")
+            print("")
         
-        # Create output directory
+        # Resolve output directory from CLI or unified config
+        if not args.output_dir:
+            try:
+                from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
+                cfg = ConfigurationManager().load_config()
+                args.output_dir = cfg.get('paths', {}).get('output_dir') or str(Path.cwd() / 'results')
+            except Exception:
+                args.output_dir = str(Path.cwd() / 'results')
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # ============================================================================
         # OPTIMIZATION: Load templates ONCE for the entire batch
         # ============================================================================
-        print("📚 Loading templates once for entire batch...")
+        if not is_quiet:
+            print("Loading templates once for entire batch...")
         template_manager = BatchTemplateManager(args.templates_dir, verbose=args.verbose)
         
         if not template_manager.load_templates_once():
             print("[ERROR] Failed to load templates", file=sys.stderr)
             return 1
         
-        print(f"[SUCCESS] Templates loaded in {template_manager.load_time:.2f}s")
-        print(f"📊 Ready to process {len(input_files)} spectra with {template_manager.template_count} templates")
-        print("")
+        if not is_quiet:
+            print(f"[SUCCESS] Templates loaded in {template_manager.load_time:.2f}s")
+            print(f"Ready to process {len(input_files)} spectra with {template_manager.template_count} templates")
+            print("")
         
         # Process spectra
         results = []
         failed_count = 0
         
-        if args.max_workers == 1:
-            # Sequential processing with optimized template loading
+        # Always sequential processing with optimized template loading
+        if not is_quiet:
             print("[INFO] Starting optimized sequential processing...")
-            
-            for i, spectrum_path in enumerate(input_files, 1):
-                if args.verbose:
-                    print(f"[{i:3d}/{len(input_files):3d}] {Path(spectrum_path).name}")
-                else:
-                    # Enhanced progress indicator
-                    if i % 10 == 0 or i == len(input_files):
-                        print(f"   Progress: {i}/{len(input_files)} ({i/len(input_files)*100:.0f}%)")
-                
-                name, success, message, summary = process_single_spectrum_optimized(
-                    spectrum_path, template_manager, args.output_dir, args
-                )
-                
-                results.append((name, success, message, summary))
-                
-                if not success:
-                    failed_count += 1
-                    if "No good matches" in message or "No templates after filtering" in message:
-                        # Normal outcome - no match found
+
+        for i, spectrum_path in enumerate(input_files, 1):
+            is_tty = sys.stdout.isatty()
+            show_progress = (not args.verbose) and (not is_quiet) and (not getattr(args, 'no_progress', False)) and is_tty
+            if args.verbose:
+                print(f"[{i:3d}/{len(input_files):3d}] {Path(spectrum_path).name}")
+            else:
+                # Lightweight progress
+                if show_progress and (i % 10 == 0 or i == len(input_files)):
+                    print(f"   Progress: {i}/{len(input_files)} ({i/len(input_files)*100:.0f}%)")
+
+            name, success, message, summary = process_single_spectrum_optimized(
+                spectrum_path, template_manager, args.output_dir, args
+            )
+
+            results.append((name, success, message, summary))
+
+            if not success:
+                failed_count += 1
+                if "No good matches" in message or "No templates after filtering" in message:
+                    # Normal outcome - no match found
+                    if not is_quiet:
                         print(f"      {name}: No good matches found")
-                    else:
-                        # Actual error
-                        if args.verbose:
-                            print(f"      [ERROR] {name}: {message}")
-                        else:
-                            print(f"      [ERROR] {name}: error")
-                    if args.stop_on_error:
-                        print("🛑 Stopping due to error.")
-                        break
                 else:
-                    # Success - show one-line summary
-                    if summary and isinstance(summary, dict):
-                        consensus_type = summary.get('consensus_type', 'Unknown')
-                        consensus_subtype = summary.get('consensus_subtype', '')
-                        
-                        # Use cluster-weighted redshift if available, otherwise regular redshift
-                        if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
-                            redshift = summary['cluster_redshift_weighted']
-                            z_marker = "🎯"  # Cluster analysis marker
-                        else:
-                            redshift = summary.get('redshift', 0)
-                            z_marker = ""
-                        
-                        # Use RLAP-Cos if available, otherwise RLAP
-                        from snid_sage.shared.utils.math_utils import get_best_metric_value
-                        rlap_cos = get_best_metric_value(summary)
-                        
-                        # Format subtype display
-                        type_display = f"{consensus_type} {consensus_subtype}".strip()
-                        
-                        print(f"      {name}: {type_display} z={redshift:.6f} RLAP-Cos={rlap_cos:.1f} {z_marker}")
+                    # Actual error
+                    if args.verbose and not is_quiet:
+                        print(f"      [ERROR] {name}: {message}")
+                    elif not is_quiet:
+                        print(f"      [ERROR] {name}: error")
+                if args.stop_on_error:
+                    if not is_quiet:
+                        print("Stopping due to error.")
+                    break
+            else:
+                # Success - show one-line summary
+                if summary and isinstance(summary, dict) and not is_quiet:
+                    consensus_type = summary.get('consensus_type', 'Unknown')
+                    consensus_subtype = summary.get('consensus_subtype', '')
+
+                    # Use cluster-weighted redshift if available, otherwise regular redshift
+                    if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
+                        redshift = summary['cluster_redshift_weighted']
+                        z_marker = "*"  # Marker without emoji
                     else:
-                        print(f"      {name}: success")
-        else:
-            # Parallel processing is more complex with shared template manager
-            # For now, we'll fall back to sequential processing with a warning
-            print(f"⚠️  Parallel processing not yet supported with template optimization.")
-            print(f"    Using sequential processing for maximum efficiency.")
-            print(f"[INFO] Starting optimized sequential processing...")
-            
-            for i, spectrum_path in enumerate(input_files, 1):
-                if args.verbose:
-                    print(f"[{i:3d}/{len(input_files):3d}] {Path(spectrum_path).name}")
+                        redshift = summary.get('redshift', 0)
+                        z_marker = ""
+
+                    # Use RLAP-Cos if available, otherwise RLAP
+                    from snid_sage.shared.utils.math_utils import get_best_metric_value
+                    rlap_cos = get_best_metric_value(summary)
+
+                    # Format subtype display
+                    type_display = f"{consensus_type} {consensus_subtype}".strip()
+
+                    print(f"      {name}: {type_display} z={redshift:.6f} RLAP-Cos={rlap_cos:.1f} {z_marker}")
                 else:
-                    # Enhanced progress indicator
-                    if i % 10 == 0 or i == len(input_files):
-                        print(f"   Progress: {i}/{len(input_files)} ({i/len(input_files)*100:.0f}%)")
-                
-                name, success, message, summary = process_single_spectrum_optimized(
-                    spectrum_path, template_manager, args.output_dir, args
-                )
-                
-                results.append((name, success, message, summary))
-                
-                if not success:
-                    failed_count += 1
-                    if "No good matches" in message or "No templates after filtering" in message:
-                        # Normal outcome - no match found
-                        print(f"      {name}: No good matches found")
-                    else:
-                        # Actual error
-                        if args.verbose:
-                            print(f"      [ERROR] {name}: {message}")
-                        else:
-                            print(f"      [ERROR] {name}: error")
-                    if args.stop_on_error:
-                        print("🛑 Stopping due to error.")
-                        break
-                else:
-                    # Success - show one-line summary
-                    if summary and isinstance(summary, dict):
-                        consensus_type = summary.get('consensus_type', 'Unknown')
-                        consensus_subtype = summary.get('consensus_subtype', '')
-                        
-                        # Use cluster-weighted redshift if available, otherwise regular redshift
-                        if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
-                            redshift = summary['cluster_redshift_weighted']
-                            z_marker = "🎯"  # Cluster analysis marker
-                        else:
-                            redshift = summary.get('redshift', 0)
-                            z_marker = ""
-                        
-                        # Use RLAP-Cos if available, otherwise RLAP
-                        from snid_sage.shared.utils.math_utils import get_best_metric_value
-                        rlap_cos = get_best_metric_value(summary)
-                        
-                        # Format subtype display
-                        type_display = f"{consensus_type} {consensus_subtype}".strip()
-                        
-                        print(f"      {name}: {type_display} z={redshift:.6f} RLAP-Cos={rlap_cos:.1f} {z_marker}")
-                    else:
+                    if not is_quiet:
                         print(f"      {name}: success")
         
         # Results summary
         successful_count = len(results) - failed_count
         success_rate = successful_count / len(results) * 100 if results else 0
         
-        print(f"\n📊 Completed: {success_rate:.1f}% success ({successful_count}/{len(results)})")
+        if not is_quiet:
+            print(f"\nCompleted: {success_rate:.1f}% success ({successful_count}/{len(results)})")
         
         # Generate summary report
-        summary_path = output_dir / "batch_analysis_report.txt"
-        print(f"📄 Generating summary report...")
+            summary_path = output_dir / "batch_analysis_report.txt"
+        if not is_quiet:
+                print(f"Generating summary report...")
         
         summary_report = generate_summary_report(results, args)
         with open(summary_path, 'w', encoding='utf-8') as f:
             f.write(summary_report)
         
-        print(f"[SUCCESS] Summary report: {summary_path}")
+        if not is_quiet:
+            print(f"[SUCCESS] Summary report: {summary_path}")
         
                 # Show what was created
-        if not args.minimal and successful_count > 0:
-            print(f"📁 Individual results in: {output_dir}/")
+        if not is_quiet and not args.minimal and successful_count > 0:
+            print(f"Individual results in: {output_dir}/")
             if args.complete:
-                print(f"   📊 3D Plots: Static PNG files with optimized viewing angle")
-                print(f"   📈 Top 5 templates: Sorted by RLAP-Cos (highest quality first)")
+                print(f"   3D Plots: Static PNG files with optimized viewing angle")
+                print(f"   Top 5 templates: Sorted by RLAP-Cos (highest quality first)")
             
         return 0 if failed_count == 0 else 1
         

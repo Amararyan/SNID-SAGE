@@ -18,9 +18,10 @@ from .snidtype         import (    # <<< was .utils
     determine_best_type, SNIDResult,
     compute_initial_redshift
 )
-from .plotting         import (plot_comparison, plot_result,
-                               plot_type_comparison, 
-                               plot_template_epochs, plot_type_fractions)
+from .plotting         import (
+    plot_comparison,
+    plot_template_epochs,
+)
 
 __version__ = "1.0.0"
 

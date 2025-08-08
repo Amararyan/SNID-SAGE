@@ -17,6 +17,12 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_progress')
 
+# Enhanced dialog button styling
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except Exception:
+    ENHANCED_BUTTONS_AVAILABLE = False
 
 class PySide6ProgressDialog(QtWidgets.QDialog):
     """
@@ -128,12 +134,20 @@ class PySide6ProgressDialog(QtWidgets.QDialog):
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.addStretch()
         
-        self.cancel_btn = QtWidgets.QPushButton("❌ Cancel")
+        self.cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.cancel_btn.setObjectName("cancel_btn")
         self.cancel_btn.clicked.connect(self._on_cancel)
         button_layout.addWidget(self.cancel_btn)
         
         button_layout.addStretch()
         layout.addLayout(button_layout)
+
+        # Apply enhanced styles
+        try:
+            if ENHANCED_BUTTONS_AVAILABLE:
+                self.button_manager = enhance_dialog_with_preset(self, 'progress_dialog')
+        except Exception as e:
+            _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
     
     def update_status(self, message: str):
         """Update the status message"""

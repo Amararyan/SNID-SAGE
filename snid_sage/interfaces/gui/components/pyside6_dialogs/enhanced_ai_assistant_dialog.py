@@ -28,6 +28,13 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_ai_assistant')
 
+# Enhanced dialog button styling
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except Exception:
+    ENHANCED_BUTTONS_AVAILABLE = False
+
 
 class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     """
@@ -309,6 +316,13 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         
         # Footer buttons
         self._create_footer_buttons(layout)
+
+        # Apply enhanced dialog button styling preset
+        try:
+            if ENHANCED_BUTTONS_AVAILABLE:
+                self.button_manager = enhance_dialog_with_preset(self, 'enhanced_ai_assistant_dialog')
+        except Exception as e:
+            _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
         
     def _create_header(self, layout):
         """Create header section with status indicator"""
@@ -398,7 +412,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         generate_layout = QtWidgets.QHBoxLayout()
         
         self.generate_summary_btn = QtWidgets.QPushButton("Generate Summary")
-        self.generate_summary_btn.setObjectName("primary_btn")
+        self.generate_summary_btn.setObjectName("generate_summary_btn")
         self.generate_summary_btn.clicked.connect(self._generate_summary)
         self.generate_summary_btn.setMinimumHeight(40)
         generate_layout.addWidget(self.generate_summary_btn)
@@ -422,12 +436,14 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         # Summary controls
         summary_controls_layout = QtWidgets.QHBoxLayout()
         
-        self.export_summary_btn = QtWidgets.QPushButton("💾 Export Summary")
+        self.export_summary_btn = QtWidgets.QPushButton("Export Summary")
+        self.export_summary_btn.setObjectName("export_summary_btn")
         self.export_summary_btn.clicked.connect(self._export_summary)
         self.export_summary_btn.setEnabled(False)
         summary_controls_layout.addWidget(self.export_summary_btn)
         
-        self.copy_summary_btn = QtWidgets.QPushButton("📋 Copy to Clipboard")
+        self.copy_summary_btn = QtWidgets.QPushButton("Copy to Clipboard")
+        self.copy_summary_btn.setObjectName("copy_summary_btn")
         self.copy_summary_btn.clicked.connect(self._copy_summary)
         self.copy_summary_btn.setEnabled(False)
         summary_controls_layout.addWidget(self.copy_summary_btn)
@@ -450,7 +466,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.chat_history.setReadOnly(True)
         self.chat_history.setMinimumHeight(350)
         self.chat_history.setPlainText(
-            "🤖 AI Assistant: Hello! Ask me questions about your SNID analysis.\n\n"
+            "AI Assistant: Hello! Ask me questions about your SNID analysis.\n\n"
             "Examples:\n"
             "• What type of supernova is this?\n"
             "• How confident is this classification?\n"
@@ -482,12 +498,13 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         # Send controls
         send_layout = QtWidgets.QHBoxLayout()
         
-        self.send_btn = QtWidgets.QPushButton("💬 Send")
-        self.send_btn.setObjectName("primary_btn")
+        self.send_btn = QtWidgets.QPushButton("Send")
+        self.send_btn.setObjectName("send_btn")
         self.send_btn.clicked.connect(self._send_chat_message)
         send_layout.addWidget(self.send_btn)
         
-        self.clear_chat_btn = QtWidgets.QPushButton("🧹 Clear")
+        self.clear_chat_btn = QtWidgets.QPushButton("Clear")
+        self.clear_chat_btn.setObjectName("clear_chat_btn")
         self.clear_chat_btn.clicked.connect(self._clear_chat)
         send_layout.addWidget(self.clear_chat_btn)
         
@@ -555,11 +572,13 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         
         # Show/hide API key button
         self.show_key_btn = QtWidgets.QPushButton("Show")
+        self.show_key_btn.setObjectName("show_key_btn")
         self.show_key_btn.setMaximumWidth(90)
         self.show_key_btn.clicked.connect(self._toggle_api_key_visibility)
         key_layout.addWidget(self.show_key_btn)
         # Move test connection controls next to the Show button
-        self.test_connection_btn = QtWidgets.QPushButton("🔍 Test Connection")
+        self.test_connection_btn = QtWidgets.QPushButton("Test Connection")
+        self.test_connection_btn.setObjectName("test_connection_btn")
         self.test_connection_btn.clicked.connect(self._test_openrouter_connection)
         key_layout.addWidget(self.test_connection_btn)
 
@@ -659,15 +678,18 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         right_side_layout.setContentsMargins(0, 0, 0, 0)
         right_side_layout.setSpacing(6)
 
-        self.fetch_models_btn = QtWidgets.QPushButton("📡 Fetch All Models")
+        self.fetch_models_btn = QtWidgets.QPushButton("Fetch All Models")
+        self.fetch_models_btn.setObjectName("fetch_models_btn")
         self.fetch_models_btn.clicked.connect(self._fetch_all_models)
         right_side_layout.addWidget(self.fetch_models_btn)
 
-        self.fetch_free_btn = QtWidgets.QPushButton("🆓 Free Only")
+        self.fetch_free_btn = QtWidgets.QPushButton("Free Only")
+        self.fetch_free_btn.setObjectName("fetch_free_btn")
         self.fetch_free_btn.clicked.connect(self._fetch_free_models)
         right_side_layout.addWidget(self.fetch_free_btn)
 
-        self.test_model_btn = QtWidgets.QPushButton("🧪 Test Selected")
+        self.test_model_btn = QtWidgets.QPushButton("Test Selected")
+        self.test_model_btn.setObjectName("test_model_btn")
         self.test_model_btn.clicked.connect(self._test_selected_model)
         self.test_model_btn.setEnabled(False)
         right_side_layout.addWidget(self.test_model_btn)
@@ -1034,7 +1056,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         model_name = model_item.text()
         
         self.test_model_btn.setEnabled(False)
-        self.test_model_btn.setText("🧪 Testing...")
+        self.test_model_btn.setText("Testing...")
         
         # Test model in separate thread
         def test_model():
@@ -1157,14 +1179,16 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         button_layout = QtWidgets.QHBoxLayout()
         
         # Help button
-        help_btn = QtWidgets.QPushButton("❓ Help")
+        help_btn = QtWidgets.QPushButton("Help")
+        help_btn.setObjectName("help_btn")
         help_btn.clicked.connect(self._show_help)
         button_layout.addWidget(help_btn)
         
         button_layout.addStretch()
         
         # Close button
-        close_btn = QtWidgets.QPushButton("❌ Close")
+        close_btn = QtWidgets.QPushButton("Close")
+        close_btn.setObjectName("close_btn")
         close_btn.clicked.connect(self.reject)
         button_layout.addWidget(close_btn)
         
@@ -1363,7 +1387,7 @@ CLASSIFICATION ANALYSIS:
     def _clear_chat(self):
         """Clear chat history"""
         self.chat_history.setPlainText(
-            "🤖 AI Assistant: Hello! Ask me questions about your SNID analysis.\n\n"
+            "AI Assistant: Hello! Ask me questions about your SNID analysis.\n\n"
             "Examples:\n"
             "• What type of supernova is this?\n"
             "• How confident is this classification?\n"

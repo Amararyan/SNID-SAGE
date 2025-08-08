@@ -770,7 +770,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         
         self.no_filter_rb = QtWidgets.QRadioButton("No filtering")
         self.no_filter_rb.setChecked(self.processing_params['filter_type'] == 'none')
-        self.no_filter_rb.toggled.connect(self._on_filter_type_changed)
+        self.no_filter_rb.toggled.connect(lambda *_: self._on_filter_type_changed())
         self.filter_type_group.addButton(self.no_filter_rb, 0)
         filter_layout.addWidget(self.no_filter_rb)
         
@@ -778,21 +778,42 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         fixed_layout = QtWidgets.QHBoxLayout()
         self.fixed_filter_rb = QtWidgets.QRadioButton("Fixed window:")
         self.fixed_filter_rb.setChecked(self.processing_params['filter_type'] == 'fixed')
-        self.fixed_filter_rb.toggled.connect(self._on_filter_type_changed)
+        self.fixed_filter_rb.toggled.connect(lambda *_: self._on_filter_type_changed())
         self.filter_type_group.addButton(self.fixed_filter_rb, 1)
         fixed_layout.addWidget(self.fixed_filter_rb)
         
-        self.fixed_window_spin = create_flexible_int_input(min_val=3, max_val=101, suffix=" pixels", default=11)
+        self.fixed_window_spin = create_flexible_int_input(min_val=3, max_val=101, default=11)
         # Set the value explicitly to ensure proper display
         filter_window = self.processing_params.get('filter_window', 11)
         self.fixed_window_spin.setValue(filter_window)
-        self.fixed_window_spin.valueChanged.connect(self._update_preview)
+        self.fixed_window_spin.valueChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
+        # Also react on raw text changes and editing finished for immediate feedback
+        if hasattr(self.fixed_window_spin, 'textChanged'):
+            try:
+                self.fixed_window_spin.textChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
+            except Exception:
+                pass
+        if hasattr(self.fixed_window_spin, 'editingFinished'):
+            try:
+                self.fixed_window_spin.editingFinished.connect(self._on_fixed_filter_params_changed)
+            except Exception:
+                pass
         fixed_layout.addWidget(self.fixed_window_spin)
         
         fixed_layout.addWidget(QtWidgets.QLabel("order:"))
         self.polyorder_spin = create_flexible_int_input(min_val=1, max_val=10, default=3)
         self.polyorder_spin.setValue(self.processing_params['filter_order'])
-        self.polyorder_spin.valueChanged.connect(self._update_preview)
+        self.polyorder_spin.valueChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
+        if hasattr(self.polyorder_spin, 'textChanged'):
+            try:
+                self.polyorder_spin.textChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
+            except Exception:
+                pass
+        if hasattr(self.polyorder_spin, 'editingFinished'):
+            try:
+                self.polyorder_spin.editingFinished.connect(self._on_fixed_filter_params_changed)
+            except Exception:
+                pass
         fixed_layout.addWidget(self.polyorder_spin)
         
         fixed_layout.addStretch()
@@ -802,14 +823,33 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         wave_layout = QtWidgets.QHBoxLayout()
         self.wave_filter_rb = QtWidgets.QRadioButton("Wavelength-based:")
         self.wave_filter_rb.setChecked(self.processing_params['filter_type'] == 'wavelength')
-        self.wave_filter_rb.toggled.connect(self._on_filter_type_changed)
+        self.wave_filter_rb.toggled.connect(lambda *_: self._on_filter_type_changed())
         self.filter_type_group.addButton(self.wave_filter_rb, 2)
         wave_layout.addWidget(self.wave_filter_rb)
         
         self.wave_fwhm_spin = create_flexible_double_input(min_val=0.1, max_val=50.0, suffix=" Å FWHM", default=10.0)
         self.wave_fwhm_spin.setValue(self.processing_params['filter_fwhm'])
-        self.wave_fwhm_spin.valueChanged.connect(self._update_preview)
+        self.wave_fwhm_spin.valueChanged.connect(lambda *_: self._on_wave_filter_params_changed())
+        if hasattr(self.wave_fwhm_spin, 'textChanged'):
+            try:
+                self.wave_fwhm_spin.textChanged.connect(lambda *_: self._on_wave_filter_params_changed())
+            except Exception:
+                pass
+        if hasattr(self.wave_fwhm_spin, 'editingFinished'):
+            try:
+                self.wave_fwhm_spin.editingFinished.connect(self._on_wave_filter_params_changed)
+            except Exception:
+                pass
         wave_layout.addWidget(self.wave_fwhm_spin)
+
+        # Ensure any radio click triggers immediate preview
+        try:
+            self.filter_type_group.buttonClicked.connect(lambda *_: self._on_filter_type_changed())
+        except Exception:
+            pass
+
+        # Initial enable/disable state for inputs
+        self._update_filter_inputs_enabled_state()
         
         wave_layout.addStretch()
         filter_layout.addLayout(wave_layout)
@@ -824,6 +864,57 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             self.processing_params['filter_type'] = 'fixed'
         elif self.wave_filter_rb.isChecked():
             self.processing_params['filter_type'] = 'wavelength'
+        try:
+            _LOGGER.debug(
+                f"Filter type changed → {self.processing_params['filter_type']}"
+            )
+        except Exception:
+            pass
+        # Enable/disable inputs based on selected type and update preview
+        self._update_filter_inputs_enabled_state()
+        self._update_preview()
+
+    def _update_filter_inputs_enabled_state(self):
+        """Enable/disable filter parameter inputs based on selected filter type."""
+        try:
+            fixed = self.processing_params.get('filter_type') == 'fixed'
+            wav = self.processing_params.get('filter_type') == 'wavelength'
+            if hasattr(self, 'fixed_window_spin') and self.fixed_window_spin is not None:
+                self.fixed_window_spin.setEnabled(fixed)
+            if hasattr(self, 'polyorder_spin') and self.polyorder_spin is not None:
+                self.polyorder_spin.setEnabled(fixed or wav)
+            if hasattr(self, 'wave_fwhm_spin') and self.wave_fwhm_spin is not None:
+                self.wave_fwhm_spin.setEnabled(wav)
+        except Exception:
+            pass
+
+    def _on_fixed_filter_params_changed(self):
+        """Handle changes to fixed-window filter parameters and refresh preview immediately."""
+        # Update processing params for consistency/debug summary
+        try:
+            win_val = self.fixed_window_spin.value() if hasattr(self, 'fixed_window_spin') else None
+            if win_val is not None:
+                self.processing_params['filter_window'] = int(win_val)
+            order_val = self.polyorder_spin.value() if hasattr(self, 'polyorder_spin') else None
+            if order_val is not None:
+                self.processing_params['filter_order'] = int(order_val)
+            _LOGGER.debug(f"Fixed filter params: window={self.processing_params.get('filter_window')}, order={self.processing_params.get('filter_order')}")
+        except Exception:
+            pass
+        self._update_preview()
+
+    def _on_wave_filter_params_changed(self):
+        """Handle changes to wavelength-based filter parameters and refresh preview immediately."""
+        try:
+            fwhm_val = self.wave_fwhm_spin.value() if hasattr(self, 'wave_fwhm_spin') else None
+            if fwhm_val is not None:
+                self.processing_params['filter_fwhm'] = float(fwhm_val)
+            order_val = self.polyorder_spin.value() if hasattr(self, 'polyorder_spin') else None
+            if order_val is not None:
+                self.processing_params['filter_order'] = int(order_val)
+            _LOGGER.debug(f"Wave filter params: fwhm={self.processing_params.get('filter_fwhm')} Å, order={self.processing_params.get('filter_order')}")
+        except Exception:
+            pass
         self._update_preview()
     
     def _create_step_2_rebinning(self, layout):
@@ -1116,9 +1207,9 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             elif step_to_apply == 4:  # Apodization
                 self._apply_step_4()
             
-            # Update preview after applying - wrapped in try-catch for button deletion issues
+            # Immediately refresh plots to show the newly applied state in BOTH plots
             try:
-                self._update_preview()
+                self._refresh_plots_with_current_state()
             except RuntimeError as e:
                 if "Internal C++ object" in str(e):
                     _LOGGER.warning(f"Widget deletion during preview update: {e}")
@@ -1161,13 +1252,15 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                     else:
                         raise
                 
-                # Final preview update - wrapped in try-catch
+                # After moving to next step, keep plots showing the applied state
+                # so the user clearly sees the result of the action
                 try:
+                    self._refresh_plots_with_current_state()
+                    # Also trigger a preview recomputation for the new step so bottom plot reflects it
                     self._update_preview()
                 except RuntimeError as e:
                     if "Internal C++ object" in str(e):
-                        _LOGGER.warning(f"Widget deletion during final preview update: {e}")
-                        # Continue without final preview update
+                        _LOGGER.warning(f"Widget deletion during final refresh: {e}")
                     else:
                         raise
             
@@ -1182,6 +1275,34 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         except Exception as e:
             _LOGGER.error(f"Error applying step {self.current_step}: {e}")
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to apply step: {str(e)}")
+
+    def _refresh_plots_with_current_state(self):
+        """Force-refresh both plots so top plot shows the applied step and bottom plot shows next step preview."""
+        if not self.preview_calculator or not self.plot_manager:
+            return
+        try:
+            current_wave, current_flux = self.preview_calculator.get_current_state()
+            _LOGGER.info(f"_refresh_plots_with_current_state: Got {len(current_flux)} points from get_current_state()")
+            # Apply zero padding removal consistently on both
+            current_wave, current_flux = self._apply_zero_padding_removal(current_wave, current_flux)
+            
+            # Calculate preview for the current step (what would happen if we apply it)
+            preview_wave, preview_flux = self._calculate_current_step_preview()
+            preview_wave, preview_flux = self._apply_zero_padding_removal(preview_wave, preview_flux)
+            
+            # Mask regions only relevant on masking step
+            mask_regions = []
+            if self.current_step == 0 and self.masking_widget:
+                try:
+                    mask_regions = self.masking_widget.get_mask_regions()
+                except Exception:
+                    mask_regions = []
+            # Update with current state in top plot and preview in bottom plot
+            self.plot_manager.update_standard_preview(
+                current_wave, current_flux, preview_wave, preview_flux, mask_regions
+            )
+        except Exception as e:
+            _LOGGER.debug(f"Error during immediate plot refresh: {e}")
     
     def restart_to_step_one(self):
         """Restart the advanced preprocessing workflow back to Step 1 (initial state)."""
@@ -1279,8 +1400,30 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                         elif method == 'gaussian':
                             sigma = step['kwargs'].get('sigma', None)
 
-                            # Similar logic for gaussian...
-                            
+                            # Prefer using the exact continuum used during preview (stored)
+                            stored = getattr(self.preview_calculator, 'stored_continuum', None)
+                            if stored is not None and len(stored) == len(final_flux):
+                                continuum = stored.copy()
+                            else:
+                                # Recompute using the SAME improved method to match preview results
+                                try:
+                                    temp_calc = type(self.preview_calculator)(self.original_wave, self.original_flux)
+                                    # Replay steps up to (but not including) the continuum step
+                                    for i, s in enumerate(applied_steps):
+                                        if s['type'] == 'continuum_fit':
+                                            break
+                                        step_kwargs = s['kwargs'].copy()
+                                        step_kwargs.pop('step_index', None)
+                                        temp_calc.apply_step(s['type'], **step_kwargs)
+                                    # Flux right before continuum removal
+                                    _, flux_before_continuum = temp_calc.get_current_state()
+                                    # Use the preview calculator's improved fitting for Gaussian
+                                    flat_flux, continuum = self.preview_calculator._fit_continuum_improved(
+                                        flux_before_continuum, method='gaussian', sigma=sigma
+                                    )
+                                except Exception:
+                                    continuum = None
+                                
                     except Exception as e:
 
                         continuum = None
@@ -1342,9 +1485,25 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 # final_flux is the flattened (continuum-removed) spectrum after continuum step
                 flat_spectrum = final_flux.copy()  # This is already flat (continuum-removed)
                 
+                # For Gaussian method, the stored continuum may be zeroed outside the valid range.
+                # Reconstruct a non-zeroed continuum for display by extending edge values.
+                recon_continuum = continuum.copy()
+                try:
+                    nz = np.nonzero(recon_continuum > 0)[0]
+                    if nz.size:
+                        c0, c1 = nz[0], nz[-1]
+                        # Extend to edges with edge values
+                        if c0 > 0:
+                            recon_continuum[:c0] = recon_continuum[c0]
+                        if c1 < len(recon_continuum) - 1:
+                            recon_continuum[c1+1:] = recon_continuum[c1]
+                except Exception:
+                    # Fallback: use original continuum array
+                    recon_continuum = continuum
+                
                 # Generate display versions using the correct logic
-                # display_flux: Reconstruct flux using (flat + 1) * continuum
-                display_flux = (flat_spectrum + 1.0) * continuum
+                # display_flux: Reconstruct flux using (flat + 1) * (non-zeroed) continuum
+                display_flux = (flat_spectrum + 1.0) * recon_continuum
                 display_flat = flat_spectrum  # Already flattened
                 
                 # For log_flux, we need to reconstruct what the flux was before continuum removal
@@ -1386,7 +1545,8 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 # For continuum case: display_flat should be the apodized flat spectrum (tapered_flux)
                 display_flat = tapered_flux  # Use apodized version like quick preprocessing
                 # display_flux should also be reconstructed from the apodized version
-                display_flux = (tapered_flux + 1.0) * continuum  # Reconstruct from apodized flat
+                # Use the non-zero-extended continuum to avoid zeroing edges (especially for Gaussian)
+                display_flux = (tapered_flux + 1.0) * recon_continuum  # Reconstruct from apodized flat
             else:
                 # For no-continuum case: both should use the apodized version
                 display_flat = tapered_flux  # Use apodized version
@@ -1477,7 +1637,18 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
     
     def _apply_step_1(self):
         """Apply Savitzky-Golay filtering exactly like original"""
-        filter_type = self.processing_params['filter_type']
+        # Determine filter type directly from UI to avoid any stale processing_params state
+        try:
+            if hasattr(self, 'fixed_filter_rb') and self.fixed_filter_rb.isChecked():
+                filter_type = 'fixed'
+            elif hasattr(self, 'wave_filter_rb') and self.wave_filter_rb.isChecked():
+                filter_type = 'wavelength'
+            elif hasattr(self, 'no_filter_rb') and self.no_filter_rb.isChecked():
+                filter_type = 'none'
+            else:
+                filter_type = self.processing_params.get('filter_type', 'none')
+        except Exception:
+            filter_type = self.processing_params.get('filter_type', 'none')
         
         # CRITICAL FIX: Cache widget values immediately to avoid accessing deleted C++ objects
         # This prevents the "Internal C++ object already deleted" error when widgets are cleaned up
@@ -1499,8 +1670,12 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                     except RuntimeError as e:
                         _LOGGER.warning(f"Widget access error for polyorder_spin: {e}, using default value {polyorder}")
                 
+                _LOGGER.info(f"Applying Savitzky-Golay filter: type=fixed, window={window}, polyorder={polyorder}")
                 self.preview_calculator.apply_step("savgol_filter", filter_type="fixed", 
                                                  value=window, polyorder=polyorder, step_index=1)
+                # Verify the state was updated
+                current_wave, current_flux = self.preview_calculator.get_current_state()
+                _LOGGER.info(f"After applying filter: {len(current_flux)} points")
                 
             elif filter_type == 'wavelength':
                 # Cache values safely with proper error handling
@@ -1519,8 +1694,12 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                     except RuntimeError as e:
                         _LOGGER.warning(f"Widget access error for polyorder_spin: {e}, using default value {polyorder}")
                 
+                _LOGGER.info(f"Applying Savitzky-Golay filter: type=wavelength, fwhm={fwhm}, polyorder={polyorder}")
                 self.preview_calculator.apply_step("savgol_filter", filter_type="wavelength",
                                                  value=fwhm, polyorder=polyorder, step_index=1)
+                # Verify the state was updated
+                current_wave, current_flux = self.preview_calculator.get_current_state()
+                _LOGGER.info(f"After applying filter: {len(current_flux)} points")
             # If filter_type == 'none', don't apply anything
             
         except Exception as e:
@@ -1761,14 +1940,58 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 return self.preview_calculator.get_current_state()
             
             try:
-                polyorder = self.polyorder_spin.value() if hasattr(self, 'polyorder_spin') else 3
+                # Safely read polyorder
+                polyorder_val = None
+                if hasattr(self, 'polyorder_spin') and self.polyorder_spin is not None:
+                    try:
+                        polyorder_val = self.polyorder_spin.value()
+                    except Exception:
+                        polyorder_val = None
+                if polyorder_val is None:
+                    polyorder_val = self.processing_params.get('filter_order', 3)
+                try:
+                    polyorder = int(polyorder_val)
+                except Exception:
+                    polyorder = 3
                 
                 if filter_type == "fixed":
-                    value = self.fixed_window_spin.value() if hasattr(self, 'fixed_window_spin') else 11
+                    # Safely read window length
+                    win_val = None
+                    if hasattr(self, 'fixed_window_spin') and self.fixed_window_spin is not None:
+                        try:
+                            win_val = self.fixed_window_spin.value()
+                        except Exception:
+                            win_val = None
+                    if win_val is None:
+                        win_val = self.processing_params.get('filter_window', 11)
+                    try:
+                        value = int(win_val)
+                    except Exception:
+                        value = 11
+                    try:
+                        _LOGGER.debug(f"Preview (filtering/fixed): window={value}, order={polyorder}")
+                    except Exception:
+                        pass
                     return self.preview_calculator.preview_step("savgol_filter", 
                                                               filter_type=filter_type, value=value, polyorder=polyorder)
                 elif filter_type == "wavelength":
-                    value = self.wave_fwhm_spin.value() if hasattr(self, 'wave_fwhm_spin') else 5.0
+                    # Safely read FWHM
+                    fwhm_val = None
+                    if hasattr(self, 'wave_fwhm_spin') and self.wave_fwhm_spin is not None:
+                        try:
+                            fwhm_val = self.wave_fwhm_spin.value()
+                        except Exception:
+                            fwhm_val = None
+                    if fwhm_val is None:
+                        fwhm_val = self.processing_params.get('filter_fwhm', 5.0)
+                    try:
+                        value = float(fwhm_val)
+                    except Exception:
+                        value = 5.0
+                    try:
+                        _LOGGER.debug(f"Preview (filtering/wavelength): fwhm={value} Å, order={polyorder}")
+                    except Exception:
+                        pass
                     return self.preview_calculator.preview_step("savgol_filter", 
                                                               filter_type=filter_type, value=value, polyorder=polyorder)
             except:
@@ -1915,9 +2138,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             # Clean up preview calculator
             if hasattr(self, 'preview_calculator') and self.preview_calculator:
                 try:
-                    # Disconnect signals
-                    if hasattr(self.preview_calculator, 'stage_memory_updated'):
-                        self.preview_calculator.stage_memory_updated.disconnect()
+                    # No explicit signal disconnection needed; ensure object is dereferenced
                     self.preview_calculator = None
                 except Exception as e:
                     _LOGGER.debug(f"Error cleaning up preview calculator: {e}")

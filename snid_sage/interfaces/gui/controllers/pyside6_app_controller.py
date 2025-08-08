@@ -100,6 +100,9 @@ class PySide6AppController(QtCore.QObject):
         self.current_state = WorkflowState.INITIAL
         self.analysis_thread = None
         self.analysis_running = False
+        # Cancellation control for analysis thread
+        self.cancel_event = threading.Event()
+        self.analysis_cancelled = False
         
         # Interactive state
         self.current_template = 0
@@ -236,14 +239,44 @@ class PySide6AppController(QtCore.QObject):
                 if 'display_flux' in self.processed_spectrum:
                     flux_data = self.processed_spectrum['display_flux']
                     _LOGGER.debug(f"Using display_flux for flux view")
-                elif 'log_flux' in self.processed_spectrum and 'continuum' in self.processed_spectrum:
-                    # Reconstruct flux from flat and continuum
-                    flat_flux = self.processed_spectrum['log_flux']
+                elif 'tapered_flux' in self.processed_spectrum and 'continuum' in self.processed_spectrum:
+                    # Prefer reconstructing from apodized flat spectrum to match visual display
+                    tapered_flat = self.processed_spectrum['tapered_flux']
                     continuum = self.processed_spectrum['continuum']
-                    flux_data = (flat_flux + 1.0) * continuum
-                    _LOGGER.debug(f"Reconstructed flux from flat+continuum for flux view")
+                    # Extend continuum edges if it was zeroed outside valid range (e.g., Gaussian)
+                    recon_continuum = continuum.copy()
+                    try:
+                        nz = (recon_continuum > 0).nonzero()[0]
+                        if nz.size:
+                            c0, c1 = int(nz[0]), int(nz[-1])
+                            if c0 > 0:
+                                recon_continuum[:c0] = recon_continuum[c0]
+                            if c1 < recon_continuum.size - 1:
+                                recon_continuum[c1+1:] = recon_continuum[c1]
+                    except Exception:
+                        pass
+                    flux_data = (tapered_flat + 1.0) * recon_continuum
+                    _LOGGER.debug(f"Reconstructed flux from tapered_flat + extended continuum for flux view")
+                elif 'flat_flux' in self.processed_spectrum and 'continuum' in self.processed_spectrum:
+                    # Fallback: reconstruct from non-apodized flat spectrum
+                    flat_flux = self.processed_spectrum['flat_flux']
+                    continuum = self.processed_spectrum['continuum']
+                    # Extend continuum edges if it was zeroed outside valid range
+                    recon_continuum = continuum.copy()
+                    try:
+                        nz = (recon_continuum > 0).nonzero()[0]
+                        if nz.size:
+                            c0, c1 = int(nz[0]), int(nz[-1])
+                            if c0 > 0:
+                                recon_continuum[:c0] = recon_continuum[c0]
+                            if c1 < recon_continuum.size - 1:
+                                recon_continuum[c1+1:] = recon_continuum[c1]
+                    except Exception:
+                        pass
+                    flux_data = (flat_flux + 1.0) * recon_continuum
+                    _LOGGER.debug(f"Reconstructed flux from flat_flux + extended continuum for flux view")
                 else:
-                    flux_data = self.processed_spectrum['log_flux']
+                    flux_data = self.processed_spectrum.get('log_flux')
                     _LOGGER.debug(f"Fallback to log_flux for flux view")
             
             # Apply zero padding filtering
@@ -405,10 +438,25 @@ class PySide6AppController(QtCore.QObject):
                     _LOGGER.info("Using existing progress dialog for analysis")
                 else:
                     _LOGGER.warning("Main window not available for progress dialog")
+
+                # Wire up Cancel button from the progress dialog to controller cancellation
+                if self.main_window and getattr(self.main_window, 'progress_dialog', None):
+                    try:
+                        # Avoid duplicate connections by tagging the dialog
+                        if not hasattr(self.main_window.progress_dialog, '_cancel_connected'):
+                            self.main_window.progress_dialog.cancel_requested.connect(self.cancel_analysis)
+                            setattr(self.main_window.progress_dialog, '_cancel_connected', True)
+                            _LOGGER.debug("Connected progress dialog cancel signal to controller")
+                    except Exception as e:
+                        _LOGGER.warning(f"Unable to connect cancel signal: {e}")
             except ImportError:
                 # Fallback if progress dialog not available
                 _LOGGER.warning("Analysis progress dialog not available")
             
+            # Reset cancellation state before starting
+            self.cancel_event.clear()
+            self.analysis_cancelled = False
+
             # Run analysis in separate thread
             self.analysis_thread = threading.Thread(
                 target=self._run_analysis_thread, 
@@ -461,8 +509,17 @@ class PySide6AppController(QtCore.QObject):
             def progress_callback(message: str, progress: float = None):
                 """Progress callback to update GUI - thread-safe"""
                 try:
-                    # Log the progress message for debugging
-                    _LOGGER.info(f"Analysis progress: {message} ({progress}%)")
+                    # Respect cancellation as early as possible
+                    if self.cancel_event.is_set():
+                        raise InterruptedError("Analysis cancelled by user")
+
+                    # Log only meaningful progress updates to avoid noise
+                    if (message and message.strip()) or (progress is not None):
+                        _LOGGER.info(f"Analysis progress: {message} ({progress}%)")
+
+                    # Skip UI updates when both message and progress are empty/None
+                    if (not message or not message.strip()) and (progress is None):
+                        return
                     
                     # Use Qt's thread-safe signal mechanism to update GUI
                     QtCore.QMetaObject.invokeMethod(
@@ -470,11 +527,19 @@ class PySide6AppController(QtCore.QObject):
                         "_update_progress_from_thread",
                         QtCore.Qt.QueuedConnection,
                         QtCore.Q_ARG(str, message),
-                        QtCore.Q_ARG(float, progress or 0.0)
+                        QtCore.Q_ARG(float, float(progress) if progress is not None else 0.0)
                     )
+                except InterruptedError:
+                    # Propagate cancellation without logging warnings
+                    raise
                 except Exception as e:
-                    _LOGGER.warning(f"Error in progress callback: {e}")
+                    # Non-fatal UI update error; log at debug to avoid noise
+                    _LOGGER.debug(f"Non-fatal progress callback issue: {e}")
             
+            # Early cancellation check
+            if self.cancel_event.is_set():
+                raise InterruptedError("Analysis cancelled by user")
+
             # First, preprocess the spectrum if not already done
             if not hasattr(self, 'processed_spectrum') or self.processed_spectrum is None:
                 progress_callback("Running preprocessing as part of analysis...")
@@ -491,6 +556,10 @@ class PySide6AppController(QtCore.QObject):
                 progress_callback("Preprocessing completed", 10)
                 _LOGGER.info("Preprocessing completed")
             
+            # Cancellation check after preprocessing
+            if self.cancel_event.is_set():
+                raise InterruptedError("Analysis cancelled by user")
+
             # Get templates directory from configuration
             progress_callback("Loading configuration and templates...", 20)
             try:
@@ -523,6 +592,10 @@ class PySide6AppController(QtCore.QObject):
                 progress_callback(f"Error loading templates: {str(e)}", 30)
                 raise
             
+            # Cancellation check before starting analysis engine
+            if self.cancel_event.is_set():
+                raise InterruptedError("Analysis cancelled by user")
+
             # Run actual SNID analysis
             progress_callback("Starting SNID analysis engine...", 40)
             from snid_sage.snid.snid import run_snid_analysis
@@ -590,7 +663,7 @@ class PySide6AppController(QtCore.QObject):
                 save_plots=False,
                 plot_dir=None,
                 # REMOVED: output_plots parameter (doesn't exist in run_snid_analysis function)
-                progress_callback=progress_callback  # Pass progress callback
+                progress_callback=progress_callback  # Pass progress callback (enforces cancellation)
             )
             
             progress_callback("Processing analysis results...", 90)
@@ -626,6 +699,27 @@ class PySide6AppController(QtCore.QObject):
             
             _LOGGER.info("SNID analysis completed successfully")
             
+        except InterruptedError:
+            # Graceful cancellation path
+            self.analysis_running = False
+            self.snid_results = None
+            self.analysis_cancelled = True
+
+            try:
+                QtCore.QMetaObject.invokeMethod(
+                    self,
+                    "_update_progress_from_thread",
+                    QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, "🔴 Analysis cancelled by user"),
+                    QtCore.Q_ARG(float, 0.0)
+                )
+            except Exception:
+                pass
+
+            # Notify GUI that work ended (not a failure dialog; GUI will detect cancelled state)
+            self.analysis_completed.emit(False)
+            _LOGGER.info("Analysis cancelled by user")
+
         except Exception as e:
             self.analysis_running = False
             self.snid_results = None
@@ -674,6 +768,29 @@ class PySide6AppController(QtCore.QObject):
     def is_analysis_running(self) -> bool:
         """Check if analysis is currently running"""
         return self.analysis_running
+
+    def cancel_analysis(self):
+        """Request cancellation of the running analysis (thread-safe)."""
+        try:
+            # Set cancellation flag/event
+            self.cancel_event.set()
+            self.analysis_cancelled = True
+
+            # Update progress dialog UI if available (non-blocking)
+            dlg = getattr(self.main_window, 'progress_dialog', None)
+            if dlg:
+                try:
+                    dlg.add_progress_line("Cancellation requested... waiting for current step to finish", "warning")
+                    if hasattr(dlg, 'cancel_btn'):
+                        dlg.cancel_btn.setEnabled(False)
+                        dlg.cancel_btn.setText("Cancelling...")
+                    dlg.set_stage("Cancelling Analysis", dlg.progress_bar.value())
+                except Exception:
+                    pass
+
+            _LOGGER.debug("Cancellation event set for analysis thread")
+        except Exception as e:
+            _LOGGER.warning(f"Error during cancel request: {e}")
     
     def get_analysis_results(self) -> Optional[Dict[str, Any]]:
         """Get current analysis results"""

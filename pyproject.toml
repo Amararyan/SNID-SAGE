@@ -56,18 +56,9 @@ dependencies = [
 
     # Games and multimedia support – required for the built-in mini-games and sound handling
     "pygame>=2.3.0",
-
-    # Fallback Tk bindings for environments where the standard tkinter bundle is absent (e.g. many minimal Linux distributions)
-    "tk>=0.1.0",
-
-    # GUI libraries - with better platform handling
-    "ttkbootstrap>=1.10.0",
     
     # Version checking
     "packaging>=20.0",
-    
-    # Platform-specific dependencies for Mac
-    "tkinter-tooltip>=2.0.0; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
@@ -79,8 +70,12 @@ llm = [
 ]
 gui = [
     "pillow>=8.0.0",
-    "PySide6==6.9.0",  # Specific version - 6.9.1+ have known issues
+    "PySide6>=6.7,<6.9.1",  # 6.9.0 works; allow slightly lower but block 6.9.1+
     "pyqtgraph>=0.13.0",  # High-performance plotting for PySide6
+]
+tk = [
+    "ttkbootstrap>=1.10.0",
+    "tkinter-tooltip>=2.0.0; sys_platform == 'darwin'",
 ]
 dev = [
     "pytest>=6.0.0",

@@ -417,11 +417,8 @@ class AnalysisMenuManager:
             
         except ImportError as e:
             _LOGGER.warning(f"PySide6 results dialog not available: {e}")
-            QtWidgets.QMessageBox.information(
-                self.main_window, 
-                "Analysis Results", 
-                "Analysis results dialog will be implemented."
-            )
+            # Silently return if dialog class not available
+            return
         except Exception as e:
             _LOGGER.error(f"Error opening analysis results dialog: {e}")
     

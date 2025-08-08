@@ -19,6 +19,12 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_preprocessing_selection')
 
+# Enhanced dialog button styling
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except Exception:
+    ENHANCED_BUTTONS_AVAILABLE = False
 
 class PySide6PreprocessingSelectionDialog(QtWidgets.QDialog):
     """Dialog for selecting preprocessing mode - PySide6 version"""
@@ -300,6 +306,13 @@ class PySide6PreprocessingSelectionDialog(QtWidgets.QDialog):
         button_layout.addWidget(self.apply_btn)
         
         layout.addLayout(button_layout)
+
+        # Apply enhanced styles
+        try:
+            if ENHANCED_BUTTONS_AVAILABLE:
+                self.button_manager = enhance_dialog_with_preset(self, 'preprocessing_selection_dialog')
+        except Exception as e:
+            _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
     
     def _on_apply(self):
         """Handle apply button"""
@@ -328,7 +341,7 @@ def show_preprocessing_selection_dialog(parent):
         'quick', 'advanced', or None if cancelled
     """
     dialog = PySide6PreprocessingSelectionDialog(parent)
-    result = dialog.exec_()
+    result = dialog.exec()
     
     if result == QtWidgets.QDialog.Accepted:
         return dialog.get_result()

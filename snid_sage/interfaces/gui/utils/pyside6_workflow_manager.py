@@ -277,7 +277,7 @@ class PySide6WorkflowManager:
             'redshift_selection_btn',
             'analysis_btn',
             'emission_line_btn',
-            'chat_btn',  # AI assistant
+            'chat_btn',  # AI Assistant
             # Always-enabled utility buttons
             'reset_btn',
             'settings_btn',

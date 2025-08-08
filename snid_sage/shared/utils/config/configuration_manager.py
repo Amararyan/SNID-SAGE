@@ -346,7 +346,21 @@ class ConfigurationManager:
                 self._current_config = merged_config
                 return merged_config
             else:
-                # Return default configuration
+                # Attempt legacy import from old CLI config (~/.config/snid/config.json)
+                legacy_path = Path.home() / '.config' / 'snid' / 'config.json'
+                if legacy_path.exists():
+                    try:
+                        with open(legacy_path, 'r', encoding='utf-8') as f:
+                            legacy_cfg = json.load(f)
+                        migrated = self._migrate_legacy_cli_config(legacy_cfg)
+                        merged = self._deep_merge_configs(self.get_default_config(), migrated)
+                        # Save migrated as new default for future runs
+                        self.save_config(merged, self.default_config_file)
+                        self._current_config = merged
+                        return merged
+                    except Exception:
+                        pass
+                # Fallback: return default configuration
                 default_config = self.get_default_config()
                 self._current_config = default_config
                 return default_config
@@ -460,6 +474,70 @@ class ConfigurationManager:
             errors=errors,
             warnings=warnings
         )
+
+    def _migrate_legacy_cli_config(self, legacy: Dict[str, Any]) -> Dict[str, Any]:
+        """Migrate legacy CLI config schema to the unified schema.
+
+        Legacy keys examples:
+          templates.default_dir -> paths.templates_dir
+          output.default_dir -> paths.output_dir
+          analysis.zmin -> analysis.redshift_min
+          analysis.zmax -> analysis.redshift_max
+          analysis.rlapmin -> analysis.rlapmin (same)
+          analysis.lapmin -> analysis.lapmin (same)
+          preprocessing.* -> processing.* (map selected keys)
+        """
+        migrated: Dict[str, Any] = {}
+
+        # Start from defaults to ensure completeness
+        migrated = self.get_default_config()
+
+        # Templates/output dirs
+        try:
+            templates = legacy.get('templates', {})
+            if 'default_dir' in templates:
+                migrated['paths']['templates_dir'] = templates['default_dir']
+        except Exception:
+            pass
+        try:
+            output = legacy.get('output', {})
+            if 'default_dir' in output:
+                migrated['paths']['output_dir'] = output['default_dir']
+            if 'save_plots' in output:
+                migrated['output']['save_plots'] = bool(output['save_plots'])
+            if 'max_output_templates' in output:
+                migrated['analysis']['max_output_templates'] = int(output['max_output_templates'])
+        except Exception:
+            pass
+
+        # Analysis mapping
+        try:
+            la = legacy.get('analysis', {})
+            if 'zmin' in la:
+                migrated['analysis']['redshift_min'] = la['zmin']
+            if 'zmax' in la:
+                migrated['analysis']['redshift_max'] = la['zmax']
+            if 'rlapmin' in la:
+                migrated['analysis']['rlapmin'] = la['rlapmin']
+            if 'lapmin' in la:
+                migrated['analysis']['lapmin'] = la['lapmin']
+        except Exception:
+            pass
+
+        # Preprocessing -> processing
+        try:
+            lp = legacy.get('preprocessing', {})
+            if 'apodize_percent' in lp:
+                migrated['processing']['apodize_percent'] = lp['apodize_percent']
+            if 'aband_remove' in lp:
+                migrated['processing']['median_fwmed'] = migrated['processing'].get('median_fwmed', 0.0)  # no direct map
+                migrated['processing']['aband_remove'] = lp['aband_remove']
+            if 'skyclip' in lp:
+                migrated['processing']['skyclip'] = lp['skyclip']
+        except Exception:
+            pass
+
+        return migrated
     
     def _deep_merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         """Deep merge two configuration dictionaries"""

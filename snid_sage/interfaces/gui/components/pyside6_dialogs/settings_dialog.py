@@ -123,7 +123,7 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
     
     def setup_ui(self):
         """Setup the dialog UI"""
-        self.setWindowTitle("⚙️ SNID SAGE Settings")
+        self.setWindowTitle("SNID SAGE Settings")
         self.setMinimumSize(700, 500)
         self.resize(800, 600)
         self.setModal(True)
@@ -183,7 +183,7 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         
         header_layout = QtWidgets.QVBoxLayout(header_frame)
         
-        title_label = QtWidgets.QLabel("⚙️ GUI Settings & Preferences")
+        title_label = QtWidgets.QLabel("GUI Settings & Preferences")
         title_label.setStyleSheet(f"""
             font-size: 18px;
             font-weight: bold;
@@ -436,7 +436,7 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         reset_group = QtWidgets.QGroupBox("Reset Options")
         reset_layout = QtWidgets.QVBoxLayout(reset_group)
         
-        reset_button = QtWidgets.QPushButton("🔄 Reset All Settings to Defaults")
+        reset_button = QtWidgets.QPushButton("Reset All Settings to Defaults")
         reset_button.setStyleSheet(f"""
             QPushButton {{
                 background: {self.colors['btn_warning']};

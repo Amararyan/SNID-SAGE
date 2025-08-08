@@ -57,6 +57,12 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_gmm')
 
+# Enhanced dialog button styling
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except Exception:
+    ENHANCED_BUTTONS_AVAILABLE = False
 # Import GMM clustering utilities
 try:
     from snid_sage.snid.cosmological_clustering import perform_direct_gmm_clustering
@@ -132,7 +138,7 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
     
     def _setup_dialog(self):
         """Setup dialog window properties"""
-        self.setWindowTitle("🎯 GMM Clustering Analysis")
+        self.setWindowTitle("GMM Clustering Analysis")
         self.setMinimumSize(1200, 800)
         self.resize(1400, 900)
         self.setModal(False)  # Allow interaction with main window
@@ -253,7 +259,7 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
         header_layout.setContentsMargins(0, 0, 0, 0)
         
         # Title
-        title = QtWidgets.QLabel("🎯 GMM Clustering Analysis")
+        title = QtWidgets.QLabel("GMM Clustering Analysis")
         title.setAlignment(QtCore.Qt.AlignCenter)
         title.setStyleSheet("""
             font-size: 18pt;
@@ -303,7 +309,7 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
         except ImportError:
             # Fallback message
             fallback_label = QtWidgets.QLabel(
-                "📊 Matplotlib Required for 3D Plotting\n\n"
+                "Matplotlib Required for 3D Plotting\n\n"
                 "3D GMM clustering visualization requires matplotlib.\n\n"
                 "Clustering analysis will still be available in the text summary."
             )
@@ -355,11 +361,11 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
         # Table controls
         table_controls = QtWidgets.QHBoxLayout()
         
-        highlight_btn = QtWidgets.QPushButton("🎯 Highlight Winning")
+        highlight_btn = QtWidgets.QPushButton("Highlight Winning")
         highlight_btn.clicked.connect(self._highlight_winning_cluster)
         table_controls.addWidget(highlight_btn)
         
-        export_data_btn = QtWidgets.QPushButton("📊 Export Data")
+        export_data_btn = QtWidgets.QPushButton("Export Data")
         export_data_btn.clicked.connect(self._export_clustering_data)
         table_controls.addWidget(export_data_btn)
         
@@ -375,26 +381,35 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
         button_layout = QtWidgets.QHBoxLayout()
         
         # Refresh clustering button
-        refresh_btn = QtWidgets.QPushButton("🔄 Refresh Clustering")
+        refresh_btn = QtWidgets.QPushButton("Refresh Clustering")
+        refresh_btn.setObjectName("refresh_btn")
         refresh_btn.clicked.connect(self._refresh_clustering)
         button_layout.addWidget(refresh_btn)
         
         # Export plot button
         if PYQTGRAPH_AVAILABLE:
-            export_plot_btn = QtWidgets.QPushButton("📈 Export Plot")
+            export_plot_btn = QtWidgets.QPushButton("Export Plot")
+            export_plot_btn.setObjectName("export_plot_btn")
             export_plot_btn.clicked.connect(self._export_plot)
             button_layout.addWidget(export_plot_btn)
         
         button_layout.addStretch()
         
         # Close button
-        close_btn = QtWidgets.QPushButton("✅ Close")
-        close_btn.setObjectName("primary_btn")
+        close_btn = QtWidgets.QPushButton("Close")
+        close_btn.setObjectName("close_btn")
         close_btn.clicked.connect(self.accept)
         close_btn.setDefault(True)
         button_layout.addWidget(close_btn)
         
         layout.addLayout(button_layout)
+
+        # Apply enhanced styles
+        try:
+            if ENHANCED_BUTTONS_AVAILABLE:
+                self.button_manager = enhance_dialog_with_preset(self, 'gmm_clustering_dialog')
+        except Exception as e:
+            _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
     
     def _extract_data_and_cluster(self):
         """Extract template matches and perform GMM clustering"""
@@ -520,12 +535,12 @@ Fallback type-based grouping may be available in the table below.
         
         # Build summary text
         lines = [
-            "🎯 GMM CLUSTERING ANALYSIS",
+            "GMM CLUSTERING ANALYSIS",
             "=" * 40,
             "",
-            f"📊 METHOD: {method.replace('_', ' ').title()}",
-            f"📝 TOTAL MATCHES: {len(self.all_matches)}",
-            f"🎯 CLUSTERS FOUND: {len(clusters)}",
+            f"METHOD: {method.replace('_', ' ').title()}",
+            f"TOTAL MATCHES: {len(self.all_matches)}",
+            f"CLUSTERS FOUND: {len(clusters)}",
             ""
         ]
         
@@ -542,7 +557,7 @@ Fallback type-based grouping may be available in the table below.
         
         # Cluster summary
         if len(clusters) > 1:
-            lines.append("📋 ALL CLUSTERS:")
+            lines.append("ALL CLUSTERS:")
             for i, cluster in enumerate(clusters):
                 winner_mark = " 🏆" if cluster.get('is_winning', False) else ""
                 lines.append(

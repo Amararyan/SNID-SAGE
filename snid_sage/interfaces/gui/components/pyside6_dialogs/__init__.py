@@ -16,7 +16,7 @@ Available dialogs:
 - RedshiftModeDialog: Redshift analysis mode selection (Qt native)
 - PreprocessingSelectionDialog: Quick vs advanced preprocessing selection (Qt native)
 - SNIDAnalysisDialog: Combined SNID analysis dialog (Qt native)
-- EnhancedAIAssistantDialog: AI assistant for analysis interpretation (Qt native)
+- EnhancedAIAssistantDialog: AI Assistant for analysis interpretation (Qt native)
 """
 
 # Core dialogs without matplotlib dependencies (safe to import at module level)

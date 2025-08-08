@@ -178,7 +178,19 @@ class PySide6PreprocessingController:
                 
                 # Generate flux version: reconstruct from apodized flat spectrum using the correct unflatten formula
                 # The flattened spectrum is defined as flux/continuum - 1, so to reconstruct: (flat + 1) * continuum
-                display_flux = (tapered_flux + 1.0) * continuum  # Correct unflatten formula
+                # Extend continuum to edges if it was zeroed outside valid range (e.g., Gaussian method)
+                recon_continuum = continuum.copy()
+                try:
+                    nz = (recon_continuum > 0).nonzero()[0]
+                    if nz.size:
+                        c0, c1 = int(nz[0]), int(nz[-1])
+                        if c0 > 0:
+                            recon_continuum[:c0] = recon_continuum[c0]
+                        if c1 < recon_continuum.size - 1:
+                            recon_continuum[c1+1:] = recon_continuum[c1]
+                except Exception:
+                    pass
+                display_flux = (tapered_flux + 1.0) * recon_continuum  # Correct unflatten with extended continuum
                 display_flat = tapered_flux                      # Apodized continuum-removed
                 
                 # Store both versions in processed_spectrum for view switching

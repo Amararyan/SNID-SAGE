@@ -677,12 +677,12 @@ class PySide6PlotManager:
             current_index = getattr(app_controller, 'current_template', 0) + 1
             total_matches = len(app_controller.snid_results.best_matches) if hasattr(app_controller, 'snid_results') and app_controller.snid_results else 1
             
-            # Get redshift uncertainty if available
+            # Get redshift uncertainty if available (show 6 decimals like CLI)
             redshift_error = current_match.get('redshift_error', 0)
             if redshift_error > 0:
-                redshift_text = f"z = {redshift:.5f} ±{redshift_error:.5f}"
+                redshift_text = f"z = {redshift:.6f} ±{redshift_error:.6f}"
             else:
-                redshift_text = f"z = {redshift:.5f}"
+                redshift_text = f"z = {redshift:.6f}"
             
             # Use RLAP-cos if available, otherwise RLAP
             rlap_cos = current_match.get('rlap_cos')

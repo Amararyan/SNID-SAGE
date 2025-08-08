@@ -210,6 +210,8 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         self.masking_enabled = False
         self.line_markers = []
         self.progress_dialog = None  # Track progress dialog
+        # Stable stage label for the progress bar (avoid flicker)
+        self._current_progress_stage = "Initialization"
         
         # Get platform config from app controller
         self.platform_config = self.app_controller.platform_config
@@ -879,11 +881,8 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
     def start_games(self):
         """Start GAMES integration"""
         try:
-            dialog = QtWidgets.QMessageBox(self)
-            dialog.setWindowTitle("GAMES Integration")
-            dialog.setText("GAMES integration will be implemented.")
-            dialog.setIcon(QtWidgets.QMessageBox.Information)
-            dialog.exec()
+            # Directly open the games menu if available
+            self.start_games_menu()
         except Exception as e:
             _LOGGER.error(f"Error starting GAMES: {e}")
     
@@ -1022,6 +1021,28 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
     def _on_analysis_completed(self, success: bool):
         """Handle analysis completion signal from app controller"""
         try:
+            # Handle user-cancelled analysis distinctly (no failure dialogs)
+            if hasattr(self, 'app_controller') and getattr(self.app_controller, 'analysis_cancelled', False):
+                # Close/cleanup progress dialog gracefully
+                if hasattr(self, 'progress_dialog') and self.progress_dialog:
+                    try:
+                        # Add a final line and close quickly
+                        self.progress_dialog.add_progress_line("🔴 Analysis cancelled", "warning")
+                        QtCore.QTimer.singleShot(200, self.progress_dialog.reject)
+                    except Exception:
+                        pass
+                # Update GUI state
+                self.status_label.setText("🔴 Analysis cancelled")
+                self.config_status_label.setText("Analysis Cancelled")
+                self.config_status_label.setStyleSheet("font-style: italic; color: #dc2626;")
+                # Ensure buttons are re-enabled
+                for btn in self.analysis_plot_buttons:
+                    btn.setEnabled(False)
+                for btn in self.nav_buttons:
+                    btn.setEnabled(False)
+                # Stop further handling
+                return
+
             # Check if clustering is available to determine progress dialog handling
             has_clustering = (hasattr(self.app_controller, 'snid_results') and 
                             self.app_controller.snid_results and 
@@ -1165,20 +1186,33 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         """Handle progress update signal from app controller"""
         try:
             if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                # Determine stage based on progress percentage - generic stages
-                if progress <= 25:
-                    stage = "Preparing Data"
-                elif progress <= 50:
-                    stage = "Loading Resources"
-                elif progress <= 75:
-                    stage = "Running Analysis"
-                elif progress < 100:
-                    stage = "Finalizing Results"
-                else:
+                # Derive a stable, human-friendly stage name from message content
+                normalized = (message or "").lower()
+                stage = self._current_progress_stage
+
+                if any(k in normalized for k in ["initializing", "starting snid correlation analysis", "starting snid analysis engine", "starting quick", "starting advanced"]):
+                    stage = "Initialization"
+                elif "preprocess" in normalized:
+                    stage = "Preprocessing"
+                elif any(k in normalized for k in ["templates", "loading configuration", "loading templates"]):
+                    stage = "Cross-correlating spectra"
+                elif any(k in normalized for k in ["correlation", "template matching", "running template"]):
+                    stage = "Correlation Analysis"
+                elif any(k in normalized for k in ["processing analysis results", "clustering", "gmm", "statistics"]):
+                    stage = "Results & Clustering"
+                elif any(k in normalized for k in ["completed", "analysis complete"]):
                     stage = "Complete"
-                
-                self.progress_dialog.set_stage(stage, int(progress))
-                self.progress_dialog.add_progress_line(message, "info")
+
+                # Only update stage label if it actually changed to avoid flicker
+                if stage != self._current_progress_stage:
+                    self._current_progress_stage = stage
+
+                # Always update percentage with the stable stage label
+                self.progress_dialog.set_stage(self._current_progress_stage, int(progress))
+
+                # Still show the raw progress message in the log panel (when non-empty)
+                if message and message.strip():
+                    self.progress_dialog.add_progress_line(message, "info")
         except Exception as e:
             _LOGGER.error(f"Error handling progress update: {e}")
     
@@ -1914,7 +1948,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             msg.setWindowTitle("Keyboard Shortcuts")
             msg.setTextFormat(QtCore.Qt.RichText)
             msg.setText(shortcuts_text)
-            msg.exec_()
+            msg.exec()
             
             _LOGGER.debug("Fallback shortcuts dialog shown")
         except Exception as e:

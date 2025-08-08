@@ -114,7 +114,7 @@ class DialogManager:
                 dialog_args=[self.main_window, getattr(self.app_controller, 'gui_settings', {})],
                 dialog_name="Settings",
                 success_callback=self._handle_settings_success,
-                fallback_callback=lambda: self._show_simple_fallback("Settings", "Settings dialog will be implemented.")
+                fallback_callback=lambda: None
             )
             
         except Exception as e:
@@ -242,7 +242,7 @@ class DialogManager:
                 dialog_args=[self.main_window, getattr(self.app_controller, 'snid_results', None)],
                 dialog_name="AI Assistant",
                 success_callback=lambda dialog: (dialog.show(), _LOGGER.info("AI Assistant dialog opened")),
-                fallback_callback=lambda: self._show_simple_fallback("AI Assistant", "AI Assistant dialog will be implemented."),
+                fallback_callback=lambda: None,
                 use_show=True  # Use show() instead of exec()
             )
             
@@ -258,7 +258,7 @@ class DialogManager:
                 dialog_args=[self.main_window],
                 dialog_name="SNID Configuration",
                 success_callback=self._handle_configuration_success,
-                fallback_callback=lambda: self._show_simple_fallback("SNID Configuration", "SNID configuration dialog will be implemented.")
+                fallback_callback=lambda: None
             )
             
         except Exception as e:
@@ -278,7 +278,7 @@ class DialogManager:
                 dialog_args=[self.main_window],
                 dialog_name="Mask Manager",
                 success_callback=self._handle_mask_manager_success,
-                fallback_callback=lambda: self._show_simple_fallback("Mask Manager", "Mask manager dialog will be implemented.")
+                fallback_callback=lambda: None
             )
             
         except Exception as e:
@@ -413,7 +413,7 @@ class DialogManager:
             if redshift > 0:
                 self._handle_redshift_result(redshift)
             else:
-                self.main_window.redshift_status_label.setText("Optional: no redshift selected")
+                self.main_window.redshift_status_label.setText("Redshift not set (optional)")
                 self.main_window.redshift_status_label.setStyleSheet("font-style: italic; color: #6b7280;")
                 self.app_controller.manual_redshift = None
                 _LOGGER.info("Manual redshift cleared - will use automatic determination")
@@ -444,17 +444,8 @@ class DialogManager:
     
     def _show_emission_line_fallback(self):
         """Show emission line analysis fallback"""
-        QtWidgets.QMessageBox.information(
-            self.main_window, 
-            "SN Emission Line Analysis", 
-            "🔬 SN Emission Line Analysis\n\n"
-            "This feature provides:\n"
-            "• Interactive emission line identification\n"
-            "• Redshift verification using emission lines\n"
-            "• P-Cygni profile analysis\n"
-            "• Wind velocity measurements\n\n"
-            "Dialog implementation is in progress."
-        )
+        # Quiet fallback removed; feature is expected to be available.
+        pass
     
     def _show_shortcuts_fallback(self):
         """Show shortcuts fallback dialog"""

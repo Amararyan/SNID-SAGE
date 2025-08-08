@@ -21,6 +21,7 @@ import snid_sage.interfaces.cli.identify as identify_module
 import snid_sage.interfaces.cli.template as template_module
 import snid_sage.interfaces.cli.batch as batch_module
 import snid_sage.interfaces.cli.config as config_module
+from snid_sage.shared.utils.logging import add_logging_arguments, configure_from_args
 
 # Import version
 try:
@@ -43,6 +44,9 @@ def create_parser() -> argparse.ArgumentParser:
         version=f"SNID SAGE v{__version__}"
     )
     
+    # Logging options (global)
+    add_logging_arguments(parser)
+
     # Create subcommands
     subparsers = parser.add_subparsers(
         dest="command", 
@@ -82,42 +86,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     config_module.add_arguments(config_parser)
     
-    # Output options
-    output_group = parser.add_argument_group('Output Options')
-    output_group.add_argument('-o', '--output-dir',
-                       help='Output directory for results')
-    output_group.add_argument('--output-main', action='store_true',
-                       help='Generate main output file')
-    output_group.add_argument('--output-fluxed', action='store_true',
-                       help='Generate fluxed spectrum file')
-    output_group.add_argument('--output-flattened', action='store_true',
-                       help='Generate flattened spectrum file')
-    output_group.add_argument('--output-correlation', action='store_true',
-                       help='Generate correlation data files for templates')
-    output_group.add_argument('--output-plots', action='store_true',
-                       help='Generate plots for all templates')
-    output_group.add_argument('--plot-types', nargs='+', 
-                       choices=['flux', 'flat', 'all'],
-                       default=['flux'],
-                       help='Types of plots to generate')
-    output_group.add_argument('--max-templates', type=int, default=5,
-                       help='Maximum number of templates for data output')
-    output_group.add_argument('--max-plot-templates', type=int, default=20,
-                       help='Maximum number of templates for plot generation')
-    output_group.add_argument('--plot-figsize', nargs=2, type=int, default=[10, 8],
-                       help='Figure size for plots in inches [width height]')
-    output_group.add_argument('--plot-dpi', type=int, default=150,
-                       help='DPI for saved plots')
-    
-    # Plotting options
-    plot_group = parser.add_argument_group('Plotting Options')
-    plot_group.add_argument('--show-plots', action='store_true',
-                     help='Display plots during analysis')
-    plot_group.add_argument('--save-plots', action='store_true',
-                     help='Save plots to files')
-    plot_group.add_argument('--plot-dir',
-                     help='Directory for saving plots')
-    
     return parser
 
 
@@ -135,12 +103,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     
     # Special case: if first argument looks like a spectrum file, 
     # assume it's the legacy "identify" command
-    if len(argv) >= 2 and not argv[0].startswith('-') and argv[0] not in ['identify', 'template', 'batch', 'config']:
+    if len(argv) >= 1 and not argv[0].startswith('-') and argv[0] not in ['identify', 'template', 'batch', 'config']:
         # Legacy mode: snid spectrum.dat templates/
         argv = ['identify'] + argv
     
     args = parser.parse_args(argv)
     
+    # Configure logging once at the top-level based on global flags
+    try:
+        configure_from_args(args, gui_mode=False)
+    except Exception:
+        pass
+
     try:
         if args.command == "identify":
             return identify_module.main(args)

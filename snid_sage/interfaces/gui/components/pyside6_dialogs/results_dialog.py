@@ -28,6 +28,13 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_results')
 
+# Enhanced dialog button styling
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except Exception:
+    ENHANCED_BUTTONS_AVAILABLE = False
+
 # Import analysis utilities (avoid Tkinter-based modules)
 try:
     from snid_sage.shared.utils.math_utils import get_best_metric_value, get_metric_name_for_match
@@ -121,7 +128,7 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
         cluster_type = self.selected_cluster.get('type', 'Unknown') if self.selected_cluster else 'Unknown'
         cluster_num = self.cluster_index + 1
         
-        self.setWindowTitle(f"📊 Analysis Results - {cluster_type} (Cluster #{cluster_num})")
+        self.setWindowTitle(f"Analysis Results - {cluster_type} (Cluster #{cluster_num})")
         # Made smaller and more compact as requested
         self.setMinimumSize(700, 500)
         self.resize(900, 650)
@@ -202,15 +209,7 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
                 background: #e2e8f0;
             }}
             
-            QPushButton#primary_btn {{
-                background: {self.colors['success']};
-                border: 2px solid {self.colors['success']};
-                color: white;
-            }}
-            
-            QPushButton#primary_btn:hover {{
-                background: #16a34a;
-            }}
+            /* Primary button ID style removed in favor of unified enhancer */
             
             QTabWidget::pane {{
                 border: 2px solid {self.colors['border']};
@@ -278,11 +277,13 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
         button_layout = QtWidgets.QHBoxLayout()
         
         # Quick actions on the left (no group box, no section name)
-        copy_summary_btn = QtWidgets.QPushButton("📋 Copy Summary")
+        copy_summary_btn = QtWidgets.QPushButton("Copy Summary")
+        copy_summary_btn.setObjectName("copy_summary_btn")
         copy_summary_btn.clicked.connect(self._copy_summary)
         button_layout.addWidget(copy_summary_btn)
         
-        save_results_btn = QtWidgets.QPushButton("💾 Save Results")
+        save_results_btn = QtWidgets.QPushButton("Save Results")
+        save_results_btn.setObjectName("save_results_btn")
         save_results_btn.clicked.connect(self._save_results)
         button_layout.addWidget(save_results_btn)
         
@@ -290,13 +291,20 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
         button_layout.addStretch()
         
         # Close button on the right
-        close_btn = QtWidgets.QPushButton("✅ Close")
-        close_btn.setObjectName("primary_btn")
+        close_btn = QtWidgets.QPushButton("Close")
+        close_btn.setObjectName("close_btn")
         close_btn.clicked.connect(self.accept)
         close_btn.setDefault(True)
         button_layout.addWidget(close_btn)
         
         layout.addLayout(button_layout)
+
+        # Apply enhanced styles for consistent colors and states
+        try:
+            if ENHANCED_BUTTONS_AVAILABLE:
+                self.button_manager = enhance_dialog_with_preset(self, 'results_dialog')
+        except Exception as e:
+            _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
     
     def _populate_results(self):
         """Populate the dialog with analysis results using CLI-style formatter"""

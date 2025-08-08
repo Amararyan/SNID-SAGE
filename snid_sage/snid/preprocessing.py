@@ -24,6 +24,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple
 from scipy.ndimage import gaussian_filter1d
+from numpy import ma
 
 
 _LOG = logging.getLogger("snid.preprocessing")
@@ -346,7 +347,7 @@ def log_rebin(
 def fit_continuum(
     flux: NDArray[np.floating],
     *,
-    method: Literal["spline","gaussian"] = "spline",
+    method: str = "spline",
     # spline args:
     knotnum: int = 13,
     izoff:    int = 0,
@@ -365,7 +366,7 @@ def fit_continuum(
     ----------
     method : "spline" or "gaussian"
        - "spline": use the original SNID cubic‐spline (fit_continuum_spline) (DEFAULT)
-       - "gaussian": local‐constant Gaussian filter of width `sigma` bins
+       - "gaussian": local‐constant Gaussian filter of width `sigma` bins with robust edge handling
     knotnum, izoff
       passed to fit_continuum_spline if method="spline"
     sigma
@@ -377,81 +378,24 @@ def fit_continuum(
     elif method == "gaussian":
         # Auto-calculate sigma if not provided
         if sigma is None:
-            sigma = calculate_auto_gaussian_sigma(flux)
-        
-        # Find valid data range, excluding problematic edge bins
-        positive_mask = flux > 0
-        if not np.any(positive_mask):
-            # No positive flux - return zeros and ones
+            sigma = calculate_auto_gaussian_sigma(flux, wave_grid_size=len(flux))
+
+        # Core-only smoothing between first and last valid data bins
+        valid_indices = np.where((flux != 0) & np.isfinite(flux))[0]
+        if valid_indices.size == 0:
             return np.zeros_like(flux), np.ones_like(flux)
-        
-        positive_indices = np.where(positive_mask)[0]
-        i0, i1 = positive_indices[0], positive_indices[-1]
-        
-        # Exclude first and last few bins from continuum estimation to avoid edge artifacts
-        # Skip first/last bins if they are significantly lower than nearby values
-        n_edge_check = min(3, len(positive_indices) // 10)  # Check up to 3 bins or 10% of data
-        
-        # Check first bins and skip if they're much lower than the median
-        if len(positive_indices) > 2 * n_edge_check:
-            median_flux = np.median(flux[positive_mask])
-            threshold = median_flux * 0.2  # 20% of median flux
-            
-            # Skip low-value edge bins at the beginning
-            for check_idx in range(n_edge_check):
-                if i0 + check_idx < len(flux) and flux[i0 + check_idx] < threshold:
-                    i0 = i0 + check_idx + 1
-                else:
-                    break
-            
-            # Skip low-value edge bins at the end
-            for check_idx in range(n_edge_check):
-                if i1 - check_idx >= 0 and flux[i1 - check_idx] < threshold:
-                    i1 = i1 - check_idx - 1
-                else:
-                    break
-        
-        # Ensure we still have enough data for continuum fitting
-        if i1 - i0 < 10:
-            # Fallback to original range if we excluded too much
-            i0, i1 = positive_indices[0], positive_indices[-1]
-        
-        # Extract the core flux range for continuum estimation (excluding problematic edges)
-        core_flux = flux[i0:i1+1]
-        
-        # Apply Gaussian filter only to the core range
-        core_continuum = gaussian_filter1d(core_flux, sigma=sigma, mode="mirror")
-        
-        # Create full continuum array and extend to edges
-        cont = np.ones_like(flux)
-        cont[i0:i1+1] = core_continuum
-        
-        # Extend continuum to edges using edge values (linear extrapolation for smoother transition)
-        if i0 > 0:
-            # Linear extrapolation to the beginning
-            if i0 + 1 < len(cont):
-                slope = (core_continuum[1] - core_continuum[0])
-                for idx in range(i0):
-                    cont[idx] = core_continuum[0] + slope * (idx - i0)
-                    cont[idx] = max(cont[idx], core_continuum[0] * 0.1)  # Prevent negative values
-            else:
-                cont[:i0] = core_continuum[0]
-        
-        if i1 < len(flux) - 1:
-            # Linear extrapolation to the end
-            if i1 - 1 >= 0:
-                slope = (core_continuum[-1] - core_continuum[-2])
-                for idx in range(i1 + 1, len(flux)):
-                    cont[idx] = core_continuum[-1] + slope * (idx - i1)
-                    cont[idx] = max(cont[idx], core_continuum[-1] * 0.1)  # Prevent negative values
-            else:
-                cont[i1+1:] = core_continuum[-1]
-        
-        # Calculate flattened flux
+
+        i0, i1 = valid_indices[0], valid_indices[-1]
+        core_flux = flux[i0:i1 + 1].astype(float)
+
+        # Smooth only the core; leave outside as zero-continuum
+        core_cont = gaussian_filter1d(core_flux, sigma=sigma, mode="mirror")
+        cont = np.zeros_like(flux)
+        cont[i0:i1 + 1] = core_cont
+
+        # Calculate flattened flux only where both flux and cont are valid
         flat = np.zeros_like(flux)
-        # only remove continuum where we actually had data (including negative flux values)
-        data_mask = (flux != 0) & np.isfinite(flux)
-        good = data_mask & (cont > 0)
+        good = (flux > 0) & (cont > 0)
         flat[good] = flux[good] / cont[good] - 1.0
     else:
         raise ValueError(f"Unknown method={method!r}; choose 'spline' or 'gaussian'")
@@ -597,6 +541,8 @@ def fit_continuum_spline(
 
     return flat, cont
 
+
+# hybrid method removed per request; strengthened gaussian edge handling is now default
 
 def unflatten_on_loggrid(flat_tpl: np.ndarray,
                          cont: np.ndarray) -> np.ndarray:

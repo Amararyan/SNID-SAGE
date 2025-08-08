@@ -601,7 +601,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         
         group_layout.addLayout(input_layout)
         
-        # Precision mode toggle - styling will be handled by enhanced button system
+        # Precision mode toggle - styling handled by enhanced button system
         self.precision_button = QtWidgets.QPushButton("Sensitivity: Normal")
         self.precision_button.setObjectName("precision_button")
         # Note: click handler will be overridden by enhanced button system
@@ -1285,11 +1285,15 @@ How to use this tool:
             
             # Setup the special sensitivity toggle button
             if hasattr(self, 'precision_button'):
+                # Make both states share the same color as the active state
+                active = "#FFA600"   # ocre/orange for both states
                 setup_sensitivity_toggle_button(
                     self.button_manager,
                     self.precision_button,
                     self._toggle_precision_mode_enhanced,
-                    initial_state=self.precision_mode
+                    initial_state=self.precision_mode,
+                    active_color=active,
+                    inactive_color=active
                 )
             
             _LOGGER.info("Enhanced buttons successfully applied to manual redshift dialog")

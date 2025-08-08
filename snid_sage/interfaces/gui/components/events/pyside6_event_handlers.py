@@ -209,7 +209,7 @@ class PySide6EventHandlers(QtCore.QObject):
                 # Try to load the spectrum data using app controller
                 if self.app_controller.load_spectrum_file(file_path):
                     # Reset preprocessing status for new file
-                    self.main_window.preprocess_status_label.setText("Not preprocessed")
+                    self.main_window.preprocess_status_label.setText("Preprocessing not run")
                     self.main_window.preprocess_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
                     
                     # CRITICAL: Ensure FILE_LOADED state is processed immediately
@@ -654,12 +654,12 @@ class PySide6EventHandlers(QtCore.QObject):
             
             # Reset redshift status label
             if hasattr(self.main_window, 'redshift_status_label'):
-                self.main_window.redshift_status_label.setText("Optional: No redshift selected")
+                self.main_window.redshift_status_label.setText("Redshift not set (optional)")
                 self.main_window.redshift_status_label.setStyleSheet(initial_status_style)
             
             # Reset preprocessing status label
             if hasattr(self.main_window, 'preprocess_status_label'):
-                self.main_window.preprocess_status_label.setText("Not preprocessed")
+                self.main_window.preprocess_status_label.setText("Preprocessing not run")
                 self.main_window.preprocess_status_label.setStyleSheet(initial_status_style)
             
             # Reset configuration status label
@@ -794,75 +794,34 @@ class PySide6EventHandlers(QtCore.QObject):
     def on_open_configuration_dialog(self):
         """Handle opening configuration dialog"""
         try:
-            # Implementation for configuration dialog
-            QtWidgets.QMessageBox.information(
-                self.main_window,
-                "Configuration",
-                "Configuration dialog will be implemented."
-            )
+            # Open configuration dialog directly via dialog manager
+            if hasattr(self.main_window, 'dialog_manager'):
+                self.main_window.dialog_manager.open_configuration_dialog()
         except Exception as e:
             _LOGGER.error(f"Error opening configuration dialog: {e}")
     
     def on_open_settings_dialog(self):
         """Handle opening settings dialog"""
         try:
-            # Implementation for settings dialog
-            QtWidgets.QMessageBox.information(
-                self.main_window,
-                "Settings",
-                "Settings dialog will be implemented."
-            )
+            # Open settings dialog directly via dialog manager
+            if hasattr(self.main_window, 'dialog_manager'):
+                self.main_window.dialog_manager.open_settings_dialog()
         except Exception as e:
             _LOGGER.error(f"Error opening settings dialog: {e}")
     
     def on_show_shortcuts_dialog(self):
         """Handle showing keyboard shortcuts dialog"""
         try:
-            platform_config = get_platform_config()
-            right_click_text = platform_config.get_click_text('right').lower()
-            shortcuts_text = f"""
-            <h3>Keyboard Shortcuts</h3>
-            <p><b>File Operations:</b></p>
-            <ul>
-            <li>Ctrl+O : Load spectrum file</li>
-            <li>Ctrl+Shift+O : Open configuration</li>
-            </ul>
-            <p><b>Workflow:</b></p>
-            <ul>
-            <li>F6 : Open preprocessing dialog</li>
-            <li>Ctrl+Enter : Quick workflow (simulate {right_click_text} preprocessing + analysis)</li>
-            <li>Ctrl+Shift+Enter : Extended quick workflow ({right_click_text} preprocessing + analysis + auto-select best cluster)</li>
-            <li>Ctrl+Shift+R : Reset to initial state</li>
-            </ul>
-            <p><b>View Controls:</b></p>
-            <ul>
-            <li>F : Switch to Flux view</li>
-            <li>T : Switch to Flat view</li>
-            <li>Space : Toggle between views</li>
-            </ul>
-            <p><b>Template Navigation:</b></p>
-            <ul>
-            <li>Left/Right : Previous/Next template</li>
-            <li>Up/Down : Move template up/down</li>
-            </ul>
-            <p><b>Analysis:</b></p>
-            <ul>
-            <li>Ctrl+O : Load spectrum file</li>
-            <li>Ctrl+R : Run analysis</li>
-            <li>Ctrl+, : Open settings</li>
-            </ul>
-            <p><b>Help:</b></p>
-            <ul>
-            <li>F1 or Ctrl+/ : Show this help</li>
-            </ul>
-            """
-            
-            msg = QtWidgets.QMessageBox(self.main_window)
-            msg.setWindowTitle("Keyboard Shortcuts")
-            msg.setTextFormat(QtCore.Qt.RichText)
-            msg.setText(shortcuts_text)
-            msg.exec_()
-            
+            # Prefer centralized dialog manager
+            if hasattr(self.main_window, 'dialog_manager'):
+                self.main_window.dialog_manager.show_shortcuts_dialog()
+            else:
+                # Fallback simple info dialog
+                QtWidgets.QMessageBox.information(
+                    self.main_window,
+                    "Keyboard Shortcuts",
+                    "See documentation for keyboard shortcuts."
+                )
             _LOGGER.debug("Shortcuts dialog shown")
         except Exception as e:
             _LOGGER.error(f"Error showing shortcuts dialog: {e}") 

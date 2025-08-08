@@ -89,7 +89,9 @@ def create_button_with_enhancement(parent: QtWidgets.QWidget,
 def setup_sensitivity_toggle_button(button_manager: EnhancedDialogButtonManager,
                                    button: QtWidgets.QPushButton,
                                    callback_function,
-                                   initial_state: bool = False) -> None:
+                                   initial_state: bool = False,
+                                   active_color: str = None,
+                                   inactive_color: str = None) -> None:
     """
     Setup a sensitivity toggle button (like Precision/Normal)
     
@@ -102,9 +104,11 @@ def setup_sensitivity_toggle_button(button_manager: EnhancedDialogButtonManager,
     active_text = "Sensitivity: Precision"
     inactive_text = "Sensitivity: Normal"
     
-    # Colors matching the existing implementation
-    active_color = "#FFA600"    # preprocessing color (orange)
-    inactive_color = "#6E6E6E"  # load color (gray)
+    # Colors (allow overrides); default to preprocessing orange and load gray
+    if active_color is None:
+        active_color = "#FFA600"
+    if inactive_color is None:
+        inactive_color = "#6E6E6E"
     
     button_manager.register_toggle_button(
         button=button,
@@ -209,6 +213,56 @@ DIALOG_BUTTON_PRESETS = {
             'is_toggle': True,
             'toggle_state': False
         },
+    },
+
+    'enhanced_ai_assistant_dialog': {
+        # Summary tab
+        'generate_summary_btn': {'type': 'apply', 'size_class': 'normal'},
+        'export_summary_btn': {'type': 'utility', 'size_class': 'normal'},
+        'copy_summary_btn': {'type': 'utility', 'size_class': 'normal'},
+        # Chat tab
+        'send_btn': {'type': 'apply', 'size_class': 'normal'},
+        'clear_chat_btn': {'type': 'reset', 'size_class': 'normal'},
+        # Settings tab
+        'show_key_btn': {'type': 'info', 'size_class': 'small'},
+        'test_connection_btn': {'type': 'neutral', 'size_class': 'normal'},
+        'fetch_models_btn': {'type': 'neutral', 'size_class': 'normal'},
+        'fetch_free_btn': {'type': 'neutral', 'size_class': 'normal'},
+        'test_model_btn': {'type': 'neutral', 'size_class': 'normal'},
+        # Footer
+        'help_btn': {'type': 'info', 'size_class': 'normal'},
+        'close_btn': {'type': 'cancel', 'size_class': 'normal'},
+    },
+
+    # Additional dialogs
+    'redshift_age_dialog': {
+        'export_plot_btn': {'type': 'utility', 'size_class': 'normal'},
+        'export_data_btn': {'type': 'utility', 'size_class': 'normal'},
+        'close_btn': {'type': 'apply', 'size_class': 'normal'},
+    },
+
+    'preprocessing_selection_dialog': {
+        'apply_btn': {'type': 'apply', 'size_class': 'normal'},
+        'cancel_btn': {'type': 'cancel', 'size_class': 'normal'},
+    },
+
+    'games_dialog': {
+        'play_button': {'type': 'apply', 'size_class': 'normal'},
+        'cancel_button': {'type': 'cancel', 'size_class': 'normal'},
+    },
+
+    'progress_dialog': {
+        'cancel_btn': {'type': 'cancel', 'size_class': 'normal'},
+    },
+
+    'subtype_proportions_dialog': {
+        'export_plot_btn': {'type': 'utility', 'size_class': 'normal'},
+        'export_data_btn': {'type': 'utility', 'size_class': 'normal'},
+        'close_btn': {'type': 'apply', 'size_class': 'normal'},
+    },
+
+    'cluster_selection_dialog': {
+        'confirm_btn': {'type': 'apply', 'size_class': 'normal'},
     },
 }
 

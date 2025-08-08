@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-**SNID SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is your go-to tool for analyzing supernova spectra. It combines an intuitive graphical interface with the original SNID (Blondin & Tonry 2007) cross-correlation techniques, enhanced with a new clustering methodology for classification choice and LLM-powered analysis summaries and interactive chat assistance.
+**SNID SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is your go-to tool for analyzing supernova spectra. It combines an intuitive PySide6/Qt graphical interface with the original SNID (Blondin & Tonry 2007) cross-correlation techniques, enhanced with modern clustering for classification choice, high-performance plotting via `pyqtgraph`, and LLM-powered analysis summaries and interactive chat assistance.
 
 ---
 
@@ -13,7 +13,7 @@
 
 ---
 
-## Quick Installation
+## Quick Installation (v0.3.0)
 
 ### Option 1: Install from PyPI (Recommended)
 
@@ -22,6 +22,8 @@ The easiest way to install SNID SAGE is directly from PyPI:
 ```bash
 pip install snid-sage
 ```
+
+ 
 
 ### Option 2: Virtual Environment (Recommended for Development)
 
@@ -40,6 +42,7 @@ source snid_env/bin/activate
 
 # Install SNID SAGE
 pip install snid-sage
+ 
 ```
 
 #### Using conda
@@ -50,6 +53,7 @@ conda activate snid_sage
 
 # Install SNID SAGE
 pip install snid-sage
+ 
 ```
 
 ### Option 3: Development Installation
@@ -80,29 +84,40 @@ snid-gui
 snid-sage
 ```
 
+ 
+
 ### Use the CLI (For automation)
 ```bash
-# Single spectrum analysis (templates auto-discovered)
-snid data/sn2003jo.dat --output-dir results/
+# Single spectrum analysis (templates auto-discovered). By default saves summary (.output) and plots
+snid data/sn2003jo.dat -o results/
 
-# Single spectrum analysis with explicit templates
-snid identify data/sn2003jo.dat templates/ --output-dir results/
+# Single spectrum with explicit templates
+snid identify data/sn2003jo.dat templates/ -o results/
 
-# Batch processing
-snid batch "data/*.dat" templates/ --output-dir results/
+# Batch processing (default saves per-object summary and plots)
+snid batch "data/*.dat" templates/ -o results/
+
+# Minimal outputs (summary only, no plots)
+snid identify data/sn2003jo.dat -o results/ --minimal
+
+# Complete outputs (summary, plots, and all additional data files)
+snid identify data/sn2003jo.dat -o results/ --complete
+
+# Disable plots explicitly (default is to generate plots)
+snid identify data/sn2003jo.dat -o results/ --no-plots
 ```
 
 
 
 ## Documentation & Support
 
-- **[Complete Documentation](docs/)** - Comprehensive guides and tutorials
-- **[Quick Start Guide](docs/quickstart/first-analysis.md)** - Your first analysis in 5 minutes
-- **[GUI Manual](docs/gui/interface-overview.md)** - Complete interface guide
-- **[CLI Reference](docs/cli/command-reference.md)** - All commands and options
-- **[AI Integration](docs/ai/overview.md)** - Setting up AI analysis
-- **[Troubleshooting](docs/reference/troubleshooting.md)** - Common issues and solutions
-- **[FAQ](docs/reference/faq.md)** - Frequently asked questions
+- **[Complete Documentation](https://fiorenst.github.io/SNID-SAGE/)** - Comprehensive guides and tutorials
+- **[Quick Start Guide](https://fiorenst.github.io/SNID-SAGE/quickstart/first-analysis/)** - Your first analysis in 5 minutes
+- **[GUI Manual](https://fiorenst.github.io/SNID-SAGE/gui/interface-overview/)** - Complete interface guide
+- **[CLI Reference](https://fiorenst.github.io/SNID-SAGE/cli/command-reference/)** - All commands and options
+- **[AI Integration](https://fiorenst.github.io/SNID-SAGE/ai/overview/)** - Setting up AI analysis
+- **[Troubleshooting](https://fiorenst.github.io/SNID-SAGE/reference/troubleshooting/)** - Common issues and solutions
+- **[FAQ](https://fiorenst.github.io/SNID-SAGE/reference/faq/)** - Frequently asked questions
 
 ## Supported Data Formats
 
@@ -142,6 +157,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with care for the astronomical community**
 
-[Documentation](docs/) • [Report Bug](https://github.com/FiorenSt/SNID-SAGE/issues) • [Request Feature](https://github.com/FiorenSt/SNID-SAGE/issues) • [Discussions](https://github.com/FiorenSt/SNID-SAGE/discussions)
+[Documentation](https://fiorenst.github.io/SNID-SAGE/) • [Report Bug](https://github.com/FiorenSt/SNID-SAGE/issues) • [Request Feature](https://github.com/FiorenSt/SNID-SAGE/issues) • [Discussions](https://github.com/FiorenSt/SNID-SAGE/discussions)
 
 </div>

@@ -503,61 +503,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
     
     return fig
 
-def plot_result(result: Any, figsize: Tuple[int, int] = (10, 8),
-                save_path: Optional[str] = None,
-                fig: Optional[plt.Figure] = None,
-                theme_manager=None) -> plt.Figure:
-    """
-    [DEPRECATED] This function is no longer used in the SNID GUI.
-    
-    To maintain backward compatibility with existing code, this function
-    now just creates a simple message figure.
-    """
-    # Create a simple message figure for notification
-    if fig is None:
-        fig = plt.figure(figsize=figsize)
-    else:
-        fig.clear()
-    
-    ax = fig.add_subplot(111)
-    ax.text(0.5, 0.5, "This function is deprecated.\nPlease use plot_flux_comparison, plot_flat_comparison, or plot_correlation_view instead.", 
-           ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, 
-           transform=ax.transAxes)
-    ax.axis('off')
-    fig.tight_layout()
-    
-    if save_path:
-        fig.savefig(save_path, dpi=150, bbox_inches='tight')
-    
-    return fig
-
-def plot_type_comparison(result: Any, figsize: Tuple[int, int] = (12, 8),
-                          save_path: Optional[str] = None,
-                          fig: Optional[plt.Figure] = None,
-                          theme_manager=None) -> plt.Figure:
-    """
-    [DEPRECATED] This function is no longer used in the SNID GUI.
-    
-    To maintain backward compatibility with existing code, this function
-    now just creates a simple message figure.
-    """
-    # Create a simple message figure for notification
-    if fig is None:
-        fig = plt.figure(figsize=figsize)
-    else:
-        fig.clear()
-    
-    ax = fig.add_subplot(111)
-    ax.text(0.5, 0.5, "This function is deprecated.\nPlease use plot_flux_comparison, plot_flat_comparison, or plot_correlation_view instead.", 
-           ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, 
-           transform=ax.transAxes)
-    ax.axis('off')
-    fig.tight_layout()
-    
-    if save_path:
-        fig.savefig(save_path, dpi=150, bbox_inches='tight')
-    
-    return fig
+ 
 
 def plot_type_fractions(result: Any, figsize: Tuple[int, int] = (10, 8),
                        save_path: Optional[str] = None,
@@ -583,6 +529,15 @@ def plot_type_fractions(result: Any, figsize: Tuple[int, int] = (10, 8),
     if fig is None:
         fig = plt.figure(figsize=figsize, constrained_layout=True)
     
+    # Deprecated: retain a minimal placeholder to avoid import breakages in older code paths
+    # Create a simple message figure and return
+    ax = fig.add_subplot(111)
+    ax.text(0.5, 0.5, "Deprecated: use cluster-aware subtype plots instead", ha='center', va='center')
+    ax.axis('off')
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches='tight')
+    return fig
+
     # Create a grid for multiple plots
     gs = fig.add_gridspec(2, 2)
     
@@ -926,7 +881,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
         
         # Mark the best redshift
         ax.axvline(x=redshift, color='r', linestyle=':', linewidth=1.5, 
-                  label=f'z = {redshift:.4f}', alpha=0.8)
+                  label=f'z = {redshift:.6f}', alpha=0.8)
         
         # Set axis limits based on available data
         if 'z_axis_full' in corr_data:
@@ -946,7 +901,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
             
             # Add vertical line at best redshift
             ax.axvline(x=redshift, color='r', linestyle=':', linewidth=1.5, 
-                      label=f'z = {redshift:.4f}', alpha=0.8)
+                      label=f'z = {redshift:.6f}', alpha=0.8)
             
             # Set x-axis limits to focus on the relevant region
             z_min, z_max = np.min(result.redshift_axis), np.max(result.redshift_axis)
@@ -960,7 +915,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
             
             # Add vertical line at best redshift
             ax.axvline(x=redshift, color='r', linestyle=':', linewidth=1.5, 
-                      label=f'z = {redshift:.4f}', alpha=0.8)
+                      label=f'z = {redshift:.6f}', alpha=0.8)
             
             # Set x-axis limits to focus on the relevant region
             z_min, z_max = np.min(corr_data['z_axis']), np.max(corr_data['z_axis'])
@@ -984,7 +939,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
     
     if template_age is not None and np.isfinite(template_age):
         template_info += f"Age: {template_age:.1f} days\n"
-    template_info += f"z = {redshift:.4f}\n"
+    template_info += f"z = {redshift:.6f}\n"
     template_info += f"RLAP = {rlap:.1f}"
     
     # Add the annotation with a semi-transparent background
@@ -1009,7 +964,7 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
     # Set y-axis limits to show full correlation range with some padding
     y_data = []
     for line in ax.get_lines():
-        if line.get_label() not in ['z = {:.4f}'.format(redshift)]:  # Skip vertical line
+        if line.get_label() not in ['z = {:.6f}'.format(redshift)]:  # Skip vertical line
             y_data.extend(line.get_ydata())
     
     if y_data:
@@ -1106,62 +1061,30 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
         fig.tight_layout()
         return fig
     
-    # Extract data from all matches
+    # Extract data from all matches (GUI-style)
     data = []
-    # Keep track of the best match (highest RLAP)
-    best_match_data = None
-    best_match_rlap = -1
-    
     for i, match in enumerate(matches):
         if not isinstance(match, dict):
             continue
-        
-        # CORRECTED: Extract data directly from match (not from nested template)
         z = match.get('redshift', None)
-        z_error = match.get('redshift_error', None)  # This is already calculated by SNID!
-        age = match.get('age', None)  # Age is in match, not template
-        sn_type = match.get('type', 'Unknown')  # Type is in match, not template
-        template = match.get('template', {})
-        
-        # Get additional info from template if available
-        sn_subtype = template.get('subtype', '') if isinstance(template, dict) else ''
-        name = template.get('name', f'Template {i}') if isinstance(template, dict) else f'Template {i}'
-        rlap = match.get('rlap', 0)
-        lap = match.get('lap', 0)
-        
-        # Filter out invalid data points
+        age = match.get('age', None)
         if z is None or age is None:
             continue
-        
-        # Note: Original Fortran SNID does NOT plot error bars - just scatter points
-        # The redshift_error is available but not used for plotting
-        # We'll store it for potential future use but not display it
-            
-        # Create the full type string with subtype if available
-        full_type = sn_type
-        if sn_subtype:
-            full_type = f"{sn_type} {sn_subtype}"
-            
-        match_data = {
-            'z': z,
-            'z_error': z_error,  # Available but not plotted (like original Fortran)
+        template = match.get('template', {})
+        sn_subtype = template.get('subtype', 'Unknown') if isinstance(template, dict) else 'Unknown'
+        if not sn_subtype or sn_subtype.strip() == '':
+            sn_subtype = 'Unknown'
+        # Use RLAP-cos for point size if available; fallback to RLAP
+        rlap_value = float(match.get('rlap', 0))
+        rlap_cos_value = match.get('rlap_cos', None)
+        size_metric = float(rlap_cos_value) if rlap_cos_value is not None else rlap_value
+        data.append({
+            'z': float(z),
             'age': float(age),
-            'type': sn_type,
             'subtype': sn_subtype,
-            'full_type': full_type,
-            'rlap': rlap,
-            'lap': lap,
-            'name': name
-        }
-        
-        data.append(match_data)
-        
-        # Check if this is the best match so far
-        if rlap > best_match_rlap:
-            best_match_rlap = rlap
-            best_match_data = match_data
-    
-    # If no valid data after filtering, show error
+            'size_metric': size_metric
+        })
+
     if not data:
         ax.text(0.5, 0.5, "No valid redshift-age data available", 
                ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, 
@@ -1172,66 +1095,32 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
         fig.tight_layout()
         return fig
     
-    # Group data by subtype instead of main type
-    grouped_data = {}
-    for item in data:
-        # Extract subtype from template
-        template = item.get('template', {})
-        subtype = template.get('subtype', 'Unknown') if isinstance(template, dict) else 'Unknown'
-        if not subtype or subtype.strip() == '':
-            subtype = 'Unknown'
-        
-        if subtype not in grouped_data:
-            grouped_data[subtype] = []
-        grouped_data[subtype].append(item)
-    
-    # Create color mapping for subtypes using custom palette
+    # Group data by subtype and assign colors (GUI-style)
+    from collections import defaultdict
+    subtype_data: Dict[str, List[Dict[str, float]]] = defaultdict(list)
+    for point in data:
+        subtype_data[point['subtype']].append(point)
+
     custom_palette = get_custom_color_palette()
-    sorted_subtypes = sorted(grouped_data.keys())
-    subtype_color_map = {}
-    for i, subtype in enumerate(sorted_subtypes):
-        subtype_color_map[subtype] = custom_palette[i % len(custom_palette)]
-    
-    # Plot each subtype group
-    marker_size = 80  # Balanced size for good visibility without being too large
-    for subtype, items in sorted(grouped_data.items()):
-        if not items:
-            continue
-            
-        # Extract data for this subtype group
-        ages = [item['age'] for item in items]
-        redshifts = [item['z'] for item in items]
-        rlaps = [item['rlap'] for item in items]
-        
-        # Get color for this subtype
-        color = subtype_color_map.get(subtype, '#A9A9A9')  # Gray fallback
-        
-        # Create simple scatter plot (like original Fortran SNID - no error bars)
-        scatter = ax.scatter(
-            redshifts, ages,
-            s=marker_size,  # Size in points^2
+    sorted_subtypes = sorted(subtype_data.keys())
+    subtype_color_map = {subtype: custom_palette[i % len(custom_palette)] for i, subtype in enumerate(sorted_subtypes)}
+
+    # Plot each subtype with RLAP-cos-scaled sizes (fallback RLAP) and count in legend (GUI-style)
+    for subtype, points in sorted(subtype_data.items()):
+        redshifts = [p['z'] for p in points]
+        ages = [p['age'] for p in points]
+        metrics = [p['size_metric'] for p in points]
+        sizes = [max(20.0, m * 3.0) for m in metrics]
+        color = subtype_color_map.get(subtype, '#A9A9A9')
+        ax.scatter(
+            redshifts,
+            ages,
             c=color,
+            s=sizes,
             alpha=0.7,
             edgecolors='black',
-            linewidths=1.5,
-            label=subtype
-        )
-    
-    # Plot best match separately with a star marker (like original Fortran)
-    if best_match_data:
-        best_type = best_match_data['type']
-        
-        # Highlight the best match with a large gold star (like original Fortran)
-        ax.scatter(
-            [best_match_data['z']], [best_match_data['age']],
-            s=marker_size * 2.5,  # Larger for prominence
-            c='gold',
-            alpha=1.0,
-            edgecolors='black',
-            linewidths=2.5,
-            marker='*',  # Star marker like original
-            label=f"Best match ({best_type})",
-            zorder=10  # Make sure it's on top
+            linewidth=0.5,
+            label=f"{subtype} (n={len(points)})"
         )
     
     # Extract all ages and redshifts for calculations
@@ -1275,147 +1164,14 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
         ax.set_xlim(z_min_plot, z_max_plot)
         ax.set_ylim(age_min_plot, age_max_plot)
         
-    # For user-selected clusters, use the cluster's own consensus data if available
-    cluster_consensus_z = None
-    if "user-selected cluster" in match_source and hasattr(result, 'clustering_results'):
-        user_cluster = result.clustering_results.get('user_selected_cluster', {})
-        cluster_consensus_z = user_cluster.get('consensus_redshift')
-    
-    # Only add consensus lines if they fall within or close to the data range
-    show_consensus_lines = True
-    current_xlim = ax.get_xlim()
-    
-    # Use cluster-specific consensus redshift first, then fall back to global consensus
-    if cluster_consensus_z is not None:
-        weighted_z = cluster_consensus_z
-        # Only show if within reasonable range of data
-        if current_xlim[0] <= weighted_z <= current_xlim[1] * 1.2:  # Allow 20% beyond axis
-            ax.axvline(x=weighted_z, color='red', linestyle='--', linewidth=2, alpha=0.8, 
-                      label=f'RLAP-cos weighted z = {weighted_z:.4f}')
-            
-            if all_ages:
-                # Calculate weighted age using RLAP-cos metric weighting
-                try:
-                    from snid_sage.shared.utils.math_utils import calculate_metric_weighted_age, get_best_metric_value
-                    
-                    # Get ages and their corresponding metric weights (RLAP-cos if available, otherwise RLAP)
-                    ages = []
-                    age_weights = []
-                    # Use the same matches that are being plotted (cluster matches)
-                    for match in matches:
-                        template = match.get('template', {})
-                        age = template.get('age', 0.0) if template else 0.0
-                        # Check for valid age (negative ages are valid for pre-peak)
-                        if age is not None and np.isfinite(age):
-                            ages.append(age)
-                            age_weights.append(get_best_metric_value(match))
-                    
-                    if ages and len(ages) == len(age_weights):
-                        weighted_age, _, _, _ = calculate_metric_weighted_age(
-                            np.array(ages), np.array(age_weights), include_cluster_scatter=True
-                        )
-                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
-                    else:
-                        # Fallback to consensus age if available, otherwise median
-                        if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
-                            weighted_age = result.consensus_age
-                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                      label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
-                        else:
-                            weighted_age = np.median(all_ages)
-                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                      label=f'Cluster median age = {weighted_age:.1f}d')
-                except ImportError:
-                    # Fallback to consensus age if available, otherwise median
-                    if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
-                        weighted_age = result.consensus_age
-                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
-                    else:
-                        weighted_age = np.median(all_ages)
-                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                  label=f'Cluster median age = {weighted_age:.1f}d')
-                
-                # Add intersection point (no label)
-                ax.plot(weighted_z, weighted_age, 'ro', markersize=12, markeredgecolor='black', 
-                       markeredgewidth=2, zorder=9)
-                   
-    elif hasattr(result, 'consensus_redshift') and result.consensus_redshift is not None:
-        weighted_z = result.consensus_redshift
-        # Only show if within reasonable range of data
-        if current_xlim[0] <= weighted_z <= current_xlim[1] * 1.2:  # Allow 20% beyond axis
-            ax.axvline(x=weighted_z, color='red', linestyle='--', linewidth=2, alpha=0.8, 
-                      label=f'RLAP-cos weighted z = {weighted_z:.4f}')
-            
-            if all_ages:
-                # Calculate weighted age using RLAP-cos metric weighting
-                try:
-                    from snid_sage.shared.utils.math_utils import calculate_metric_weighted_age, get_best_metric_value
-                    
-                    # Get ages and their corresponding metric weights (RLAP-cos if available, otherwise RLAP)
-                    ages = []
-                    age_weights = []
-                    # Use the same matches that are being plotted (cluster matches)
-                    for match in matches:
-                        template = match.get('template', {})
-                        age = template.get('age', 0.0) if template else 0.0
-                        # Check for valid age (negative ages are valid for pre-peak)
-                        if age is not None and np.isfinite(age):
-                            ages.append(age)
-                            age_weights.append(get_best_metric_value(match))
-                    
-                    if ages and len(ages) == len(age_weights):
-                        weighted_age, _, _, _ = calculate_metric_weighted_age(
-                            np.array(ages), np.array(age_weights), include_cluster_scatter=True
-                        )
-                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
-                    else:
-                        # Fallback to consensus age if available, otherwise median
-                        if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
-                            weighted_age = result.consensus_age
-                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                      label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
-                        else:
-                            weighted_age = np.median(all_ages)
-                            ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                      label=f'Global median age = {weighted_age:.1f}d')
-                except ImportError:
-                    # Fallback to consensus age if available, otherwise median
-                    if hasattr(result, 'consensus_age') and result.consensus_age is not None and np.isfinite(result.consensus_age) and True:
-                        weighted_age = result.consensus_age
-                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                  label=f'RLAP-cos weighted age = {weighted_age:.1f}d')
-                    else:
-                        weighted_age = np.median(all_ages)
-                        ax.axhline(y=weighted_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                                  label=f'Global median age = {weighted_age:.1f}d')
-                
-                # Add intersection point (no label)
-                ax.plot(weighted_z, weighted_age, 'ro', markersize=12, markeredgecolor='black', 
-                       markeredgewidth=2, zorder=9)
-                   
-    elif all_redshifts:
-        # Always use data-based median (this should always be within range)
-        median_z = np.median(all_redshifts)
-        ax.axvline(x=median_z, color='red', linestyle='--', linewidth=2, alpha=0.8, 
-                  label=f'Data median z = {median_z:.4f}')
-        
-        if all_ages:
-            median_age = np.median(all_ages)
-            ax.axhline(y=median_age, color='red', linestyle='--', linewidth=2, alpha=0.8,
-                      label=f'Data median age = {median_age:.1f}d')
-            
-            # Add intersection point (no label)
-            ax.plot(median_z, median_age, 'ro', markersize=12, markeredgecolor='black', 
-                   markeredgewidth=2, zorder=9)
+    # Match GUI: do not draw consensus/median red reference lines in CLI plot
     
     # Format plot correctly (no title per user requirement)
     # Always use standardized font sizes, regardless of GUI styling
     # Note: Plot is now colored by subtype instead of type (legend will show subtypes)
     ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
     ax.set_ylabel('Age (days)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: age
+    ax.set_title('Redshift vs Age Distribution (by Subtype)', fontsize=PLOT_TITLE_FONTSIZE)
     ax.grid(True, alpha=0.3)
     
     # Apply no-title styling if available, but ensure font sizes are preserved
@@ -1517,30 +1273,46 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
     
     # Get template info
     template = match.get('template', {})
-    template_name = template.get('name', 'Unknown')
+    # Clean template name to remove epoch suffix like GUI
+    try:
+        from snid_sage.shared.utils import clean_template_name
+        template_name = clean_template_name(template.get('name', 'Unknown') or match.get('name', 'Unknown'))
+    except Exception:
+        template_name = template.get('name', 'Unknown')
     template_type = template.get('type', 'Unknown')
     template_subtype = template.get('subtype', '')
     template_age = template.get('age', 0)
     z_template = match.get('redshift', 0)
+    # Prefer RLAP-cos like GUI overlay info
+    rlap_cos_value = match.get('rlap_cos', None)
     rlap_value = match.get('rlap', 0)
+    redshift_error = match.get('redshift_error', 0)
     
     # Plot the processed input spectrum (what SNID actually worked with)
     input_wave = None
     input_flux = None
     
-    # Use processed spectrum - SNID analysis stores the correctly processed versions
+    # Use processed spectrum - reconstruct flux the same way as the GUI
     if hasattr(result, 'processed_spectrum') and result.processed_spectrum:
-        input_wave = result.processed_spectrum['log_wave']
-        
-        
-        # This is: (tapered_flux[left_edge:right_edge+1] + 1.0) * cont[left_edge:right_edge+1]
-        # So log_flux in result.processed_spectrum IS the correctly reconstructed apodized flux
-        input_flux = result.processed_spectrum['log_flux']  # This IS the apodized reconstructed flux from SNID analysis
-        
-        # No need to filter - SNID analysis already trimmed to [left_edge:right_edge+1]
-        # The data in result.processed_spectrum is already the correctly processed and trimmed version
-        
-        ax.plot(input_wave, input_flux, 'k-', label='Input Spectrum (processed)', linewidth=1.5)
+        ps = result.processed_spectrum
+        input_wave = ps.get('log_wave')
+        # Preferred: display_flux if available (apodized, GUI-style)
+        if 'display_flux' in ps:
+            input_flux = ps['display_flux']
+        # If we have flat + continuum (from result.input_continuum), reconstruct flux
+        elif 'flat_flux' in ps and hasattr(result, 'input_continuum') and isinstance(result.input_continuum, dict) and 'flux' in result.input_continuum:
+            try:
+                input_flux = (np.asarray(ps['flat_flux']) + 1.0) * np.asarray(result.input_continuum['flux'])
+            except Exception:
+                input_flux = ps.get('log_flux')
+        # Legacy fallback: if continuum is bundled inside ps
+        elif 'log_flux' in ps and 'continuum' in ps:
+            input_flux = (ps['log_flux'] + 1.0) * ps['continuum']
+        else:
+            # Final fallback: use stored log_flux directly
+            input_flux = ps.get('log_flux')
+        # Match GUI colors and linewidth
+        ax.plot(input_wave, input_flux, color='#3b82f6', linewidth=2, label='Observed Spectrum')
         
     elif isinstance(result.input_spectrum, dict) and 'wave' in result.input_spectrum and 'flux' in result.input_spectrum:
         input_wave = result.input_spectrum['wave']
@@ -1549,7 +1321,7 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
         # Filter out zero-padded regions (INPUT SPECTRUM ONLY)
         input_wave, input_flux = _filter_nonzero_spectrum(input_wave, input_flux)
         
-        ax.plot(input_wave, input_flux, 'k-', label='Input Spectrum (original)', linewidth=1.5)
+        ax.plot(input_wave, input_flux, color='#3b82f6', linewidth=2, label='Observed Spectrum')
         
     else:
         raise ValueError("No input spectrum data available for plotting")
@@ -1570,9 +1342,9 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
             ax.plot(
                 template_wave,
                 template_flux,
-                'r-',
-                linewidth=1.5,
-                label=f'Template (z={z_template:.4f})'
+                color='#E74C3C',
+                linewidth=2,
+                label='Template'
             )
             template_plotted = True
         
@@ -1596,9 +1368,9 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
                 ax.plot(
                     wave,
                     template_flux_reconstructed,
-                    'r-',
-                    linewidth=1.5,
-                    label=f'Template (z={z_template:.4f})'
+                    color='#E74C3C',
+                    linewidth=2,
+                    label='Template'
                 )
                 template_plotted = True
         
@@ -1631,8 +1403,8 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
                         scale_factor = input_median / template_median
                         plot_flux *= scale_factor
                     
-                    ax.plot(plot_wave, plot_flux, 'r-', linewidth=1.5,
-                           label=f'Template (z={z_template:.4f})')
+                    ax.plot(plot_wave, plot_flux, color='#E74C3C', linewidth=2,
+                           label='Template')
                     template_plotted = True
                            
     except Exception as e:
@@ -1645,39 +1417,74 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
                ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, transform=ax.transAxes,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8))
     
-    # Create a secondary x-axis for rest wavelength
-    # Since template is already redshifted to match input, convert back to rest frame for secondary axis
-    ax_twin = ax.twiny()
-    ax_twin.set_xlim([x/(1+z_template) for x in ax.get_xlim()])
-    ax_twin.set_xlabel('Rest Wavelength (Å)')
+    # Match GUI: no secondary x-axis in overlay plot
     
     # Add template metadata annotation
-    template_info = f"Template: {template_name}\n"
+    # Match GUI overlay info box (top-right, white background, black border)
+    template_info_lines = []
+    template_info_lines.append(f"Template: {template_name}")
     if template_type != 'Unknown':
-        template_info += f"Type: {template_type}"
         if template_subtype:
-            template_info += f" {template_subtype}"
-        template_info += "\n"
-    
-    template_info += f"Age: {template_age:.1f} days\n"
-    template_info += f"z = {z_template:.4f}\n"
-    template_info += f"RLAP = {rlap_value:.1f}"
-    
-    # Add the annotation in the upper left corner with a semi-transparent background
-    ax.text(0.02, 0.98, template_info, transform=ax.transAxes,
-         verticalalignment='top', horizontalalignment='left',
-         bbox=_create_themed_bbox_if_available(theme_manager=theme_manager))
+            template_info_lines.append(f"Subtype: {template_subtype}, Age: {template_age:.1f}d")
+        else:
+            template_info_lines.append(f"Type: {template_type}, Age: {template_age:.1f}d")
+    else:
+        template_info_lines.append(f"Age: {template_age:.1f}d")
+    if redshift_error and np.isfinite(redshift_error) and redshift_error > 0:
+        template_info_lines.append(f"z = {z_template:.6f} ±{redshift_error:.6f}")
+    else:
+        template_info_lines.append(f"z = {z_template:.6f}")
+    if rlap_cos_value is not None:
+        template_info_lines.append(f"RLAP-cos = {rlap_cos_value:.2f}")
+    else:
+        template_info_lines.append(f"RLAP = {rlap_value:.2f}")
+    template_info = "\n".join(template_info_lines)
+    ax.text(0.98, 0.98, template_info, transform=ax.transAxes,
+            verticalalignment='top', horizontalalignment='right',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor='black', alpha=0.8))
     
     # Format plot (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Observed Wavelength (Å)", "Flux", theme_manager):
+    if not _apply_no_title_styling_if_available(fig, ax, "Wavelength (Å)", "Flux", theme_manager):
         # Fallback styling if unified systems not available
-        ax.set_xlabel('Observed Wavelength (Å)')
+        ax.set_xlabel('Wavelength (Å)')
         ax.set_ylabel('Flux')
         ax.grid(True, alpha=0.3)
-    ax.legend(loc='upper right')
-    
-    # Autoscale the axes for better viewing
-    ax.autoscale(enable=True, axis='both', tight=False)
+    # Match GUI: no legend (info box replaces it)
+
+    # Match GUI stable range setting with margins
+    try:
+        all_wave = None
+        all_flux = None
+        if input_wave is not None and input_flux is not None:
+            all_wave = np.array(input_wave)
+            all_flux = np.array(input_flux)
+        if template_plotted:
+            if 'spectra' in match and 'flux' in match['spectra']:
+                tw = np.asarray(match['spectra']['flux']['wave'])
+                tf = np.asarray(match['spectra']['flux']['flux'])
+            elif ('processed_flux' in match and hasattr(result, 'processed_spectrum') and 'continuum' in result.processed_spectrum):
+                tw = np.asarray(result.processed_spectrum['log_wave'])
+                tf = (np.asarray(match['processed_flux']) + 1.0) * np.asarray(result.processed_spectrum['continuum'])
+            else:
+                tw = None
+                tf = None
+            if tw is not None and tf is not None:
+                all_wave = tw if all_wave is None else np.concatenate([all_wave, tw])
+                all_flux = tf if all_flux is None else np.concatenate([all_flux, tf])
+        if all_wave is not None and all_flux is not None and all_wave.size > 1:
+            x_margin = (np.max(all_wave) - np.min(all_wave)) * 0.05
+            y_margin = (np.max(all_flux) - np.min(all_flux)) * 0.10
+            ax.set_xlim(np.min(all_wave) - x_margin, np.max(all_wave) + x_margin)
+            y_min = np.min(all_flux) - y_margin
+            y_max = np.max(all_flux) + y_margin
+            if y_max <= y_min:
+                y_center = y_min
+                y_min = y_center - (abs(y_center) * 0.1 if y_center != 0 else 1.0)
+                y_max = y_center + (abs(y_center) * 0.1 if y_center != 0 else 1.0)
+            ax.set_ylim(y_min, y_max)
+    except Exception:
+        # Fallback autoscale
+        ax.autoscale(enable=True, axis='both', tight=False)
     
     fig.tight_layout()
     
@@ -1723,14 +1530,20 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
     # Create single full-size plot
     ax = fig.add_subplot(111)
     
-    # Get template info
+    # Get template info (cleaned like GUI)
     template = match.get('template', {})
-    template_name = template.get('name', 'Unknown')
+    try:
+        from snid_sage.shared.utils import clean_template_name
+        template_name = clean_template_name(template.get('name', 'Unknown') or match.get('name', 'Unknown'))
+    except Exception:
+        template_name = template.get('name', 'Unknown')
     template_type = template.get('type', 'Unknown')
     template_subtype = template.get('subtype', '')
     template_age = template.get('age', 0)
     z_template = match.get('redshift', 0)
+    rlap_cos_value = match.get('rlap_cos', None)
     rlap_value = match.get('rlap', 0)
+    redshift_error = match.get('redshift_error', 0)
     
     # Plot flattened input spectrum (using the spectrum just before retransformation to flux)
     input_wave = None
@@ -1748,7 +1561,7 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
         # No need to filter - SNID analysis already trimmed to [left_edge:right_edge+1]
         # The data in result.processed_spectrum is already the correctly processed and trimmed version
         
-        ax.plot(input_wave, input_flux, 'k-', label='Input (flattened)', linewidth=1.5)
+        ax.plot(input_wave, input_flux, color='#3b82f6', label='Observed Spectrum', linewidth=2)
         
     elif isinstance(result.flat_input, dict) and 'wave' in result.flat_input and 'flux' in result.flat_input:
         # Fallback to flat_input if processed_spectrum not available
@@ -1759,7 +1572,7 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
         input_wave, input_flux = _filter_nonzero_spectrum(input_wave, input_flux, 
                                                        getattr(result, 'processed_spectrum', None))
         
-        ax.plot(input_wave, input_flux, 'k-', label='Input (flattened)', linewidth=1.5)
+        ax.plot(input_wave, input_flux, color='#3b82f6', label='Observed Spectrum', linewidth=2)
         
     else:
         raise ValueError("No flattened input spectrum data available for plotting")
@@ -1779,9 +1592,9 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
             ax.plot(
                 template_wave,
                 template_flux,
-                'r-',
-                linewidth=1.5,
-                label=f'Template (flattened)'
+                color='#E74C3C',
+                linewidth=2,
+                label='Template'
             )
             template_plotted = True
         
@@ -1798,8 +1611,8 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
                 ax.plot(
                     input_wave, 
                     template_flux_proc,
-                    'r-', linewidth=1.5, 
-                    label=f'Template (flattened)'
+                    color='#E74C3C', linewidth=2, 
+                    label='Template'
                 )
                 template_plotted = True
                            
@@ -1814,32 +1627,71 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8))
     
     # Add template metadata annotation
-    template_info = f"Template: {template_name}\n"
+    # Match GUI overlay info box (top-right, white background, black border)
+    template_info_lines = []
+    template_info_lines.append(f"Template: {template_name}")
     if template_type != 'Unknown':
-        template_info += f"Type: {template_type}"
         if template_subtype:
-            template_info += f" {template_subtype}"
-        template_info += "\n"
-    
-    template_info += f"Age: {template_age:.1f} days\n"
-    template_info += f"z = {z_template:.4f}\n"
-    template_info += f"RLAP = {rlap_value:.1f}"
-    
-    # Add the annotation in the upper left corner with a semi-transparent background
-    ax.text(0.02, 0.98, template_info, transform=ax.transAxes,
-         verticalalignment='top', horizontalalignment='left',
-         bbox=_create_themed_bbox_if_available(theme_manager=theme_manager))
+            template_info_lines.append(f"Subtype: {template_subtype}, Age: {template_age:.1f}d")
+        else:
+            template_info_lines.append(f"Type: {template_type}, Age: {template_age:.1f}d")
+    else:
+        template_info_lines.append(f"Age: {template_age:.1f}d")
+    if redshift_error and np.isfinite(redshift_error) and redshift_error > 0:
+        template_info_lines.append(f"z = {z_template:.6f} ±{redshift_error:.6f}")
+    else:
+        template_info_lines.append(f"z = {z_template:.6f}")
+    if rlap_cos_value is not None:
+        template_info_lines.append(f"RLAP-cos = {rlap_cos_value:.2f}")
+    else:
+        template_info_lines.append(f"RLAP = {rlap_value:.2f}")
+    template_info = "\n".join(template_info_lines)
+    ax.text(0.98, 0.98, template_info, transform=ax.transAxes,
+            verticalalignment='top', horizontalalignment='right',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor='black', alpha=0.8))
     
     # Format plot (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Log Wavelength (Å)", "Flattened Flux", theme_manager):
+    if not _apply_no_title_styling_if_available(fig, ax, "Wavelength (Å)", "Flattened Flux", theme_manager):
         # Fallback styling if unified systems not available
-        ax.set_xlabel('Log Wavelength (Å)')
+        ax.set_xlabel('Wavelength (Å)')
         ax.set_ylabel('Flattened Flux')
         ax.grid(True, alpha=0.3)
-    ax.legend(loc='upper right')
-    
-    # Set aspect ratio similar to Fortran SNID
-    ax.autoscale(enable=True, axis='both', tight=False)
+    # Match GUI: no legend (info box replaces it)
+
+    # Match GUI stable range setting with margins
+    try:
+        all_wave = None
+        all_flux = None
+        if input_wave is not None and input_flux is not None:
+            all_wave = np.array(input_wave)
+            all_flux = np.array(input_flux)
+        if template_plotted:
+            if 'spectra' in match and 'flat' in match['spectra']:
+                tw = np.asarray(match['spectra']['flat']['wave'])
+                tf = np.asarray(match['spectra']['flat']['flux'])
+            elif 'processed_flux' in match and input_wave is not None:
+                tw = np.asarray(input_wave)
+                tf = np.asarray(match['processed_flux'])
+            else:
+                tw = None
+                tf = None
+            if tw is not None and tf is not None:
+                all_wave = tw if all_wave is None else np.concatenate([all_wave, tw])
+                all_flux = tf if all_flux is None else np.concatenate([all_flux, tf])
+        if all_wave is not None and all_flux is not None and all_wave.size > 1:
+            x_margin = (np.max(all_wave) - np.min(all_wave)) * 0.05
+            y_margin = (np.max(all_flux) - np.min(all_flux)) * 0.10
+            ax.set_xlim(np.min(all_wave) - x_margin, np.max(all_wave) + x_margin)
+            y_min = np.min(all_flux) - y_margin
+            y_max = np.max(all_flux) + y_margin
+            if y_max <= y_min:
+                y_center = y_min
+                y_min = y_center - (abs(y_center) * 0.1 if y_center != 0 else 1.0)
+                y_max = y_center + (abs(y_center) * 0.1 if y_center != 0 else 1.0)
+            ax.set_ylim(y_min, y_max)
+    except Exception:
+        # Fallback autoscale
+        ax.autoscale(enable=True, axis='both', tight=False)
     
     fig.tight_layout()
     

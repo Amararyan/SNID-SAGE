@@ -315,25 +315,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         
         # Confirm button (smaller, inline with dropdown)
         confirm_btn = QtWidgets.QPushButton("Confirm")
-        confirm_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10b981;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 11px;
-                min-width: 60px;
-                min-height: 28px;
-            }
-            QPushButton:hover {
-                background-color: #059669;
-            }
-            QPushButton:pressed {
-                background-color: #047857;
-            }
-        """)
+        confirm_btn.setObjectName("confirm_btn")
         confirm_btn.clicked.connect(self._confirm_selection)
         confirm_btn.setDefault(True)
         dropdown_layout.addWidget(confirm_btn)
@@ -366,6 +348,13 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         left_layout.addWidget(plot_group, 1)
         
         layout.addWidget(self.left_panel, 3)  # Give left panel 3 parts of space (60%)
+
+        # Apply enhanced styles (after UI is built)
+        try:
+            from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+            self.button_manager = enhance_dialog_with_preset(self, 'cluster_selection_dialog')
+        except Exception:
+            pass
     
     def _create_matplotlib_3d_plot(self, layout):
         """Create matplotlib 3D scatter plot (matching tkinter implementation exactly)"""

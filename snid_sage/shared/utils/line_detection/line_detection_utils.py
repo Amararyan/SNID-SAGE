@@ -778,8 +778,12 @@ def auto_detect_and_compare_lines(self):
         self.obs_lines_btn.config(state='normal')
         self.tmpl_lines_btn.config(state='normal')
         
-        # Enable NIST search button
-        self.nist_search_btn.config(state='normal')
+        # Remove NIST search enablement (feature removed)
+        if hasattr(self, 'nist_search_btn'):
+            try:
+                self.nist_search_btn.config(state='disabled')
+            except Exception:
+                pass
         
         # Draw the line comparisons
         self.show_obs_lines = True

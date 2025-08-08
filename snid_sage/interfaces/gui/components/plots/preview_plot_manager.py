@@ -25,18 +25,22 @@ import os
 pyside6_gui_running = os.environ.get('SNID_SAGE_GUI_BACKEND') == 'PySide6'
 
 # Only set backend if not in PySide6 context and not already set to avoid conflicts
-if not pyside6_gui_running and matplotlib.get_backend() != 'TkAgg':
-    matplotlib.use('TkAgg')
-elif pyside6_gui_running and matplotlib.get_backend() not in ['Qt5Agg', 'QtAgg']:
+if pyside6_gui_running:
     # Use Qt backend when PySide6 is running
     try:
-        matplotlib.use('Qt5Agg')
-    except ImportError:
+        matplotlib.use('QtAgg')
+    except Exception:
         try:
-            matplotlib.use('QtAgg')
-        except ImportError:
-            # Fallback to Agg if Qt backends not available
+            matplotlib.use('Qt5Agg')
+        except Exception:
             matplotlib.use('Agg')
+else:
+    # Legacy Tk usage path; try to avoid forcing it if already configured
+    try:
+        if matplotlib.get_backend() != 'TkAgg':
+            matplotlib.use('TkAgg')
+    except Exception:
+        pass
 
 # Clean import order to prevent backend conflicts
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg

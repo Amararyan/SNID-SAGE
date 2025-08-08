@@ -650,7 +650,8 @@ def _run_forced_redshift_analysis_optimized(
     zmax: float,
     log_wave: np.ndarray,
     cont: np.ndarray,
-    report_progress: Callable[[str, Optional[float]], None]
+    report_progress: Callable[[str, Optional[float]], None],
+    templates_override: Optional[List[Dict[str, Any]]] = None
 ) -> List[Dict[str, Any]]:
     """
     OPTIMIZED forced redshift analysis using vectorized FFT correlation.
@@ -687,28 +688,37 @@ def _run_forced_redshift_analysis_optimized(
     _LOG.info(f"🎯 OPTIMIZED forced redshift z={forced_redshift:.6f} corresponds to lag={forced_lag:.3f}")
     
     # ============================================================================
-    # LOAD TEMPLATES (SAME AS NORMAL ANALYSIS)
+    # LOAD OR USE PROVIDED TEMPLATES (SAME AS NORMAL ANALYSIS)
     # ============================================================================
-    
-    # Use unified storage for loading templates (same as normal analysis)
-    try:
-        templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
-        _LOG.info(f"✅ Loaded {len(templates)} templates using UNIFIED STORAGE for forced redshift analysis")
-    except Exception as e:
-        _LOG.warning(f"Unified storage failed in forced analysis, falling back to legacy loader: {e}")
-        from .io import load_templates
-        templates, _ = load_templates(templates_dir, flatten=True)
-        
-        # Apply template filtering to legacy templates
+    if templates_override is not None:
+        templates = list(templates_override)
+        # Apply additional filtering if requested
         if template_filter:
             templates = [t for t in templates if t.get('name', '') in template_filter]
-            _LOG.info(f"Applied template filter: {len(templates)} templates remaining")
-        elif exclude_templates:
-            original_count = len(templates)
+        if exclude_templates:
             templates = [t for t in templates if t.get('name', '') not in exclude_templates]
-            _LOG.info(f"Excluded {original_count - len(templates)} templates: {len(templates)} remaining")
-        
-        _LOG.info(f"✅ Loaded {len(templates)} templates using STANDARD method for forced redshift analysis")
+        if type_filter:
+            templates = [t for t in templates if t.get('type', '') in type_filter]
+        _LOG.info(f"Using preloaded templates for forced redshift analysis: {len(templates)} templates")
+    else:
+        # Use unified storage for loading templates (same as normal analysis)
+        try:
+            templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
+            _LOG.info(f"Loaded {len(templates)} templates using unified storage for forced redshift analysis")
+        except Exception as e:
+            _LOG.warning(f"Unified storage failed in forced analysis, falling back to legacy loader: {e}")
+            from .io import load_templates
+            templates, _ = load_templates(templates_dir, flatten=True)
+            
+            # Apply template filtering to legacy templates
+            if template_filter:
+                templates = [t for t in templates if t.get('name', '') in template_filter]
+            elif exclude_templates:
+                original_count = len(templates)
+                templates = [t for t in templates if t.get('name', '') not in exclude_templates]
+                _LOG.info(f"Excluded {original_count - len(templates)} templates: {len(templates)} remaining")
+            
+            _LOG.info(f"Loaded {len(templates)} templates using standard method for forced redshift analysis")
     
     if not templates:
         _LOG.error("No templates loaded for forced redshift analysis")
@@ -1182,7 +1192,9 @@ def run_snid_analysis(
     save_plots: bool = False,
     plot_dir: Optional[str | Path] = None,
     # Progress callback
-    progress_callback: Optional[Callable[[str, float], None]] = None
+    progress_callback: Optional[Callable[[str, float], None]] = None,
+    # Allow callers (e.g., batch CLI) to provide preloaded templates
+    preloaded_templates: Optional[List[Dict[str, Any]]] = None
 ) -> Tuple[SNIDResult, Dict[str, Any]]:
     """
     Run SNID correlation analysis on preprocessed spectrum.
@@ -1245,8 +1257,12 @@ def run_snid_analysis(
         if progress_callback:
             try:
                 progress_callback(message, progress)
+            except InterruptedError:
+                # Propagate cancellation so callers can stop work immediately
+                raise
             except Exception:
-                pass  # Don't let progress reporting break the analysis
+                # Ignore non-fatal progress reporting errors
+                pass
     
     _LOG.info("="*60)
     _LOG.info("SNID CORRELATION ANALYSIS")
@@ -1318,29 +1334,32 @@ def run_snid_analysis(
     # STEP 7: LOAD TEMPLATES (ONLY FOR NON-FORCED ANALYSIS)
     # ============================================================================
     
-    # Skip template loading for forced redshift analysis (new method handles its own loading)
+    # Skip template loading for forced redshift analysis (handled later)
     if forced_redshift is None:
         # NORMAL ANALYSIS: Load templates here
-        report_progress("Loading template library")
-        
-        # Use unified storage for loading templates
-        try:
-            templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
-            _LOG.info(f"✅ Loaded {len(templates)} templates using UNIFIED STORAGE")
-        except Exception as e:
-            _LOG.warning(f"Unified storage failed, falling back to legacy loader: {e}")
-            templates, _ = load_templates(templates_dir, flatten=True)
+        if preloaded_templates is not None:
+            templates = list(preloaded_templates)
+        else:
+            report_progress("Loading template library")
             
-            # Apply template filtering to legacy templates
-            if template_filter:
-                templates = [t for t in templates if t.get('name', '') in template_filter]
-                _LOG.info(f"Applied template filter: {len(templates)} templates remaining")
-            elif exclude_templates:
-                original_count = len(templates)
-                templates = [t for t in templates if t.get('name', '') not in exclude_templates]
-                _LOG.info(f"Excluded {original_count - len(templates)} templates: {len(templates)} remaining")
-            
-            _LOG.info(f"✅ Loaded {len(templates)} templates using STANDARD method")
+            # Use unified storage for loading templates
+            try:
+                templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
+                _LOG.info(f"Loaded {len(templates)} templates using unified storage")
+            except Exception as e:
+                _LOG.warning(f"Unified storage failed, falling back to legacy loader: {e}")
+                templates, _ = load_templates(templates_dir, flatten=True)
+                
+                # Apply template filtering to legacy templates
+                if template_filter:
+                    templates = [t for t in templates if t.get('name', '') in template_filter]
+                    _LOG.info(f"Applied template filter: {len(templates)} templates remaining")
+                elif exclude_templates:
+                    original_count = len(templates)
+                    templates = [t for t in templates if t.get('name', '') not in exclude_templates]
+                    _LOG.info(f"Excluded {original_count - len(templates)} templates: {len(templates)} remaining")
+                
+                _LOG.info(f"Loaded {len(templates)} templates using standard method")
         
         if not templates:
             _LOG.error("No templates loaded")
@@ -1430,7 +1449,8 @@ def run_snid_analysis(
                 templates_dir, type_filter, template_filter, exclude_templates, age_range,
                 tapered_flux, dtft, drms, left_edge, right_edge, 
                 forced_redshift, NW_grid, DWLOG_grid, k1, k2, k3, k4, 
-                lapmin, rlapmin, zmin, zmax, log_wave, cont, report_progress
+                lapmin, rlapmin, zmin, zmax, log_wave, cont, report_progress,
+                templates_override=preloaded_templates
             )
             
             _LOG.info(f"Phase 1 complete: Forced redshift analysis found {len(matches)} matches with rlap >= {rlapmin}")
@@ -1546,6 +1566,8 @@ def run_snid_analysis(
                         # Correlation for this batch
                         # ------------------------------------------------------
                         correlator = integrate_fft_optimization(batch_templates, k1, k2, k3, k4, config=config)
+                        # Cancellation poll just before heavy compute
+                        report_progress("", None)
                         correlation_results = correlator.correlate_snid_style(dtft, drms)
 
                         # Vectorized peak finding and match processing (same as before)
@@ -1561,6 +1583,9 @@ def run_snid_analysis(
                             template_data_dict = {}
 
                             for template_name, corr_result in correlation_results.items():
+                                # Periodic cancellation poll within inner loop
+                                if len(correlation_results) > 0 and (template_names.__len__() % 100 == 0):
+                                    report_progress("", None)
                                 correlation = corr_result['correlation']
                                 template_data = corr_result['template']
                                 template_rms = corr_result['template_rms']
@@ -1663,6 +1688,9 @@ def run_snid_analysis(
             template_progress_interval = 500  # Report every 500 templates instead of percentage-based
             
             for template_idx, tpl in enumerate(templates):
+                # Lightweight cancellation poll via progress callback (no text)
+                if template_idx % 50 == 0:
+                    report_progress("", None)
                 # Report progress every 500 templates or at the end
                 if template_idx % template_progress_interval == 0 or template_idx == total_templates - 1:
                     progress_pct = (template_idx + 1) / total_templates * 100
@@ -1698,8 +1726,8 @@ def run_snid_analysis(
                 Rz_rolled = np.roll(ccf, NW_grid//2)
                 Rz = Rz_rolled / (NW_grid * drms * trms) if (drms * trms) != 0 else Rz_rolled
             
-                # Find peaks in allowed redshift range
-                peaks_indices, properties = find_peaks(Rz, distance=3, prominence=0.1, height=0.1)
+                # Find peaks in allowed redshift range (consistent thresholds)
+                peaks_indices, properties = find_peaks(Rz, distance=3, height=0.3)
                 valid_peaks_indices = [i for i in peaks_indices if lz1 <= i <= lz2]
 
                 if not valid_peaks_indices:
@@ -2249,10 +2277,8 @@ def run_snid_analysis(
             if save_plots:
                 fig_fractions.savefig(plot_dir / 'snid_subtype_analysis.png', dpi=150, bbox_inches='tight')
         else:
-            # Fallback to original type fractions if no clustering
-            fig_fractions = plot_type_fractions(result)
-            if save_plots:
-                fig_fractions.savefig(plot_dir / 'snid_type_fractions.png', dpi=150, bbox_inches='tight')
+            # If no clustering results, skip legacy type fractions plot
+            pass
         
         if result.best_matches:
             # Removed - individual template correlation plots are generated by enhanced output system

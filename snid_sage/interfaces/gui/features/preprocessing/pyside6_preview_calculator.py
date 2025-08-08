@@ -395,8 +395,10 @@ class PySide6PreviewCalculator(QtCore.QObject):
         
         # Apply the step
         preview_wave, preview_flux = self.preview_step(step_type, **kwargs)
+        _LOGGER.info(f"apply_step: {step_type} - Before: {len(self.current_flux)} points, After: {len(preview_flux)} points")
         self.current_wave = preview_wave
         self.current_flux = preview_flux
+        _LOGGER.info(f"apply_step: {step_type} - State updated to {len(self.current_flux)} points")
         
         # Update edge information after applying the step
         self._update_edge_info_after_step(step_type)
@@ -475,14 +477,28 @@ class PySide6PreviewCalculator(QtCore.QObject):
         try:
             temp_wave = self.current_wave.copy()
             temp_flux = self.current_flux.copy()
+            # Ensure integer values for SciPy API to avoid silent fallbacks
+            try:
+                polyorder_int = int(polyorder)
+            except Exception:
+                polyorder_int = 3
+            try:
+                window_int = int(value)
+            except Exception:
+                window_int = 11
+            _LOGGER.info(f"_preview_savgol_filter: Input {len(temp_flux)} points, filter_type={filter_type}, value={window_int if filter_type=='fixed' else value}, polyorder={polyorder_int}")
             
-            if filter_type == "fixed" and value >= 3:
-                filtered_flux = savgol_filter_fixed(temp_flux, int(value), polyorder)
+            if filter_type == "fixed" and window_int >= 3:
+                filtered_flux = savgol_filter_fixed(temp_flux, window_int, polyorder_int)
+                _LOGGER.info(f"_preview_savgol_filter: Fixed filter applied, output {len(filtered_flux)} points")
             elif filter_type == "wavelength" and value > 0:
-                filtered_flux = savgol_filter_wavelength(temp_wave, temp_flux, value, polyorder)
+                filtered_flux = savgol_filter_wavelength(temp_wave, temp_flux, float(value), polyorder_int)
+                _LOGGER.info(f"_preview_savgol_filter: Wavelength filter applied, output {len(filtered_flux)} points")
             else:
+                _LOGGER.info(f"_preview_savgol_filter: No filtering applied (filter_type={filter_type})")
                 return temp_wave, temp_flux
             
+            _LOGGER.info(f"_preview_savgol_filter: Returning {len(filtered_flux)} points")
             return temp_wave, filtered_flux
             
         except Exception as e:
