@@ -34,15 +34,12 @@ except ImportError:
     EnhancedPlotWidget = None
     SimplePlotWidget = None
 
-# Matplotlib for analysis plots
+# Matplotlib for analysis plots (unified Qt helper)
 try:
-    import matplotlib
-    matplotlib.use('QtAgg')  # Use Qt backend for PySide6
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.figure import Figure
+    from snid_sage.interfaces.gui.utils.matplotlib_qt import get_qt_mpl
+    plt, Figure, FigureCanvas, _NavigationToolbar = get_qt_mpl()
     MATPLOTLIB_AVAILABLE = True
-except ImportError:
+except Exception:
     MATPLOTLIB_AVAILABLE = False
     plt = None
     FigureCanvas = None

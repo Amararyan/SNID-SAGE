@@ -20,16 +20,13 @@ import PySide6.QtWidgets as QtWidgets
 import numpy as np
 from typing import Dict, List, Any, Optional, Tuple, Callable
 
-# Matplotlib for 3D plotting (matching the working tkinter implementation)
+# Matplotlib for 3D plotting (Qt helper)
 try:
-    import matplotlib
-    matplotlib.use('QtAgg')  # Use Qt backend for PySide6
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.figure import Figure
-    from mpl_toolkits.mplot3d import Axes3D
+    from snid_sage.interfaces.gui.utils.matplotlib_qt import get_qt_mpl
+    plt, Figure, FigureCanvas, _NavigationToolbar = get_qt_mpl()
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
     MATPLOTLIB_AVAILABLE = True
-except ImportError:
+except Exception:
     MATPLOTLIB_AVAILABLE = False
     plt = None
     FigureCanvas = None
@@ -317,7 +314,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         dropdown_layout.addWidget(self.cluster_dropdown, 1)  # Take most space
         
         # Confirm button (smaller, inline with dropdown)
-        confirm_btn = QtWidgets.QPushButton("✅ Confirm")
+        confirm_btn = QtWidgets.QPushButton("Confirm")
         confirm_btn.setStyleSheet("""
             QPushButton {
                 background-color: #10b981;
@@ -703,7 +700,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 
                 # Plot input spectrum (matching tkinter)
                 if input_wave is not None and input_flux is not None:
-                    ax.plot(input_wave, input_flux, color='#0078d4', linewidth=1.5, alpha=0.8, 
+                    ax.plot(input_wave, input_flux, color='#0078d4', linewidth=1.0, alpha=0.8, 
                            label='Input Spectrum', zorder=2)
                 
                 # Plot template match (matching tkinter)
@@ -729,7 +726,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                         # Clean template name to remove _epoch_X suffix
                         from snid_sage.shared.utils import clean_template_name
                         template_name = clean_template_name(match.get('name', 'Unknown'))
-                        ax.plot(t_wave, t_flux, color='#E74C3C', linewidth=1.5, alpha=0.9,
+                        ax.plot(t_wave, t_flux, color='#E74C3C', linewidth=1.0, alpha=0.9,
                                label=f"Template: {template_name}", zorder=3)
                         
                 except Exception as e:

@@ -12,6 +12,9 @@ from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 from PySide6 import QtWidgets, QtCore, QtGui
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import create_flexible_double_input
+
 # Import layout manager
 from ..utils.layout_manager import get_template_layout_manager
 
@@ -79,14 +82,9 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         self.type_combo.addItems(["Ia", "Ib", "Ic", "II", "IIn", "IIP", "AGN", "Galaxy", "Star", "SLSN", "KN", "Other"])
         
         self.subtype_edit = QtWidgets.QLineEdit()
-        self.age_spinbox = QtWidgets.QDoubleSpinBox()
-        self.age_spinbox.setRange(-999.9, 999.9)
-        self.age_spinbox.setValue(0.0)
-        self.age_spinbox.setSuffix(" days")
+        self.age_spinbox = create_flexible_double_input(min_val=-999.9, max_val=999.9, suffix=" days", default=0.0)
         
-        self.redshift_spinbox = QtWidgets.QDoubleSpinBox()
-        self.redshift_spinbox.setRange(0.0, 5.0)
-        self.redshift_spinbox.setDecimals(4)
+        self.redshift_spinbox = create_flexible_double_input(min_val=0.0, max_val=5.0, default=0.0)
         
         metadata_layout.addRow("Template Name:", self.name_edit)
         metadata_layout.addRow("Type:", self.type_combo)

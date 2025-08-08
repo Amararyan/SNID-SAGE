@@ -17,6 +17,9 @@ import numpy as np
 from typing import List, Tuple, Optional, Callable, Dict, Any
 from PySide6 import QtWidgets, QtCore, QtGui
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import create_flexible_double_input
+
 # PyQtGraph imports
 try:
     import pyqtgraph as pg
@@ -130,28 +133,16 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         input_layout = QtWidgets.QHBoxLayout()
         
         input_layout.addWidget(QtWidgets.QLabel("Start:"))
-        self.start_input = QtWidgets.QDoubleSpinBox()
-        self.start_input.setRange(0, 99999)
-        self.start_input.setDecimals(2)
+        self.start_input = create_flexible_double_input(min_val=0, max_val=99999, default=0)
         input_layout.addWidget(self.start_input)
         
         input_layout.addWidget(QtWidgets.QLabel("End:"))
-        self.end_input = QtWidgets.QDoubleSpinBox()
-        self.end_input.setRange(0, 99999)
-        self.end_input.setDecimals(2)
+        self.end_input = create_flexible_double_input(min_val=0, max_val=99999, default=0)
         input_layout.addWidget(self.end_input)
         
         add_button = QtWidgets.QPushButton("Add")
         add_button.clicked.connect(self.add_mask_from_input)
-        add_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('success', '#22c55e')};
-                color: white;
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-            }}
-        """)
+        # Styling will be handled by enhanced button system
         input_layout.addWidget(add_button)
         
         manual_layout.addLayout(input_layout)
@@ -162,28 +153,12 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         
         remove_button = QtWidgets.QPushButton("Remove Selected")
         remove_button.clicked.connect(self.remove_selected_mask)
-        remove_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('warning', '#f59e0b')};
-                color: white;
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-            }}
-        """)
+        # Styling will be handled by enhanced button system
         button_layout.addWidget(remove_button)
         
         clear_button = QtWidgets.QPushButton("Clear All")
         clear_button.clicked.connect(self.clear_all_masks)
-        clear_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors.get('danger', '#ef4444')};
-                color: white;
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-            }}
-        """)
+        # Styling will be handled by enhanced button system
         button_layout.addWidget(clear_button)
         
         layout.addLayout(button_layout)
@@ -525,29 +500,6 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
     def get_mask_regions(self) -> List[Tuple[float, float]]:
         """Get current mask regions"""
         return self.mask_regions.copy()
-    
-    def stop_masking_mode(self):
-        """Stop masking mode and clean up any active selection"""
-        if self.masking_active:
-            self.masking_active = False
-            
-            # Clear any active selection
-            self._clear_selection_visual()
-            self.selection_start = None
-            
-            # Disconnect events
-            self._disconnect_drag_events()
-            if self.mouse_press_connection:
-                try:
-                    self.plot_widget.scene().sigMouseClicked.disconnect(self._on_mouse_press)
-                except (RuntimeError, TypeError):
-                    pass
-                self.mouse_press_connection = None
-            
-            # Emit signal
-            self.masking_mode_changed.emit(False)
-            
-            _LOGGER.debug("Interactive masking mode stopped")
     
     def set_mask_regions(self, mask_regions: List[Tuple[float, float]]):
         """Set mask regions programmatically"""

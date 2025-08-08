@@ -9,6 +9,9 @@ import logging
 from typing import Dict, List, Optional, Any
 from PySide6 import QtWidgets, QtCore, QtGui
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import create_flexible_double_input
+
 # Import layout manager
 from ..utils.layout_manager import get_template_layout_manager
 
@@ -77,9 +80,7 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         self.edit_type = QtWidgets.QComboBox()
         self.edit_type.addItems(["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star", "Other"])
         self.edit_subtype = QtWidgets.QLineEdit()
-        self.edit_age = QtWidgets.QDoubleSpinBox()
-        self.edit_age.setRange(-999.9, 999.9)
-        self.edit_age.setSuffix(" days")
+        self.edit_age = create_flexible_double_input(min_val=-999.9, max_val=999.9, suffix=" days", default=0.0)
         
         metadata_layout.addRow("Name:", self.edit_name)
         metadata_layout.addRow("Type:", self.edit_type)

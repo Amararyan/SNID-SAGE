@@ -115,8 +115,8 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
                 "category": "🚀 QUICK WORKFLOW",
                 "shortcuts": [
                     {"action": "Open Spectrum", "shortcut": f"{mod_key}+O", "description": "Load spectrum file"},
-                                         {"action": "Quick Analysis", "shortcut": f"{mod_key}+Enter", "description": f"{get_platform_config().get_click_text('right')} preprocessing + analysis"},
-                     {"action": "Extended Quick Analysis", "shortcut": f"{mod_key}+Shift+Enter", "description": f"{get_platform_config().get_click_text('right')} preprocessing + analysis + auto-cluster"},
+                                         {"action": "Quick Analysis", "shortcut": f"{mod_key}+Enter", "description": "preprocessing + analysis"},
+                     {"action": "Extended Quick Analysis", "shortcut": f"{mod_key}+Shift+Enter", "description": "preprocessing + analysis + auto-cluster"},
                     {"action": "Reset Application", "shortcut": f"{mod_key}+Shift+R", "description": "Reset all analysis and plots"}
                 ]
             },

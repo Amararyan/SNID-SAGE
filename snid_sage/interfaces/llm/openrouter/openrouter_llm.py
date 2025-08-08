@@ -24,8 +24,9 @@ except ImportError:
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
-# Default free model if nothing else works
-DEFAULT_MODEL = "openai/gpt-3.5-turbo"
+# Default free model if nothing else works (must remain a free variant)
+# Using DeepSeek V3 0324 free route which is available on OpenRouter
+DEFAULT_MODEL = "deepseek/deepseek-chat-v3-0324:free"
 
 
 def get_openrouter_api_key():
@@ -292,26 +293,42 @@ def fetch_free_models(api_key=None):
                 model_id = model.get("id", "")
                 model_name = model.get("name", "")
                 
-                # Check if model is free (has "(free)" in name or zero pricing)
+                # Pricing
                 pricing = model.get("pricing", {})
-                prompt_price = float(pricing.get("prompt", "1")) 
+                prompt_price = float(pricing.get("prompt", "1"))
                 completion_price = float(pricing.get("completion", "1"))
                 
-                if "(free)" in model_name.lower() or (prompt_price == 0 and completion_price == 0):
-                    context_length = model.get("context_length", 4096)
-                    formatted_context = format_context_length(context_length)
-                    
-                    supported_params = model.get("supported_parameters", [])
-                    supports_reasoning = "reasoning" in supported_params if supported_params else False
-                    
-                    if "(free)" in model_name:
-                        display_name = model.get("name", "Unknown").replace(" (free)", "")
-                        free_models.append({
-                            "id": model_id,
-                            "name": display_name,
-                            "context_length": formatted_context,
-                            "supports_reasoning": supports_reasoning
-                        })
+                # Determine if model is free
+                is_free = "(free)" in model_name.lower() or (prompt_price == 0 and completion_price == 0)
+                if not is_free:
+                    continue
+                
+                # Context length
+                context_length = model.get("context_length", 4096)
+                formatted_context = format_context_length(context_length)
+                
+                # Capabilities
+                supported_params = model.get("supported_parameters", [])
+                supports_reasoning = "reasoning" in supported_params if supported_params else False
+                
+                # Clean display name
+                display_name = model_name.replace(" (free)", "") if "(free)" in model_name else model_name
+                
+                # Price display
+                price_display = "Free" if is_free else f"${prompt_price:.6f}/${completion_price:.6f}"
+                
+                free_models.append({
+                    "id": model_id,
+                    "name": display_name,
+                    "context_length": context_length,
+                    "context_display": formatted_context,
+                    "supports_reasoning": supports_reasoning,
+                    "is_free": True,
+                    "prompt_price": 0.0,
+                    "completion_price": 0.0,
+                    "price_display": price_display,
+                    "provider": model_id.split("/")[0] if "/" in model_id else "Unknown",
+                })
             
             _LOGGER.info(f"Successfully fetched {len(free_models)} free models from OpenRouter")
             return free_models
@@ -501,7 +518,15 @@ def _configure_openrouter_dialog_tkinter(parent):
 def call_openrouter_api(prompt, max_tokens=2000):
     """Call the OpenRouter API with the given prompt"""
     config = get_openrouter_config()
-    api_key = config.get('api_key')
+
+    # Always prefer secure storage for the API key; fall back to legacy config only if present
+    try:
+        api_key = get_openrouter_api_key()
+    except Exception:
+        api_key = None
+    if not api_key:
+        api_key = config.get('api_key')  # backward compatibility if key was stored previously
+
     model_id = config.get('model_id')
     
     if not api_key:
@@ -518,50 +543,71 @@ def call_openrouter_api(prompt, max_tokens=2000):
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://snid-spectrum-analyzer.io"
+        "HTTP-Referer": "https://snid-spectrum-analyzer.io",
+        "X-Title": "SNID SAGE"
     }
     
     # Set up the API request parameters
+    # Important: do NOT fall back to a paid non-free model. When a free model is selected, keep routing within that model only.
     data = {
         "model": model_id,
+        # Keep provider fallbacks for the chosen model, but do not change models implicitly
+        "route": "fallback",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "include_reasoning": False,
-        "reasoning": {
-            "exclude": True
-        }
+        "reasoning": {"exclude": True}
     }
     
     try:
         _LOGGER.debug(f"Sending request to OpenRouter API with model: {model_id}")
         response = requests.post(OPENROUTER_API_URL, headers=headers, json=data)
-        
+
         # Handle different error cases
         if response.status_code == 401:
             _LOGGER.error("OpenRouter API key is invalid or expired")
             raise ValueError("API key is invalid or expired")
         elif response.status_code == 404:
+            # Model not found; fall back to a known free default model only
             _LOGGER.error(f"Model '{model_id}' not found")
-            raise ValueError(f"Model '{model_id}' not found")
+            _LOGGER.info(f"Falling back to default free model: {DEFAULT_MODEL}")
+            try:
+                api_key_for_save = get_openrouter_api_key() or api_key
+            except Exception:
+                api_key_for_save = api_key
+            try:
+                save_openrouter_config(api_key_for_save, DEFAULT_MODEL, DEFAULT_MODEL, False)
+            except Exception:
+                pass
+            data["model"] = DEFAULT_MODEL
+            response = requests.post(OPENROUTER_API_URL, headers=headers, json=data)
+            if response.status_code == 404:
+                _LOGGER.error(f"Default model '{DEFAULT_MODEL}' not found")
+                raise ValueError(f"Model '{model_id}' not found and default model unavailable")
+            elif response.status_code >= 400:
+                error_info = response.json() if response.text else {"error": "Unknown error"}
+                error_message = error_info.get("error", {}).get("message", str(error_info))
+                _LOGGER.error(f"OpenRouter API request failed after fallback: {error_message}")
+                raise ValueError(f"API request failed: {error_message}")
         elif response.status_code >= 400:
             error_info = response.json() if response.text else {"error": "Unknown error"}
             error_message = error_info.get("error", {}).get("message", str(error_info))
             _LOGGER.error(f"OpenRouter API request failed: {error_message}")
             raise ValueError(f"API request failed: {error_message}")
-        
+
         response.raise_for_status()
         result = response.json()
         _LOGGER.debug("OpenRouter API request completed successfully")
-        
+
         # Extract the completion text from the response
         try:
             completion_text = result["choices"][0]["message"]["content"]
-            
+
             # Check if response was truncated due to length
             finish_reason = result.get("choices", [{}])[0].get("finish_reason", "")
             if finish_reason == "length":
                 _LOGGER.warning(f"⚠️ Warning: Response was truncated due to token limit. Consider increasing max_tokens.")
-            
+
             # Apply the strip_thinking function to remove any thinking tags
             completion_text = strip_thinking(completion_text)
             _LOGGER.info(f"Successfully received response from OpenRouter API (length: {len(completion_text)} chars)")

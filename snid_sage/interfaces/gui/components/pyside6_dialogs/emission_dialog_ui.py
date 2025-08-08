@@ -9,6 +9,9 @@ separated from the main dialog class to reduce file size and improve organizatio
 from PySide6 import QtWidgets, QtCore, QtGui
 from typing import Dict, Any
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import create_flexible_double_input
+
 # Import logging
 try:
     from snid_sage.shared.utils.logging import get_logger
@@ -34,10 +37,7 @@ class EmissionDialogUIBuilder:
         host_layout = QtWidgets.QHBoxLayout()
         host_layout.addWidget(QtWidgets.QLabel("Host z:"))
         
-        self.dialog.base_redshift_input = QtWidgets.QDoubleSpinBox()
-        self.dialog.base_redshift_input.setRange(-0.1, 5.0)
-        self.dialog.base_redshift_input.setDecimals(6)
-        self.dialog.base_redshift_input.setSingleStep(0.001)
+        self.dialog.base_redshift_input = create_flexible_double_input(min_val=-0.1, max_val=5.0, default=0.0)
         self.dialog.base_redshift_input.setValue(self.dialog.host_redshift)
         self.dialog.base_redshift_input.valueChanged.connect(self.dialog._on_base_redshift_changed)
         host_layout.addWidget(self.dialog.base_redshift_input)
@@ -48,10 +48,7 @@ class EmissionDialogUIBuilder:
         velocity_layout = QtWidgets.QHBoxLayout()
         velocity_layout.addWidget(QtWidgets.QLabel("Ejecta velocity (km/s):"))
         
-        self.dialog.velocity_input = QtWidgets.QDoubleSpinBox()
-        self.dialog.velocity_input.setRange(-50000, 50000)
-        self.dialog.velocity_input.setDecimals(0)
-        self.dialog.velocity_input.setSingleStep(100)
+        self.dialog.velocity_input = create_flexible_double_input(min_val=-50000, max_val=50000, suffix=" km/s", default=0)
         self.dialog.velocity_input.setValue(self.dialog.velocity_shift)
         self.dialog.velocity_input.valueChanged.connect(self.dialog._on_velocity_changed)
         velocity_layout.addWidget(self.dialog.velocity_input)
@@ -184,26 +181,7 @@ class EmissionDialogUIBuilder:
         
         presets_layout.addLayout(sn_presets_layout)
         
-        # Galaxy and other presets dropdown
-        other_presets_layout = QtWidgets.QHBoxLayout()
-        other_presets_layout.addWidget(QtWidgets.QLabel("Other Presets:"))
-        
-        self.dialog.other_dropdown = QtWidgets.QComboBox()
-        self.dialog.other_dropdown.addItems([
-            "Select Preset...",
-            "Main Galaxy Lines",
-            "Very Strong Lines",
-            "Strong Lines", 
-            "Diagnostic Lines",
-            "Common Lines",
-            "Emission Lines",
-            "Flash Lines",
-            "Interaction Lines"
-        ])
-        self.dialog.other_dropdown.currentTextChanged.connect(self.dialog.event_handlers.on_other_preset_selected)
-        other_presets_layout.addWidget(self.dialog.other_dropdown)
-        other_presets_layout.addStretch()
-        presets_layout.addLayout(other_presets_layout)
+
         
         # Clear button
         clear_layout = QtWidgets.QHBoxLayout()
@@ -478,30 +456,6 @@ class EmissionDialogUIBuilder:
         presets_layout.addWidget(self.dialog.element_dropdown)
         
         # Separator
-        sep3 = QtWidgets.QFrame()
-        sep3.setFrameShape(QtWidgets.QFrame.VLine)
-        sep3.setFrameShadow(QtWidgets.QFrame.Sunken)
-        sep3.setStyleSheet("color: #cbd5e1;")
-        presets_layout.addWidget(sep3)
-        
-        # Other presets dropdown (compact) - no label, placeholder text
-        self.dialog.other_dropdown = QtWidgets.QComboBox()
-        self.dialog.other_dropdown.addItems([
-            "Choose Preset...",
-            "Main Galaxy Lines",
-            "Very Strong Lines",
-            "Strong Lines", 
-            "Diagnostic Lines",
-            "Common Lines",
-            "Emission Lines",
-            "Flash Lines",
-            "Interaction Lines"
-        ])
-        self.dialog.other_dropdown.setMaximumWidth(140)
-        # Remove automatic connection - will apply on button click
-        presets_layout.addWidget(self.dialog.other_dropdown)
-        
-        # Separator
         sep4 = QtWidgets.QFrame()
         sep4.setFrameShape(QtWidgets.QFrame.VLine)
         sep4.setFrameShadow(QtWidgets.QFrame.Sunken)
@@ -559,15 +513,39 @@ class EmissionDialogUIBuilder:
         return toolbar_frame
     
     def _apply_preset_selection(self):
-        """Apply the selected preset combinations when Apply button is clicked"""
+        """Apply the selected preset combinations when Apply button is clicked with smart filtering"""
         try:
             # Get current selections
             sn_type = self.dialog.sn_type_dropdown.currentText()
             sn_phase = self.dialog.sn_phase_dropdown.currentText()
             element = self.dialog.element_dropdown.currentText()
-            other_preset = self.dialog.other_dropdown.currentText()
             
-            # Apply SN presets if type, phase, or element is selected
+            # Check if we have any SN-related selections
+            has_sn_selections = (
+                (sn_type and not sn_type.startswith("Choose")) or
+                (sn_phase and not sn_phase.startswith("Choose")) or
+                (element and not element.startswith("Choose"))
+            )
+            
+            if has_sn_selections:
+                # Use smart filtering for interconnected SN type/phase/element selections
+                self._apply_smart_filtering(sn_type, sn_phase, element)
+            
+            # Keep selections visible - don't reset dropdowns to placeholder text
+            # This allows users to see what they've selected and potentially build on it
+            
+        except Exception as e:
+            _LOGGER.error(f"Error applying preset selection: {e}")
+    
+    def _apply_smart_filtering(self, sn_type, sn_phase, element):
+        """Apply smart filtering for SN type, phase, and element combinations"""
+        try:
+            # Reset event handler selections
+            self.dialog.event_handlers.current_type = None
+            self.dialog.event_handlers.current_phase = None
+            self.dialog.event_handlers.current_element = None
+            
+            # Set selections in order, letting smart filtering work
             if sn_type and not sn_type.startswith("Choose"):
                 self.dialog.event_handlers.on_sn_type_preset_selected(sn_type)
             
@@ -577,21 +555,20 @@ class EmissionDialogUIBuilder:
             if element and not element.startswith("Choose"):
                 # Handle "All" selection for elements
                 if element == "All":
-                    # Apply all element types
+                    # Apply all element types one by one with current type/phase context
                     for elem in ["Hydrogen", "Helium", "Silicon", "Iron", "Calcium", "Oxygen"]:
-                        self.dialog.event_handlers.on_element_preset_selected(elem)
+                        # Temporarily set element and get smart filtered lines
+                        temp_element = self.dialog.event_handlers.current_element
+                        self.dialog.event_handlers.current_element = elem
+                        lines = self.dialog.event_handlers._get_smart_filtered_lines()
+                        if lines:
+                            self.dialog._add_lines_to_plot(lines, is_sn=True)
+                        self.dialog.event_handlers.current_element = temp_element
                 else:
                     self.dialog.event_handlers.on_element_preset_selected(element)
-            
-            # Apply other presets if selected
-            if other_preset and not other_preset.startswith("Choose"):
-                self.dialog.event_handlers.on_other_preset_selected(other_preset)
-            
-            # Keep selections visible - don't reset dropdowns to placeholder text
-            # This allows users to see what they've selected and potentially build on it
-            
+                    
         except Exception as e:
-            _LOGGER.error(f"Error applying preset selection: {e}") 
+            _LOGGER.error(f"Error in smart filtering application: {e}") 
 
     def create_step2_analysis_toolbar(self):
         """Create a toolbar for step 2 showing current line info and key controls"""
@@ -658,6 +635,23 @@ class EmissionDialogUIBuilder:
 
         
         # Analyze button
+        # Clear points button (to the left of Analyze)
+        clear_points_btn = QtWidgets.QPushButton("Clear Points")
+        clear_points_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6b7280;
+                border: 1px solid #4b5563;
+                border-radius: 3px;
+                color: white;
+                font-weight: bold;
+                padding: 4px 8px;
+            }
+            QPushButton:hover {
+                background-color: #4b5563;
+            }
+        """)
+        info_layout.addWidget(clear_points_btn)
+
         analyze_btn = QtWidgets.QPushButton("🔬 Analyze")
         analyze_btn.setStyleSheet("""
             QPushButton {
@@ -679,7 +673,8 @@ class EmissionDialogUIBuilder:
         
         # Store references for connection later (simplified)
         self.dialog.step2_toolbar_refs = {
-            'analyze_btn': analyze_btn
+            'analyze_btn': analyze_btn,
+            'clear_points_btn': clear_points_btn
         }
         
         return toolbar_frame 

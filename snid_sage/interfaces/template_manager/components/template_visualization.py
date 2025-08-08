@@ -11,6 +11,9 @@ from typing import Dict, List, Optional, Any
 import numpy as np
 from PySide6 import QtWidgets, QtCore, QtGui
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import create_flexible_int_input
+
 from .template_data import TemplateData
 
 # Import layout manager
@@ -62,8 +65,7 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         self.view_mode_combo.addItems(["All Epochs", "Individual Epoch", "Normalized"])
         self.view_mode_combo.currentTextChanged.connect(self.update_plot)
         
-        self.epoch_selector = QtWidgets.QSpinBox()
-        self.epoch_selector.setMinimum(1)
+        self.epoch_selector = create_flexible_int_input(min_val=1, max_val=999, default=1)
         self.epoch_selector.valueChanged.connect(self.update_plot)
         
         control_layout.addWidget(QtWidgets.QLabel("View Mode:"))
@@ -83,25 +85,8 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         # Initialize PyQtGraph plotting
         self._setup_pyqtgraph_plot()
         
-        # Template info panel
-        info_panel = QtWidgets.QGroupBox("Template Information")
-        self.layout_manager.setup_group_box(info_panel)
-        info_layout = QtWidgets.QFormLayout(info_panel)
-        self.layout_manager.setup_form_layout(info_layout)
-        
-        self.info_name_label = QtWidgets.QLabel("No template selected")
-        self.info_type_label = QtWidgets.QLabel("-")
-        self.info_age_label = QtWidgets.QLabel("-")
-        self.info_epochs_label = QtWidgets.QLabel("-")
-        self.info_redshift_label = QtWidgets.QLabel("-")
-        
-        info_layout.addRow("Name:", self.info_name_label)
-        info_layout.addRow("Type:", self.info_type_label)
-        info_layout.addRow("Age:", self.info_age_label)
-        info_layout.addRow("Epochs:", self.info_epochs_label)
-        info_layout.addRow("Redshift:", self.info_redshift_label)
-        
-        layout.addWidget(info_panel)
+        # Template info panel - REMOVED as requested
+        # The info panel has been removed to simplify the interface
         
     def _setup_pyqtgraph_plot(self):
         """Setup PyQtGraph plotting in the widget"""
@@ -188,18 +173,12 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             'info': template_info
         }
         
-        # Update template information display - clean template name to remove _epoch_X suffix
-        from snid_sage.shared.utils import clean_template_name
-        clean_name = clean_template_name(template_name)
-        self.info_name_label.setText(clean_name)
-        self.info_type_label.setText(f"{template_info.get('type', 'Unknown')}/{template_info.get('subtype', 'Unknown')}")
-        self.info_age_label.setText(f"{template_info.get('age', 'Unknown')} days")
-        self.info_epochs_label.setText(str(template_info.get('epochs', 1)))
-        self.info_redshift_label.setText(str(template_info.get('redshift', 0.0)))
+        # Info labels removed - template information now shown only in plot title
         
         # Update epoch selector
         epochs = template_info.get('epochs', 1)
-        self.epoch_selector.setMaximum(epochs)
+        # Use setRange instead of setMaximum for FlexibleNumberInput
+        self.epoch_selector.setRange(1, epochs)
         
         # Load template data
         self._load_template_data()
@@ -273,8 +252,12 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         if not hasattr(self, 'plot_item'):
             return
             
-        # Clear previous plots
+        # Clear previous plots and legends
         self.plot_item.clear()
+        # Explicitly clear legend if it exists
+        if hasattr(self.plot_item, 'legend') and self.plot_item.legend is not None:
+            self.plot_item.legend.scene().removeItem(self.plot_item.legend)
+            self.plot_item.legend = None
         
         if self.template_data and self.template_data.wave_data is not None:
             view_mode = self.view_mode_combo.currentText()
@@ -289,15 +272,41 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             # Create a sample plot if no real data available
             self._create_sample_plot_pg()
             
-        # Set title - clean template name to remove _epoch_X suffix
+        # Set title with comprehensive template information
         from snid_sage.shared.utils import clean_template_name
         clean_name = clean_template_name(self.current_template['name'])
-        title = f"Template: {clean_name}"
+        template_info = self.current_template['info']
+        
+        # Build comprehensive title
+        title_parts = [f"Template: {clean_name}"]
+        
+        # Add type/subtype
+        type_info = template_info.get('type', 'Unknown')
+        subtype_info = template_info.get('subtype', '')
+        if subtype_info and subtype_info != 'Unknown':
+            type_info += f"/{subtype_info}"
+        title_parts.append(f"Type: {type_info}")
+        
+        # Add age
+        age = template_info.get('age', 'Unknown')
+        title_parts.append(f"Age: {age} days")
+        
+        # Add epoch info if multiple epochs
+        epochs = template_info.get('epochs', 1)
+        if epochs > 1:
+            title_parts.append(f"Epochs: {epochs}")
+        
+        title = " | ".join(title_parts)
         self.plot_item.setTitle(title)
         
     def _plot_all_epochs_pg(self):
         """Plot all epochs with vertical offset using PyQtGraph"""
         if not self.template_data or not self.template_data.epochs:
+            return
+            
+        # Validate data
+        if self.template_data.wave_data is None:
+            _LOGGER.warning("No wavelength data available for plotting")
             return
             
         # Generate colors
@@ -306,7 +315,7 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         legend_items = []
         
         for i, epoch in enumerate(self.template_data.epochs):
-            if epoch['flux'] is not None:
+            if epoch['flux'] is not None and len(epoch['flux']) == len(self.template_data.wave_data):
                 # Apply vertical offset
                 offset = i * 0.5
                 flux = epoch['flux'] + offset
@@ -319,10 +328,13 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                     name=f"Age: {age:.1f} days"
                 )
                 legend_items.append((curve, f"Age: {age:.1f} days"))
+            else:
+                _LOGGER.warning(f"Skipping epoch {i}: flux data mismatch with wavelength grid")
         
-        # Add legend
+        # Add legend - ensure no duplicates
         if legend_items:
-            legend = self.plot_item.addLegend()
+            # Remove any existing legend first (already handled in _plot_template_spectrum)
+            legend = self.plot_item.addLegend(offset=(10, 10))
             for curve, label in legend_items:
                 legend.addItem(curve, label)
         
@@ -331,10 +343,20 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         if not self.template_data or not self.template_data.epochs:
             return
             
-        epoch_idx = self.epoch_selector.value() - 1
+        # Validate data
+        if self.template_data.wave_data is None:
+            _LOGGER.warning("No wavelength data available for plotting")
+            return
+            
+        epoch_value = self.epoch_selector.value()
+        if epoch_value is None:
+            epoch_value = 1  # Default to first epoch
+        epoch_idx = int(epoch_value) - 1
+        
         if epoch_idx < len(self.template_data.epochs):
             epoch = self.template_data.epochs[epoch_idx]
-            if epoch['flux'] is not None:
+            if (epoch['flux'] is not None and 
+                len(epoch['flux']) == len(self.template_data.wave_data)):
                 age = epoch['age']
                 
                 # Plot the epoch
@@ -345,12 +367,21 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 )
                 
                 # Add legend
-                legend = self.plot_item.addLegend()
+                legend = self.plot_item.addLegend(offset=(10, 10))
                 legend.addItem(curve, f"Age: {age:.1f} days")
+            else:
+                _LOGGER.warning(f"Epoch {epoch_idx}: flux data mismatch with wavelength grid")
+        else:
+            _LOGGER.warning(f"Epoch index {epoch_idx} out of range (available: {len(self.template_data.epochs)})")
                 
     def _plot_normalized_pg(self):
         """Plot normalized spectra using PyQtGraph"""
         if not self.template_data or not self.template_data.epochs:
+            return
+            
+        # Validate data
+        if self.template_data.wave_data is None:
+            _LOGGER.warning("No wavelength data available for plotting")
             return
             
         # Generate colors  
@@ -360,10 +391,16 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         legend_items = []
         
         for i, epoch in enumerate(self.template_data.epochs):
-            if epoch['flux'] is not None:
+            if (epoch['flux'] is not None and 
+                len(epoch['flux']) == len(self.template_data.wave_data)):
                 # Normalize flux
                 flux = epoch['flux']
-                flux_normalized = flux / np.median(flux)
+                median_flux = np.median(flux)
+                if median_flux > 0:
+                    flux_normalized = flux / median_flux
+                else:
+                    _LOGGER.warning(f"Skipping epoch {i}: zero or negative median flux")
+                    continue
                 age = epoch['age']
                 
                 # Plot normalized flux
@@ -373,13 +410,16 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                     name=f"Age: {age:.1f} days"
                 )
                 legend_items.append((curve, f"Age: {age:.1f} days"))
+            else:
+                _LOGGER.warning(f"Skipping epoch {i}: flux data mismatch with wavelength grid")
                 
         # Update Y label for normalized plot
         self.plot_item.setLabel('left', 'Flattened Flux')
         
-        # Add legend
+        # Add legend - ensure no duplicates
         if legend_items:
-            legend = self.plot_item.addLegend()
+            # Remove any existing legend first (already handled in _plot_template_spectrum)
+            legend = self.plot_item.addLegend(offset=(10, 10))
             for curve, label in legend_items:
                 legend.addItem(curve, label)
         

@@ -392,7 +392,7 @@ class AnalysisMenuManager:
             self.main_window.ai_assistant_btn.setEnabled(True)
             
             # Update status indicators
-            self.main_window.config_status_label.setText("✅ Analysis Complete")
+            self.main_window.config_status_label.setText("Analysis Complete")
             self.main_window.config_status_label.setStyleSheet(
                 "font-style: italic; color: #059669; font-size: 10px !important; "
                 "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "

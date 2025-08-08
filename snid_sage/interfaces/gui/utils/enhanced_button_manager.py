@@ -41,12 +41,12 @@ class EnhancedButtonManager(QtCore.QObject):
             'hover': '#656565', 
             'pressed': '#585858'
         },
-        'preprocessing': {
+        'redshift': {
             'base': '#FFA600',
             'hover': '#E89500',
             'pressed': '#CC8400'
         },
-        'redshift': {
+        'preprocessing': {
             'base': '#FF6361',
             'hover': '#E85A58',
             'pressed': '#CC514F'

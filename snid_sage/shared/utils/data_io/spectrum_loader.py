@@ -81,61 +81,190 @@ def load_fits_spectrum(filename: str, band: int = 0, **kwargs) -> Tuple[np.ndarr
     
     try:
         with fits.open(filename) as hdul:
-            header = hdul[0].header
-            data = hdul[0].data
-            
-            if data is None:
+            primary = hdul[0]
+            primary_header = primary.header
+            data = primary.data
+
+            # Helper to merge primary and extension headers (extension overrides primary)
+            def _merge_headers_dict(hdr_primary, hdr_ext):
+                merged = {}
+                try:
+                    for k in hdr_primary.keys():
+                        merged[k] = hdr_primary.get(k)
+                except Exception:
+                    pass
+                try:
+                    for k in hdr_ext.keys():
+                        merged[k] = hdr_ext.get(k)
+                except Exception:
+                    pass
+                return merged
+
+            # If primary HDU has no data, look for the first HDU with usable data
+            chosen_hdu = None
+            if data is not None:
+                chosen_hdu = primary
+            else:
+                # Prefer an IMAGE-like HDU with numpy array data
+                try:
+                    from astropy.io.fits import ImageHDU
+                    try:
+                        from astropy.io.fits.hdu.compressed import CompImageHDU
+                    except Exception:
+                        CompImageHDU = tuple()  # type: ignore
+                    image_like_types = (ImageHDU,)
+                    if CompImageHDU:
+                        image_like_types = (ImageHDU, CompImageHDU)  # type: ignore
+                except Exception:
+                    image_like_types = tuple()
+
+                for hdu in hdul[1:]:
+                    # Skip table HDUs here; we'll handle them in the table branch below
+                    if image_like_types and not isinstance(hdu, image_like_types):
+                        continue
+                    if getattr(hdu, 'data', None) is not None:
+                        try:
+                            arr = np.asarray(hdu.data)
+                            if arr.size > 0 and arr.dtype.fields is None:
+                                chosen_hdu = hdu
+                                break
+                        except Exception:
+                            continue
+
+                # If still not found, try table HDUs with columns like wavelength/flux
+                if chosen_hdu is None:
+                    for hdu in hdul[1:]:
+                        try:
+                            from astropy.io.fits.hdu.table import BinTableHDU, TableHDU
+                            if isinstance(hdu, (BinTableHDU, TableHDU)):
+                                # Build a case-insensitive name map
+                                names = hdu.columns.names or []
+                                name_map = {str(n).lower(): str(n) for n in names}
+                                colnames = set(name_map.keys())
+                                wave_candidates = [
+                                    'wave', 'wavelength', 'lambda', 'lam', 'wl', 'angstrom', 'ang'
+                                ]
+                                flux_candidates = [
+                                    'flux', 'fnu', 'flam', 'counts', 'spec', 'spectrum', 'intensity'
+                                ]
+                                wave_key = next((c for c in wave_candidates if c in colnames), None)
+                                flux_key = next((c for c in flux_candidates if c in colnames), None)
+                                if wave_key and flux_key:
+                                    tbl = hdu.data
+                                    wave_name = name_map[wave_key]
+                                    flux_name = name_map[flux_key]
+
+                                    # Extract possibly vector-valued columns; prefer first row if multiple
+                                    wave_col = tbl[wave_name]
+                                    flux_col = tbl[flux_name]
+
+                                    # Helper to convert a column that may be an array of vectors
+                                    def _to_1d_vector(col):
+                                        arr = np.asarray(col)
+                                        # If 2D with single row, take first row
+                                        if arr.ndim == 2 and arr.shape[0] == 1:
+                                            return np.asarray(arr[0], dtype=float)
+                                        # If 1D object array (vector per row), take first element
+                                        if arr.ndim == 1 and arr.dtype == object:
+                                            return np.asarray(arr[0], dtype=float)
+                                        # Fallback: flatten
+                                        return np.asarray(arr, dtype=float).squeeze()
+
+                                    wavelength = _to_1d_vector(wave_col)
+                                    flux = _to_1d_vector(flux_col)
+
+                                    wavelength, flux = _validate_and_clean_arrays(wavelength, flux)
+                                    _LOGGER.info(
+                                        f"✅ FITS table spectrum loaded from HDU '{getattr(hdu, 'name', '')}': {len(wavelength)} points"
+                                    )
+                                    return wavelength, flux
+                        except Exception:
+                            continue
+
+            if chosen_hdu is None:
                 raise SpectrumLoadError("FITS file contains no data")
-            
+
+            # Use chosen HDU for image-like data
+            hdu_data = np.asarray(chosen_hdu.data)
+            header = _merge_headers_dict(primary_header, chosen_hdu.header)
+
+            # If this is actually a table (structured dtype), route through table logic
+            if hdu_data.dtype.fields is not None:
+                # Attempt to find vector columns in this HDU
+                try:
+                    from astropy.io.fits.hdu.table import BinTableHDU, TableHDU
+                    if isinstance(chosen_hdu, (BinTableHDU, TableHDU)):
+                        names = chosen_hdu.columns.names or []
+                        name_map = {str(n).lower(): str(n) for n in names}
+                        colnames = set(name_map.keys())
+                        wave_candidates = ['wave', 'wavelength', 'lambda', 'lam', 'wl', 'angstrom', 'ang']
+                        flux_candidates = ['flux', 'fnu', 'flam', 'counts', 'spec', 'spectrum', 'intensity']
+                        wave_key = next((c for c in wave_candidates if c in colnames), None)
+                        flux_key = next((c for c in flux_candidates if c in colnames), None)
+                        if wave_key and flux_key:
+                            tbl = chosen_hdu.data
+                            wave_name = name_map[wave_key]
+                            flux_name = name_map[flux_key]
+
+                            def _to_1d_vector_any(col):
+                                arr = np.asarray(col)
+                                if arr.ndim == 2:
+                                    return np.asarray(arr[0], dtype=float)
+                                if arr.dtype == object and arr.ndim == 1:
+                                    return np.asarray(arr[0], dtype=float)
+                                return np.asarray(arr, dtype=float)
+
+                            wavelength = _to_1d_vector_any(tbl[wave_name])
+                            flux = _to_1d_vector_any(tbl[flux_name])
+                            wavelength, flux = _validate_and_clean_arrays(wavelength, flux)
+                            _LOGGER.info(
+                                f"✅ FITS table spectrum loaded from chosen HDU '{getattr(chosen_hdu, 'name', '')}': {len(wavelength)} points"
+                            )
+                            return wavelength, flux
+                except Exception:
+                    pass
+
             # Handle different data structures
-            if data.ndim == 1:
-                # Simple 1D spectrum
-                flux = data
+            if hdu_data.ndim == 1:
+                flux = hdu_data
                 wavelength = _construct_wavelength_axis(header, len(flux))
-                
-            elif data.ndim == 2:
-                # 2D data - could be [wavelength, flux] or multiple spectra
-                if data.shape[0] == 2:
-                    # Assume [wavelength, flux] format
-                    wavelength = data[0]
-                    flux = data[1]
-                elif data.shape[1] == 2:
-                    # Assume columns are [wavelength, flux]
-                    wavelength = data[:, 0]
-                    flux = data[:, 1]
+
+            elif hdu_data.ndim == 2:
+                if hdu_data.shape[0] == 2:
+                    wavelength = hdu_data[0]
+                    flux = hdu_data[1]
+                elif hdu_data.shape[1] == 2:
+                    wavelength = hdu_data[:, 0]
+                    flux = hdu_data[:, 1]
                 else:
-                    # Take first spectrum and construct wavelength
-                    flux = data[0] if data.shape[0] < data.shape[1] else data[:, 0]
+                    flux = hdu_data[0] if hdu_data.shape[0] < hdu_data.shape[1] else hdu_data[:, 0]
                     wavelength = _construct_wavelength_axis(header, len(flux))
-                    
-            elif data.ndim == 3:
-                # 3D data - common for spectroscopic FITS files
-                # Shape is typically (bands, spatial, wavelength)
-                
+
+            elif hdu_data.ndim == 3:
                 # Validate band selection
-                if band >= data.shape[0]:
-                    available_bands = data.shape[0]
-                    warnings.warn(f"Band {band} requested but only {available_bands} bands available. Using band 0.")
+                if band >= hdu_data.shape[0]:
+                    available_bands = hdu_data.shape[0]
+                    warnings.warn(
+                        f"Band {band} requested but only {available_bands} bands available. Using band 0."
+                    )
                     band = 0
-                
-                # Extract spectrum from specified band, first spatial pixel
-                flux = data[band, 0, :]
+                flux = hdu_data[band, 0, :]
                 wavelength = _construct_wavelength_axis(header, len(flux))
-                
-                # Print band information for user
+
                 band_info = _get_band_info(header, band)
                 if band_info:
                     _LOGGER.info(f"✅ Loaded FITS band {band}: {band_info}")
-                
+
             else:
-                raise SpectrumLoadError(f"Unsupported FITS data dimensions: {data.ndim}D")
-            
+                raise SpectrumLoadError(f"Unsupported FITS data dimensions: {hdu_data.ndim}D")
+
             # Validate the extracted data
             wavelength, flux = _validate_and_clean_arrays(wavelength, flux)
-            
-            _LOGGER.info(f"✅ FITS spectrum loaded: {len(wavelength)} points, "
-                  f"λ = {wavelength[0]:.1f}-{wavelength[-1]:.1f} Å")
-            
+
+            _LOGGER.info(
+                f"✅ FITS spectrum loaded: {len(wavelength)} points, λ = {wavelength[0]:.1f}-{wavelength[-1]:.1f} Å"
+            )
+
             return wavelength, flux
             
     except SpectrumLoadError:

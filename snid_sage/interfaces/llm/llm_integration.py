@@ -15,7 +15,13 @@ from typing import Dict, List, Optional, Any, Union
 import traceback
 
 try:
-    from snid_sage.interfaces.llm.openrouter.openrouter_llm import call_openrouter_api, configure_openrouter_dialog, get_openrouter_config
+    from snid_sage.interfaces.llm.openrouter.openrouter_llm import (
+        call_openrouter_api,
+        configure_openrouter_dialog,
+        get_openrouter_config,
+        get_openrouter_api_key,
+        DEFAULT_MODEL,
+    )
     from snid_sage.interfaces.llm.analysis.llm_utils import build_enhanced_context_with_metadata
     OPENROUTER_AVAILABLE = True
 except ImportError as e:
@@ -49,8 +55,17 @@ class LLMIntegration:
         """Load OpenRouter configuration."""
         try:
             config = get_openrouter_config()
-            self.api_key = config.get('api_key')
-            self.current_model = config.get('model_id')
+            # Prefer secure storage for API key
+            try:
+                self.api_key = get_openrouter_api_key()
+            except Exception:
+                self.api_key = None
+            if not self.api_key:
+                # Backward compatibility if key was stored previously
+                self.api_key = config.get('api_key')
+
+            # Use saved model or default to a known free variant
+            self.current_model = config.get('model_id') or DEFAULT_MODEL
             
             # Check if configuration is valid
             if self.api_key and self.current_model:

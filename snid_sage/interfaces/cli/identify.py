@@ -19,9 +19,8 @@ import numpy as np
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
 from snid_sage.snid.io import read_spectrum
 from snid_sage.shared.utils.math_utils import (
-    calculate_joint_weighted_estimates,
-    calculate_weighted_redshift,
-    calculate_weighted_age,
+    calculate_weighted_redshift_balanced,
+    calculate_weighted_age_estimate,
     get_best_metric_value
 )
 
@@ -431,42 +430,63 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
         
         # Calculate enhanced cluster statistics using hybrid methods
         if cluster_matches:
-            redshifts = np.array([m['redshift'] for m in cluster_matches])
             rlaps = np.array([m['rlap'] for m in cluster_matches])
-            redshift_errors = np.array([m.get('redshift_error', 0) for m in cluster_matches])
             
-            # Collect joint redshift-age data for enhanced estimation
-            joint_redshifts = []
-            joint_ages = []
-            joint_weights = []
+            # Collect redshift data with uncertainties for balanced estimation
+            redshifts_with_errors = []
+            redshift_errors = []
+            rlap_cos_values = []
+            
+            # Collect age data for separate age estimation
+            ages_for_estimation = []
+            age_rlap_cos_values = []
             
             for m in cluster_matches:
                 template = m.get('template', {})
+                
+                # Always collect redshift data (uncertainties are always available)
+                z = m.get('redshift')
+                z_err = m.get('redshift_error', 0.0)
+                rlap_cos = get_best_metric_value(m)
+                
+                if z is not None and np.isfinite(z) and z_err > 0:
+                    redshifts_with_errors.append(z)
+                    redshift_errors.append(z_err)
+                    rlap_cos_values.append(rlap_cos)
+                
+                # Separately collect age data (no uncertainties available)
                 age = template.get('age', 0.0) if template else 0.0
-                # Check for valid age (negative ages are valid for pre-peak)
                 if age is not None and np.isfinite(age):
-                    joint_redshifts.append(m['redshift'])
-                    joint_ages.append(age)
-                    joint_weights.append(get_best_metric_value(m))
+                    ages_for_estimation.append(age)
+                    age_rlap_cos_values.append(rlap_cos)
             
-            # Use joint estimation if we have both redshift and age data
-            if joint_redshifts:
-                z_final, age_mean, z_final_err, age_uncertainty, redshift_age_covariance = calculate_joint_weighted_estimates(
-                    joint_redshifts, joint_ages, joint_weights
+            # Balanced redshift estimation (always use this when data available)
+            if redshifts_with_errors:
+                z_final, z_final_err = calculate_weighted_redshift_balanced(
+                    redshifts_with_errors, redshift_errors, rlap_cos_values
                 )
                 summary['cluster_redshift_weighted'] = z_final
                 summary['cluster_redshift_weighted_uncertainty'] = z_final_err
-                summary['cluster_redshift_scatter'] = 0.0  # Joint method handles scatter internally
-                summary['cluster_age_weighted'] = age_mean
-                summary['cluster_age_uncertainty'] = age_uncertainty
-                summary['cluster_age_scatter'] = 0.0
-                summary['redshift_age_covariance'] = redshift_age_covariance
+                summary['cluster_redshift_scatter'] = 0.0  # Properly handled in balanced estimation
             else:
-                # Fallback to redshift-only calculation if no age data available
-                z_final, z_final_err = calculate_weighted_redshift(redshifts, rlaps)
-                summary['cluster_redshift_weighted'] = z_final
-                summary['cluster_redshift_weighted_uncertainty'] = z_final_err
+                # No valid redshift data
+                summary['cluster_redshift_weighted'] = np.nan
+                summary['cluster_redshift_weighted_uncertainty'] = np.nan
                 summary['cluster_redshift_scatter'] = 0.0
+            
+            # Simple age estimation (no uncertainties)
+            if ages_for_estimation:
+                age_final = calculate_weighted_age_estimate(ages_for_estimation, age_rlap_cos_values)
+                summary['cluster_age_weighted'] = age_final
+                summary['cluster_age_uncertainty'] = 0.0  # No uncertainty available for ages
+                summary['cluster_age_scatter'] = 0.0
+                summary['redshift_age_covariance'] = 0.0  # Separate estimation, no covariance
+            else:
+                # No valid age data
+                summary['cluster_age_weighted'] = np.nan
+                summary['cluster_age_uncertainty'] = 0.0
+                summary['cluster_age_scatter'] = 0.0
+                summary['redshift_age_covariance'] = 0.0
             
             summary['cluster_rlap_mean'] = np.mean(rlaps)
             

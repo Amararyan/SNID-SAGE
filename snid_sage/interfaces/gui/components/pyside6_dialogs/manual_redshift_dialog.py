@@ -17,6 +17,12 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Any
 import math
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import (
+    FlexibleNumberInput,
+    create_flexible_double_input
+)
+
 # Enhanced button management
 try:
     from snid_sage.interfaces.gui.utils.dialog_button_enhancer import (
@@ -441,7 +447,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         self._setup_dialog()
         self._create_interface()
         
-        # Enhanced button styling and animations
+        # Enhanced button styling and animations (must be after dialog setup)
         self._setup_enhanced_buttons()
         
         # Initial plot
@@ -495,21 +501,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                 border-radius: 4px;
                 background: {self.colors['bg_secondary']};
             }}
-            QPushButton {{
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 9pt;
-                background: {self.colors['bg_secondary']};
-                border: 1px solid {self.colors['border']};
-            }}
-            QPushButton:hover {{
-                background: {self.colors['hover']};
-            }}
-            QPushButton:pressed {{
-                background: {self.colors['border']};
-            }}
+            /* Button styling handled by enhanced button system */
         """)
     
     def _create_interface(self):
@@ -602,10 +594,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
         input_layout = QtWidgets.QHBoxLayout()
         input_layout.addWidget(QtWidgets.QLabel("Direct input:"))
         
-        self.redshift_input = QtWidgets.QDoubleSpinBox()
-        self.redshift_input.setRange(0.0, 1.0)
-        self.redshift_input.setDecimals(6)
-        self.redshift_input.setSingleStep(0.1)  # Default step for Normal mode
+        self.redshift_input = create_flexible_double_input(min_val=0.0, max_val=1.0, default=0.0)
         self.redshift_input.setValue(self.overlay_redshift)
         self.redshift_input.valueChanged.connect(self._on_redshift_input_changed)
         input_layout.addWidget(self.redshift_input)

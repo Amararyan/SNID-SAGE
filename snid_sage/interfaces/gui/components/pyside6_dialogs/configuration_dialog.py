@@ -12,6 +12,13 @@ import PySide6.QtWidgets as QtWidgets
 from typing import Dict, Any, List, Optional, Tuple
 import os
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import (
+    FlexibleNumberInput, 
+    create_flexible_double_input, 
+    create_flexible_int_input
+)
+
 
 class CustomAgeSpinBox(QtWidgets.QDoubleSpinBox):
     """Custom QDoubleSpinBox that can show special text for both minimum and maximum values"""
@@ -105,7 +112,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             'lapmin': 0.3,
             'rlapmin': 5.0,
             'max_output_templates': 10,
-            'peak_window_size': 10,
+            
             
             # Template filtering
             'type_filter': [],  # Empty = all types
@@ -275,13 +282,6 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
         
-        # Header
-        header_label = QtWidgets.QLabel("SNID Analysis Configuration")
-        header_label.setFont(QtGui.QFont("Segoe UI", 18, QtGui.QFont.Bold))
-        header_label.setAlignment(QtCore.Qt.AlignCenter)
-        header_label.setStyleSheet("color: #3b82f6; margin-bottom: 10px;")
-        layout.addWidget(header_label)
-        
         # Create tabbed interface
         tab_widget = QtWidgets.QTabWidget()
         
@@ -339,29 +339,20 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         redshift_group = QtWidgets.QGroupBox("Redshift Range")
         redshift_layout = QtWidgets.QFormLayout(redshift_group)
         
-        self.widgets['zmin'] = QtWidgets.QDoubleSpinBox()
-        self.widgets['zmin'].setRange(-0.1, 2.0)
-        self.widgets['zmin'].setSingleStep(0.01)
-        self.widgets['zmin'].setDecimals(3)
-        self.widgets['zmin'].setToolTip("Minimum redshift for analysis")
+        self.widgets['zmin'] = create_flexible_double_input(min_val=-0.1, max_val=2.0, default=0.0)
+        self.widgets['zmin'].setToolTip("Minimum redshift for analysis (enter any precision)")
         redshift_layout.addRow("Minimum Redshift (zmin):", self.widgets['zmin'])
         
-        self.widgets['zmax'] = QtWidgets.QDoubleSpinBox()
-        self.widgets['zmax'].setRange(-0.1, 3.0)
-        self.widgets['zmax'].setSingleStep(0.01)
-        self.widgets['zmax'].setDecimals(3)
-        self.widgets['zmax'].setToolTip("Maximum redshift for analysis")
+        self.widgets['zmax'] = create_flexible_double_input(min_val=-0.1, max_val=3.0, default=1.0)
+        self.widgets['zmax'].setToolTip("Maximum redshift for analysis (enter any precision)")
         redshift_layout.addRow("Maximum Redshift (zmax):", self.widgets['zmax'])
         
         # Optional forced redshift
         forced_redshift_layout = QtWidgets.QHBoxLayout()
         self.widgets['forced_redshift_enabled'] = QtWidgets.QCheckBox("Force specific redshift:")
-        self.widgets['forced_redshift_value'] = QtWidgets.QDoubleSpinBox()
-        self.widgets['forced_redshift_value'].setRange(-0.1, 3.0)
-        self.widgets['forced_redshift_value'].setSingleStep(0.001)
-        self.widgets['forced_redshift_value'].setDecimals(4)
+        self.widgets['forced_redshift_value'] = create_flexible_double_input(min_val=-0.1, max_val=3.0, default=0.0)
         self.widgets['forced_redshift_value'].setEnabled(False)
-        self.widgets['forced_redshift_value'].setToolTip("Force analysis to use this specific redshift")
+        self.widgets['forced_redshift_value'].setToolTip("Force analysis to use this specific redshift (any precision)")
         
         # Connect checkbox to enable/disable spinbox
         self.widgets['forced_redshift_enabled'].toggled.connect(
@@ -379,20 +370,20 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         age_group = QtWidgets.QGroupBox("📅 Age Filtering")
         age_layout = QtWidgets.QFormLayout(age_group)
         
-        self.widgets['age_min'] = QtWidgets.QDoubleSpinBox()
-        self.widgets['age_min'].setRange(-9999, 9999)
-        self.widgets['age_min'].setSingleStep(1)
-        self.widgets['age_min'].setDecimals(1)
-        self.widgets['age_min'].setSpecialValueText("No minimum")  # Show special text for minimum value
-        self.widgets['age_min'].setValue(-9999)  # Set to minimum to show "No minimum"
-        self.widgets['age_min'].setToolTip("Minimum age in days (negative = before maximum light). Set to minimum to disable age filtering.")
+        self.widgets['age_min'] = create_flexible_double_input(min_val=-9999, max_val=9999, default=-9999, suffix=" days")
+        # Show a friendly label for sentinel value
+        if hasattr(self.widgets['age_min'], 'setSpecialValueDisplay'):
+            # Important: display should not include the suffix
+            self.widgets['age_min'].setSpecialValueDisplay(-9999.0, "No Minimum")
+        self.widgets['age_min'].setValue(-9999)
+        self.widgets['age_min'].setToolTip("Minimum age in days (negative = before maximum light). Use -9999 to disable filtering.")
         age_layout.addRow("Minimum Age (days):", self.widgets['age_min'])
         
         self.widgets['age_max'] = CustomAgeSpinBox()
         self.widgets['age_max'].setRange(-9999, 9999)
         self.widgets['age_max'].setSingleStep(1)
         self.widgets['age_max'].setDecimals(1)
-        self.widgets['age_max'].setMaximumSpecialValueText("No maximum", 9999.0)
+        self.widgets['age_max'].setMaximumSpecialValueText("No Maximum", 9999.0)
         self.widgets['age_max'].setValue(9999)
         self.widgets['age_max'].setToolTip("Maximum age in days (negative = before maximum light). Set to maximum to disable age filtering.")
         age_layout.addRow("Maximum Age (days):", self.widgets['age_max'])
@@ -403,25 +394,15 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         correlation_group = QtWidgets.QGroupBox("🔗 Correlation Settings")
         correlation_layout = QtWidgets.QFormLayout(correlation_group)
         
-        self.widgets['lapmin'] = QtWidgets.QDoubleSpinBox()
-        self.widgets['lapmin'].setRange(0.0, 1.0)
-        self.widgets['lapmin'].setSingleStep(0.05)
-        self.widgets['lapmin'].setDecimals(2)
-        self.widgets['lapmin'].setToolTip("Minimum overlap fraction required between spectrum and template")
+        self.widgets['lapmin'] = create_flexible_double_input(min_val=0.0, max_val=1.0, default=0.0)
+        self.widgets['lapmin'].setToolTip("Minimum overlap fraction required between spectrum and template (any precision)")
         correlation_layout.addRow("Minimum Overlap (lapmin):", self.widgets['lapmin'])
         
-        self.widgets['rlapmin'] = QtWidgets.QDoubleSpinBox()
-        self.widgets['rlapmin'].setRange(0.0, 20.0)
-        self.widgets['rlapmin'].setSingleStep(0.5)
-        self.widgets['rlapmin'].setDecimals(1)
-        self.widgets['rlapmin'].setToolTip("Minimum relative overlap for a good match")
+        self.widgets['rlapmin'] = create_flexible_double_input(min_val=0.0, max_val=20.0, default=0.0)
+        self.widgets['rlapmin'].setToolTip("Minimum relative overlap for a good match (any precision)")
         correlation_layout.addRow("Minimum Relative Overlap (rlapmin):", self.widgets['rlapmin'])
         
-        self.widgets['peak_window_size'] = QtWidgets.QSpinBox()
-        self.widgets['peak_window_size'].setRange(5, 50)
-        self.widgets['peak_window_size'].setSingleStep(1)
-        self.widgets['peak_window_size'].setToolTip("Window size for finding correlation peaks")
-        correlation_layout.addRow("Peak Window Size:", self.widgets['peak_window_size'])
+        # Removed Peak Window Size option from configuration UI
         
         layout.addWidget(correlation_group)
         
@@ -452,17 +433,21 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         types_grid = QtWidgets.QGridLayout(types_widget)
         types_grid.setSpacing(10)
         
-        # Main supernova types with their subtypes
+        # Main supernova and related object types with representative subtypes
+        # Expanded to include all categories supported by SNID templates
         self.sn_types = {
-            'Ia': ['Ia-norm', 'Ia-91T', 'Ia-91bg', 'Ia-csm', 'Ia-pec'],
-            'Ib': ['Ib-norm', 'Ib-pec', 'IIb', 'Ibn'],
-            'Ic': ['Ic-norm', 'Ic-pec', 'Ic-Broad', 'Icn'],
-            'II': ['IIP', 'II-pec', 'IIn', 'IIL'],
-            'SLSN': ['SLSN-I', 'SLSN-II'],
-            'Galaxy': ['Gal-E', 'Gal-S0', 'Gal-Sa', 'Gal-Sb', 'Gal-Sc'],
-            'Star': ['M-star', 'C-star'],
-            'AGN': ['AGN-type1', 'QSO'],
-            'Other': ['TDE', 'KN', 'LFBOT']
+            'Ia': ['Ia', 'Ia-norm', 'Ia-91T', 'Ia-91bg', 'Ia-csm', 'Ia-pec', 'Ia-02cx', 'Ia-03fg', 'Ia-02es', 'Ia-Ca-rich'],
+            'Ib': ['Ib', 'Ib-norm', 'Ib-pec', 'IIb', 'Ibn', 'Ib-Ca-rich', 'Ib-csm'],
+            'Ic': ['Ic', 'Ic-norm', 'Ic-pec', 'Ic-broad', 'Icn', 'Ic-Ca-rich', 'Ic-csm'],
+            'II': ['II', 'IIP', 'II-pec', 'IIn', 'IIL', 'IIn-pec'],
+            'SLSN': ['SLSN', 'SLSN-I', 'SLSN-Ib', 'SLSN-Ic', 'SLSN-II', 'SLSN-IIn'],
+            'LFBOT': ['LFBOT', '18cow', '20xnd'],
+            'TDE': ['TDE', 'TDE-H', 'TDE-He', 'TDE-H-He', 'TDE-Ftless'],
+            'KN': ['KN', '17gfo'],
+            'GAP': ['GAP', 'LRN', 'LBV', 'ILRT'],
+            'Galaxy': ['Galaxy', 'Gal', 'Gal-E', 'Gal-S0', 'Gal-Sa', 'Gal-Sb', 'Gal-Sc', 'Gal-SB'],
+            'Star': ['Star', 'M-star', 'C-star'],
+            'AGN': ['AGN', 'AGN-type1', 'QSO']
         }
         
         row, col = 0, 0
@@ -592,18 +577,6 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         self.selected_templates = set()
         self._load_available_templates()
         
-        # Template Limits
-        limits_group = QtWidgets.QGroupBox("📊 Output Limits")
-        limits_layout = QtWidgets.QFormLayout(limits_group)
-        
-        self.widgets['max_output_templates'] = QtWidgets.QSpinBox()
-        self.widgets['max_output_templates'].setRange(1, 50)
-        self.widgets['max_output_templates'].setSingleStep(1)
-        self.widgets['max_output_templates'].setToolTip("Maximum number of best templates to output")
-        limits_layout.addRow("Max Output Templates:", self.widgets['max_output_templates'])
-        
-        layout.addWidget(limits_group)
-        
         layout.addStretch()
         return tab
     
@@ -649,6 +622,16 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         
         plot_layout.addLayout(output_dir_layout)
         layout.addWidget(plot_group)
+        
+        # Output Limits (moved from Template Filtering tab)
+        limits_group = QtWidgets.QGroupBox("📊 Output Limits")
+        limits_layout = QtWidgets.QFormLayout(limits_group)
+        
+        self.widgets['max_output_templates'] = create_flexible_int_input(min_val=1, max_val=50, default=10)
+        self.widgets['max_output_templates'].setToolTip("Maximum number of best templates to output (integer)")
+        limits_layout.addRow("Max Output Templates:", self.widgets['max_output_templates'])
+        
+        layout.addWidget(limits_group)
         
         layout.addStretch()
         return tab
@@ -881,7 +864,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         
         # Load basic parameters
         for key in ['zmin', 'zmax', 'lapmin', 'rlapmin', 'age_min', 'age_max', 
-                   'max_output_templates', 'peak_window_size']:
+                   'max_output_templates']:
             if key in params and key in self.widgets and params[key] is not None:
                 try:
                     self.widgets[key].setValue(params[key])
@@ -902,8 +885,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
                         self.widgets[key].setValue(9999)
                     elif key == 'max_output_templates':
                         self.widgets[key].setValue(10)
-                    elif key == 'peak_window_size':
-                        self.widgets[key].setValue(10)
+                    
         
         # Load forced redshift
         if 'forced_redshift' in params and params['forced_redshift'] is not None:
@@ -981,7 +963,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             result['lapmin'] = self.widgets['lapmin'].value()
             result['rlapmin'] = self.widgets['rlapmin'].value()
             result['max_output_templates'] = self.widgets['max_output_templates'].value()
-            result['peak_window_size'] = self.widgets['peak_window_size'].value()
+            # Peak Window Size option removed; no longer captured
             
             # Age range
             age_min = self.widgets['age_min'].value()

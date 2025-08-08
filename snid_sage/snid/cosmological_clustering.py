@@ -106,38 +106,55 @@ def calculate_joint_redshift_age_from_cluster(
     if not cluster_matches:
         return np.nan, np.nan, np.nan, np.nan, np.nan
     
-    # Extract redshifts, ages, and quality weights from matches
-    redshifts = []
-    ages = []
-    quality_weights = []
+    from snid_sage.shared.utils.math_utils import get_best_metric_value, calculate_weighted_redshift_balanced, calculate_weighted_age_estimate
     
-    from snid_sage.shared.utils.math_utils import get_best_metric_value
+    # Separate collection for redshift (with errors) and age (without errors)
+    redshifts_for_estimation = []
+    redshift_errors_for_estimation = []
+    rlap_cos_for_redshift = []
+    
+    ages_for_estimation = []
+    rlap_cos_for_age = []
     
     for match in cluster_matches:
         if 'redshift' in match:
             template = match.get('template', {})
             age = template.get('age', 0.0)
+            rlap_cos = get_best_metric_value(match)
             
-            # Only include matches that have both redshift and finite age
+            # Collect redshift data (uncertainties always available)
+            z = match.get('redshift')
+            z_err = match.get('redshift_error', 0.0)
+            if z is not None and np.isfinite(z) and z_err > 0:
+                redshifts_for_estimation.append(z)
+                redshift_errors_for_estimation.append(z_err)
+                rlap_cos_for_redshift.append(rlap_cos)
+            
+            # Separately collect age data (no uncertainties available)
             # Note: Negative ages are acceptable (pre-maximum light)
             if np.isfinite(age):
-                redshifts.append(match['redshift'])
-                ages.append(age)
-                # Use squared RLAP-Cos for stronger weighting of high-quality matches
-                base_weight = get_best_metric_value(match)
-                quality_weights.append(base_weight ** 2)
+                ages_for_estimation.append(age)
+                rlap_cos_for_age.append(rlap_cos)
     
-    if not redshifts or not ages:
-        _LOGGER.warning("No valid (redshift, age) pairs found in cluster matches")
-        return np.nan, np.nan, np.nan, np.nan, np.nan
+    # Calculate balanced redshift estimate
+    if redshifts_for_estimation:
+        z_mean, z_uncertainty = calculate_weighted_redshift_balanced(
+            redshifts_for_estimation, redshift_errors_for_estimation, rlap_cos_for_redshift
+        )
+    else:
+        _LOGGER.warning("No valid redshift data found in cluster matches")
+        z_mean, z_uncertainty = np.nan, np.nan
     
-    # Use the joint weighted estimation method
-    from snid_sage.shared.utils.math_utils import calculate_joint_weighted_estimates
-    z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance = calculate_joint_weighted_estimates(
-        redshifts=np.array(redshifts),
-        ages=np.array(ages),
-        weights=np.array(quality_weights)
-    )
+    # Calculate simple age estimate  
+    if ages_for_estimation:
+        t_mean = calculate_weighted_age_estimate(ages_for_estimation, rlap_cos_for_age)
+        t_uncertainty = 0.0  # No uncertainty available for ages
+    else:
+        _LOGGER.warning("No valid age data found in cluster matches")
+        t_mean, t_uncertainty = np.nan, 0.0
+    
+    # No covariance since we estimate separately
+    zt_covariance = 0.0
     
     return z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance
 

@@ -12,6 +12,16 @@ import PySide6.QtGui as QtGui
 import PySide6.QtWidgets as QtWidgets
 from typing import Optional, Dict, Any
 
+# Import flexible number input widget
+from snid_sage.interfaces.gui.components.widgets.flexible_number_input import FlexibleNumberInput
+
+# Import enhanced button support
+try:
+    from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+    ENHANCED_BUTTONS_AVAILABLE = True
+except ImportError:
+    ENHANCED_BUTTONS_AVAILABLE = False
+
 try:
     from snid_sage.shared.utils.logging import get_logger
     _LOGGER = get_logger('gui.pyside6_redshift_mode')
@@ -43,6 +53,9 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         
         self._setup_dialog()
         self._create_interface()
+        
+        # Setup enhanced buttons
+        self._setup_enhanced_buttons()
         
         # Center the dialog properly on parent
         if parent:
@@ -146,43 +159,7 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
                 background: {self.colors['accent_primary']};
             }}
             
-            QPushButton {{
-                padding: 10px 20px;
-                min-height: 24px;
-                border: 2px solid {self.colors['border']};
-                border-radius: 6px;
-                background: {self.colors['bg_secondary']};
-                font-size: 10pt;
-                font-weight: 500;
-            }}
-            
-            QPushButton:hover {{
-                background: {self.colors['bg_tertiary']};
-                border-color: {self.colors['accent_primary']};
-            }}
-            
-            QPushButton#primary_btn {{
-                background: {self.colors['accent_primary']};
-                color: white;
-                border: 2px solid {self.colors['accent_primary']};
-                font-weight: bold;
-            }}
-            
-            QPushButton#primary_btn:hover {{
-                background: #2563eb;
-                border-color: #2563eb;
-            }}
-            
-            QPushButton#cancel_btn {{
-                background: {self.colors['bg_secondary']};
-                border: 2px solid {self.colors['border']};
-                color: {self.colors['text_secondary']};
-            }}
-            
-            QPushButton#cancel_btn:hover {{
-                background: {self.colors['bg_tertiary']};
-                border-color: {self.colors['text_secondary']};
-            }}
+            /* Button styling handled by enhanced button system */
             
             QLineEdit {{
                 border: 2px solid {self.colors['border']};
@@ -284,9 +261,12 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         range_label.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Bold))
         range_layout.addWidget(range_label)
         
-        self.range_input = QtWidgets.QLineEdit("0.0005")
+        self.range_input = FlexibleNumberInput()
+        self.range_input.setValue(0.0005)
+        self.range_input.setRange(0.0, 1.0)
         self.range_input.setMaximumWidth(80)
         self.range_input.setFont(QtGui.QFont("Segoe UI", 9))
+        self.range_input.setToolTip("Search range around redshift (any precision)")
         range_layout.addWidget(self.range_input)
         
         range_help = QtWidgets.QLabel("(typical: 0.0005-0.01)")
@@ -326,6 +306,22 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         
         layout.addLayout(button_layout)
     
+    def _setup_enhanced_buttons(self):
+        """Setup enhanced button styling and animations"""
+        if not ENHANCED_BUTTONS_AVAILABLE:
+            _LOGGER.info("Enhanced buttons not available, using standard styling")
+            return
+
+        try:
+            # Use the redshift_mode_dialog preset
+            self.button_manager = enhance_dialog_with_preset(
+                self, 'redshift_mode_dialog'
+            )
+            _LOGGER.info("Enhanced buttons successfully applied to redshift mode dialog")
+
+        except Exception as e:
+            _LOGGER.error(f"Failed to setup enhanced buttons: {e}")
+    
     def _on_apply(self):
         """Handle apply button"""
         try:
@@ -339,11 +335,8 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
                 _LOGGER.debug(f"Forced redshift mode selected: z = {self.redshift_value:.6f}")
                 
             elif self.search_radio.isChecked():
-                try:
-                    search_range = float(self.range_input.text())
-                    if search_range <= 0:
-                        raise ValueError("Search range must be positive")
-                except ValueError:
+                search_range = self.range_input.value()
+                if search_range is None or search_range <= 0:
                     QtWidgets.QMessageBox.warning(
                         self,
                         "Invalid Range",

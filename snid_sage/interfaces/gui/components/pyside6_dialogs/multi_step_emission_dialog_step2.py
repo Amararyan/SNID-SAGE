@@ -86,49 +86,21 @@ class EmissionLineStep2Analysis:
         # Get platform-appropriate click text
         platform_config = get_platform_config()
         right_click_text = platform_config.get_click_text("right")
-        
+
         self.manual_instructions = QtWidgets.QLabel(
             "Manual Selection Instructions:\n"
-            "• Left Click: Smart peak detection\n"
-            "• Ctrl+Click: Add free-floating point\n"
-            "• Shift+Click: Add spectrum-snapped point\n" 
+            "• Left Click: Add point snapped to nearest bin\n"
+            "• Ctrl/Cmd+Click: Add free-floating point anywhere\n"
             f"• {right_click_text}: Remove closest point"
         )
         self.manual_instructions.setWordWrap(True)
         self.manual_instructions.setStyleSheet(f"color: {self.colors.get('text_secondary', '#666')}; padding: 5px;")
         layout.addWidget(self.manual_instructions)
         
-        # Manual point controls
-        manual_controls = QtWidgets.QHBoxLayout()
+        # Manual point controls removed in favor of toolbar button
         
-        self.clear_points_btn = QtWidgets.QPushButton("Clear Points")
-        self.clear_points_btn.clicked.connect(self.clear_selected_points)
-        manual_controls.addWidget(self.clear_points_btn)
-        
-        self.auto_contour_btn = QtWidgets.QPushButton("Auto Contour")
-        self.auto_contour_btn.clicked.connect(self.auto_detect_contour)
-        manual_controls.addWidget(self.auto_contour_btn)
-        
-        self.point_counter_label = QtWidgets.QLabel("Points: 0")
-        manual_controls.addWidget(self.point_counter_label)
-        
-        manual_controls.addStretch()
-        layout.addLayout(manual_controls)
-        
-        # Current results display
-        analysis_group = QtWidgets.QGroupBox("📊 Current Line Analysis")
-        analysis_layout = QtWidgets.QVBoxLayout(analysis_group)
-        
-        self.current_result_text = QtWidgets.QTextEdit()
-        self.current_result_text.setMaximumHeight(100)
-        self.current_result_text.setReadOnly(True)
-        self.current_result_text.setPlainText("Select a line and click 'Analyze' in the toolbar above...")
-        analysis_layout.addWidget(self.current_result_text)
-        
-        layout.addWidget(analysis_group)
-        
-        # All Lines Summary
-        summary_group = QtWidgets.QGroupBox("📋 All Lines Summary")
+        # Single minimal summary
+        summary_group = QtWidgets.QGroupBox("📋 Line Summary")
         summary_layout = QtWidgets.QVBoxLayout(summary_group)
         
         summary_controls = QtWidgets.QHBoxLayout()
@@ -136,10 +108,6 @@ class EmissionLineStep2Analysis:
         copy_summary_btn = QtWidgets.QPushButton("Copy Summary")
         copy_summary_btn.clicked.connect(self.copy_summary)
         summary_controls.addWidget(copy_summary_btn)
-        
-        refresh_summary_btn = QtWidgets.QPushButton("Refresh")
-        refresh_summary_btn.clicked.connect(self.refresh_summary)
-        summary_controls.addWidget(refresh_summary_btn)
         
         export_btn = QtWidgets.QPushButton("💾 Export Results")
         export_btn.clicked.connect(self.export_results)
@@ -149,11 +117,12 @@ class EmissionLineStep2Analysis:
         summary_layout.addLayout(summary_controls)
         
         self.summary_text = QtWidgets.QTextEdit()
-        self.summary_text.setMaximumHeight(150)
         self.summary_text.setReadOnly(True)
-        summary_layout.addWidget(self.summary_text)
+        self.summary_text.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.summary_text.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        summary_layout.addWidget(self.summary_text, 1)
         
-        layout.addWidget(summary_group)
+        layout.addWidget(summary_group, 1)
         
         # Initialize - will be properly connected by parent
         self.populate_line_dropdown()
@@ -192,6 +161,8 @@ class EmissionLineStep2Analysis:
                 self.current_line_index = i
                 break
         
+        # Clear any existing manual points when switching lines
+        self.selected_manual_points.clear()
         self.update_line_counter()
         self.plot_focused_line()
     
@@ -214,6 +185,8 @@ class EmissionLineStep2Analysis:
             display_name = f"{'🌟' if line_type == 'sn' else '🌌'} {line_name}"
             if self.line_dropdown:
                 self.line_dropdown.setCurrentText(display_name)
+            # Clear any existing manual points when switching lines
+            self.selected_manual_points.clear()
             self.update_line_counter()
             self.plot_focused_line()
     
@@ -251,21 +224,16 @@ class EmissionLineStep2Analysis:
         self.update_method_visibility()
     
     def update_method_visibility(self):
-        """Update visibility of method-specific controls (simplified for Manual Points only)"""
-        # Since we only support Manual Points, always show manual controls
+        """Update visibility of method-specific controls (Manual Points only)"""
         if hasattr(self, 'manual_instructions') and self.manual_instructions:
             self.manual_instructions.setVisible(True)
+        # No left-panel Clear Points button anymore
         if hasattr(self, 'clear_points_btn') and self.clear_points_btn:
-            self.clear_points_btn.setVisible(True)
-        if hasattr(self, 'auto_contour_btn') and self.auto_contour_btn:
-            self.auto_contour_btn.setVisible(True)
-        if hasattr(self, 'point_counter_label') and self.point_counter_label:
-            self.point_counter_label.setVisible(True)
+            self.clear_points_btn.setVisible(False)
     
     def clear_selected_points(self):
         """Clear manually selected points"""
         self.selected_manual_points.clear()
-        self.update_point_counter()
         self.plot_focused_line()  # Refresh plot
     
     def auto_detect_contour(self):
@@ -304,21 +272,19 @@ class EmissionLineStep2Analysis:
             for peak_idx in peaks:
                 self.selected_manual_points.append((region_wave[peak_idx], region_flux[peak_idx]))
             
-            self.update_point_counter()
             self.plot_focused_line()
             
         except Exception as e:
             _LOGGER.error(f"Error in auto contour detection: {e}")
     
-    def update_point_counter(self):
-        """Update manual point counter"""
-        count = len(self.selected_manual_points)
-        self.point_counter_label.setText(f"Points: {count}")
+    # Removed point counter per simplified UI
     
     def analyze_current_line(self):
         """Analyze the currently selected line using Manual Points method"""
         if not self.available_lines:
-            self.current_result_text.setPlainText("No lines available for analysis.")
+            # Update minimal summary area when no lines
+            if self.summary_text:
+                self.summary_text.setPlainText("No lines available for analysis.")
             return
         
         try:
@@ -332,12 +298,12 @@ class EmissionLineStep2Analysis:
             
             # Store and display result
             self.line_analysis_results[line_name] = result
-            self.update_current_result_display(result)
             self.refresh_summary()
             
         except Exception as e:
             error_msg = f"Error analyzing line: {e}"
-            self.current_result_text.setPlainText(error_msg)
+            if self.summary_text:
+                self.summary_text.setPlainText(error_msg)
             _LOGGER.error(error_msg)
     
     def analyze_manual_points(self, line_name, obs_wavelength):
@@ -346,8 +312,10 @@ class EmissionLineStep2Analysis:
             return {"error": "No manual points selected"}
         
         # Simple analysis of manual points
-        wavelengths = [p[0] for p in self.selected_manual_points]
-        fluxes = [p[1] for p in self.selected_manual_points]
+        # Sort by wavelength for consistent analysis
+        pts = sorted(self.selected_manual_points, key=lambda p: p[0])
+        wavelengths = [p[0] for p in pts]
+        fluxes = [p[1] for p in pts]
         
         result = {
             "method": "Manual Points",
@@ -359,6 +327,17 @@ class EmissionLineStep2Analysis:
             "peak_flux": max(fluxes),
             "peak_wavelength": wavelengths[fluxes.index(max(fluxes))]
         }
+
+        # Attempt to compute FWHM from manual points
+        fwhm_tuple = self._compute_fwhm_from_points(wavelengths, fluxes)
+        if fwhm_tuple is not None:
+            fwhm, left_lambda, right_lambda, half_level = fwhm_tuple
+            result.update({
+                'fwhm': fwhm,
+                'fwhm_left': left_lambda,
+                'fwhm_right': right_lambda,
+                'half_max_level': half_level
+            })
         
         return result
     
@@ -389,31 +368,39 @@ class EmissionLineStep2Analysis:
             "status": "Not implemented yet"
         }
     
-    def update_current_result_display(self, result):
-        """Update current result display"""
+    def _format_minimal_result_line(self, result: Dict[str, Any]) -> str:
+        """Return a minimal, two-line HTML summary: bold name on first line, extracted info on second."""
+        name = result.get('line_name', 'Unknown')
         if "error" in result:
-            self.current_result_text.setPlainText(f"Error: {result['error']}")
-            return
-        
-        # Format result for display
-        text_lines = [
-            f"Line: {result.get('line_name', 'Unknown')}",
-            f"Method: {result.get('method', 'Unknown')}",
-            f"Observed λ: {result.get('observed_wavelength', 0):.2f} Å"
-        ]
-        
-        if "num_points" in result:
-            text_lines.append(f"Points: {result['num_points']}")
-        if "wavelength_range" in result:
-            text_lines.append(f"λ Range: {result['wavelength_range']}")
-        if "peak_flux" in result:
-            text_lines.append(f"Peak Flux: {result['peak_flux']:.3f}")
-        if "peak_wavelength" in result:
-            text_lines.append(f"Peak λ: {result['peak_wavelength']:.2f} Å")
-        if "status" in result:
-            text_lines.append(f"Status: {result['status']}")
-        
-        self.current_result_text.setPlainText("\n".join(text_lines))
+            return f"<b>{name}</b><br/>Error: {result['error']}"
+
+        observed_wavelength = result.get('observed_wavelength')
+        fwhm_value = result.get('fwhm') or result.get('FWHM')
+        peak_wavelength = result.get('peak_wavelength')
+        num_points = result.get('num_points')
+
+        details_parts = []
+        if observed_wavelength is not None:
+            try:
+                details_parts.append(f"λobs={float(observed_wavelength):.2f} Å")
+            except Exception:
+                details_parts.append(f"λobs={observed_wavelength}")
+
+        if fwhm_value is not None:
+            try:
+                details_parts.append(f"FWHM={float(fwhm_value):.2f} Å")
+            except Exception:
+                details_parts.append(f"FWHM={fwhm_value} Å")
+        elif peak_wavelength is not None:
+            try:
+                details_parts.append(f"peak={float(peak_wavelength):.2f} Å")
+            except Exception:
+                details_parts.append(f"peak={peak_wavelength} Å")
+        elif num_points is not None:
+            details_parts.append(f"points={num_points}")
+
+        details_line = ", ".join(details_parts) if details_parts else "No details available"
+        return f"<b>{name}</b><br/>{details_line}"
     
     def copy_summary(self):
         """Copy summary to clipboard"""
@@ -421,24 +408,64 @@ class EmissionLineStep2Analysis:
     
     def refresh_summary(self):
         """Refresh the analysis summary"""
+        if not self.summary_text:
+            return
         if not self.line_analysis_results:
             self.summary_text.setPlainText("No analysis results yet.")
             return
-        
-        summary_lines = ["=== Emission Line Analysis Summary ===\n"]
-        
-        for line_name, result in self.line_analysis_results.items():
-            summary_lines.append(f"• {line_name}:")
-            summary_lines.append(f"  Method: {result.get('method', 'Unknown')}")
-            if "peak_wavelength" in result:
-                summary_lines.append(f"  Peak λ: {result['peak_wavelength']:.2f} Å")
-            if "peak_flux" in result:
-                summary_lines.append(f"  Peak Flux: {result['peak_flux']:.3f}")
-            summary_lines.append("")
-        
-        summary_lines.append(f"Total lines analyzed: {len(self.line_analysis_results)}")
-        
-        self.summary_text.setPlainText("\n".join(summary_lines))
+        lines = []
+        for _, result in self.line_analysis_results.items():
+            lines.append(self._format_minimal_result_line(result))
+        # Enable rich text to allow bold name on first line and details on second
+        self.summary_text.setHtml("<br/>".join(lines))
+
+    def _compute_fwhm_from_points(self, wavelengths: List[float], fluxes: List[float]):
+        """Compute FWHM from ordered points using linear interpolation at half maximum.
+
+        Returns tuple (fwhm, left_lambda, right_lambda, half_level) or None if not derivable.
+        """
+        try:
+            if len(wavelengths) < 3:
+                return None
+            # Ensure strictly increasing by sorting (callers already sort, but keep safe)
+            pts = sorted(zip(wavelengths, fluxes), key=lambda p: p[0])
+            w = [p[0] for p in pts]
+            f = [p[1] for p in pts]
+            peak_idx = int(np.argmax(f))
+            peak_flux = f[peak_idx]
+            if peak_flux <= 0:
+                return None
+            half = peak_flux / 2.0
+
+            # Left crossing
+            li = peak_idx
+            while li > 0 and f[li] > half:
+                li -= 1
+            if li == peak_idx:
+                return None
+            left_lambda = w[li]
+            if f[li] != f[li + 1]:
+                # Interpolate between li and li+1 (li is below/at half after loop)
+                x0, x1 = w[li], w[li + 1]
+                y0, y1 = f[li], f[li + 1]
+                left_lambda = x0 + (half - y0) * (x1 - x0) / (y1 - y0)
+
+            # Right crossing
+            ri = peak_idx
+            while ri < len(f) - 1 and f[ri] > half:
+                ri += 1
+            if ri == peak_idx:
+                return None
+            right_lambda = w[ri]
+            if f[ri] != f[ri - 1]:
+                x0, x1 = w[ri - 1], w[ri]
+                y0, y1 = f[ri - 1], f[ri]
+                right_lambda = x0 + (half - y0) * (x1 - x0) / (y1 - y0)
+
+            fwhm = float(max(0.0, right_lambda - left_lambda))
+            return (fwhm, left_lambda, right_lambda, half)
+        except Exception:
+            return None
     
     def export_results(self):
         """Export analysis results to file"""
@@ -535,18 +562,50 @@ class EmissionLineStep2Analysis:
             )
             self.parent.plot_item.addItem(line_marker)
             
-            # Plot manual points if any
+            # Plot manual points if any, and connect them by lines
             if self.selected_manual_points:
-                point_waves = [p[0] for p in self.selected_manual_points]
-                point_fluxes = [p[1] for p in self.selected_manual_points]
+                # Sort by wavelength to connect in order
+                pts = sorted(self.selected_manual_points, key=lambda p: p[0])
+                point_waves = [p[0] for p in pts]
+                point_fluxes = [p[1] for p in pts]
+                # Line connecting the points
+                self.parent.plot_item.plot(
+                    point_waves,
+                    point_fluxes,
+                    pen=pg.mkPen(color='orange', width=2, style=QtCore.Qt.SolidLine),
+                    name='Manual Points Path'
+                )
+                # Scatter markers on top
                 scatter = pg.ScatterPlotItem(
-                    x=point_waves, 
+                    x=point_waves,
                     y=point_fluxes,
-                    size=10,
+                    size=8,
                     brush='orange',
-                    pen=pg.mkPen(color='red', width=2)
+                    pen=pg.mkPen(color='red', width=1)
                 )
                 self.parent.plot_item.addItem(scatter)
+
+                # Compute FWHM from points for immediate visual feedback
+                fwhm_tuple = self._compute_fwhm_from_points(point_waves, point_fluxes)
+                if fwhm_tuple is not None:
+                    fwhm, left_lambda, right_lambda, half_level = fwhm_tuple
+                    # Draw horizontal FWHM line segment at half-max between left and right
+                    self.parent.plot_item.plot(
+                        [left_lambda, right_lambda],
+                        [half_level, half_level],
+                        pen=pg.mkPen(color=(0, 150, 0), width=2, style=QtCore.Qt.DashLine),
+                        name='FWHM'
+                    )
+                    # Stash into latest result if it exists
+                    if self.available_lines:
+                        lt, ln = self.available_lines[self.current_line_index]
+                        if ln in self.line_analysis_results:
+                            self.line_analysis_results[ln]['fwhm'] = fwhm
+                            self.line_analysis_results[ln]['fwhm_left'] = left_lambda
+                            self.line_analysis_results[ln]['fwhm_right'] = right_lambda
+                            self.line_analysis_results[ln]['half_max_level'] = half_level
+                        # Refresh minimal summary to reflect FWHM quickly
+                        self.refresh_summary()
             
         except Exception as e:
             _LOGGER.error(f"Error plotting focused line: {e}") 

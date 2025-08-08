@@ -216,7 +216,7 @@ class DialogManager:
                 )
                 _LOGGER.info("✅ Emission line dialog created successfully")
                 
-                self._update_status("emission", "✅ Dialog opened", success_style=True)
+                self._update_status("emission", "Dialog opened", success_style=True)
                 _LOGGER.info(f"🔬 Emission line analysis dialog opened successfully using {spectrum_view} view")
                 
             except ImportError as e:

@@ -14,9 +14,8 @@ except ImportError:
 # Import all needed math utility functions
 try:
     from snid_sage.shared.utils.math_utils import (
-        calculate_joint_weighted_estimates,
-        calculate_weighted_redshift,  # Still needed for fallback cases
-        calculate_weighted_age,  # Still needed for fallback cases
+        calculate_weighted_redshift_balanced,
+        calculate_weighted_age_estimate,
         calculate_weighted_median,
         get_best_metric_value,
         get_metric_name_for_match
@@ -203,43 +202,58 @@ class AnalysisResultsAnalyzer:
         redshifts = np.array([m['redshift'] for m in self.matches])
         rlaps = np.array([m['rlap'] for m in self.matches])
         
-        # First collect all redshift and age data for joint estimation
-        all_redshifts = []
-        all_ages = []
-        all_weights = []
+        # Collect redshift data with uncertainties for balanced estimation
+        redshifts_with_errors = []
+        redshift_errors = []
+        rlap_cos_for_redshift = []
+        
+        # Collect age data for separate age estimation  
+        ages_for_estimation = []
+        rlap_cos_for_age = []
         
         for m in self.matches:
             template = m.get('template', {})
-            age = extract_age(m, template)
-            redshift = m['redshift']
-            weight = get_best_metric_value(m)
+            rlap_cos = get_best_metric_value(m)
             
-            # For joint estimation, we need both redshift and age
-            if age is not None:
-                all_redshifts.append(redshift)
-                all_ages.append(age)
-                all_weights.append(weight)
+            # Collect redshift data (uncertainties always available)
+            z = m.get('redshift')
+            z_err = m.get('redshift_error', 0.0)
+            if z is not None and np.isfinite(z) and z_err > 0:
+                redshifts_with_errors.append(z)
+                redshift_errors.append(z_err)
+                rlap_cos_for_redshift.append(rlap_cos)
+            
+            # Separately collect age data (no uncertainties available)
+            age = extract_age(m, template)
+            if age is not None and np.isfinite(age):
+                ages_for_estimation.append(age)
+                rlap_cos_for_age.append(rlap_cos)
         
-        # Use joint estimation when we have both redshift and age data
-        if len(all_redshifts) > 0 and _MATH_UTILS_AVAILABLE:
-            z_weighted_mean, age_weighted_mean, z_weighted_uncertainty, age_weighted_uncertainty, redshift_age_covariance = calculate_joint_weighted_estimates(
-                all_redshifts, all_ages, all_weights
+        # Balanced redshift estimation
+        if len(redshifts_with_errors) > 0 and _MATH_UTILS_AVAILABLE:
+            z_weighted_mean, z_weighted_uncertainty = calculate_weighted_redshift_balanced(
+                redshifts_with_errors, redshift_errors, rlap_cos_for_redshift
             )
-            cluster_scatter = 0.0  # The joint method handles uncertainty internally
-            age_stat_error = age_weighted_uncertainty
-            age_total_error = age_weighted_uncertainty
+            cluster_scatter = 0.0  # Properly handled in balanced estimation
+        else:
+            # Fallback if no valid data or math utils not available
+            if len(redshifts) > 0:
+                z_weighted_mean = np.average(redshifts, weights=rlaps)
+                z_weighted_uncertainty = 0.01
+            else:
+                z_weighted_mean = np.nan
+                z_weighted_uncertainty = np.nan
+            cluster_scatter = 0.0
+        
+        # Simple age estimation
+        if len(ages_for_estimation) > 0 and _MATH_UTILS_AVAILABLE:
+            age_weighted_mean = calculate_weighted_age_estimate(ages_for_estimation, rlap_cos_for_age)
+            age_weighted_uncertainty = 0.0  # No uncertainty available for ages
+            age_stat_error = 0.0
+            age_total_error = 0.0
             age_scatter = 0.0
         else:
-            # Fallback to separate calculations if joint estimation not possible
-            redshift_weights = rlaps  # Use RLAP values as weights
-            if _MATH_UTILS_AVAILABLE:
-                z_weighted_mean, z_weighted_uncertainty = calculate_weighted_redshift(redshifts, redshift_weights)
-            else:
-                z_weighted_mean = np.average(redshifts, weights=redshift_weights)
-                z_weighted_uncertainty = 0.01
-            cluster_scatter = 0.0
-            
-            # Age fallback
+            # No valid age data or math utils not available
             age_weighted_mean = 0.0
             age_weighted_uncertainty = 0.0
             age_stat_error = 0.0
@@ -263,8 +277,8 @@ class AnalysisResultsAnalyzer:
                 age_weights.append(get_best_metric_value(m))
         
         age_stats = {}
-        if len(all_redshifts) > 0:
-            # Use joint estimation results
+        if len(ages_for_estimation) > 0:
+            # Use separate estimation results
             age_stats = {
                 'min': np.min(ages) if ages else 0.0,
                 'max': np.max(ages) if ages else 0.0,
@@ -274,12 +288,14 @@ class AnalysisResultsAnalyzer:
                 'total_uncertainty': age_total_error,
                 'cluster_scatter': age_scatter,
                 'count': len(ages) if ages else 0,
-                'redshift_age_covariance': redshift_age_covariance if len(all_redshifts) > 0 and _MATH_UTILS_AVAILABLE else 0.0
+                'redshift_age_covariance': 0.0  # No covariance since we estimate separately
             }
         elif ages:
             # Fallback for age-only calculation when no joint data available
             if _MATH_UTILS_AVAILABLE:
-                age_weighted_mean_fallback, age_weighted_uncertainty_fallback = calculate_weighted_age(ages, age_weights)
+                # This is old fallback code - should not be reached with new implementation
+                age_weighted_mean_fallback = np.average(ages, weights=age_weights)
+                age_weighted_uncertainty_fallback = 0.0
             else:
                 age_weighted_mean_fallback = np.average(ages, weights=age_weights)
                 age_weighted_uncertainty_fallback = 1.0
@@ -394,10 +410,9 @@ class AnalysisResultsAnalyzer:
                             age_rlaps.append(get_best_metric_value(match))
                 
                 if len(age_rlaps) == len(ages) and len(ages) > 0:
-                    from snid_sage.shared.utils.math_utils import calculate_weighted_age
-                    age_weighted_mean, age_weighted_uncertainty = calculate_weighted_age(
-                        ages, np.array(age_rlaps)
-                    )
+                    # Use new age estimation function
+                    age_weighted_mean = calculate_weighted_age_estimate(ages, age_rlaps)
+                    age_weighted_uncertainty = 0.0  # No uncertainty available for ages
                 else:
                     age_weighted_mean, age_weighted_uncertainty = 0.0, 0.0
             else:

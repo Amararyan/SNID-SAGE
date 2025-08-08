@@ -61,8 +61,8 @@ class PySide6WorkflowManager:
             'info_btn': ButtonDefinition('info_btn', 'info', WorkflowState.INITIAL, always_enabled=True),
             
             # Workflow progression buttons
-            'preprocessing_btn': ButtonDefinition('preprocessing_btn', 'redshift', WorkflowState.FILE_LOADED),
-            'redshift_selection_btn': ButtonDefinition('redshift_selection_btn', 'preprocessing', WorkflowState.FILE_LOADED),
+            'preprocessing_btn': ButtonDefinition('preprocessing_btn', 'preprocessing', WorkflowState.FILE_LOADED),
+            'redshift_selection_btn': ButtonDefinition('redshift_selection_btn', 'redshift', WorkflowState.FILE_LOADED),
             'analysis_btn': ButtonDefinition('analysis_btn', 'analysis', WorkflowState.PREPROCESSED),
             
             # Advanced features (enabled after analysis)

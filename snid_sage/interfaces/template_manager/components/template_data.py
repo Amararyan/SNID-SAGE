@@ -65,7 +65,31 @@ class TemplateData:
                     # Load flux data
                     self.epochs = []
                     
-                    if 'flux' in template_group:
+                    # Check for multiple epochs first
+                    if 'epochs' in template_group:
+                        epochs_group = template_group['epochs']
+                        _LOGGER.info(f"Found epochs group with {len(epochs_group)} epochs")
+                        
+                        for epoch_name in sorted(epochs_group.keys()):
+                            epoch_group = epochs_group[epoch_name]
+                            flux_data = epoch_group['flux'][:]
+                            age = epoch_group.attrs.get('age', 0.0)
+                            phase = epoch_group.attrs.get('phase', 'Unknown')
+                            
+                            epoch_info = {
+                                'age': age,
+                                'flux': flux_data,
+                                'phase': phase
+                            }
+                            self.epochs.append(epoch_info)
+                            _LOGGER.debug(f"Loaded epoch {epoch_name} with age {age} and {len(flux_data)} flux points")
+                        
+                        # Set default flux to first epoch
+                        if self.epochs:
+                            self.flux_data = self.epochs[0]['flux']
+                        
+                    elif 'flux' in template_group:
+                        # Single epoch template
                         flux_data = template_group['flux'][:]
                         # Get age from template info if available
                         age = self.info.get('age', 0.0)

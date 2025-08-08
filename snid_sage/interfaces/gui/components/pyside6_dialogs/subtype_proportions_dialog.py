@@ -21,15 +21,12 @@ import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
 
-# Matplotlib for plotting (matching the existing clustering dialogs)
+# Matplotlib for plotting (Qt helper)
 try:
-    import matplotlib
-    matplotlib.use('QtAgg')  # Use Qt backend for PySide6
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.figure import Figure
+    from snid_sage.interfaces.gui.utils.matplotlib_qt import get_qt_mpl
+    plt, Figure, FigureCanvas, _NavigationToolbar = get_qt_mpl()
     MATPLOTLIB_AVAILABLE = True
-except ImportError:
+except Exception:
     MATPLOTLIB_AVAILABLE = False
     plt = None
     FigureCanvas = None
@@ -718,24 +715,11 @@ Please check your analysis results and try again.
                 row_text += f"{cell:<{col_widths[i]}}"
             table_text += row_text + "\n"
         
-        # Add summary information
-        winning_subtype = sorted_subtypes[0][0] if sorted_subtypes else "Unknown"
-        winning_count = sorted_subtypes[0][1] if sorted_subtypes else 0
-        winning_percentage = (winning_count / total_matches * 100) if total_matches > 0 else 0
-        
-        summary_text = f"\nSUMMARY:\n"
-        summary_text += f"Cluster: {self.cluster_type}\n"
-        summary_text += f"Total Matches: {total_matches}\n"
-        summary_text += f"Unique Subtypes: {len(subtype_counts)}\n"
-        summary_text += f"Winning: {winning_subtype} ({winning_percentage:.1f}%)"
-        
         # Display the table
         ax.text(0.02, 0.98, "Subtype Statistics", ha='left', va='top', 
                transform=ax.transAxes, fontsize=11, fontweight='bold')
         ax.text(0.02, 0.85, table_text, ha='left', va='top', 
                transform=ax.transAxes, fontsize=8, fontfamily='monospace')
-        ax.text(0.02, 0.35, summary_text, ha='left', va='top', 
-               transform=ax.transAxes, fontsize=9)
 
     def _export_plot(self):
         """Export the plot to image file"""

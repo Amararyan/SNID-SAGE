@@ -392,7 +392,8 @@ class UnifiedResultsFormatter:
         
         for i, match in enumerate(matches, 1):
             template = match.get('template', {})
-            template_name = match.get('name', template.get('name', 'Unknown'))
+            template_name_original = match.get('name', template.get('name', 'Unknown'))
+            template_name = clean_template_name(template_name_original)
             
             # Get type and subtype separately
             main_type = match.get('type', template.get('type', 'Unknown'))
@@ -487,49 +488,86 @@ class UnifiedResultsFormatter:
         
         # Build display summary
         lines = [
-            "SNID CLASSIFICATION RESULTS",
+            "SNID-SAGE CLASSIFICATION RESULTS",
             "=" * 50,
             "",
         ]
         
-        # Different header based on selection method
-        if is_manual_selection:
-            lines.append("FINAL CLASSIFICATION (Manual Selection):")
-        else:
-            lines.append("FINAL CLASSIFICATION (Automatic Method):")
+        # Add file name line
+        try:
+            file_name = Path(self.spectrum_path).name if self.spectrum_path else self.spectrum_name
+        except Exception:
+            file_name = self.spectrum_name
+        lines.append(f"File: {file_name}")
+        lines.append("")
         
-        # Type with quality metrics (always show quality as it's cluster-specific)
+        # Removed the "FINAL CLASSIFICATION (...)" line per requirements
+
+        # Winning single template and its info (with cleaned name)
+        try:
+            best_template_entry = s['template_matches'][0] if s.get('template_matches') else None
+        except Exception:
+            best_template_entry = None
+
+        if best_template_entry:
+            best_template_name = clean_template_name(best_template_entry.get('template_name', s.get('best_template', 'Unknown')))
+            best_template_type = best_template_entry.get('full_type', s.get('best_template_type', 'Unknown'))
+            best_template_subtype = best_template_entry.get('subtype', s.get('best_template_subtype', ''))
+            best_metric_name = best_template_entry.get('metric_name', self.metric_name)
+            best_metric_value = best_template_entry.get('best_metric_value', best_template_entry.get('rlap', s.get('rlap', 0)))
+            best_z = best_template_entry.get('redshift', s.get('redshift', 0))
+            best_z_err = best_template_entry.get('redshift_error', s.get('redshift_error', 0))
+            best_age = best_template_entry.get('age_days', None)
+        else:
+            best_template_name = clean_template_name(s.get('best_template', 'Unknown'))
+            best_template_type = s.get('best_template_type', 'Unknown')
+            best_template_subtype = s.get('best_template_subtype', '')
+            best_metric_name = self.metric_name
+            best_metric_value = s.get('rlap', 0)
+            best_z = s.get('redshift', 0)
+            best_z_err = s.get('redshift_error', 0)
+            best_age = None
+
+        lines.append(f"Best Template: {best_template_name}")
+        type_sub_line = f"   └─ Type: {best_template_type}"
+        if best_template_subtype and best_template_subtype != 'Unknown':
+            type_sub_line += f", Subtype: {best_template_subtype}"
+        lines.append(type_sub_line)
+        age_text = f"{best_age:.1f}" if best_age is not None and np.isfinite(best_age) else "N/A"
+        z_err_text = f"{best_z_err:.6f}" if best_z_err and best_z_err > 0 else "N/A"
+        lines.append(f"   └─ {best_metric_name}: {best_metric_value:.1f} | z={best_z:.6f} ± {z_err_text} | age={age_text}")
+        lines.append("")
+        
+        # Type with quality, plus confidence and margin consolidated into parentheses
+        best_type_info_parts = []
         if s['has_clustering'] and s['cluster_quality_level']:
-            lines.append(f"   Type: {s['consensus_type']} (Quality: {s['cluster_quality_level'].title()})")
-        else:
-            lines.append(f"   Type: {s['consensus_type']}")
-        
+            best_type_info_parts.append(f"Quality: {s['cluster_quality_level'].title()}")
         # Add confidence level and type margin ONLY for automatic selection
         if not is_manual_selection and s['has_clustering'] and s['cluster_confidence_level']:
-            lines.append(f"   Confidence Level: {s['cluster_confidence_level'].title()}")
+            best_type_info_parts.append(f"Confidence: {s['cluster_confidence_level'].title()}")
             if s['cluster_confidence_description']:
                 second_best_type = s.get('cluster_second_best_type', None)
                 if second_best_type and second_best_type != 'N/A':
                     # Try to extract the margin percentage from the description
+                    margin_text = None
                     if '% better than second best' in s['cluster_confidence_description']:
-                        # Extract just the percentage number, not the full text
                         margin_match = re.search(r'(\d+\.?\d*)% better than second best', s['cluster_confidence_description'])
                         if margin_match:
                             margin_text = margin_match.group(1)
-                            lines.append(f"   └─ Winning type is {margin_text}% better than second best ({second_best_type})")
-                        else:
-                            # Fallback to original logic if regex doesn't work
-                            margin_text = s['cluster_confidence_description'].split('% better than second best')[0]
-                            margin_text = margin_text.strip()
-                            lines.append(f"   └─ Winning type is {margin_text}% better than second best ({second_best_type})")
-                    else:
-                        lines.append(f"   └─ Winning type margin: {s['cluster_confidence_description']} ({second_best_type})")
-                else:
-                    lines.append(f"   └─ {s['cluster_confidence_description']}")
+                    if margin_text is None:
+                        # Fallback: extract text before phrase
+                        margin_text = s['cluster_confidence_description'].split('% better than second best')[0].strip()
+                    if margin_text:
+                        best_type_info_parts.append(f"margin over next-best type {second_best_type}: +{margin_text}%")
+        # Compose Best Type line
+        if best_type_info_parts:
+            lines.append(f"Best Type: {s['consensus_type']} ({'; '.join(best_type_info_parts)})")
+        else:
+            lines.append(f"Best Type: {s['consensus_type']}")
         
-        # Subtype with its specific confidence if available (always show as it's within-cluster)
+        # Subtype with confidence and margin consolidated into parentheses (no indent) and renamed to Best Subtype
         if s['consensus_subtype'] and s['consensus_subtype'] != 'Unknown':
-            subtype_conf_text = ""
+            subtype_info_parts = []
             if s['subtype_confidence'] > 0:
                 # Convert numeric confidence to qualitative level (like CLI)
                 if s['subtype_confidence'] > 0.7:
@@ -538,37 +576,34 @@ class UnifiedResultsFormatter:
                     confidence_level = "Medium"
                 else:
                     confidence_level = "Low"
-                subtype_conf_text = f" (confidence: {confidence_level})"
-            
-            lines.append(f"   Subtype: {s['consensus_subtype']}{subtype_conf_text}")
-            
-            # Always show margin/second best subtype if second_best_subtype is present
+                subtype_info_parts.append(f"confidence: {confidence_level}")
             second_best = s.get('second_best_subtype')
             margin = s.get('subtype_margin_over_second', 0)
             if second_best and second_best != s['consensus_subtype']:
                 if margin == 0:
-                    lines.append(f"   └─ Winning subtype is tied with ({second_best})")
+                    subtype_info_parts.append(f"tied with {second_best}")
                 else:
-                    # The margin is now calculated as relative percentage in choose_subtype_weighted_voting
-                    lines.append(f"   └─ Winning subtype is {margin:.1f}% better than second best ({second_best})")
+                    subtype_info_parts.append(f"margin over next-best subtype {second_best}: +{margin:.1f}% based on weighted voting")
+            if subtype_info_parts:
+                lines.append(f"Best Subtype: {s['consensus_subtype']} ({'; '.join(subtype_info_parts)})")
+            else:
+                lines.append(f"Best Subtype: {s['consensus_subtype']}")
         
-        lines.extend([
-            "",
-            "📏 MEASUREMENTS:",
-        ])
+        # Measurements are integrated into the Best Type section (no separate header)
         
         # Use enhanced (weighted) redshift if clustering was used, otherwise regular
         if s['has_clustering'] and s['enhanced_redshift'] != s['redshift']:
             # Check if we're using subtype-specific redshift
             if s.get('using_subtype_redshift', False):
                 # Show subtype-specific redshift as primary
-                redshift_text = f"   Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f}"
-                lines.append(redshift_text)
-                
-                # Show explanation for subtype redshift
                 subtype_name = s.get('consensus_subtype', 'Unknown')
                 template_count = s.get('subtype_template_count', 0)
-                lines.append(f"   └─ Weighted from {template_count} {subtype_name} subtype templates (winning subtype)")
+                weight_note = f"weighted from {template_count} {subtype_name} subtype templates"
+                redshift_text = (
+                    f"Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f} "
+                    f"({weight_note})"
+                )
+                lines.append(redshift_text)
                 
                 # Optionally show full cluster redshift if different and user wants to see it
                 full_cluster_z = s.get('full_cluster_redshift')
@@ -578,37 +613,35 @@ class UnifiedResultsFormatter:
                     lines.append(f"   └─ Full cluster redshift: {full_cluster_z:.6f} ± {full_cluster_z_err:.6f} (from {s['cluster_size']} total templates)")
             else:
                 # Fall back to full cluster redshift display
-                redshift_text = f"   Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f}"
-                
+                notes = []
                 # Optionally show components of uncertainty in parentheses
                 try:
-                    # Try to get the separate uncertainty components if available
                     winning_cluster = self._get_active_cluster()
                     if winning_cluster:
                         stat_error = winning_cluster.get('statistical_redshift_uncertainty', 0)
                         sys_error = winning_cluster.get('systematic_redshift_uncertainty', 0)
                         if stat_error > 0 and sys_error > 0:
-                            redshift_text += f" (stat: ±{stat_error:.6f}, sys: ±{sys_error:.6f})"
+                            notes.append(f"stat: ±{stat_error:.6f}")
+                            notes.append(f"sys: ±{sys_error:.6f}")
                 except:
                     pass  # If components not available, just show combined
-                
+                notes.append(f"weighted from {s['cluster_size']} cluster templates, includes individual errors + cluster scatter τ")
+                notes_str = f" ({'; '.join(notes)})" if notes else ""
+                redshift_text = f"Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f}{notes_str}"
                 lines.append(redshift_text)
-                lines.append(f"   └─ Weighted from {s['cluster_size']} cluster templates (includes individual errors + cluster scatter τ)")
         else:
             # Regular redshift from best template
-            lines.append(f"   Redshift: {s['redshift']:.6f} ± {s['redshift_error']:.6f} (correlation fit uncertainty)")
+            lines.append(f"Redshift: {s['redshift']:.6f} ± {s['redshift_error']:.6f} (correlation fit uncertainty)")
         
         # Display age information
         if s['enhanced_age'] is not None and np.isfinite(s['enhanced_age']):
             # Check if we're using subtype-specific age
             if s.get('using_subtype_age', False):
-                # Show subtype-specific age as primary
-                lines.append(f"   Age: {s['enhanced_age']:.0f} ± {s['enhanced_age_error']:.0f} days")
-                
-                # Show explanation for subtype age
+                # Show subtype-specific age as primary with inline weighting note
                 subtype_name = s.get('consensus_subtype', 'Unknown')
                 age_template_count = s.get('subtype_age_template_count', 0)
-                lines.append(f"   └─ Weighted from {age_template_count} {subtype_name} subtype templates (winning subtype)")
+                weight_note = f"weighted from {age_template_count} {subtype_name} subtype templates"
+                lines.append(f"Age: {s['enhanced_age']:.1f} ± {s['enhanced_age_error']:.1f} days ({weight_note})")
                 
                 # Optionally show full cluster age if different and meaningful
                 full_cluster_age = s.get('full_cluster_age')
@@ -618,27 +651,13 @@ class UnifiedResultsFormatter:
                     # Count total templates with ages in cluster
                     cluster_age_count = len([m for m in s.get('template_matches', []) 
                                            if m.get('age_days', 0) is not None and np.isfinite(m.get('age_days', 0))])
-                    lines.append(f"   └─ Full cluster age: {full_cluster_age:.0f} ± {full_cluster_age_err:.0f} days (from {cluster_age_count} total templates)")
+                    lines.append(f"   └─ Full cluster age: {full_cluster_age:.1f} ± {full_cluster_age_err:.1f} days (from {cluster_age_count} total templates)")
             else:
                 # Fall back to standard age display
-                lines.append(f"   Age: {s['enhanced_age']:.0f} ± {s['enhanced_age_error']:.0f} days")
+                lines.append(f"Age: {s['enhanced_age']:.1f} ± {s['enhanced_age_error']:.1f} days")
         
         lines.append("")
-        
-        # Show clustering overview if multiple clusters found
-        if s['has_clustering']:
-            overview = s['clustering_overview']
-            if overview and overview['total_clusters_found'] > 1:
-                lines.extend([
-                    "📈 CLUSTERING OVERVIEW:",
-                    f"   Total Clusters Found: {overview['total_clusters_found']}",
-                    f"   Active Cluster: {overview['active_cluster_type']}",
-                ])
-                
-                if overview['other_top_clusters']:
-                    other_types = [f"{c['type']} ({c['size']})" for c in overview['other_top_clusters']]
-                    lines.append(f"   Other Clusters: {', '.join(other_types)}")
-                lines.append("")
+        # Clustering overview removed per updated summary requirements
         
 
         
@@ -646,7 +665,7 @@ class UnifiedResultsFormatter:
         if s['template_matches']:
             cluster_note = f" (from {s['cluster_label']})" if s['has_clustering'] else ""
             lines.extend([
-                f"🏆 TEMPLATE MATCHES{cluster_note}:",
+                f"TEMPLATE MATCHES{cluster_note}:",
                 f"{'#':<3} {'Template':<18} {'Type':<8} {'Subtype':<10} {self.metric_name:<8}     {'Redshift':<12}     {'±Error':<10}     {'Age':<8}",
                 "-" * 105,
             ])
@@ -739,9 +758,7 @@ class UnifiedResultsFormatter:
     def _save_txt(self, filename: str):
         """Save results as text"""
         with open(filename, 'w', encoding='utf-8') as f:
-            f.write(f"SNID-SAGE Analysis Results\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write("=" * 60 + "\n\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             f.write(self.get_display_summary())
     
     def _get_active_cluster(self):

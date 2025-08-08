@@ -297,11 +297,13 @@ def preprocess_spectrum(
     
     trace["step5_flux"], trace["step5_cont"] = flat_flux.copy(), cont.copy()
 
-    # Find nonzero region of the spectrum
-    nonzero_mask = (log_flux > 0)
-    if np.any(nonzero_mask):
-        left_edge = np.argmax(nonzero_mask)
-        right_edge = len(log_flux) - 1 - np.argmax(nonzero_mask[::-1])
+    # Find valid (non-zero) region of the spectrum
+    # For continuum-subtracted spectra, negative values are valid
+    # We should only exclude true zeros/NaNs, not negative values
+    valid_mask = (log_flux != 0) & np.isfinite(log_flux)
+    if np.any(valid_mask):
+        left_edge = np.argmax(valid_mask)
+        right_edge = len(log_flux) - 1 - np.argmax(valid_mask[::-1])
     else:
         left_edge = 0
         right_edge = len(log_flux) - 1
@@ -310,9 +312,11 @@ def preprocess_spectrum(
     # STEP 6: APODIZE THE ENDS
     # ============================================================================
     if "apodization" not in skip_steps:
-        nz = np.nonzero(flat_flux)[0]
-        if nz.size:
-            l1, l2 = nz[0], nz[-1]
+        # For continuum-subtracted spectra, negative values are valid
+        # We should only exclude true zeros/NaNs, not negative values
+        valid_indices = np.where((flat_flux != 0) & np.isfinite(flat_flux))[0]
+        if valid_indices.size:
+            l1, l2 = valid_indices[0], valid_indices[-1]
         else:
             l1, l2 = 0, len(flat_flux) - 1
         tapered_flux = apodize(flat_flux, l1, l2, percent=apodize_percent)

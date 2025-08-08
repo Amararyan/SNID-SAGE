@@ -6,6 +6,12 @@ redshift and age estimation using template quality metrics.
 """
 
 from .weighted_statistics import (
+    calculate_combined_weights,
+    apply_exponential_weighting,
+    calculate_weighted_redshift_balanced,  # NEW: Recommended for redshift estimation
+    calculate_weighted_age_estimate,       # NEW: Recommended for age estimation
+    calculate_uncertainty_aware_estimates,
+    calculate_joint_uncertainty_aware_estimates,
     calculate_joint_weighted_estimates,
     calculate_weighted_redshift,
     calculate_weighted_age,
@@ -25,6 +31,12 @@ from .similarity_metrics import (
 
 __all__ = [
     # Weighted statistics
+    'calculate_combined_weights',
+    'apply_exponential_weighting',
+    'calculate_weighted_redshift_balanced',  # NEW: Recommended for redshift estimation
+    'calculate_weighted_age_estimate',       # NEW: Recommended for age estimation
+    'calculate_uncertainty_aware_estimates',
+    'calculate_joint_uncertainty_aware_estimates',
     'calculate_joint_weighted_estimates',
     'calculate_weighted_redshift',
     'calculate_weighted_age',

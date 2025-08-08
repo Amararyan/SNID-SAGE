@@ -28,11 +28,8 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_results')
 
-# Import analysis utilities
+# Import analysis utilities (avoid Tkinter-based modules)
 try:
-    from snid_sage.interfaces.gui.features.analysis.cluster_summary import (
-        AnalysisResultsAnalyzer, extract_age, format_age_display, is_valid_age
-    )
     from snid_sage.shared.utils.math_utils import get_best_metric_value, get_metric_name_for_match
 except ImportError:
     _LOGGER.warning("Some analysis utilities not available - results may be limited")
@@ -82,29 +79,19 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
                     self.selected_cluster = self.all_candidates[cluster_index]
                 
                 # Create analyzer with the selected cluster
-                if self.selected_cluster and self.all_candidates:
-                    try:
-                        self.analyzer = AnalysisResultsAnalyzer(self.selected_cluster, self.all_candidates)
-                    except Exception as e:
-                        _LOGGER.error(f"Failed to create AnalysisResultsAnalyzer: {e}")
-                        self.analyzer = None
+                # Analyzer creation removed to avoid Tkinter dependency
         
         # Fallback: if no clustering results, try to create a single cluster from best_matches
         if not self.analyzer and analysis_results and hasattr(analysis_results, 'best_matches'):
-            try:
-                # Create a pseudo-cluster from the best matches
-                self.selected_cluster = {
-                    'type': getattr(analysis_results, 'consensus_type', 'Unknown'),
-                    'matches': analysis_results.best_matches,
-                    'size': len(analysis_results.best_matches),
-                    'cluster_id': 0
-                }
-                self.all_candidates = [self.selected_cluster]
-                self.analyzer = AnalysisResultsAnalyzer(self.selected_cluster, self.all_candidates)
-                _LOGGER.info("Created fallback cluster analysis from best_matches")
-            except Exception as e:
-                _LOGGER.error(f"Failed to create fallback analyzer: {e}")
-                self.analyzer = None
+            # Fallback: simple pseudo-cluster without analyzer to avoid Tkinter dependency
+            # Create a pseudo-cluster from the best matches
+            self.selected_cluster = {
+                'type': getattr(analysis_results, 'consensus_type', 'Unknown'),
+                'matches': analysis_results.best_matches,
+                'size': len(analysis_results.best_matches),
+                'cluster_id': 0
+            }
+            self.all_candidates = [self.selected_cluster]
         
         # UI components
         self.summary_text = None

@@ -61,15 +61,12 @@ except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
 
-# Matplotlib for analysis plots
+# Matplotlib for analysis plots (Qt helper)
 try:
-    import matplotlib
-    matplotlib.use('QtAgg')  # Use Qt backend for PySide6
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.figure import Figure
+    from snid_sage.interfaces.gui.utils.matplotlib_qt import get_qt_mpl
+    plt, Figure, FigureCanvas, _NavigationToolbar = get_qt_mpl()
     MATPLOTLIB_AVAILABLE = True
-except ImportError:
+except Exception:
     MATPLOTLIB_AVAILABLE = False
     plt = None
     FigureCanvas = None
@@ -1075,7 +1072,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 self.ai_assistant_btn.setEnabled(True)
                 
                 # Update status indicators
-                self.config_status_label.setText("✅ Analysis Complete")
+                self.config_status_label.setText("Analysis Complete")
                 self.config_status_label.setStyleSheet("font-style: italic; color: #059669; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
                 
                 if has_clustering:
@@ -1099,7 +1096,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 _LOGGER.info("🎉 GUI updated after successful analysis completion")
             else:
                 self.status_label.setText("❌ SNID analysis failed")
-                self.config_status_label.setText("❌ Analysis Failed")
+                self.config_status_label.setText("Analysis Failed")
                 self.config_status_label.setStyleSheet("font-style: italic; color: #ef4444;")
                 
                 # Enhanced error messaging based on analysis type
@@ -1144,7 +1141,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 _LOGGER.info("GUI updated after successful preprocessing completion")
             else:
                 self.status_label.setText("Spectrum preprocessing failed")
-                self.preprocess_status_label.setText("✗ Failed")
+                self.preprocess_status_label.setText("Failed")
                 self.preprocess_status_label.setStyleSheet("font-style: italic; color: #dc2626; font-size: 10px;")
                 QtWidgets.QMessageBox.warning(
                     self,
@@ -1443,7 +1440,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             self.status_label.setText(status_text)
             
             # Update config status
-            self.config_status_label.setText("✅ Analysis Complete (Cluster Updated)")
+            self.config_status_label.setText("Analysis Complete (Cluster Updated)")
             self.config_status_label.setStyleSheet("font-style: italic; color: #059669; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
             
             # Ensure all navigation and plot buttons are enabled
@@ -1478,7 +1475,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     cluster_info = " [Auto Selected Cluster]"
             
             # Update main window to show analysis is complete
-            status_msg = f"✅ Analysis Complete: {getattr(result, 'template_name', 'Unknown')} ({getattr(result, 'consensus_type', 'Unknown')}){cluster_info}"
+            status_msg = f"Analysis Complete: {getattr(result, 'template_name', 'Unknown')} ({getattr(result, 'consensus_type', 'Unknown')}){cluster_info}"
             if hasattr(self, 'update_header_status'):
                 self.update_header_status(status_msg)
             

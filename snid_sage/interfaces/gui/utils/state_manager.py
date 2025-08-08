@@ -262,7 +262,8 @@ class StateManager:
             self.gui.llm_provider = tk.StringVar(value="openrouter")
             # Get model from llm_config instead of current_model attribute
             current_model = self.gui.llm_integration.llm_config.get('model_id') if self.gui.llm_integration.llm_config else None
-            self.gui.llm_model = tk.StringVar(value=current_model or "deepseek/deepseek-chat")
+            # Default display model to a known free variant to avoid accidental paid fallbacks
+            self.gui.llm_model = tk.StringVar(value=current_model or "deepseek/deepseek-chat-v3-0324:free")
             
             # Try to load optional LLM features
             optional_features = self._import_optional_features()

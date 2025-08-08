@@ -294,11 +294,11 @@ class PySide6AppController(QtCore.QObject):
                 right_edge = processed_spectrum['right_edge']
                 return wave[left_edge:right_edge+1], flux[left_edge:right_edge+1]
             
-            # Fallback: find nonzero regions manually
-            nonzero_mask = flux > 0
-            if np.any(nonzero_mask):
-                left_edge = np.argmax(nonzero_mask)
-                right_edge = len(flux) - 1 - np.argmax(nonzero_mask[::-1])
+            # Fallback: find valid regions manually (including negative values for continuum-subtracted spectra)
+            valid_mask = (flux != 0) & np.isfinite(flux)
+            if np.any(valid_mask):
+                left_edge = np.argmax(valid_mask)
+                right_edge = len(flux) - 1 - np.argmax(valid_mask[::-1])
                 return wave[left_edge:right_edge+1], flux[left_edge:right_edge+1]
             
             # If no nonzero data found, return original arrays

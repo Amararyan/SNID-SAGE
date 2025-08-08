@@ -6,16 +6,10 @@ Controllers for managing different aspects of the SNID SAGE GUI.
 Part of the SNID SAGE GUI restructuring.
 """
 
-from .app_controller import AppController
-from .file_controller import FileController  
-from .plot_controller import PlotController
-from .view_controller import ViewController
-from .dialog_controller import DialogController
+from .pyside6_app_controller import PySide6AppController
+from .pyside6_preprocessing_controller import PySide6PreprocessingController
 
 __all__ = [
-    'AppController',
-    'FileController',
-    'PlotController', 
-    'ViewController',
-    'DialogController'
+    'PySide6AppController',
+    'PySide6PreprocessingController'
 ] 

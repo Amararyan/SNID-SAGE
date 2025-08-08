@@ -19,7 +19,7 @@ import threading
 from datetime import datetime
 import json
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 try:
     from snid_sage.shared.utils.logging import get_logger
@@ -47,6 +47,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.parent_gui = parent
         self.is_generating = False
         self.current_snid_results = snid_results
+        self.conversation: List[Dict[str, str]] = []
         
         # Theme colors (matching PySide6 main GUI)
         self.colors = {
@@ -70,8 +71,11 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     def _setup_dialog(self):
         """Setup dialog window properties"""
         self.setWindowTitle("AI Assistant")
-        self.resize(1000, 700)
+        # Allow full-screen and maximizing; no artificial max size
+        self.setSizeGripEnabled(True)
         self.setMinimumSize(700, 500)
+        self.resize(1200, 800)
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowMaximizeButtonHint)
         
         # Apply dialog styling
         self.setStyleSheet(f"""
@@ -275,93 +279,56 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
         
-        # Header
+        # Header (left-side model label only)
         self._create_header(layout)
-        
+
         # Tab widget for different functionality
         self.tab_widget = QtWidgets.QTabWidget()
         layout.addWidget(self.tab_widget)
+
+        # Status label in the tab bar corner (top-right, same height as tabs)
+        corner_container = QtWidgets.QWidget()
+        corner_layout = QtWidgets.QHBoxLayout(corner_container)
+        corner_layout.setContentsMargins(0, 0, 6, 0)
+        corner_layout.setSpacing(6)
+        self.status_label = QtWidgets.QLabel("Ready")
+        self.status_label.setStyleSheet(f"color: {self.colors['btn_success']}; font-weight: bold; font-size: 10pt;")
+        corner_layout.addWidget(self.status_label)
+        # Also show current model on the top-right
+        self.corner_model_label = QtWidgets.QLabel("")
+        self.corner_model_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-style: italic; font-size: 10pt;")
+        corner_layout.addWidget(self.corner_model_label)
+        self.tab_widget.setCornerWidget(corner_container, QtCore.Qt.TopRightCorner)
+        # Initialize corner model label
+        self._refresh_model_label()
         
         # Create tabs
         self._create_summary_tab()
         self._create_chat_tab()
+        self._create_settings_tab()
         
         # Footer buttons
         self._create_footer_buttons(layout)
         
     def _create_header(self, layout):
-        """Create header section with AI controls"""
+        """Create header section with status indicator"""
         header_layout = QtWidgets.QHBoxLayout()
         
-        # Left side - Status indicator
-        self.status_label = QtWidgets.QLabel("Ready")
-        self.status_label.setStyleSheet(f"color: {self.colors['btn_success']}; font-weight: bold; font-size: 11pt;")
-        header_layout.addWidget(self.status_label)
+        # Left: show active model
+        header_left = QtWidgets.QHBoxLayout()
+        self.model_label = QtWidgets.QLabel("")
+        self.model_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-style: italic;")
+        header_left.addWidget(self.model_label)
+        header_left_widget = QtWidgets.QWidget()
+        header_left_widget.setLayout(header_left)
+        # Hide model label on the top-left per request
+        header_left_widget.setVisible(False)
+        header_layout.addWidget(header_left_widget)
         
         header_layout.addStretch()
         
-        # Right side - AI Controls
-        ai_controls_group = QtWidgets.QGroupBox("🔧 AI Settings")
-        ai_controls_layout = QtWidgets.QGridLayout(ai_controls_group)
-        ai_controls_layout.setSpacing(8)
-        
-        # Model selection
-        ai_controls_layout.addWidget(QtWidgets.QLabel("Model:"), 0, 0)
-        self.model_combo = QtWidgets.QComboBox()
-        self.model_combo.setMinimumWidth(200)
-        self.model_combo.currentTextChanged.connect(self._on_model_changed)
-        ai_controls_layout.addWidget(self.model_combo, 0, 1)
-        
-        # Refresh models button
-        self.refresh_models_btn = QtWidgets.QPushButton("🔄")
-        self.refresh_models_btn.setMaximumWidth(30)
-        self.refresh_models_btn.setToolTip("Refresh available models")
-        self.refresh_models_btn.clicked.connect(self._refresh_models)
-        ai_controls_layout.addWidget(self.refresh_models_btn, 0, 2)
-        
-        # Temperature setting
-        ai_controls_layout.addWidget(QtWidgets.QLabel("Temperature:"), 1, 0)
-        self.temperature_spin = QtWidgets.QDoubleSpinBox()
-        self.temperature_spin.setRange(0.0, 2.0)
-        self.temperature_spin.setSingleStep(0.1)
-        self.temperature_spin.setValue(0.7)
-        self.temperature_spin.setDecimals(1)
-        self.temperature_spin.setMaximumWidth(80)
-        ai_controls_layout.addWidget(self.temperature_spin, 1, 1)
-        
-        # Max tokens setting
-        ai_controls_layout.addWidget(QtWidgets.QLabel("Max Tokens:"), 1, 2)
-        self.max_tokens_spin = QtWidgets.QSpinBox()
-        self.max_tokens_spin.setRange(100, 4000)
-        self.max_tokens_spin.setValue(2000)
-        self.max_tokens_spin.setMaximumWidth(80)
-        ai_controls_layout.addWidget(self.max_tokens_spin, 1, 3)
-        
-        # Style the group box
-        ai_controls_group.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: bold;
-                font-size: 9pt;
-                border: 1px solid {self.colors['border']};
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 8px;
-                background: {self.colors['bg_secondary']};
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px 0 4px;
-                background: {self.colors['bg_secondary']};
-            }}
-        """)
-        
-        header_layout.addWidget(ai_controls_group)
-        
         layout.addLayout(header_layout)
-        
-        # Load available models
-        self._load_available_models()
+        self._refresh_model_label()
     
     def _create_summary_tab(self):
         """Create summary generation tab"""
@@ -398,6 +365,12 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         metadata_layout.addWidget(self.observation_date_input)
         
         layout.addLayout(metadata_layout)
+        
+        # Specific request input
+        self.specific_request_input = QtWidgets.QTextEdit()
+        self.specific_request_input.setPlaceholderText("Enter any specific requests or questions about the analysis (optional)")
+        self.specific_request_input.setMaximumHeight(80)
+        layout.addWidget(self.specific_request_input)
         
         # Simplified options in a single row
         options_layout = QtWidgets.QHBoxLayout()
@@ -485,6 +458,10 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             "• Should I follow up with more observations?\n\n"
             "What would you like to know?"
         )
+        # Initialize conversation history with assistant greeting
+        self.conversation = [
+            {"role": "assistant", "content": "Hello! Ask me questions about your SNID analysis."}
+        ]
         layout.addWidget(self.chat_history)
         
         # Input area - simplified, no group box
@@ -492,6 +469,15 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.chat_input.setMaximumHeight(70)
         self.chat_input.setPlaceholderText("Type your question here...")
         layout.addWidget(self.chat_input)
+
+        # Add keyboard shortcut: Ctrl+Enter to send
+        try:
+            send_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self.chat_input)
+            send_shortcut.activated.connect(self._send_chat_message)
+            send_shortcut2 = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Enter"), self.chat_input)
+            send_shortcut2.activated.connect(self._send_chat_message)
+        except Exception:
+            pass
         
         # Send controls
         send_layout = QtWidgets.QHBoxLayout()
@@ -511,6 +497,659 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         
         self.tab_widget.addTab(chat_widget, "💬 Chat")
     
+    def _create_settings_tab(self):
+        """Create AI settings configuration tab"""
+        settings_widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(settings_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
+        
+        # OpenRouter API configuration group
+        api_group = QtWidgets.QGroupBox("🔑 OpenRouter API Configuration")
+        api_layout = QtWidgets.QVBoxLayout(api_group)
+        api_layout.setSpacing(12)
+        
+        # Information label with clickable link
+        info_frame = QtWidgets.QFrame()
+        info_frame.setStyleSheet(f"""
+            color: {self.colors['text_secondary']};
+            font-style: italic;
+            padding: 8px;
+            background: {self.colors['bg_tertiary']};
+            border-radius: 4px;
+        """)
+        
+        info_layout = QtWidgets.QHBoxLayout(info_frame)
+        info_layout.setContentsMargins(8, 8, 8, 8)
+        info_layout.setSpacing(4)
+        
+        # Main text
+        info_text = QtWidgets.QLabel("Configure your OpenRouter API key to enable AI-powered analysis features. Get your free API key at:")
+        info_text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-style: italic;")
+        info_layout.addWidget(info_text)
+        
+        # Clickable link
+        link_label = QtWidgets.QLabel("https://openrouter.ai")
+        link_label.setStyleSheet(f"""
+            color: {self.colors['accent_primary']};
+            text-decoration: underline;
+            font-style: italic;
+        """)
+        link_label.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        link_label.mousePressEvent = lambda event: self._open_openrouter_website()
+        info_layout.addWidget(link_label)
+        
+        info_layout.addStretch()
+        api_layout.addWidget(info_frame)
+        
+        # API Key input
+        key_layout = QtWidgets.QHBoxLayout()
+        key_layout.addWidget(QtWidgets.QLabel("API Key:"))
+        
+        self.api_key_input = QtWidgets.QLineEdit()
+        self.api_key_input.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.api_key_input.setPlaceholderText("Enter your OpenRouter API key")
+        # Reduce the visible length of the API key field
+        self.api_key_input.setMaximumWidth(360)
+        key_layout.addWidget(self.api_key_input)
+        
+        # Show/hide API key button
+        self.show_key_btn = QtWidgets.QPushButton("Show")
+        self.show_key_btn.setMaximumWidth(90)
+        self.show_key_btn.clicked.connect(self._toggle_api_key_visibility)
+        key_layout.addWidget(self.show_key_btn)
+        # Move test connection controls next to the Show button
+        self.test_connection_btn = QtWidgets.QPushButton("🔍 Test Connection")
+        self.test_connection_btn.clicked.connect(self._test_openrouter_connection)
+        key_layout.addWidget(self.test_connection_btn)
+
+        self.connection_status_label = QtWidgets.QLabel("Not tested")
+        self.connection_status_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        key_layout.addWidget(self.connection_status_label)
+        key_layout.addStretch()
+
+        api_layout.addLayout(key_layout)
+        layout.addWidget(api_group)
+        
+        # Model selection group
+        model_group = QtWidgets.QGroupBox("🤖 Model Selection & Testing")
+        model_layout = QtWidgets.QVBoxLayout(model_group)
+        model_layout.setSpacing(12)
+        
+        # Model selection info
+        model_info_label = QtWidgets.QLabel(
+            "Choose your preferred model for AI analysis. "
+            "Click 'Fetch Models' to see available options."
+        )
+        model_info_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-style: italic;")
+        model_info_label.setWordWrap(True)
+        model_layout.addWidget(model_info_label)
+        
+        # Create split layout: table on the left, controls on the right
+        split_layout = QtWidgets.QHBoxLayout()
+
+        # Left side (filters + table)
+        left_side_layout = QtWidgets.QVBoxLayout()
+
+        # Filter controls
+        filter_layout = QtWidgets.QHBoxLayout()
+
+        filter_layout.addWidget(QtWidgets.QLabel("Filter:"))
+
+        self.filter_input = QtWidgets.QLineEdit()
+        self.filter_input.setPlaceholderText("Search models...")
+        self.filter_input.textChanged.connect(self._filter_models)
+        filter_layout.addWidget(self.filter_input)
+
+        # Remove Free Only and Reasoning support checkboxes per request
+
+        left_side_layout.addLayout(filter_layout)
+
+        # Model table
+        self.model_table = QtWidgets.QTableWidget()
+        # Remove Reasoning column; keep pricing column
+        self.model_table.setColumnCount(5)
+        self.model_table.setHorizontalHeaderLabels([
+            "Model Name", "Provider", "Context", "Price", "Status"
+        ])
+        self.model_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.model_table.setAlternatingRowColors(True)
+        self.model_table.setSortingEnabled(True)
+        # Let the table expand to fill vertical space
+        self.model_table.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        
+        # Set column widths
+        header = self.model_table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.resizeSection(0, 250)  # Model Name
+        header.resizeSection(1, 100)  # Provider
+        header.resizeSection(2, 80)   # Context
+        header.resizeSection(3, 120)  # Price
+        header.resizeSection(4, 80)   # Status
+        
+        self.model_table.setStyleSheet(f"""
+            QTableWidget {{
+                background: {self.colors['bg_secondary']};
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                font-size: 9pt;
+                gridline-color: {self.colors['bg_tertiary']};
+            }}
+            QTableWidget::item {{
+                padding: 4px 8px;
+                border: none;
+            }}
+            QTableWidget::item:selected {{
+                background: {self.colors['btn_primary']};
+                color: white;
+            }}
+            QHeaderView::section {{
+                background: {self.colors['bg_tertiary']};
+                border: 1px solid {self.colors['border']};
+                padding: 4px 8px;
+                font-weight: bold;
+            }}
+        """)
+        left_side_layout.addWidget(self.model_table)
+
+        # Right side (controls and status)
+        right_container = QtWidgets.QWidget()
+        right_container.setMaximumWidth(260)
+        right_side_layout = QtWidgets.QVBoxLayout(right_container)
+        right_side_layout.setContentsMargins(0, 0, 0, 0)
+        right_side_layout.setSpacing(6)
+
+        self.fetch_models_btn = QtWidgets.QPushButton("📡 Fetch All Models")
+        self.fetch_models_btn.clicked.connect(self._fetch_all_models)
+        right_side_layout.addWidget(self.fetch_models_btn)
+
+        self.fetch_free_btn = QtWidgets.QPushButton("🆓 Free Only")
+        self.fetch_free_btn.clicked.connect(self._fetch_free_models)
+        right_side_layout.addWidget(self.fetch_free_btn)
+
+        self.test_model_btn = QtWidgets.QPushButton("🧪 Test Selected")
+        self.test_model_btn.clicked.connect(self._test_selected_model)
+        self.test_model_btn.setEnabled(False)
+        right_side_layout.addWidget(self.test_model_btn)
+
+        # Status label at the bottom of the right pane
+        right_side_layout.addStretch()
+        self.model_status_label = QtWidgets.QLabel("No models loaded")
+        self.model_status_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        right_side_layout.addWidget(self.model_status_label)
+
+        # Add left and right to split
+        split_layout.addLayout(left_side_layout)
+        split_layout.addWidget(right_container)
+        # Make the left side (table) take remaining space
+        split_layout.setStretch(0, 1)
+        split_layout.setStretch(1, 0)
+
+        # Add split layout to the group
+        model_layout.addLayout(split_layout)
+
+        # Connect selection change
+        self.model_table.itemSelectionChanged.connect(self._on_model_selection_changed)
+        
+        # Ensure the model group (and table) stretch to the bottom of the dialog
+        model_group.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        layout.addWidget(model_group, 1)
+        self.tab_widget.addTab(settings_widget, "⚙️ Settings")
+        
+        # Load current settings
+        self._load_current_settings()
+        self._update_ai_buttons_enabled()
+
+    def _load_current_settings(self):
+        """Load current AI settings from configuration"""
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import (
+                get_openrouter_api_key,
+                get_openrouter_config,
+            )
+            # Prefer secure storage for API key
+            api_key = get_openrouter_api_key() or ''
+            self.api_key_input.setText(api_key)
+            if api_key:
+                self.connection_status_label.setText("API key loaded")
+                self.connection_status_label.setStyleSheet(f"color: {self.colors['btn_success']};")
+            
+        except Exception as e:
+            _LOGGER.warning(f"Could not load AI settings: {e}")
+        finally:
+            self._update_ai_buttons_enabled()
+    
+    def _toggle_api_key_visibility(self):
+        """Toggle API key visibility"""
+        if self.api_key_input.echoMode() == QtWidgets.QLineEdit.Password:
+            self.api_key_input.setEchoMode(QtWidgets.QLineEdit.Normal)
+            self.show_key_btn.setText("Hide")
+        else:
+            self.api_key_input.setEchoMode(QtWidgets.QLineEdit.Password)
+            self.show_key_btn.setText("Show")
+    
+    def _test_openrouter_connection(self):
+        """Test OpenRouter API connection"""
+        api_key = self.api_key_input.text().strip()
+        if not api_key:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No API Key", 
+                "Please enter your OpenRouter API key first."
+            )
+            return
+        
+        self.connection_status_label.setText("Testing...")
+        self.connection_status_label.setStyleSheet(f"color: {self.colors['btn_warning']};")
+        self.test_connection_btn.setEnabled(False)
+        
+        # Test connection in a separate thread
+        def test_connection():
+            try:
+                import requests
+                response = requests.get(
+                    "https://openrouter.ai/api/v1/models",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    QtCore.QMetaObject.invokeMethod(
+                        self, "_on_connection_success", QtCore.Qt.QueuedConnection
+                    )
+                else:
+                    error_msg = f"API Error: {response.status_code}"
+                    QtCore.QMetaObject.invokeMethod(
+                        self, "_on_connection_error", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(str, error_msg)
+                    )
+                    
+            except Exception as e:
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_on_connection_error", QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, str(e))
+                )
+        
+        import threading
+        thread = threading.Thread(target=test_connection, daemon=True)
+        thread.start()
+    
+    @QtCore.Slot()
+    def _on_connection_success(self):
+        """Handle successful connection test"""
+        self.connection_status_label.setText("✅ Connected successfully")
+        self.connection_status_label.setStyleSheet(f"color: {self.colors['btn_success']};")
+        self.test_connection_btn.setEnabled(True)
+        
+        # Save API key to config
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import (
+                save_openrouter_config,
+                save_openrouter_api_key,
+            )
+            api_key = self.api_key_input.text().strip()
+            # Persist securely
+            save_openrouter_api_key(api_key)
+            save_openrouter_config(api_key, "", "", False)
+        except Exception as e:
+            _LOGGER.warning(f"Could not save API key: {e}")
+        finally:
+            self._update_ai_buttons_enabled()
+    
+    @QtCore.Slot(str)
+    def _on_connection_error(self, error):
+        """Handle connection test error"""
+        self.connection_status_label.setText(f"❌ Error: {error}")
+        self.connection_status_label.setStyleSheet(f"color: {self.colors['btn_danger']};")
+        self.test_connection_btn.setEnabled(True)
+    
+    def _fetch_free_models(self):
+        """Fetch available free models from OpenRouter"""
+        api_key = self.api_key_input.text().strip()
+        if not api_key:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No API Key", 
+                "Please enter your OpenRouter API key first."
+            )
+            return
+        
+        self.model_status_label.setText("Fetching models...")
+        self.model_status_label.setStyleSheet(f"color: {self.colors['btn_warning']};")
+        self.fetch_models_btn.setEnabled(False)
+        self.fetch_free_btn.setEnabled(False)
+        self.model_table.setRowCount(0)
+        
+        # Fetch models in separate thread
+        def fetch_models():
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import fetch_free_models
+                models = fetch_free_models(api_key)
+                if models is None:
+                    QtCore.QMetaObject.invokeMethod(
+                        self, "_on_fetch_error", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(str, "Failed to fetch models")
+                    )
+                    return
+                import json
+                models_json = json.dumps(models)
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_on_models_fetched", QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, models_json)
+                )
+                    
+            except Exception as e:
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_on_fetch_error", QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, str(e))
+                )
+        
+        import threading
+        thread = threading.Thread(target=fetch_models, daemon=True)
+        thread.start()
+    
+    def _fetch_all_models(self):
+        """Fetch all available models from OpenRouter"""
+        api_key = self.api_key_input.text().strip()
+        if not api_key:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No API Key", 
+                "Please enter your OpenRouter API key first."
+            )
+            return
+        
+        self.model_status_label.setText("Fetching all models...")
+        self.model_status_label.setStyleSheet(f"color: {self.colors['btn_warning']};")
+        self.fetch_models_btn.setEnabled(False)
+        self.fetch_free_btn.setEnabled(False)
+        self.model_table.setRowCount(0)
+        
+        # Fetch models in separate thread
+        def fetch_all():
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import fetch_all_models
+                models = fetch_all_models(api_key, free_only=False)
+                
+                if models:
+                    import json
+                    models_json = json.dumps(models)
+                    QtCore.QMetaObject.invokeMethod(
+                        self, "_on_models_fetched", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(str, models_json)
+                    )
+                else:
+                    QtCore.QMetaObject.invokeMethod(
+                        self, "_on_fetch_error", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(str, "No models found")
+                    )
+                    
+            except Exception as e:
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_on_fetch_error", QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, str(e))
+                )
+        
+        import threading
+        thread = threading.Thread(target=fetch_all, daemon=True)
+        thread.start()
+    
+    @QtCore.Slot(str)
+    def _on_models_fetched(self, models_json):
+        """Handle successful model fetch"""
+        # Parse JSON string back to list
+        try:
+            import json
+            models = json.loads(models_json)
+        except (json.JSONDecodeError, ValueError) as e:
+            _LOGGER.error(f"Failed to parse models JSON: {e}")
+            self.model_status_label.setText("Error parsing models data")
+            self.model_status_label.setStyleSheet(f"color: {self.colors['btn_danger']};")
+            self.fetch_models_btn.setEnabled(True)
+            self.fetch_free_btn.setEnabled(True)
+            return
+        
+        if models:
+            # Store models for filtering
+            self.all_models = models
+            
+            # Populate table
+            self._populate_model_table(models)
+            
+            self.model_status_label.setText(f"Found {len(models)} models")
+            self.model_status_label.setStyleSheet(f"color: {self.colors['btn_success']};")
+        else:
+            self.model_status_label.setText("No models found")
+            self.model_status_label.setStyleSheet(f"color: {self.colors['btn_warning']};")
+        
+        self.fetch_models_btn.setEnabled(True)
+        self.fetch_free_btn.setEnabled(True)
+    
+    def _populate_model_table(self, models):
+        """Populate the model table with data"""
+        table = self.model_table
+        table.setRowCount(len(models))
+        
+        # Get current selected model to preserve selection
+        config = {}
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_config, get_model_test_status
+            config = get_openrouter_config()
+        except Exception as e:
+            _LOGGER.warning(f"Could not load OpenRouter config: {e}")
+        
+        current_model_id = config.get('model_id', '')
+        
+        for row, model in enumerate(models):
+            # Model Name (with fallback)
+            model_name = model.get('name', model.get('id', 'Unknown Model'))
+            model_id = model.get('id', '')
+            name_item = QtWidgets.QTableWidgetItem(model_name)
+            name_item.setData(QtCore.Qt.UserRole, model_id)
+            table.setItem(row, 0, name_item)
+            
+            # Provider (with fallback)
+            provider = model.get('provider', 'Unknown')
+            if not provider and 'id' in model:
+                # Extract provider from model ID as fallback
+                provider = model['id'].split('/')[0] if '/' in model['id'] else 'Unknown'
+            provider_item = QtWidgets.QTableWidgetItem(provider)
+            table.setItem(row, 1, provider_item)
+            
+            # Context Length (with fallback)
+            context_display = model.get('context_display', str(model.get('context_length', 'Unknown')))
+            context_item = QtWidgets.QTableWidgetItem(context_display)
+            context_item.setData(QtCore.Qt.UserRole, model.get('context_length', 0))  # Store raw number for sorting
+            table.setItem(row, 2, context_item)
+            
+            # Price (with fallback)
+            price_display = model.get('price_display', 'Unknown')
+            price_item = QtWidgets.QTableWidgetItem(price_display)
+            prompt_price = model.get('prompt_price', 0)
+            price_item.setData(QtCore.Qt.UserRole, prompt_price)  # Store raw price for sorting
+            is_free = model.get('is_free', False)
+            if is_free:
+                price_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green for free
+            table.setItem(row, 3, price_item)
+            
+            # Status
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_model_test_status
+                is_tested = get_model_test_status(model_id)
+                if model_id == current_model_id and is_tested:
+                    status_text = "✅ Active"
+                    status_item = QtWidgets.QTableWidgetItem(status_text)
+                    status_item.setBackground(QtGui.QColor(144, 238, 144))  # Light green
+                elif is_tested:
+                    status_text = "✅ Tested"
+                    status_item = QtWidgets.QTableWidgetItem(status_text)
+                    status_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green
+                else:
+                    status_text = "⏳ Untested"
+                    status_item = QtWidgets.QTableWidgetItem(status_text)
+            except:
+                status_text = "⏳ Untested"
+                status_item = QtWidgets.QTableWidgetItem(status_text)
+            
+            table.setItem(row, 4, status_item)
+            
+            # Select current model if it matches
+            if model['id'] == current_model_id:
+                table.selectRow(row)
+    
+    @QtCore.Slot(str)
+    def _on_fetch_error(self, error):
+        """Handle model fetch error"""
+        self.model_status_label.setText(f"Error: {error}")
+        self.model_status_label.setStyleSheet(f"color: {self.colors['btn_danger']};")
+        self.fetch_models_btn.setEnabled(True)
+        self.fetch_free_btn.setEnabled(True)
+    
+    def _on_model_selection_changed(self):
+        """Handle model selection change"""
+        selected_rows = self.model_table.selectionModel().selectedRows()
+        self.test_model_btn.setEnabled(len(selected_rows) > 0)
+    
+    def _test_selected_model(self):
+        """Test the selected model"""
+        selected_rows = self.model_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        
+        api_key = self.api_key_input.text().strip()
+        if not api_key:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No API Key", 
+                "Please enter your OpenRouter API key first."
+            )
+            return
+        
+        row = selected_rows[0].row()
+        model_item = self.model_table.item(row, 0)
+        if not model_item:
+            return
+            
+        model_id = model_item.data(QtCore.Qt.UserRole)
+        model_name = model_item.text()
+        
+        self.test_model_btn.setEnabled(False)
+        self.test_model_btn.setText("🧪 Testing...")
+        
+        # Test model in separate thread
+        def test_model():
+            try:
+                from snid_sage.interfaces.llm.openrouter.openrouter_llm import call_openrouter_api, save_openrouter_config
+                
+                # Temporarily save this model for testing
+                save_openrouter_config(api_key, model_id, model_name, False)
+                
+                # Test with a simple prompt
+                test_prompt = "Hello! Please respond with a simple 'OK' if you can process this request."
+                response = call_openrouter_api(test_prompt, max_tokens=50)
+                
+                if response and len(response.strip()) > 0:
+                    # Mark as tested
+                    save_openrouter_config(api_key, model_id, model_name, True)
+                    QtCore.QMetaObject.invokeMethod(
+                        self, "_on_model_test_success", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(str, model_id), QtCore.Q_ARG(str, model_name)
+                    )
+                else:
+                    QtCore.QMetaObject.invokeMethod(
+                        self, "_on_model_test_error", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(str, model_id), QtCore.Q_ARG(str, "Empty response from model")
+                    )
+                    
+            except Exception as e:
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_on_model_test_error", QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, model_id), QtCore.Q_ARG(str, str(e))
+                )
+        
+        import threading
+        thread = threading.Thread(target=test_model, daemon=True)
+        thread.start()
+    
+    @QtCore.Slot(str, str)
+    def _on_model_test_success(self, model_id, model_name):
+        """Handle successful model test"""
+        self.test_model_btn.setEnabled(True)
+        self.test_model_btn.setText("🧪 Test Selected")
+        
+        # Update the status column in the table
+        for row in range(self.model_table.rowCount()):
+            item = self.model_table.item(row, 0)
+            if item and item.data(QtCore.Qt.UserRole) == model_id:
+                status_item = self.model_table.item(row, 5)  # Status column
+                if status_item:
+                    status_item.setText("✅ Tested")
+                    status_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green
+                break
+        
+        QtWidgets.QMessageBox.information(
+            self,
+            "Model Test Successful",
+            f"Model '{model_name}' tested successfully!\nIt will be used for future AI operations."
+        )
+        self._refresh_model_label()
+    
+    @QtCore.Slot(str, str)
+    def _on_model_test_error(self, model_id, error_message):
+        """Handle model test error"""
+        self.test_model_btn.setEnabled(True)
+        self.test_model_btn.setText("🧪 Test Selected")
+        
+        # Update the status column in the table
+        for row in range(self.model_table.rowCount()):
+            item = self.model_table.item(row, 0)
+            if item and item.data(QtCore.Qt.UserRole) == model_id:
+                status_item = self.model_table.item(row, 5)  # Status column
+                if status_item:
+                    status_item.setText("❌ Failed")
+                    status_item.setBackground(QtGui.QColor(255, 200, 200))  # Light red
+                break
+        
+        QtWidgets.QMessageBox.warning(
+            self,
+            "Model Test Failed",
+            f"Failed to test model:\n{error_message}"
+        )
+        self._refresh_model_label()
+    
+    def _open_openrouter_website(self):
+        """Open OpenRouter website in default browser"""
+        import webbrowser
+        try:
+            webbrowser.open("https://openrouter.ai")
+        except Exception as e:
+            _LOGGER.error(f"Failed to open OpenRouter website: {e}")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Browser Error",
+                "Failed to open browser. Please visit https://openrouter.ai manually."
+            )
+    
+    def _filter_models(self):
+        """Filter models based on search criteria"""
+        if not hasattr(self, 'all_models') or not self.all_models:
+            return
+        
+        search_text = self.filter_input.text().lower()
+        
+        # Filter models
+        filtered_models = []
+        for model in self.all_models:
+            # Text search
+            if search_text and search_text not in model['name'].lower() and search_text not in model.get('provider', '').lower():
+                continue
+            
+            # Note: free and reasoning filters removed per request
+            
+            filtered_models.append(model)
+        
+        # Update table with filtered models
+        self._populate_model_table(filtered_models)
 
     
     def _create_footer_buttons(self, layout):
@@ -561,18 +1200,15 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
                 if hasattr(self.parent_gui, 'llm_integration') and self.parent_gui.llm_integration:
                     summary_text = self.parent_gui.llm_integration.generate_summary(
                         self.current_snid_results,
-                        user_metadata=user_metadata,
-                        max_tokens=ai_settings['max_tokens'],
-                        temperature=ai_settings['temperature']
+                        user_metadata=user_metadata
                     )
                 else:
-                    # Fallback if no LLM integration
-                    from snid_sage.interfaces.gui.features.results.llm_integration import LLMIntegration
-                    llm = LLMIntegration(self.current_snid_results)
+                    # Fallback if no LLM integration - use non-Tk LLM module
+                    from snid_sage.interfaces.llm.llm_integration import LLMIntegration
+                    llm = LLMIntegration(self.parent())
                     summary_text = llm.generate_summary(
-                        user_metadata=user_metadata,
-                        max_tokens=ai_settings['max_tokens'],
-                        temperature=ai_settings['temperature']
+                        self.current_snid_results,
+                        user_metadata=user_metadata
                     )
                 
                 summary = f"""
@@ -583,7 +1219,7 @@ Observer: {user_metadata.get('observer_name', 'Not specified')}
 Telescope: {user_metadata.get('telescope', 'Not specified')}  
 Observation Date: {user_metadata.get('observation_date', 'Not specified')}
 Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-AI Model: {self.model_combo.currentText().replace('✅ ', '').replace('⏳ ', '').replace('🆓 ', '').replace('🧠 ', '')}
+AI Model: {ai_settings['model_id']}
 
 CLASSIFICATION ANALYSIS:
 {summary_text}
@@ -642,52 +1278,56 @@ CLASSIFICATION ANALYSIS:
             return
         
         # Add user message to chat
-        current_chat = self.chat_history.toPlainText()
-        current_chat += f"\n\nYou: {message}"
-        self.chat_history.setPlainText(current_chat)
+        self._append_chat_line(f"You: {message}")
         self.chat_input.clear()
+        # Maintain conversation history
+        self.conversation.append({"role": "user", "content": message})
+        # Disable send while processing
+        self.send_btn.setEnabled(False)
         
         # Get AI response using current settings
         def get_ai_response():
             try:
                 ai_settings = self._get_current_ai_settings()
-                
+                # Collect optional user metadata from summary tab controls if available
+                user_metadata = {
+                    'observer_name': getattr(self, 'observer_name_input', None).text() if hasattr(self, 'observer_name_input') else '',
+                    'telescope': getattr(self, 'telescope_input', None).text() if hasattr(self, 'telescope_input') else '',
+                    'observation_date': getattr(self, 'observation_date_input', None).text() if hasattr(self, 'observation_date_input') else '',
+                }
+
                 # Use LLM integration to get real response
                 if hasattr(self.parent_gui, 'llm_integration') and self.parent_gui.llm_integration:
                     ai_response = self.parent_gui.llm_integration.chat_with_llm(
                         message,
-                        context=str(self.current_snid_results) if self.current_snid_results else "",
+                        conversation_history=self.conversation,
+                        user_metadata=user_metadata,
                         max_tokens=ai_settings['max_tokens']
                     )
                 else:
-                    # Fallback if no LLM integration
-                    from snid_sage.interfaces.gui.features.results.llm_integration import LLMIntegration
-                    llm = LLMIntegration(self.current_snid_results)
+                    # Fallback if no LLM integration - use non-Tk LLM module
+                    from snid_sage.interfaces.llm.llm_integration import LLMIntegration
+                    llm = LLMIntegration(self.parent())
                     ai_response = llm.chat_with_llm(
                         message,
-                        context="",
+                        conversation_history=self.conversation,
+                        user_metadata=user_metadata,
                         max_tokens=ai_settings['max_tokens']
                     )
-                
-                # Update chat in main thread
-                current_chat = self.chat_history.toPlainText()
-                current_chat += f"\n\nAI Assistant: {ai_response}"
-                
+
+                # Post response back to main thread (only the new assistant message)
                 QtCore.QMetaObject.invokeMethod(
-                    self, "_update_chat",
+                    self, "_on_assistant_response",
                     QtCore.Qt.QueuedConnection,
-                    QtCore.Q_ARG(str, current_chat)
+                    QtCore.Q_ARG(str, ai_response)
                 )
                 
             except Exception as e:
                 error_msg = f"Sorry, I encountered an error: {str(e)}"
-                current_chat = self.chat_history.toPlainText()
-                current_chat += f"\n\nAI Assistant: {error_msg}"
-                
                 QtCore.QMetaObject.invokeMethod(
-                    self, "_update_chat",
+                    self, "_on_assistant_response",
                     QtCore.Qt.QueuedConnection,
-                    QtCore.Q_ARG(str, current_chat)
+                    QtCore.Q_ARG(str, error_msg)
                 )
         
         # Start chat response in background
@@ -699,19 +1339,44 @@ CLASSIFICATION ANALYSIS:
         scrollbar.setValue(scrollbar.maximum())
     
     @QtCore.Slot(str)
-    def _update_chat(self, chat_text):
-        """Update chat display in main thread"""
-        self.chat_history.setPlainText(chat_text)
-        # Scroll to bottom
+    def _on_assistant_response(self, assistant_text: str):
+        """Append assistant response on the main thread and update state"""
+        # Update conversation history
+        self.conversation.append({"role": "assistant", "content": assistant_text})
+        # Append to chat area
+        self._append_chat_line(f"AI Assistant: {assistant_text}")
+        # Scroll to bottom and re-enable send
         scrollbar = self.chat_history.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+        self.send_btn.setEnabled(True)
+
+    def _append_chat_line(self, text: str):
+        """Efficiently append a new line to the chat history without rebuilding all text"""
+        cursor = self.chat_history.textCursor()
+        cursor.movePosition(QtGui.QTextCursor.End)
+        # Ensure spacing between messages
+        if self.chat_history.toPlainText().strip():
+            cursor.insertText("\n\n")
+        cursor.insertText(text)
+        self.chat_history.setTextCursor(cursor)
     
     def _clear_chat(self):
         """Clear chat history"""
         self.chat_history.setPlainText(
-            "AI Assistant: Hello! I'm ready to help you analyze your SNID results. "
+            "🤖 AI Assistant: Hello! Ask me questions about your SNID analysis.\n\n"
+            "Examples:\n"
+            "• What type of supernova is this?\n"
+            "• How confident is this classification?\n"
+            "• What's the estimated redshift?\n"
+            "• Should I follow up with more observations?\n\n"
             "What would you like to know?"
         )
+        self.conversation = [
+            {"role": "assistant", "content": "Hello! Ask me questions about your SNID analysis."}
+        ]
+
+        # Update AI availability state
+        self._update_ai_buttons_enabled()
     
     def _export_summary(self):
         """Export summary to file"""
@@ -724,7 +1389,7 @@ CLASSIFICATION ANALYSIS:
         
         if filename:
             try:
-                with open(filename, 'w') as f:
+                with open(filename, 'w', encoding='utf-8') as f:
                     f.write(self.summary_text.toPlainText())
                 
                 QtWidgets.QMessageBox.information(
@@ -781,168 +1446,72 @@ before using the AI assistant.
         msg.setWindowTitle("AI Assistant Help")
         msg.setText(help_text)
         msg.setTextFormat(QtCore.Qt.PlainText)
-        msg.exec_()
+        msg.exec()
     
-    def _load_available_models(self):
-        """Load available models from OpenRouter or saved config"""
-        try:
-            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_config, get_openrouter_api_key
-            
-            config = get_openrouter_config()
-            api_key = get_openrouter_api_key()
-            
-            # Start with current model if available
-            current_model_id = config.get('model_id', '')
-            current_model_name = config.get('model_name', '')
-            
-            self.model_combo.clear()
-            
-            if current_model_name and current_model_id:
-                # Add current model first
-                status = "✅ " if config.get('model_tested', False) else "⏳ "
-                display_text = f"{status}{current_model_name}"
-                self.model_combo.addItem(display_text, current_model_id)
-            
-            # Add some popular fallback models
-            fallback_models = [
-                ("GPT-4o Mini", "openai/gpt-4o-mini"),
-                ("GPT-3.5 Turbo", "openai/gpt-3.5-turbo"),
-                ("Claude 3 Haiku", "anthropic/claude-3-haiku"),
-                ("Llama 3.1 8B", "meta-llama/llama-3.1-8b-instruct:free"),
-            ]
-            
-            for name, model_id in fallback_models:
-                if model_id != current_model_id:  # Don't duplicate current model
-                    self.model_combo.addItem(f"⏳ {name}", model_id)
-            
-            # Add option to refresh from API
-            self.model_combo.addItem("🔄 Load from API...", "refresh_from_api")
-            
-        except Exception as e:
-            _LOGGER.warning(f"Could not load models: {e}")
-            # Add basic fallback
-            self.model_combo.addItem("GPT-4o Mini", "openai/gpt-4o-mini")
-    
-    def _refresh_models(self):
-        """Refresh models from OpenRouter API"""
-        try:
-            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_api_key, fetch_all_models
-            
-            api_key = get_openrouter_api_key()
-            if not api_key:
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "No API Key",
-                    "Please configure your OpenRouter API key in Settings first."
-                )
-                return
-            
-            self.refresh_models_btn.setEnabled(False)
-            self.refresh_models_btn.setText("...")
-            
-            # Fetch models in background
-            def fetch_models():
-                try:
-                    models = fetch_all_models(api_key, free_only=False)
-                    if models:
-                        # Filter to tested and popular models
-                        priority_models = []
-                        other_models = []
-                        
-                        for model in models:
-                            if model['is_free'] or 'gpt' in model['name'].lower() or 'claude' in model['name'].lower():
-                                priority_models.append(model)
-                            else:
-                                other_models.append(model)
-                        
-                        # Update UI on main thread
-                        self._update_model_combo(priority_models + other_models[:10])  # Limit to avoid overwhelming
-                    else:
-                        self._on_model_refresh_error("No models found")
-                except Exception as e:
-                    self._on_model_refresh_error(str(e))
-            
-            import threading
-            thread = threading.Thread(target=fetch_models, daemon=True)
-            thread.start()
-            
-        except Exception as e:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Refresh Error", 
-                f"Failed to refresh models: {str(e)}"
-            )
-    
-    def _update_model_combo(self, models):
-        """Update model combo box with fetched models"""
-        try:
-            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_config
-            
-            config = get_openrouter_config()
-            current_model_id = config.get('model_id', '')
-            
-            self.model_combo.clear()
-            
-            # Add models with status indicators
-            for model in models:
-                status = "✅ " if model['id'] == current_model_id else "⏳ "
-                if model['is_free']:
-                    status += "🆓 "
-                if model['supports_reasoning']:
-                    status += "🧠 "
-                
-                display_text = f"{status}{model['name']}"
-                self.model_combo.addItem(display_text, model['id'])
-            
-            # Select current model if it exists
-            for i in range(self.model_combo.count()):
-                if self.model_combo.itemData(i) == current_model_id:
-                    self.model_combo.setCurrentIndex(i)
-                    break
-            
-            self.refresh_models_btn.setEnabled(True)
-            self.refresh_models_btn.setText("🔄")
-            
-        except Exception as e:
-            self._on_model_refresh_error(str(e))
-    
-    def _on_model_refresh_error(self, error_msg):
-        """Handle model refresh error"""
-        self.refresh_models_btn.setEnabled(True)
-        self.refresh_models_btn.setText("🔄")
-        QtWidgets.QMessageBox.warning(
-            self,
-            "Model Refresh Failed",
-            f"Could not refresh models: {error_msg}"
-        )
-    
-    def _on_model_changed(self):
-        """Handle model selection change"""
-        current_data = self.model_combo.currentData()
-        
-        if current_data == "refresh_from_api":
-            self._refresh_models()
-            return
-        
-        if current_data:
-            try:
-                from snid_sage.interfaces.llm.openrouter.openrouter_llm import save_openrouter_config, get_openrouter_api_key
-                
-                api_key = get_openrouter_api_key()
-                model_name = self.model_combo.currentText()
-                # Clean up status indicators from display name
-                clean_name = model_name.replace("✅ ", "").replace("⏳ ", "").replace("🆓 ", "").replace("🧠 ", "")
-                
-                save_openrouter_config(api_key, current_data, clean_name, False)
-                _LOGGER.info(f"Selected model: {clean_name} ({current_data})")
-                
-            except Exception as e:
-                _LOGGER.error(f"Failed to save model selection: {e}")
+
     
     def _get_current_ai_settings(self):
-        """Get current AI settings from the controls"""
-        return {
-            'temperature': self.temperature_spin.value(),
-            'max_tokens': self.max_tokens_spin.value(),
-            'model_id': self.model_combo.currentData()
-        } 
+        """Get current AI settings with default values"""
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import (
+                get_openrouter_config, DEFAULT_MODEL
+            )
+            config = get_openrouter_config()
+            return {
+                'temperature': 0.7,
+                'max_tokens': 2000,
+                'model_id': config.get('model_id', DEFAULT_MODEL)
+            }
+        except Exception:
+            return {
+                'temperature': 0.7,
+                'max_tokens': 2000,
+                'model_id': 'openai/gpt-3.5-turbo'
+            } 
+
+    def _refresh_model_label(self):
+        """Refresh model label with the current configured model"""
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_config, DEFAULT_MODEL
+            config = get_openrouter_config()
+            model_name = config.get('model_name') or config.get('model_id') or DEFAULT_MODEL
+            self.model_label.setText(f"Model: {model_name}")
+            if hasattr(self, 'corner_model_label') and self.corner_model_label is not None:
+                self.corner_model_label.setText(f"Model: {model_name}")
+        except Exception:
+            self.model_label.setText("")
+            if hasattr(self, 'corner_model_label') and self.corner_model_label is not None:
+                self.corner_model_label.setText("")
+
+    # Removed fullscreen/maximize controls per user request
+
+    def _update_ai_buttons_enabled(self):
+        """Enable/disable AI actions based on whether an API key is configured"""
+        api_key = ''
+        try:
+            from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_openrouter_api_key
+            api_key = get_openrouter_api_key() or ''
+        except Exception:
+            api_key = ''
+
+        ai_ready = bool(api_key)
+
+        # Respect in-progress states when enabling
+        if hasattr(self, 'generate_summary_btn'):
+            self.generate_summary_btn.setEnabled(ai_ready and not self.is_generating)
+            if not ai_ready:
+                self.generate_summary_btn.setToolTip("Configure OpenRouter API key in Settings to enable AI")
+            else:
+                self.generate_summary_btn.setToolTip("")
+
+        if hasattr(self, 'send_btn'):
+            # Don't override if disabled due to an in-flight request
+            if ai_ready and self.send_btn.isEnabled() is False:
+                # Leave disabled; it will be re-enabled when the response arrives
+                pass
+            else:
+                self.send_btn.setEnabled(ai_ready)
+            if not ai_ready:
+                self.send_btn.setToolTip("Configure OpenRouter API key in Settings to enable AI chat")
+            else:
+                self.send_btn.setToolTip("")

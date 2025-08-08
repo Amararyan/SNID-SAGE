@@ -80,9 +80,9 @@ class PySide6ThemeManager:
             
             # Workflow button colors (matching Tkinter system exactly)
             'btn_load': '#6E6E6E',        # Load button – medium grey
-            'btn_preprocessing': '#FFA600', # Preprocessing - amber
-            'btn_redshift': '#FF6361',    # Redshift - coral
-            'btn_analysis': '#BC5090',    # SNID Analysis - magenta
+            'btn_redshift': '#FFA600',    # Redshift - amber
+            'btn_preprocessing': '#FF6361',    # Preprocessing - coral
+            'btn_analysis': '#BC5090',    # Analysis - magenta
             'btn_advanced': '#58508D',    # Advanced features - purple
             'btn_ai': '#003F5C',          # AI features - deep blue
             'btn_settings': '#7A8585',    # Settings button - graphite

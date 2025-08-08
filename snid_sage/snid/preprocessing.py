@@ -449,18 +449,18 @@ def fit_continuum(
         
         # Calculate flattened flux
         flat = np.zeros_like(flux)
-        # only remove continuum where we actually had data
-        data_mask = flux > 0
+        # only remove continuum where we actually had data (including negative flux values)
+        data_mask = (flux != 0) & np.isfinite(flux)
         good = data_mask & (cont > 0)
         flat[good] = flux[good] / cont[good] - 1.0
     else:
         raise ValueError(f"Unknown method={method!r}; choose 'spline' or 'gaussian'")
 
     # ——— zero‐out anything outside the observed data range ———
-    # find first/last nonzero data bins
-    nz = np.nonzero(flux > 0)[0]
-    if nz.size:
-        i0, i1 = nz[0], nz[-1]
+    # find first/last valid data bins (including negative values for continuum-subtracted spectra)
+    valid_indices = np.where((flux != 0) & np.isfinite(flux))[0]
+    if valid_indices.size:
+        i0, i1 = valid_indices[0], valid_indices[-1]
         # outside [i0,i1] we have no data → zero flat, unity continuum
         flat[:i0]   = 0.0
         flat[i1+1:] = 0.0

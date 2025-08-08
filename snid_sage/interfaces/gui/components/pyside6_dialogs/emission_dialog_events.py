@@ -59,6 +59,11 @@ class EmissionDialogEventHandlers:
     def __init__(self, dialog):
         """Initialize with reference to the main dialog"""
         self.dialog = dialog
+        
+        # Track current selections for smart filtering
+        self.current_type = None
+        self.current_phase = None
+        self.current_element = None
     
     def _get_normalized_spectrum_data(self):
         """Get spectrum data in the format expected by line preset functions"""
@@ -71,102 +76,136 @@ class EmissionDialogEventHandlers:
         return spectrum_data
     
     def on_sn_type_preset_selected(self, text):
-        """Handle SN type preset selection"""
+        """Handle SN type preset selection with smart filtering"""
         if text == "Select Type..." or text.startswith("Choose"):
             return
             
         try:
-            spectrum_data = self._get_normalized_spectrum_data()
+            # Update current selection
+            self.current_type = text
             
-            if text == "Type Ia":
-                lines = get_type_ia_lines(self.dialog.host_redshift, spectrum_data)
+            # Apply smart filtering if we have phase and/or element selections
+            lines = self._get_smart_filtered_lines()
+            if lines is not None:
+                # Replace current SN lines with the smart-filtered result (may be empty)
+                self.dialog.sn_lines.clear()
                 self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Type II":
-                lines = get_type_ii_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Type Ib/c":
-                lines = get_type_ibc_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Type IIn":
-                lines = get_type_iin_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Type IIb":
-                lines = get_type_iib_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
+            else:
+                # Fallback to type-only filtering
+                spectrum_data = self._get_normalized_spectrum_data()
                 
-            # Keep selections visible - don't reset dropdown
+                if text == "Type Ia":
+                    lines = get_type_ia_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Type II":
+                    lines = get_type_ii_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Type Ib/c":
+                    lines = get_type_ibc_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Type IIn":
+                    lines = get_type_iin_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Type IIb":
+                    lines = get_type_iib_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
             
         except Exception as e:
             _LOGGER.error(f"Error applying SN type preset '{text}': {e}")
     
     def on_sn_phase_preset_selected(self, text):
-        """Handle SN phase preset selection"""
+        """Handle SN phase preset selection with smart filtering"""
         if text == "Select Phase..." or text.startswith("Choose"):
             return
             
         try:
-            spectrum_data = self._get_normalized_spectrum_data()
+            # Update current selection
+            self.current_phase = text
             
-            if text == "Early Phase":
-                lines = get_early_sn_lines(self.dialog.host_redshift, spectrum_data)
+            # Apply smart filtering if we have type and/or element selections
+            lines = self._get_smart_filtered_lines()
+            if lines is not None:
+                # Replace current SN lines with the smart-filtered result (may be empty)
+                self.dialog.sn_lines.clear()
                 self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Maximum Light":
-                lines = get_maximum_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Late Phase":
-                lines = get_late_phase_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Nebular Phase":
-                lines = get_nebular_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
+            else:
+                # Fallback to phase-only filtering
+                spectrum_data = self._get_normalized_spectrum_data()
                 
-            # Keep selections visible - don't reset dropdown
+                if text == "Early Phase":
+                    lines = get_early_sn_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Maximum Light":
+                    lines = get_maximum_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Late Phase":
+                    lines = get_late_phase_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Nebular Phase":
+                    lines = get_nebular_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
             
         except Exception as e:
             _LOGGER.error(f"Error applying SN phase preset '{text}': {e}")
     
     def on_element_preset_selected(self, text):
-        """Handle element preset selection"""
+        """Handle element preset selection with smart filtering"""
         if text == "Select Element..." or text.startswith("Choose"):
             return
             
         try:
-            spectrum_data = self._get_normalized_spectrum_data()
+            # Update current selection
+            self.current_element = text
             
-            if text == "Hydrogen":
-                lines = get_hydrogen_lines(self.dialog.host_redshift, spectrum_data)
+            # Apply smart filtering if we have type and/or phase selections
+            lines = self._get_smart_filtered_lines()
+            if lines is not None:
+                # Replace current SN lines with the smart-filtered result (may be empty)
+                self.dialog.sn_lines.clear()
                 self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Helium":
-                lines = get_helium_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Silicon":
-                lines = get_silicon_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Iron":
-                lines = get_iron_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Calcium":
-                lines = get_calcium_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Oxygen":
-                lines = get_oxygen_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Balmer Series":
-                lines = get_balmer_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Fe II":
-                lines = get_fe_ii_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
-            elif text == "Fe III":
-                lines = get_fe_iii_lines(self.dialog.host_redshift, spectrum_data)
-                self.dialog._add_lines_to_plot(lines, is_sn=True)
+            else:
+                # Fallback to element-only filtering
+                spectrum_data = self._get_normalized_spectrum_data()
+                
+                if text == "Hydrogen":
+                    lines = get_hydrogen_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Helium":
+                    lines = get_helium_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Silicon":
+                    lines = get_silicon_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Iron":
+                    lines = get_iron_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Calcium":
+                    lines = get_calcium_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Oxygen":
+                    lines = get_oxygen_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Balmer Series":
+                    lines = get_balmer_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Fe II":
+                    lines = get_fe_ii_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
+                elif text == "Fe III":
+                    lines = get_fe_iii_lines(self.dialog.host_redshift, spectrum_data)
+                    self.dialog.sn_lines.clear(); self.dialog._add_lines_to_plot(lines, is_sn=True)
         except Exception as e:
             _LOGGER.error(f"Error selecting element preset {text}: {e}")
     
     def on_other_preset_selected(self, text):
         """Handle other preset selection"""
-        if text == "Select Preset..." or text.startswith("Choose"):
+        if not text:
             return
+        
+        # Reset smart filtering selections when using other presets
+        self.current_type = None
+        self.current_phase = None
+        self.current_element = None
             
         try:
             spectrum_data = self._get_normalized_spectrum_data()
@@ -208,6 +247,10 @@ class EmissionDialogEventHandlers:
             return
         
         try:
+            # Reset current selections for fresh start
+            self.current_type = None
+            self.current_phase = None 
+            self.current_element = None
             # Delegate to the preset handler
             self.on_sn_type_preset_selected(sn_type)
         except Exception as e:
@@ -219,6 +262,10 @@ class EmissionDialogEventHandlers:
             return
         
         try:
+            # Reset current selections for fresh start
+            self.current_type = None
+            self.current_phase = None
+            self.current_element = None
             # Delegate to the preset handler  
             self.on_sn_phase_preset_selected(phase)
         except Exception as e:
@@ -230,6 +277,10 @@ class EmissionDialogEventHandlers:
             return
         
         try:
+            # Reset current selections for fresh start
+            self.current_type = None
+            self.current_phase = None
+            self.current_element = None
             # Delegate to the preset handler
             self.on_element_preset_selected(element)
         except Exception as e:
@@ -241,7 +292,123 @@ class EmissionDialogEventHandlers:
             return
         
         try:
+            # Reset current selections for fresh start
+            self.current_type = None
+            self.current_phase = None
+            self.current_element = None
             # Map to other preset handler
             self.on_other_preset_selected(galaxy_type)
         except Exception as e:
-            _LOGGER.error(f"Error selecting galaxy type {galaxy_type}: {e}") 
+            _LOGGER.error(f"Error selecting galaxy type {galaxy_type}: {e}")
+    
+    def _get_smart_filtered_lines(self):
+        """Get lines based on current type, phase, and element selections using smart filtering"""
+        if not (self.current_type or self.current_phase or self.current_element):
+            return None
+            
+        try:
+            from snid_sage.shared.constants.physical import SUPERNOVA_EMISSION_LINES
+            
+            spectrum_data = self._get_normalized_spectrum_data()
+            lines_to_add = {}
+            
+            # Map UI text to internal values
+            type_mapping = {
+                "Type Ia": ["Ia"],
+                "Type II": ["II", "IIn", "IIb"],
+                "Type Ib/c": ["Ib", "Ic"],
+                "Type IIn": ["IIn"],
+                "Type IIb": ["IIb"]
+            }
+            
+            phase_mapping = {
+                "Early Phase": ["very_early", "early"],
+                "Maximum Light": ["maximum", "peak"],
+                "Late Phase": ["late"],
+                "Nebular Phase": ["nebular"]
+            }
+            
+            element_mapping = {
+                "Hydrogen": "hydrogen",
+                "Helium": "helium",
+                "Silicon": "silicon",
+                "Iron": "iron",
+                "Calcium": "calcium",
+                "Oxygen": "oxygen",
+                "Balmer Series": "hydrogen",  # Special case
+                "Fe II": "iron",  # Special case
+                "Fe III": "iron"  # Special case
+            }
+            
+            # Get filter criteria
+            target_sn_types = type_mapping.get(self.current_type, []) if self.current_type else None
+            target_phases = phase_mapping.get(self.current_phase, []) if self.current_phase else None
+            target_category = element_mapping.get(self.current_element) if self.current_element else None
+            
+            # Filter lines based on all active criteria
+            for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
+                line_matches = True
+                
+                # Check SN type match
+                if target_sn_types:
+                    line_sn_types = line_data.get('sn_types', [])
+                    if not any(sn_type in line_sn_types for sn_type in target_sn_types):
+                        line_matches = False
+                
+                # Check phase match (allow 'all' phase to match any selection)
+                if target_phases and line_matches:
+                    line_phase = line_data.get('phase', '')
+                    if line_phase not in target_phases and line_phase != 'all':
+                        line_matches = False
+                
+                # Check element category match
+                if target_category and line_matches:
+                    line_category = line_data.get('category', '')
+                    
+                    # Special handling for specific element selections
+                    if self.current_element == "Balmer Series":
+                        # Only include Balmer lines specifically
+                        if not any(balmer in line_name for balmer in ['H-alpha', 'H-beta', 'H-gamma', 'H-delta']):
+                            line_matches = False
+                    elif self.current_element == "Fe II":
+                        # Only include Fe II lines
+                        if "Fe II" not in line_name:
+                            line_matches = False
+                    elif self.current_element == "Fe III":
+                        # Only include Fe III lines
+                        if "Fe III" not in line_name:
+                            line_matches = False
+                    else:
+                        # Standard category matching
+                        if line_category != target_category:
+                            line_matches = False
+                
+                # Add line if it matches all criteria and is in spectrum range
+                if line_matches:
+                    if self._is_line_in_spectrum_range(line_data, self.dialog.host_redshift, spectrum_data):
+                        obs_wavelength = line_data['wavelength'] * (1 + self.dialog.host_redshift)
+                        lines_to_add[line_name] = (obs_wavelength, line_data)
+            
+            _LOGGER.info(f"Smart filtering found {len(lines_to_add)} lines for type={self.current_type}, phase={self.current_phase}, element={self.current_element}")
+            return lines_to_add
+            
+        except Exception as e:
+            _LOGGER.error(f"Error in smart filtering: {e}")
+            return None
+    
+    def _is_line_in_spectrum_range(self, line_data, current_redshift, spectrum_data):
+        """Check if line is within spectrum wavelength range"""
+        try:
+            if not spectrum_data or 'wavelength' not in spectrum_data:
+                # Try alternative key names
+                if 'wave' in spectrum_data:
+                    wavelength = spectrum_data['wave']
+                else:
+                    return True  # Allow all lines if no wavelength info
+            else:
+                wavelength = spectrum_data['wavelength']
+            
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            return wavelength[0] <= obs_wavelength <= wavelength[-1]
+        except:
+            return True  # Allow line if check fails 

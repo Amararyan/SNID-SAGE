@@ -222,6 +222,27 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     
     def _create_plot_widget(self, layout):
         """Create enhanced plot widget with save functionality and add to layout"""
+        # Create plot container frame with rounded edges (like main GUI)
+        plot_frame = QtWidgets.QFrame()
+        plot_frame.setObjectName("emission_dialog_plot_frame")
+        plot_frame.setFrameShape(QtWidgets.QFrame.NoFrame)
+        plot_frame.setMinimumHeight(400)
+        
+        # Apply styling similar to main GUI plot frame
+        plot_frame.setStyleSheet("""
+            QFrame#emission_dialog_plot_frame {
+                background-color: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                margin: 2px;
+            }
+        """)
+        
+        # Create layout for the plot frame
+        plot_frame_layout = QtWidgets.QVBoxLayout(plot_frame)
+        plot_frame_layout.setContentsMargins(8, 8, 8, 8)
+        plot_frame_layout.setSpacing(0)
+        
         if PYQTGRAPH_AVAILABLE:
             self.plot_widget = EnhancedPlotWidget()
             self.plot_item = self.plot_widget.getPlotItem()
@@ -230,6 +251,15 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.plot_widget.setLabel('bottom', 'Wavelength (Å)')
             self.plot_widget.setMinimumWidth(600)
             self.plot_widget.setMinimumHeight(400)
+
+            # Improve fit within frame: add slight internal margins and view padding
+            try:
+                # Add small content margins to avoid clipping at top
+                self.plot_item.setContentsMargins(6, 10, 6, 6)
+                # Give the ViewBox some default padding for autoRange
+                self.plot_item.getViewBox().setDefaultPadding(0.08)
+            except Exception:
+                pass
             
             # Connect mouse events for line interaction
             self.plot_widget.scene().sigMouseClicked.connect(self._on_plot_click)
@@ -238,12 +268,15 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.plot_widget.installEventFilter(self)
             self.plot_widget.setFocusPolicy(QtCore.Qt.ClickFocus)
             
-            layout.addWidget(self.plot_widget)
+            plot_frame_layout.addWidget(self.plot_widget)
         else:
             # Fallback
             placeholder = QtWidgets.QLabel("PyQtGraph not available")
             placeholder.setAlignment(QtCore.Qt.AlignCenter)
-            layout.addWidget(placeholder)
+            plot_frame_layout.addWidget(placeholder)
+        
+        # Add the containerized plot to the main layout
+        layout.addWidget(plot_frame)
     
     def _create_plot_panel(self, main_layout):
         """Legacy method - now using _create_plot_widget"""
@@ -421,6 +454,17 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                     self.spectrum_data['flux'],
                     pen='k'
                 )
+
+                # Ensure some headroom so the curve isn't cut at the top
+                try:
+                    flux = self.spectrum_data['flux']
+                    if len(flux) > 0:
+                        fmin = float(np.min(flux))
+                        fmax = float(np.max(flux))
+                        pad = (fmax - fmin) * 0.1 if fmax > fmin else abs(fmax) * 0.1 + 1.0
+                        self.plot_widget.setYRange(fmin - pad, fmax + pad)
+                except Exception:
+                    pass
             
             # Plot SN lines
             for line_name, (obs_wavelength, line_data) in self.sn_lines.items():
@@ -455,10 +499,10 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             # Add text label perpendicular to the line (rotated 90 degrees) - MOVED CLOSER TO LINE
             text = pg.TextItem(name, color=line_colors, fill=(255, 255, 255, 120))
             
-            # Get plot range for positioning
-            y_range = self.plot_item.viewRange()[1]
-            # Position closer to the middle-upper part of the plot for better visibility
-            y_pos = y_range[1] * 0.75  # Moved from 0.85 to 0.75 to be closer to the spectrum
+            # Get plot range for positioning (use relative position within current y-range)
+            y_min, y_max = self.plot_item.viewRange()[1]
+            # Position at 75% of the current visible range height
+            y_pos = y_min + (y_max - y_min) * 0.75
             
             # Set position and rotation - slightly offset from the line for better readability
             text.setPos(wavelength + 2, y_pos)  # Small horizontal offset for readability
@@ -632,21 +676,17 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 # Right-click/Two finger click: Remove closest point
                 self._remove_closest_manual_point(click_wavelength, click_flux)
             elif event.button() == QtCore.Qt.LeftButton:
-                # Left-click with modifiers
-                if modifiers & QtCore.Qt.ControlModifier:
-                    # Ctrl+Click: Add free-floating point
+                # Left-click behavior: default snap to nearest bin; Ctrl/Cmd-click free point
+                if (modifiers & QtCore.Qt.ControlModifier) or (modifiers & QtCore.Qt.MetaModifier):
+                    # Ctrl/Cmd + Click: Add free-floating point at exact position
                     self._add_manual_point(click_wavelength, click_flux, mode="free")
-                elif modifiers & QtCore.Qt.ShiftModifier:
-                    # Shift+Click: Add spectrum-snapped point
-                    self._add_manual_point_snapped(click_wavelength, click_flux)
                 else:
-                    # Plain click: Smart peak detection
-                    self._add_manual_point_smart(click_wavelength, click_flux)
+                    # Plain click: Add point snapped to nearest spectrum bin
+                    self._add_manual_point_snapped(click_wavelength, click_flux)
                     
             # Refresh plot
             if self.step2_analysis:
                 self.step2_analysis.plot_focused_line()
-                self.step2_analysis.update_point_counter()
                 
         except Exception as e:
             _LOGGER.error(f"Error handling step 2 plot click: {e}")
@@ -919,68 +959,52 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     
     def _create_simplified_step2_interface(self, layout):
         """Create simplified step 2 interface with main controls moved to toolbar"""
-        
-        # Manual point controls
-        manual_controls = QtWidgets.QHBoxLayout()
-        
-        self.clear_points_btn = QtWidgets.QPushButton("Clear Points")
-        manual_controls.addWidget(self.clear_points_btn)
-        
-        self.auto_contour_btn = QtWidgets.QPushButton("Auto Contour")
-        manual_controls.addWidget(self.auto_contour_btn)
-        
-        self.point_counter_label = QtWidgets.QLabel("Points: 0")
-        manual_controls.addWidget(self.point_counter_label)
-        
-        manual_controls.addStretch()
-        layout.addLayout(manual_controls)
-        
-        # Current results display
-        analysis_group = QtWidgets.QGroupBox("📊 Current Line Results")
-        analysis_layout = QtWidgets.QVBoxLayout(analysis_group)
-        
-        self.current_result_text = QtWidgets.QTextEdit()
-        self.current_result_text.setMaximumHeight(120)
-        self.current_result_text.setReadOnly(True)
-        self.current_result_text.setPlainText("Select a line and analysis method, then click 'Analyze' in the toolbar...")
-        analysis_layout.addWidget(self.current_result_text)
-        
-        layout.addWidget(analysis_group)
-        
-        # All Lines Summary
-        summary_group = QtWidgets.QGroupBox("📋 All Lines Summary")
+
+        # Quick interaction info (static multi-line info label like Step 1)
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text('right')
+        info_text = (
+            "ℹ️ Point Selection Hints:\n"
+            "• Left-click: add point snapped to nearest bin\n"
+            "• Ctrl/Cmd+Click: add free-floating point\n"
+            f"• {right_click_text}: remove closest point"
+        )
+        info_label = QtWidgets.QLabel(info_text)
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("font-weight: normal; color: #2563eb; font-size: 10px;")
+        layout.addWidget(info_label)
+
+        # Manual point controls removed: Clear Points now lives in the top toolbar
+
+        # Single minimal summary panel
+        summary_group = QtWidgets.QGroupBox("📋 Line Summary")
         summary_layout = QtWidgets.QVBoxLayout(summary_group)
         
         summary_controls = QtWidgets.QHBoxLayout()
-        
+
         copy_summary_btn = QtWidgets.QPushButton("Copy Summary")
         summary_controls.addWidget(copy_summary_btn)
-        
-        refresh_summary_btn = QtWidgets.QPushButton("Refresh")
-        summary_controls.addWidget(refresh_summary_btn)
-        
+
         export_btn = QtWidgets.QPushButton("💾 Export Results")
         summary_controls.addWidget(export_btn)
-        
+
         summary_controls.addStretch()
         summary_layout.addLayout(summary_controls)
         
         self.summary_text = QtWidgets.QTextEdit()
-        self.summary_text.setMaximumHeight(120)
         self.summary_text.setReadOnly(True)
-        summary_layout.addWidget(self.summary_text)
+        self.summary_text.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.summary_text.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        summary_layout.addWidget(self.summary_text, 1)
         
-        layout.addWidget(summary_group)
+        # Allow the summary group to expand and occupy available vertical space
+        summary_group.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        layout.addWidget(summary_group, 1)
         
-        # Store control references for the step2_analysis module
+        # Store control references for the step2_analysis module (no clear points here)
         self.step2_panel_controls = {
-            'clear_points_btn': self.clear_points_btn,
-            'auto_contour_btn': self.auto_contour_btn,
-            'point_counter_label': self.point_counter_label,
-            'current_result_text': self.current_result_text,
             'summary_text': self.summary_text,
             'copy_summary_btn': copy_summary_btn,
-            'refresh_summary_btn': refresh_summary_btn,
             'export_btn': export_btn
         }
     
@@ -1000,16 +1024,15 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             if hasattr(self, 'step2_line_dropdown'):
                 self.step2_line_dropdown.currentTextChanged.connect(self.step2_analysis.on_line_selection_changed)
                 
-            # Connect analyze button (only remaining toolbar button)
+            # Connect analyze and toolbar clear buttons
             if hasattr(self, 'step2_toolbar_refs'):
                 self.step2_toolbar_refs['analyze_btn'].clicked.connect(self.step2_analysis.analyze_current_line)
+                if 'clear_points_btn' in self.step2_toolbar_refs:
+                    self.step2_toolbar_refs['clear_points_btn'].clicked.connect(self.step2_analysis.clear_selected_points)
                 
-            # Connect panel controls
+            # Connect panel controls (no left-panel clear points button)
             if hasattr(self, 'step2_panel_controls'):
-                self.step2_panel_controls['clear_points_btn'].clicked.connect(self.step2_analysis.clear_selected_points)
-                self.step2_panel_controls['auto_contour_btn'].clicked.connect(self.step2_analysis.auto_detect_contour)
                 self.step2_panel_controls['copy_summary_btn'].clicked.connect(self.step2_analysis.copy_summary)
-                self.step2_panel_controls['refresh_summary_btn'].clicked.connect(self.step2_analysis.refresh_summary)
                 self.step2_panel_controls['export_btn'].clicked.connect(self.step2_analysis.export_results)
                 
             _LOGGER.debug("Connected step 2 toolbar controls")
@@ -1031,11 +1054,8 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 
             # Update panel control references
             if hasattr(self, 'step2_panel_controls'):
-                self.step2_analysis.current_result_text = self.step2_panel_controls['current_result_text']
+                # current_result_text removed; keep only summary
                 self.step2_analysis.summary_text = self.step2_panel_controls['summary_text']
-                self.step2_analysis.point_counter_label = self.step2_panel_controls['point_counter_label']
-                self.step2_analysis.clear_points_btn = self.step2_panel_controls['clear_points_btn']
-                self.step2_analysis.auto_contour_btn = self.step2_panel_controls['auto_contour_btn']
                 
             # Initialize step 2 data
             self.step2_analysis.populate_line_dropdown()
@@ -1402,8 +1422,8 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 return
             
             # Get current plot view range once
-            y_range = self.plot_item.viewRange()[1]
-            text_y_pos = y_range[1] * 0.6
+            y_min, y_max = self.plot_item.viewRange()[1]
+            text_y_pos = y_min + (y_max - y_min) * 0.6
             
             # OPTIMIZATION 4: Batch add items to reduce plot update overhead
             items_to_add = []
@@ -1513,12 +1533,11 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         help_text = f"""Step 2: Emission Line Analysis Help
 
 🎯 GOAL OF STEP 2:
-Analyze individual emission lines in detail using manual point selection to measure line properties like FWHM, equivalent width, and line centers.
+Analyze individual emission lines in detail using manual point selection to measure line properties like FWHM and line centers.
 
 ⌨️ KEYBOARD & MOUSE INTERACTIONS:
-• Left Click: Smart peak detection around click location
-• Ctrl+Click: Add free-floating point at exact position
-• Shift+Click: Add point snapped to nearest spectrum data
+• Left Click: Add point snapped to the nearest spectrum bin
+• Ctrl/Cmd+Click: Add free-floating point at exact position
 • {right_click_text}: Remove closest manual point
 
 🔧 TOOLBAR CONTROLS:
@@ -1535,21 +1554,34 @@ Analyze individual emission lines in detail using manual point selection to meas
 
 💡 ANALYSIS WORKFLOW:
 1. Select a line from the dropdown (from Step 1)
-2. Add manual points around the line using mouse clicks
+2. Click to add points along the line profile (points are connected by lines)
 3. Click 'Analyze' to calculate line properties
-4. Review results in the Current Line Results section
+4. Review minimal per-line results in the summary list
 5. Repeat for other lines or export final results
 
-📊 RESULTS INCLUDE:
-• Line center wavelength and flux
-• Full Width at Half Maximum (FWHM)
-• Equivalent width measurements
-• Signal-to-noise ratio estimates
+📊 RESULTS INCLUDE (minimal per line):
+• Line name, observed λ, and FWHM when available
 """
         
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Step 2 Analysis Help")
         msg.setText(help_text)
+        msg.setTextFormat(QtCore.Qt.PlainText)
+        msg.exec()
+
+    def _show_step2_quick_hints(self):
+        """Show compact multi-line quick hints for point selection."""
+        platform_config = get_platform_config()
+        right_click_text = platform_config.get_click_text('right')
+        hints = (
+            "Point Selection Hints:\n"
+            "• Left-click: add point snapped to nearest bin\n"
+            "• Ctrl/Cmd+Click: add free-floating point\n"
+            f"• {right_click_text}: remove closest point"
+        )
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle("Point Selection Hints")
+        msg.setText(hints)
         msg.setTextFormat(QtCore.Qt.PlainText)
         msg.exec()
 

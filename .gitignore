@@ -334,6 +334,7 @@ statistics_*
 .vscode/
 examples/
 spectral_lines/
+wise_spectra/
 
 # ===== MARKDOWN FILES TO IGNORE =====
 # Ignore all markdown files except main readmes and docs root files

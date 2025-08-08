@@ -318,11 +318,11 @@ class PySide6PreviewCalculator(QtCore.QObject):
                 _LOGGER.debug(f"Updated edges after {step_type}: left={self.current_left_edge}, right={self.current_right_edge}")
                 _LOGGER.debug(f"Wavelength range: {orig_wave_min:.1f} - {orig_wave_max:.1f}")
         elif step_type in ["log_rebin", "log_rebin_with_scaling"]:
-            # After log rebinning, calculate edges based on nonzero flux regions
-            nonzero_mask = (self.current_flux > 0)
-            if np.any(nonzero_mask):
-                self.current_left_edge = np.argmax(nonzero_mask)
-                self.current_right_edge = len(self.current_flux) - 1 - np.argmax(nonzero_mask[::-1])
+            # After log rebinning, calculate edges based on valid flux regions (including negative values)
+            valid_mask = (self.current_flux != 0) & np.isfinite(self.current_flux)
+            if np.any(valid_mask):
+                self.current_left_edge = np.argmax(valid_mask)
+                self.current_right_edge = len(self.current_flux) - 1 - np.argmax(valid_mask[::-1])
             else:
                 self.current_left_edge = 0
                 self.current_right_edge = len(self.current_flux) - 1
