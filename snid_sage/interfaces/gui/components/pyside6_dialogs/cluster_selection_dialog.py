@@ -52,7 +52,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
     Interactive GMM cluster selection dialog for SNID analysis results.
     
     This dialog provides:
-    - Interactive 3D cluster visualization using matplotlib (matching tkinter version)
+    - Interactive 3D cluster visualization using matplotlib
     - Cluster dropdown selection 
     - Top 2 template matches with spectrum overlays
     - Real-time cluster selection feedback
@@ -80,14 +80,14 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         self.selected_cluster = None
         self.selected_index = -1
         
-        # Get automatic best from clustering results, same as tkinter version
+        # Get automatic best from clustering results
         self.automatic_best = None
         if hasattr(snid_result, 'clustering_results') and snid_result.clustering_results:
             self.automatic_best = snid_result.clustering_results.get('best_cluster')
         if not self.automatic_best and self.all_candidates:
             self.automatic_best = self.all_candidates[0]
         
-        # Sort candidates by score (same as tkinter version)
+        # Sort candidates by score
         self._sort_candidates()
         
         # UI components
@@ -100,7 +100,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         self.matches_fig = None  # Matches figure
         self.matches_axes = []   # Matches subplot axes
         
-        # Colors for different supernova types (matching tkinter version)
+        # Colors for different supernova types
         self.type_colors = self._get_type_colors()
         
         # Validate matplotlib availability
@@ -126,7 +126,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             self._setup_ui()
             self._populate_data()
             
-            # Auto-select the automatic best cluster (matching tkinter version)
+            # Auto-select the automatic best cluster
             if self.all_candidates:
                 best_index = self._find_automatic_best_index()
                 self._select_cluster(best_index)
@@ -141,9 +141,9 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             QtCore.QTimer.singleShot(100, self._auto_select_and_close)
     
     def _sort_candidates(self):
-        """Sort candidates by score (same logic as tkinter version)"""
+        """Sort candidates by score"""
         def _get_candidate_score(c):
-            # Preferred metric hierarchy: penalised_score → composite_score → mean_rlap
+            # Preferred metric hierarchy: penalised_score → composite_score → mean_metric (RLAP-CCC/RLAP)
             return (
                 c.get('penalized_score') or
                 c.get('penalised_score') or  # British spelling safeguard
@@ -176,7 +176,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         return 0
     
     def _get_type_colors(self):
-        """Get color mapping for supernova types (matching tkinter version)"""
+        """Get color mapping for supernova types"""
         return {
             'Ia': '#FFB3B3',      # Pastel Red
             'Ib': '#FFCC99',      # Pastel Orange  
@@ -329,7 +329,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         plot_layout = QtWidgets.QVBoxLayout(plot_group)
         
         if MATPLOTLIB_AVAILABLE:
-            # Create matplotlib 3D plot (matching tkinter implementation)
+            # Create matplotlib 3D plot
             self._create_matplotlib_3d_plot(plot_layout)
         else:
             # Fallback message
@@ -357,12 +357,12 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             pass
     
     def _create_matplotlib_3d_plot(self, layout):
-        """Create matplotlib 3D scatter plot (matching tkinter implementation exactly)"""
-        # Create matplotlib figure with white background (matching tkinter)
+        """Create matplotlib 3D scatter plot"""
+        # Create matplotlib figure with white background
         self.fig = Figure(figsize=(8, 6), facecolor='white')  # Smaller initial size, will scale with window
         self.fig.patch.set_facecolor('white')
         
-        # MAXIMIZE the plot area - use almost the entire window space (matching tkinter)
+        # MAXIMIZE the plot area - use almost the entire window space
         self.fig.subplots_adjust(left=0.03, right=0.97, top=0.97, bottom=0.08)
         
         # Create 3D axes
@@ -377,7 +377,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         # Add canvas to layout
         layout.addWidget(self.plot_widget)
         
-        # Connect matplotlib events for interactivity (matching tkinter version)
+        # Connect matplotlib events for interactivity
         self.plot_widget.mpl_connect('motion_notify_event', self._on_plot_hover)
         self.plot_widget.mpl_connect('button_press_event', self._on_plot_click)
     
@@ -389,17 +389,17 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         right_layout.setContentsMargins(6, 6, 6, 6)  # Reduced margins
         right_layout.setSpacing(10)  # Reduced spacing
         
-        # Top 2 matches panel (matching tkinter version)
+        # Top 2 matches panel
         matches_group = QtWidgets.QGroupBox("🔍 Top 2 Template Matches For Selected Cluster")
         matches_layout = QtWidgets.QVBoxLayout(matches_group)
         matches_layout.setContentsMargins(5, 5, 5, 5)
         
         if MATPLOTLIB_AVAILABLE:
-            # Create matplotlib figure for matches (matching tkinter implementation)
+            # Create matplotlib figure for matches
             self.matches_fig = Figure(figsize=(3.5, 5.5), dpi=100, facecolor='white')  # Even smaller to prevent label cutoff
             self.matches_fig.clear()
             
-            # Create exactly 2 subplots vertically stacked (matching tkinter)
+            # Create exactly 2 subplots vertically stacked
             self.matches_axes = []
             for i in range(2):
                 ax = self.matches_fig.add_subplot(2, 1, i+1)
@@ -462,18 +462,18 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             self.cluster_dropdown.setCurrentIndex(self.selected_index)
     
     def _plot_clusters(self):
-        """Plot clusters with 3D scatter plot (exact match to tkinter implementation)"""
+        """Plot clusters with 3D scatter plot"""
         if not MATPLOTLIB_AVAILABLE or not self.all_candidates:
             return
             
         self.ax.clear()
         self.scatter_plots.clear()
         
-        # Prepare type mapping with consistent ordering (matching tkinter)
+        # Prepare type mapping with consistent ordering
         unique_types = sorted(list(set(c.get('type', 'Unknown') for c in self.all_candidates)))
         type_to_index = {sn_type: i for i, sn_type in enumerate(unique_types)}
         
-        # Determine metric name (RLAP or RLAP-Cos) matching tkinter
+        # Determine metric name (RLAP-CCC or RLAP)
         metric_name_global = 'RLAP'
         if MATH_UTILS_AVAILABLE:
             for cand in self.all_candidates:
@@ -481,7 +481,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                     metric_name_global = get_metric_name_for_match(cand['matches'][0])
                     break
         
-        # Plot all clusters with enhanced styling (matching tkinter exactly)
+        # Plot all clusters with enhanced styling
         for i, candidate in enumerate(self.all_candidates):
             matches = candidate.get('matches', [])
             if not matches:
@@ -495,11 +495,11 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 if MATH_UTILS_AVAILABLE:
                     candidate_metrics = [get_best_metric_value(m) for m in matches]
                 else:
-                    candidate_metrics = [m.get('rlap_cos', m.get('rlap', 0)) for m in matches]
+                    candidate_metrics = [m.get('rlap_ccc', m.get('rlap', 0)) for m in matches]
             
             candidate_type_indices = [type_to_index[candidate['type']]] * len(candidate_redshifts)
             
-            # Visual style: consistent size, no transparency (matching tkinter)
+            # Visual style: consistent size, no transparency
             size = 40  # Smaller points for better readability
             alpha = 1.0  # No transparency as requested
             
@@ -507,7 +507,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             edgecolor = 'gray'
             linewidth = 0.5
             
-            # Use consistent type colors (matching tkinter)
+            # Use consistent type colors
             color = self.type_colors.get(candidate['type'], self.type_colors['Unknown'])
             
             # Plot all points
@@ -517,18 +517,18 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             
             self.scatter_plots.append((scatter, i, candidate))
         
-        # Enhanced 3D setup (matching tkinter exactly)
+        # Enhanced 3D setup
         self.ax.set_xlabel('Redshift (z)', color='#000000', fontsize=16, labelpad=15)
         self.ax.set_ylabel('SN Type', color='#000000', fontsize=16, labelpad=15)
         self.ax.set_zlabel(metric_name_global, color='#000000', fontsize=16, labelpad=15)
         self.ax.set_yticks(range(len(unique_types)))
         self.ax.set_yticklabels(unique_types, fontsize=12)
         
-        # Set view and enable ONLY horizontal rotation (matching tkinter)
+        # Set view and enable ONLY horizontal rotation
         self.ax.view_init(elev=25, azim=45)
         self.ax.set_box_aspect([2.5, 1.0, 1.5])
         
-        # Enhanced 3D styling with completely white background (matching tkinter)
+        # Enhanced 3D styling with completely white background
         try:
             # Ensure all panes are white and remove any blue artifacts
             self.ax.xaxis.pane.fill = True
@@ -546,14 +546,14 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         except Exception as e:
             _LOGGER.warning(f"Some 3D styling options not available: {e}")
         
-        # Enhanced plot styling (matching tkinter)
+        # Enhanced plot styling
         self.ax.xaxis.label.set_color('#000000')
         self.ax.yaxis.label.set_color('#000000')
         self.ax.zaxis.label.set_color('#000000')
         self.ax.tick_params(colors='#666666', labelsize=12)
         self.ax.grid(True, alpha=0.4, color='gray', linestyle='-', linewidth=0.5)
         
-        # Connect rotation constraint to ONLY allow horizontal (azimuth) rotation (matching tkinter)
+        # Connect rotation constraint to ONLY allow horizontal (azimuth) rotation
         def on_rotate(event):
             if event.inaxes == self.ax:
                 # LOCK elevation to 25 degrees, only allow azimuth changes (horizontal rotation only)
@@ -569,17 +569,17 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         self.plot_widget.draw()
     
     def _add_persistent_highlight(self, cluster_index):
-        """Add persistent highlight for selected cluster (matching tkinter implementation)"""
+        """Add persistent highlight for selected cluster"""
         try:
             if MATH_UTILS_AVAILABLE:
                 get_best_metric_value_local = get_best_metric_value
             else:
-                get_best_metric_value_local = lambda m: m.get('rlap_cos', m.get('rlap', 0))
+                get_best_metric_value_local = lambda m: m.get('rlap_ccc', m.get('rlap', 0))
 
             if 0 <= cluster_index < len(self.scatter_plots):
                 scatter, idx, candidate = self.scatter_plots[cluster_index]
                 
-                # Add BLACK edge highlights to this cluster (matching tkinter)
+                # Add BLACK edge highlights to this cluster
                 matches = candidate.get('matches', [])
                 if not matches:
                     candidate_redshifts = [candidate.get('mean_redshift', 0)]
@@ -592,7 +592,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 type_to_index = {sn_type: i for i, sn_type in enumerate(unique_types)}
                 candidate_type_indices = [type_to_index[candidate['type']]] * len(candidate_redshifts)
                 
-                # Add highlighted scatter with BLACK edges (matching tkinter)
+                # Add highlighted scatter with BLACK edges
                 highlight_scatter = self.ax.scatter(candidate_redshifts, candidate_type_indices, candidate_metrics,
                                                   c=self.type_colors.get(candidate['type'], self.type_colors['Unknown']), 
                                                   s=50, alpha=1.0,
@@ -602,12 +602,12 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             _LOGGER.debug(f"Error adding persistent highlight: {e}")
     
     def _on_plot_hover(self, event):
-        """Handle plot hover events (simplified from tkinter version)"""
+        """Handle plot hover events"""
         # For now, keep it simple - hover functionality can be added later if needed
         pass
     
     def _on_plot_click(self, event):
-        """Handle plot click events (simplified from tkinter version)"""
+        """Handle plot click events"""
         # For now, use dropdown for selection - click selection can be added later if needed
         pass
     
@@ -617,7 +617,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             self._select_cluster(index)
     
     def _select_cluster(self, cluster_index):
-        """Select a cluster and update UI (matching tkinter implementation)"""
+        """Select a cluster and update UI"""
         if 0 <= cluster_index < len(self.all_candidates):
             self.selected_cluster = self.all_candidates[cluster_index]
             self.selected_index = cluster_index
@@ -635,15 +635,19 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             _LOGGER.info(f"🎯 Selected cluster {cluster_index + 1}: {self.selected_cluster.get('type', 'Unknown')}")
     
     def _update_matches_panel(self):
-        """Update the template matches panel (matching tkinter implementation)"""
+        """Update the template matches panel"""
         if not MATPLOTLIB_AVAILABLE or not self.matches_canvas or not self.selected_cluster:
             return
         
-        # Get top 2 matches from selected cluster (matching tkinter)
-        matches = sorted(self.selected_cluster.get('matches', []), 
-                        key=lambda m: m.get('rlap', 0), reverse=True)[:2]
+        # Get top 2 matches from selected cluster
+        if MATH_UTILS_AVAILABLE:
+            matches = sorted(self.selected_cluster.get('matches', []), 
+                            key=get_best_metric_value, reverse=True)[:2]
+        else:
+            matches = sorted(self.selected_cluster.get('matches', []), 
+                            key=lambda m: m.get('rlap', 0), reverse=True)[:2]
         
-        # Get input spectrum data (matching tkinter)
+        # Get input spectrum data
         input_wave = input_flux = None
         if (self.snid_result is not None and hasattr(self.snid_result, 'processed_spectrum') and
                 self.snid_result.processed_spectrum):
@@ -659,7 +663,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             input_wave = self.snid_result.input_spectrum.get('wave')
             input_flux = self.snid_result.input_spectrum.get('flux')
         
-        # Clear all axes first (matching tkinter)
+        # Clear all axes first
         for i, ax in enumerate(self.matches_axes):
             if ax is not None:
                 ax.clear()
@@ -669,7 +673,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 ax.spines['bottom'].set_visible(True)
                 ax.spines['left'].set_visible(True)
         
-        # Update exactly 2 subplots (matching tkinter)
+        # Update exactly 2 subplots
         for idx in range(2):
             if idx >= len(self.matches_axes):
                 break
@@ -723,7 +727,13 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 
                 # Simplified title (matching tkinter)
                 template_name = clean_template_name(match.get('name', 'Unknown'))
-                title_text = f"#{idx+1}: {template_name} (RLAP: {match.get('rlap', 0):.1f})"
+                # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+                if MATH_UTILS_AVAILABLE:
+                    best_metric_value = get_best_metric_value(match)
+                    metric_name = get_metric_name_for_match(match)
+                    title_text = f"#{idx+1}: {template_name} ({metric_name}: {best_metric_value:.1f})"
+                else:
+                    title_text = f"#{idx+1}: {template_name} (RLAP: {match.get('rlap', 0):.1f})"
                 ax.set_title(title_text, fontsize=10, color='#000000', 
                            fontweight='bold', pad=5)
                 

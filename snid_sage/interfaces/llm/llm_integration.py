@@ -386,9 +386,9 @@ Provide clear, scientifically accurate responses that are helpful for both stude
             if spectrum_data is None:
                 return ""
             
-            # Detect emission lines using available detection utilities
+            # Detect emission lines using Tk-free detection utilities
             try:
-                from snid_sage.shared.utils.line_detection.line_detection_utils import detect_and_fit_lines
+                from snid_sage.shared.utils.line_detection.detection import detect_and_fit_lines
                 
                 wavelength = spectrum_data['wavelength']
                 flux = spectrum_data['flux']

@@ -39,7 +39,7 @@ class PySide6ThemeManager:
     
     This class provides centralized theme management including:
     - Base color palette with platform-specific adjustments
-    - Workflow button colors matching Tkinter implementation
+    - Workflow button colors
     - Complete Qt stylesheet generation
     - Theme color access methods for custom components
     """
@@ -78,7 +78,7 @@ class PySide6ThemeManager:
             'focus': '#3b82f6',           # Focus indicators
             'accent_primary': '#3b82f6',  # Default accent/selection colour (blue)
             
-            # Workflow button colors (matching Tkinter system exactly)
+            # Workflow button colors
             'btn_load': '#6E6E6E',        # Load button – medium grey
             'btn_redshift': '#FFA600',    # Redshift - amber
             'btn_preprocessing': '#FF6361',    # Preprocessing - coral
@@ -459,6 +459,164 @@ class PySide6ThemeManager:
         QTabBar::tab:hover {{
             background: {colors['hover']};
         }}
+        
+        /* Emission-style checkbox and radio button indicators */
+        QCheckBox {{
+            spacing: 8px;  /* Better spacing to prevent text overlap */
+            font-size: 10pt;
+        }}
+        
+        QRadioButton {{
+            spacing: 8px;  /* Better spacing to prevent text overlap */
+            font-size: 10pt;
+        }}
+        
+        /* Checkbox indicator - pill-style square with moving inner indicator */
+        QCheckBox::indicator {{
+            width: 18px; 
+            height: 18px;
+            border: 2px solid {colors['border']}; 
+            border-radius: 5px;  /* Rounded square like emission demo */
+            background: {colors['bg_secondary']};
+        }}
+        
+        QCheckBox::indicator:hover {{
+            background: #f1f5f9;  /* Light blue hover like emission demo */
+            border-color: {colors['focus']};
+        }}
+        
+        QCheckBox::indicator:checked {{
+            /* Filled accent background with white tick */
+            background: {colors['accent_primary']};
+            border: 2px solid {colors['btn_primary_hover']};
+            image: url(snid_sage/images/tick_white.svg);
+        }}
+        
+        QCheckBox::indicator:checked:hover {{
+            background: {colors['btn_primary_hover']};
+            border-color: {colors['btn_primary_hover']};
+            image: url(snid_sage/images/tick_white.svg);
+        }}
+
+        /* Preserve appearance when disabled but checked (mandatory options) */
+        QCheckBox::indicator:checked:disabled {{
+            background: {colors['accent_primary']};
+            border: 2px solid {colors['btn_primary_hover']};
+            image: url(snid_sage/images/tick_white.svg);
+        }}
+        
+        QCheckBox::indicator:disabled {{
+            color: #94a3b8;
+            border-color: #e2e8f0;
+            background: #f3f4f6;
+        }}
+        
+        /* Radio button indicator - pill-style circle with moving inner indicator */
+        QRadioButton::indicator {{
+            width: 18px; 
+            height: 18px;
+            border: 2px solid {colors['border']}; 
+            border-radius: 9px;  /* Perfect circle */
+            background: {colors['bg_secondary']};
+        }}
+        
+        QRadioButton::indicator:hover {{
+            background: #f1f5f9;  /* Light blue hover like emission demo */
+            border-color: {colors['focus']};
+        }}
+        
+        QRadioButton::indicator:checked {{
+            background: {colors['accent_primary']};
+            border: 2px solid {colors['btn_primary_hover']};
+        }}
+        
+        QRadioButton::indicator:checked:hover {{
+            background: {colors['btn_primary_hover']};
+            border-color: {colors['btn_primary_hover']};
+        }}
+        
+        QRadioButton::indicator:disabled {{
+            color: #94a3b8;
+            border-color: #e2e8f0;
+            background: #f3f4f6;
+        }}
+        
+        /* Support for accent properties like in emission demo (checkbox keeps white fill + colored border) */
+        QCheckBox[accent="success"]::indicator:checked {{
+            background: {colors['btn_success']};
+            border-color: {colors['btn_success_hover']};
+            image: url(snid_sage/images/tick_white.svg);
+        }}
+        
+        QCheckBox[accent="success"]::indicator:checked:hover {{
+            background: {colors['btn_success_hover']};
+        }}
+        
+        QCheckBox[accent="warning"]::indicator:checked {{
+            background: {colors['btn_warning']};
+            border-color: {colors['btn_warning_hover']};
+            image: url(snid_sage/images/tick_white.svg);
+        }}
+        
+        QCheckBox[accent="warning"]::indicator:checked:hover {{
+            background: {colors['btn_warning_hover']};
+        }}
+        
+        QCheckBox[accent="danger"]::indicator:checked {{
+            background: {colors['btn_danger']};
+            border-color: {colors['btn_danger_hover']};
+            image: url(snid_sage/images/tick_white.svg);
+        }}
+        
+        QCheckBox[accent="danger"]::indicator:checked:hover {{
+            background: {colors['btn_danger_hover']};
+        }}
+        
+        QCheckBox[accent="neutral"]::indicator:checked {{
+            background: {colors['btn_neutral']};
+            border-color: {colors['btn_neutral_hover']};
+            image: url(snid_sage/images/tick_white.svg);
+        }}
+        
+        QCheckBox[accent="neutral"]::indicator:checked:hover {{
+            background: {colors['btn_neutral_hover']};
+        }}
+        
+        QRadioButton[accent="success"]::indicator:checked {{
+            background: {colors['btn_success']};
+            border-color: {colors['btn_success_hover']};
+        }}
+        
+        QRadioButton[accent="success"]::indicator:checked:hover {{
+            background: {colors['btn_success_hover']};
+        }}
+        
+        QRadioButton[accent="warning"]::indicator:checked {{
+            background: {colors['btn_warning']};
+            border-color: {colors['btn_warning_hover']};
+        }}
+        
+        QRadioButton[accent="warning"]::indicator:checked:hover {{
+            background: {colors['btn_warning_hover']};
+        }}
+        
+        QRadioButton[accent="danger"]::indicator:checked {{
+            background: {colors['btn_danger']};
+            border-color: {colors['btn_danger_hover']};
+        }}
+        
+        QRadioButton[accent="danger"]::indicator:checked:hover {{
+            background: {colors['btn_danger_hover']};
+        }}
+        
+        QRadioButton[accent="neutral"]::indicator:checked {{
+            background: {colors['btn_neutral']};
+            border-color: {colors['btn_neutral_hover']};
+        }}
+        
+        QRadioButton[accent="neutral"]::indicator:checked:hover {{
+            background: {colors['btn_neutral_hover']};
+        }}
         """
         
         return stylesheet
@@ -825,7 +983,8 @@ class PySide6ThemeManager:
         """
         base_stylesheet = self.generate_qt_stylesheet()
         cross_platform_styles = self.generate_cross_platform_styles()
-        return base_stylesheet + cross_platform_styles
+        emission_integration = self.get_emission_style_integration()
+        return base_stylesheet + cross_platform_styles + emission_integration
     
     def create_enhanced_button_manager(self):
         """
@@ -836,6 +995,89 @@ class PySide6ThemeManager:
         """
         from .enhanced_button_manager import EnhancedButtonManager
         return EnhancedButtonManager(self)
+    
+    def get_emission_style_integration(self) -> str:
+        """
+        Get accent color variants matching the emission demo behavior
+        
+        Returns:
+            CSS for accent color variants that match the emission demo styling
+        """
+        colors = self.theme_colors
+        return f"""
+        /* Accent color variants matching emission demo behavior */
+        QCheckBox[accent="success"]::indicator:checked {{
+            background: {colors['btn_success']};
+            border-color: {colors['btn_success_hover']};
+        }}
+        
+        QCheckBox[accent="success"]::indicator:checked:hover {{
+            background: {colors['btn_success_hover']};
+        }}
+        
+        QCheckBox[accent="warning"]::indicator:checked {{
+            background: {colors['btn_warning']};
+            border-color: {colors['btn_warning_hover']};
+        }}
+        
+        QCheckBox[accent="warning"]::indicator:checked:hover {{
+            background: {colors['btn_warning_hover']};
+        }}
+        
+        QCheckBox[accent="danger"]::indicator:checked {{
+            background: {colors['btn_danger']};
+            border-color: {colors['btn_danger_hover']};
+        }}
+        
+        QCheckBox[accent="danger"]::indicator:checked:hover {{
+            background: {colors['btn_danger_hover']};
+        }}
+        
+        QCheckBox[accent="neutral"]::indicator:checked {{
+            background: {colors['btn_neutral']};
+            border-color: {colors['btn_neutral_hover']};
+        }}
+        
+        QCheckBox[accent="neutral"]::indicator:checked:hover {{
+            background: {colors['btn_neutral_hover']};
+        }}
+        
+        QRadioButton[accent="success"]::indicator:checked {{
+            background: {colors['btn_success']};
+            border-color: {colors['btn_success_hover']};
+        }}
+        
+        QRadioButton[accent="success"]::indicator:checked:hover {{
+            background: {colors['btn_success_hover']};
+        }}
+        
+        QRadioButton[accent="warning"]::indicator:checked {{
+            background: {colors['btn_warning']};
+            border-color: {colors['btn_warning_hover']};
+        }}
+        
+        QRadioButton[accent="warning"]::indicator:checked:hover {{
+            background: {colors['btn_warning_hover']};
+        }}
+        
+        QRadioButton[accent="danger"]::indicator:checked {{
+            background: {colors['btn_danger']};
+            border-color: {colors['btn_danger_hover']};
+        }}
+        
+        QRadioButton[accent="danger"]::indicator:checked:hover {{
+            background: {colors['btn_danger_hover']};
+        }}
+        
+        QRadioButton[accent="neutral"]::indicator:checked {{
+            background: {colors['btn_neutral']};
+            border-color: {colors['btn_neutral_hover']};
+        }}
+        
+        QRadioButton[accent="neutral"]::indicator:checked:hover {{
+            background: {colors['btn_neutral_hover']};
+        }}
+        """
 
 
 # Global theme manager instance
@@ -866,5 +1108,7 @@ def apply_theme_to_widget(widget, theme_manager: Optional[PySide6ThemeManager] =
     if theme_manager is None:
         theme_manager = get_pyside6_theme_manager()
     
-    stylesheet = theme_manager.generate_qt_stylesheet()
+    # Use the complete stylesheet so emission-style indicators and cross-platform
+    # enhancements are included wherever we apply the theme.
+    stylesheet = theme_manager.generate_complete_stylesheet()
     widget.setStyleSheet(stylesheet) 

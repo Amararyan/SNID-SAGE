@@ -359,7 +359,7 @@ def configure_openrouter_dialog(parent):
         import PySide6.QtWidgets as QtWidgets
         import PySide6.QtCore as QtCore
         
-        # Create PySide6 dialog instead of tkinter
+        # Create PySide6 dialog
         dialog = QtWidgets.QDialog(parent)
         dialog.setWindowTitle("Configure OpenRouter")
         dialog.resize(800, 600)
@@ -485,38 +485,11 @@ def configure_openrouter_dialog(parent):
         return dialog.exec() == QtWidgets.QDialog.Accepted
         
     except ImportError:
-        # Fallback to original tkinter implementation
-        return _configure_openrouter_dialog_tkinter(parent)
-
-
-def _configure_openrouter_dialog_tkinter(parent):
-    """Fallback tkinter implementation"""
-    try:
-        import tkinter as tk
-    except Exception:
-        # If tkinter is unavailable, fail closed but non-fatally
+        # PySide6 not available; no GUI configuration
         return False
 
-    dialog = tk.Toplevel(parent)
-    dialog.title("Configure OpenRouter")
-    dialog.transient(parent)
-    dialog.grab_set()
-    dialog.geometry("800x600")
 
-    # Simple implementation for compatibility
-    result = tk.BooleanVar(value=False)
-
-    def save_and_close():
-        result.set(True)
-        dialog.destroy()
-
-    tk.Label(dialog, text="OpenRouter Configuration", font=('Arial', 16, 'bold')).pack(pady=10)
-    tk.Label(dialog, text="Please use the main settings dialog to configure OpenRouter.").pack(pady=20)
-
-    tk.Button(dialog, text="OK", command=save_and_close).pack(pady=10)
-
-    dialog.wait_window()
-    return result.get()
+## GUI-only implementation; no legacy GUI fallback
 
 
 def call_openrouter_api(prompt, max_tokens=2000):

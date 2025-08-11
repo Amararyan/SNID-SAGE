@@ -5,7 +5,6 @@ Public API
 ----------
   • init_wavelength_grid
   • medfilt
-  • medwfilt
   • clip_aband
   • clip_sky_lines
   • clip_host_emission_lines
@@ -23,7 +22,6 @@ import logging
 import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple
-from scipy.ndimage import gaussian_filter1d
 from numpy import ma
 
 
@@ -104,68 +102,6 @@ def savgol_filter_fixed(data: NDArray[np.floating], window_length: int = 11, pol
         return data.copy()
 
 
-def savgol_filter_wavelength(
-    wave: NDArray[np.floating],
-    data: NDArray[np.floating],
-    fwhm_angstrom: float,
-    polyorder: int = 3
-) -> NDArray[np.floating]:
-    """
-    Apply Savitzky-Golay filter with wavelength-based window (Angstrom-based smoothing).
-    Replaces the old medwfilt function.
-    
-    Parameters:
-    -----------
-    wave : NDArray[np.floating]
-        Wavelength array
-    data : NDArray[np.floating]
-        Input flux array to filter
-    fwhm_angstrom : float
-        Full width at half maximum of the smoothing kernel in Angstroms
-    polyorder : int
-        Order of the polynomial used to fit the samples (default: 3)
-        
-    Returns:
-    --------
-    NDArray[np.floating]
-        Filtered flux array
-    """
-    from scipy.signal import savgol_filter
-    
-    if data.shape != wave.shape:
-        raise ValueError("data and wave must have the same shape")
-    
-    if fwhm_angstrom <= 0:
-        return data.copy()
-    
-    # Calculate average wavelength spacing
-    avg_dwl = np.mean(np.diff(wave))
-    
-    # Convert FWHM in Angstroms to window length in pixels
-    # Use sigma relationship: FWHM = 2.35 * sigma, then scale to get reasonable window
-    sigma_angstrom = fwhm_angstrom / 2.35
-    window_length_pixels = int(2 * sigma_angstrom / avg_dwl)
-    
-    # Ensure minimum window size and make it odd
-    window_length_pixels = max(3, window_length_pixels)
-    if window_length_pixels % 2 == 0:
-        window_length_pixels += 1
-    
-    # Ensure window length is not larger than data
-    window_length_pixels = min(window_length_pixels, len(data))
-    if window_length_pixels < 3:
-        return data.copy()
-    
-    # Ensure polynomial order is less than window length
-    polyorder = min(polyorder, window_length_pixels - 1)
-    
-    try:
-        return savgol_filter(data, window_length_pixels, polyorder)
-    except Exception:
-        # Return original data if filtering fails
-        return data.copy()
-
-
 # Legacy function names for backward compatibility
 def medfilt(data: NDArray[np.floating], medlen: int) -> NDArray[np.floating]:
     """
@@ -177,17 +113,7 @@ def medfilt(data: NDArray[np.floating], medlen: int) -> NDArray[np.floating]:
     return savgol_filter_fixed(data, window_length, polyorder=3)
 
 
-def medwfilt(
-    wave: NDArray[np.floating],
-    data: NDArray[np.floating],
-    fwmed: float,
-    maxdup: int = 3,  # Kept for compatibility but not used
-) -> NDArray[np.floating]:
-    """
-    Legacy wrapper for savgol_filter_wavelength.
-    Apply Savitzky-Golay filter with wavelength-based smoothing.
-    """
-    return savgol_filter_wavelength(wave, data, fwmed, polyorder=3)
+# medwfilt removed (wavelength-based filtering no longer supported)
 
 # --- clipping helpers --------------------------------------------------------
 def clip_aband(w: np.ndarray, f: np.ndarray,
@@ -351,8 +277,6 @@ def fit_continuum(
     # spline args:
     knotnum: int = 13,
     izoff:    int = 0,
-    # gaussian args:
-    sigma:    float = None,
 ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
     """
     Remove a smooth continuum from `flux` on the fixed log‐λ grid.
@@ -364,41 +288,15 @@ def fit_continuum(
 
     Parameters
     ----------
-    method : "spline" or "gaussian"
+    method : "spline"
        - "spline": use the original SNID cubic‐spline (fit_continuum_spline) (DEFAULT)
-       - "gaussian": local‐constant Gaussian filter of width `sigma` bins with robust edge handling
     knotnum, izoff
-      passed to fit_continuum_spline if method="spline"
-    sigma
-      Gaussian‐filter σ in log‐λ bins if method="gaussian". 
-      If None, automatically calculated based on spectrum characteristics.
+      passed to fit_continuum_spline
     """
     if method == "spline":
         flat, cont = fit_continuum_spline(flux, knotnum=knotnum, izoff=izoff)
-    elif method == "gaussian":
-        # Auto-calculate sigma if not provided
-        if sigma is None:
-            sigma = calculate_auto_gaussian_sigma(flux, wave_grid_size=len(flux))
-
-        # Core-only smoothing between first and last valid data bins
-        valid_indices = np.where((flux != 0) & np.isfinite(flux))[0]
-        if valid_indices.size == 0:
-            return np.zeros_like(flux), np.ones_like(flux)
-
-        i0, i1 = valid_indices[0], valid_indices[-1]
-        core_flux = flux[i0:i1 + 1].astype(float)
-
-        # Smooth only the core; leave outside as zero-continuum
-        core_cont = gaussian_filter1d(core_flux, sigma=sigma, mode="mirror")
-        cont = np.zeros_like(flux)
-        cont[i0:i1 + 1] = core_cont
-
-        # Calculate flattened flux only where both flux and cont are valid
-        flat = np.zeros_like(flux)
-        good = (flux > 0) & (cont > 0)
-        flat[good] = flux[good] / cont[good] - 1.0
     else:
-        raise ValueError(f"Unknown method={method!r}; choose 'spline' or 'gaussian'")
+        raise ValueError(f"Unknown method={method!r}; only 'spline' is supported")
 
     # ——— zero‐out anything outside the observed data range ———
     # find first/last valid data bins (including negative values for continuum-subtracted spectra)
@@ -463,28 +361,28 @@ def fit_continuum_spline(
     if (l2 - l1) < 3 * knotnum:
         return np.zeros_like(flux), np.ones_like(flux)
 
-    # --- 2) build log-flux array for knot placement ---
-    good = flux > 0
-    logf = np.zeros(n, dtype=float)
-    logf[good] = np.log10(flux[good])
-
-
+    # --- 2) place knots using Fortran-congruent averages ---
+    # Use log10(mean(flux)) per block (NOT mean(log10(flux))).
     kwidth = n // knotnum
     istart = ((izoff % kwidth) - kwidth) if izoff > 0 else 0
 
     xknot = []
     yknot = []
-    nave = sum_x = sum_y = 0.0
+    nave = 0.0
+    sum_x = 0.0
+    sum_flux = 0.0
 
     for i in range(n):
         if l1 < i < l2 and flux[i] > 0:
-            nave += 1
+            nave += 1.0
             sum_x += (i - 0.5)
-            sum_y += logf[i]
+            sum_flux += flux[i]
         if ((i - istart) % kwidth) == 0 and nave > 0:
             xknot.append(sum_x / nave)
-            yknot.append(sum_y / nave)
-            nave = sum_x = sum_y = 0.0
+            yknot.append(np.log10(sum_flux / nave))
+            nave = 0.0
+            sum_x = 0.0
+            sum_flux = 0.0
 
     nk = len(xknot)
     if nk < 3:
@@ -609,11 +507,17 @@ def flatten_spectrum(wave: np.ndarray, flux: np.ndarray,
     Returns:
         Dict containing processed wavelength and flux arrays
     """
-    # Apply apodization if requested
+    # Apply apodization if requested (requires valid region indices)
     if apodize_percent > 0:
-        n_points = len(flux)
-        n_apodize = int(n_points * apodize_percent / 100.0)
-        flux = apodize(flux, n_apodize, n_apodize, percent=apodize_percent)
+        try:
+            valid_mask = (flux != 0) & np.isfinite(flux)
+            if np.any(valid_mask):
+                n1 = int(np.argmax(valid_mask))
+                n2 = int(len(flux) - 1 - np.argmax(valid_mask[::-1]))
+                flux = apodize(flux, n1, n2, percent=apodize_percent)
+        except Exception:
+            # If anything goes wrong, skip apodization
+            pass
     
     # Apply Savitzky-Golay filtering if requested (replaces old median filtering)
     if median_filter_type != "none" and median_filter_value > 0:
@@ -621,12 +525,9 @@ def flatten_spectrum(wave: np.ndarray, flux: np.ndarray,
             # Pixel-based Savitzky-Golay filter (3rd order polynomial)
             window_length = max(3, int(median_filter_value))
             flux = savgol_filter_fixed(flux, window_length, polyorder=3)
-        elif median_filter_type == "angstrom":
-            # Wavelength-based Savitzky-Golay filter (3rd order polynomial)
-            flux = savgol_filter_wavelength(wave, flux, median_filter_value, polyorder=3)
     
-    # Apply log rebinning
-    log_wave, log_flux = log_rebin(wave, flux, num_points=num_points)
+    # Apply log rebinning (grid size comes from init_wavelength_grid)
+    log_wave, log_flux = log_rebin(wave, flux)
     
     # Fit and remove continuum
     flat_flux, continuum = fit_continuum(log_flux, method="spline")
@@ -639,71 +540,10 @@ def flatten_spectrum(wave: np.ndarray, flux: np.ndarray,
         'original_flux': flux
     }
 
-# ------------------------------------------------------------------
-# Automatic sigma calculation for Gaussian continuum fitting
-# ------------------------------------------------------------------
-
-def calculate_auto_gaussian_sigma(flux: NDArray[np.floating], wave_grid_size: int = None) -> float:
-    """
-    Calculate an automatic sigma value for Gaussian continuum fitting.
-    
-    The sigma is calculated based on the spectrum characteristics to provide
-    effective continuum removal while preserving spectral features.
-    
-    Parameters
-    ----------
-    flux : array_like
-        Input flux array (on log-lambda grid)
-    wave_grid_size : int, optional
-        Size of the wavelength grid. If None, uses len(flux)
-    
-    Returns
-    -------
-    sigma : float
-        Optimal sigma value in log-lambda bins for Gaussian filtering
-        
-    Notes
-    -----
-    The formula is based on typical supernova spectrum characteristics:
-    - For 1024-point grids (standard): sigma ≈ N/20 where N is grid size
-    - Adjusted for spectral noise characteristics and feature preservation
-    - Minimum sigma of 10 to ensure some smoothing
-    - Maximum sigma of 100 to prevent over-smoothing
-    """
-    if wave_grid_size is None:
-        wave_grid_size = len(flux)
-    
-    # Base formula: sigma scales with grid size
-    # For standard 1024-point grid: sigma ≈ 50
-    # Scale proportionally for other grid sizes
-    base_sigma = wave_grid_size / 25.0
-    
-    # Adjust based on flux characteristics
-    valid_flux = flux[flux > 0]
-    if len(valid_flux) > 10:
-        # Calculate relative noise level
-        flux_median = np.median(valid_flux)
-        flux_std = np.std(valid_flux)
-        noise_ratio = flux_std / flux_median if flux_median > 0 else 1.0
-        
-        # More noise -> slightly larger sigma for better smoothing
-        # Less noise -> slightly smaller sigma to preserve features
-        noise_factor = 1.0 + 0.2 * (noise_ratio - 0.1)  # Adjust ±20% based on noise
-        noise_factor = np.clip(noise_factor, 0.7, 1.5)  # Limit adjustment range
-        
-        base_sigma *= noise_factor
-    
-    # Apply reasonable bounds
-    sigma = np.clip(base_sigma, 10.0, 100.0)
-    
-    _LOG.debug(f"Auto-calculated Gaussian sigma: {sigma:.1f} (grid_size={wave_grid_size})")
-    return float(sigma)
-
 __all__ = [
     "init_wavelength_grid",
-    "medfilt", "medwfilt",
+    "medfilt",
     "clip_aband", "clip_sky_lines", "clip_host_emission_lines",
     "apply_wavelength_mask",
     "log_rebin", "fit_continuum", "fit_continuum_spline", "apodize", "unflatten_on_loggrid", "prep_template", "flatten_spectrum",
-    "calculate_auto_gaussian_sigma"
 ]

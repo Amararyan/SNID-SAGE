@@ -2,8 +2,7 @@
 SNID SAGE - PySide6 Modern GUI Interface
 ========================================
 
-PySide6-based GUI for SNID SAGE that replaces the Tkinter implementation
-with a more modern, cross-platform Qt interface.
+Modern PySide6-based GUI for SNID SAGE.
 
 Features:
 - High-DPI scaling support
@@ -15,7 +14,6 @@ Features:
 - Unified theming system adapted for Qt
 
 Developed by Fiorenzo Stoppa for SNID SAGE
-Based on the original Tkinter GUI and migration suggestions
 """
 
 import os
@@ -95,7 +93,7 @@ except ImportError:
 
 
 class WorkflowState(Enum):
-    """Workflow state enumeration matching Tkinter implementation"""
+    """Workflow state enumeration"""
     INITIAL = "initial"
     FILE_LOADED = "file_loaded"
     PREPROCESSED = "preprocessed"
@@ -104,10 +102,7 @@ class WorkflowState(Enum):
 
 class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
     """
-    PySide6-based GUI for SNID SAGE
-    
-    This class provides the same functionality as the Tkinter GUI but uses
-    Qt widgets for better cross-platform consistency and modern appearance.
+    PySide6-based GUI for SNID SAGE.
     """
     
     def __init__(self):
@@ -120,7 +115,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         # Setup window properties
         self._setup_window_properties()
         
-        # Initialize theme colors (adapted from Tkinter theme manager)
+        # Initialize theme colors
         self._init_theme_colors()
         
         # Create the interface
@@ -953,7 +948,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             
             def run_game():
                 try:
-                    run_debris_game()
+                    run_debris_game(True)
                 except Exception as e:
                     _LOGGER.error(f"Error running space debris game: {e}")
             
@@ -1043,18 +1038,19 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 # Stop further handling
                 return
 
-            # Check if clustering is available to determine progress dialog handling
-            has_clustering = (hasattr(self.app_controller, 'snid_results') and 
-                            self.app_controller.snid_results and 
-                            hasattr(self.app_controller.snid_results, 'clustering_results') and
-                            self.app_controller.snid_results.clustering_results and
-                            self.app_controller.snid_results.clustering_results.get('success', False))
+            # Check if a good cluster exists to determine progress dialog handling
+            has_good_cluster = False
+            try:
+                if hasattr(self.app_controller, '_has_good_cluster'):
+                    has_good_cluster = self.app_controller._has_good_cluster(self.app_controller.snid_results)
+            except Exception:
+                has_good_cluster = False
             
             # Update progress dialog if it exists
             if hasattr(self, 'progress_dialog') and self.progress_dialog:
                 try:
                     if success:
-                        if has_clustering:
+                        if has_good_cluster:
                             # If clustering is available, close progress dialog immediately to show cluster selection
                             self.progress_dialog.analysis_completed(True, "✅ Analysis completed - selecting cluster...")
                             QtCore.QTimer.singleShot(100, self.progress_dialog.accept)  # Close quickly for cluster selection
@@ -1096,9 +1092,9 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 self.config_status_label.setText("Analysis Complete")
                 self.config_status_label.setStyleSheet("font-style: italic; color: #059669; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
                 
-                if has_clustering:
-                    # Clustering available - cluster selection dialog will automatically show results after selection
-                    _LOGGER.info("🎯 Analysis completed with clustering - cluster selection will handle results display")
+                if has_good_cluster:
+                    # Good cluster available - cluster selection dialog will automatically show results after selection
+                    _LOGGER.info("🎯 Analysis completed with valid cluster - cluster selection will handle results display")
                 else:
                     # No clustering - show the traditional message dialog to ask user if they want to view results
                     reply = QtWidgets.QMessageBox.question(
@@ -1381,7 +1377,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
     # Removed: show_previous_age, show_next_age, move_template_up, move_template_down
     # Users can switch between Flux and Flat using the dedicated Flux/Flat buttons
     
-    # Analysis workflow methods (matching tkinter version)
+        # Analysis workflow methods
     def update_results_display(self, result):
         """Update the main GUI with analysis results"""
         if not result or not hasattr(result, 'success') or not result.success:
@@ -1537,11 +1533,20 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     elif result.clustering_results.get('best_cluster'):
                         cluster_info = " [Auto Selected Cluster]"
                 
+                # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+                from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+                if hasattr(result, 'best_matches') and result.best_matches:
+                    best_metric_value = get_best_metric_value(result.best_matches[0])
+                    metric_name = get_best_metric_name(result.best_matches[0])
+                    metric_text = f"{metric_name}: {best_metric_value:.2f}"
+                else:
+                    metric_text = f"RLAP: {getattr(result, 'rlap', 0.0):.2f}"
+                
                 summary = (f"SNID Analysis Complete!\n\n"
                           f"Best match: {getattr(result, 'template_name', 'Unknown')}\n"
                           f"Type: {getattr(result, 'consensus_type', 'Unknown')}\n"
                           f"Redshift: {getattr(result, 'redshift', 0.0):.4f}\n"
-                          f"RLAP: {getattr(result, 'rlap', 0.0):.2f}{cluster_info}")
+                          f"{metric_text}{cluster_info}")
                 
                 # Show non-blocking message as fallback
                 QtWidgets.QMessageBox.information(self, "Analysis Complete", summary)

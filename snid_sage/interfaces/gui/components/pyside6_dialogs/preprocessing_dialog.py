@@ -2,8 +2,7 @@
 PySide6 Advanced Preprocessing Dialog for SNID SAGE GUI
 ======================================================
 
-Complete PySide6 implementation of the advanced preprocessing dialog,
-matching all functionality from the Tkinter version with modern Qt interface.
+Complete PySide6 implementation of the advanced preprocessing dialog.
 
 Features:
 - 6-step preprocessing workflow with split-panel UI
@@ -16,14 +15,8 @@ Features:
 """
 
 import numpy as np
-from typing import Optional, Dict, Any, List, Tuple
-from PySide6 import QtWidgets, QtCore, QtGui
-
-# Import flexible number input widget
-from snid_sage.interfaces.gui.components.widgets.flexible_number_input import (
-    create_flexible_double_input,
-    create_flexible_int_input
-)
+from typing import Optional, Dict, Any
+from PySide6 import QtWidgets, QtCore
 
 # PyQtGraph for plotting
 try:
@@ -51,13 +44,11 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_preprocessing_dialog')
 
-# Import SNID preprocessing functions
+# Import SNID preprocessing helpers used by this dialog
 try:
-    from snid_sage.snid.snid import NW, MINW, MAXW
     from snid_sage.snid.preprocessing import (
-        init_wavelength_grid, get_grid_params, medfilt, medwfilt, 
-        clip_aband, clip_sky_lines, clip_host_emission_lines,
-        apply_wavelength_mask, log_rebin, fit_continuum, apodize
+        init_wavelength_grid, get_grid_params,
+        apodize
     )
     SNID_AVAILABLE = True
 except ImportError:
@@ -66,7 +57,14 @@ except ImportError:
 
 # Import our custom components
 from snid_sage.interfaces.gui.features.preprocessing.pyside6_preview_calculator import PySide6PreviewCalculator
-from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PySide6PlotManager
+from snid_sage.interfaces.gui.features.preprocessing.steps import (
+    create_step0_options, apply_step0, calculate_step0_preview,
+    create_step1_options, apply_step1, calculate_step1_preview,
+    create_step2_options, apply_step2, calculate_step2_preview,
+    create_step3_options, apply_step3, calculate_step3_preview,
+    create_step4_options, apply_step4, calculate_step4_preview,
+    create_step5_options,
+)
 from snid_sage.interfaces.gui.components.widgets.pyside6_interactive_masking_widget import PySide6InteractiveMaskingWidget
 from snid_sage.interfaces.gui.components.widgets.pyside6_interactive_continuum_widget import PySide6InteractiveContinuumWidget
 
@@ -113,8 +111,10 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         self.masking_widget = None
         self.continuum_widget = None
         
-        # Processing parameters - Initialize with exact defaults from original Tkinter version
+        # Processing parameters - Initialize with dialog defaults
         self.processing_params = self._get_default_params()
+        # Internal guard to avoid preview updates while rebuilding options UI
+        self._rebuilding_options = False
         
         # UI components
         self.left_panel = None
@@ -172,7 +172,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             }
     
     def _get_default_params(self) -> Dict[str, Any]:
-        """Get default preprocessing parameters matching original Tkinter version"""
+        """Get default preprocessing parameters"""
         return {
             # Step 0: Masking & Clipping
             'clip_negative': True,
@@ -183,18 +183,17 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             'custom_masks': [],
             
             # Step 1: Filtering  
-            'filter_type': 'none',  # none, fixed, wavelength
+            'filter_type': 'none',  # none, fixed
             'filter_window': 11,
             'filter_order': 3,
-            'filter_fwhm': 5.0,
+            # removed wavelength/FWHM option
             
             # Step 2: Rebinning & Scaling (always applied)
             'log_rebin': True,  # Always true - required for SNID
             'flux_scaling': True,  # Scale to mean
             
             # Step 3: Continuum
-            'continuum_method': 'spline',  # spline, gaussian
-            'continuum_sigma': 10.0,
+            'continuum_method': 'spline',  # only spline
             'spline_knots': 13,
             'interactive_continuum': False,
             
@@ -214,38 +213,21 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         self.resize(1000, 600)  # Match SN Emission Lines default size
         self.setModal(True)
         
-        # Apply global styling with reduced font sizes for left panel
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {self.colors['bg_primary']};
-                color: {self.colors['text_primary']};
-            }}
+        # Apply theme manager styles and add minimal custom styling for reduced font sizes
+        from snid_sage.interfaces.gui.utils.pyside6_theme_manager import apply_theme_to_widget
+        apply_theme_to_widget(self)
+        
+        # Add minimal custom styling for reduced font sizes in left panel only
+        self.setStyleSheet(self.styleSheet() + f"""
+            /* Override font sizes for compact left panel */
             QGroupBox {{
-                font-weight: bold;
                 font-size: 10pt;  /* Reduced from default */
-                border: 2px solid {self.colors['border']};
-                border-radius: 6px;
-                margin-top: 6px;  /* Reduced spacing */
-                padding-top: 10px;  /* Reduced padding */
-                background: {self.colors['bg_secondary']};
             }}
             QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;  /* Reduced */
-                padding: 0 6px;  /* Reduced */
-                background: {self.colors['bg_secondary']};
                 font-size: 10pt;  /* Reduced */
             }}
             QLabel {{
                 font-size: 9pt;  /* Reduced for all labels */
-            }}
-            QCheckBox {{
-                font-size: 9pt;  /* Reduced for checkboxes */
-                spacing: 4px;  /* Reduced spacing */
-            }}
-            QRadioButton {{
-                font-size: 9pt;  /* Reduced for radio buttons */
-                spacing: 4px;  /* Reduced spacing */
             }}
             QComboBox {{
                 font-size: 9pt;  /* Reduced for combo boxes */
@@ -256,18 +238,11 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 padding: 2px 4px;  /* Reduced padding */
             }}
             QPushButton {{
-                padding: 6px 12px;  /* Reduced padding */
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
                 font-size: 9pt;  /* Reduced button font */
-            }}
-            QPushButton:hover {{
-                opacity: 0.8;
             }}
         """)
         
-        # Main layout - split panel exactly like Tkinter version
+        # Main layout - split panel
         main_layout = QtWidgets.QHBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
@@ -510,7 +485,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         action_layout.addWidget(self.apply_btn)
         
         # Restart button (resets workflow to Step 1)
-        self.restart_btn = QtWidgets.QPushButton("⟲ Restart")
+        self.restart_btn = QtWidgets.QPushButton("Restart")
         self.restart_btn.setObjectName("restart_btn")
         self.restart_btn.clicked.connect(self.restart_to_step_one)
         action_layout.addWidget(self.restart_btn)
@@ -662,6 +637,8 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         """Update the UI to show options for the current step"""
         if not self.options_frame:
             return
+        # Guard: suppress preview updates during rebuild to avoid C++ deleted object errors
+        self._rebuilding_options = True
         
         # Ensure interactive continuum mode is disabled when leaving step 3
         if self.current_step != 3 and self.continuum_widget:
@@ -678,19 +655,22 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         else:
             layout = QtWidgets.QVBoxLayout(self.options_frame)
         
-        # Create options for current step
-        if self.current_step == 0:
-            self._create_step_0_masking_clipping(layout)
-        elif self.current_step == 1:
-            self._create_step_1_filtering(layout)
-        elif self.current_step == 2:
-            self._create_step_2_rebinning(layout)
-        elif self.current_step == 3:
-            self._create_step_3_continuum(layout)
-        elif self.current_step == 4:
-            self._create_step_4_apodization(layout)
-        elif self.current_step == 5:
-            self._create_step_5_review(layout)
+        # Create options for current step via modular step handlers
+        try:
+            if self.current_step == 0:
+                create_step0_options(self, layout)
+            elif self.current_step == 1:
+                create_step1_options(self, layout)
+            elif self.current_step == 2:
+                create_step2_options(self, layout)
+            elif self.current_step == 3:
+                create_step3_options(self, layout)
+            elif self.current_step == 4:
+                create_step4_options(self, layout)
+            elif self.current_step == 5:
+                create_step5_options(self, layout)
+        except Exception as e:
+            _LOGGER.error(f"Failed to build options for step {self.current_step}: {e}")
         
         # Update button states
         self._update_button_states()
@@ -698,490 +678,54 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         # Update step header with progress indicator
         if hasattr(self, 'step_header'):
             self.step_header.setText(f"Step {self.current_step + 1}/{self.total_steps}: {self.step_names[self.current_step]}")
-    
-    def _create_step_0_masking_clipping(self, layout):
-        """Create step 0: Masking & Clipping Operations exactly like original"""
-        # Description
-        desc = QtWidgets.QLabel("Mask wavelength regions and apply clipping operations to exclude unwanted features from analysis.")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #64748b; font-size: 11pt; margin-bottom: 10px;")
-        layout.addWidget(desc)
-        
-        # Interactive masking section - now properly connected
-        if self.masking_widget:
-            masking_controls = self.masking_widget.create_masking_controls(self.options_frame)
-            layout.addWidget(masking_controls)
-            # Re-register masking toggle/button styling whenever step 0 is rebuilt
-            if hasattr(self, 'button_manager') and self.button_manager:
-                self._setup_masking_toggle_button()
-        else:
-            # Fallback when interactive masking is not available
-            unavailable_group = QtWidgets.QGroupBox("Interactive Masking (Unavailable)")
-            unavailable_layout = QtWidgets.QVBoxLayout(unavailable_group)
-            
-            msg = QtWidgets.QLabel("Interactive masking requires PyQtGraph.\nInstall with: pip install pyqtgraph")
-            msg.setStyleSheet("color: #f59e0b; font-style: italic;")
-            msg.setWordWrap(True)
-            unavailable_layout.addWidget(msg)
-            
-            layout.addWidget(unavailable_group)
-        
-        # Clipping operations exactly matching original
-        clipping_group = QtWidgets.QGroupBox("Clipping Operations")
-        clipping_layout = QtWidgets.QVBoxLayout(clipping_group)
-        
-        # A-band removal
-        self.aband_cb = QtWidgets.QCheckBox("Remove telluric A-band (7575-7675Å)")
-        self.aband_cb.setChecked(self.processing_params['clip_aband'])
-        self.aband_cb.toggled.connect(self._update_preview)
-        clipping_layout.addWidget(self.aband_cb)
-        
-        # Sky line removal
-        sky_layout = QtWidgets.QHBoxLayout()
-        self.sky_cb = QtWidgets.QCheckBox("Remove sky lines, width:")
-        self.sky_cb.setChecked(self.processing_params['clip_sky_lines'])
-        self.sky_cb.toggled.connect(self._update_preview)
-        sky_layout.addWidget(self.sky_cb)
-        
-        self.sky_width_spin = create_flexible_double_input(min_val=1.0, max_val=200.0, suffix=" Å", default=30.0)
-        self.sky_width_spin.setValue(self.processing_params['sky_width'])
-        self.sky_width_spin.valueChanged.connect(self._update_preview)
-        sky_layout.addWidget(self.sky_width_spin)
-        
-        sky_layout.addStretch()
-        clipping_layout.addLayout(sky_layout)
-        
-        layout.addWidget(clipping_group)
-    
-    def _create_step_1_filtering(self, layout):
-        """Create step 1: Savitzky-Golay Filtering exactly like original"""
-        # Description
-        desc = QtWidgets.QLabel("Apply Savitzky-Golay smoothing filter to reduce noise in the spectrum.")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #64748b; font-size: 11pt; margin-bottom: 10px;")
-        layout.addWidget(desc)
-        
-        # Filter options
-        filter_group = QtWidgets.QGroupBox("Filter Configuration")
-        filter_layout = QtWidgets.QVBoxLayout(filter_group)
-        
-        # Filter type selection using radio buttons like original
-        self.filter_type_group = QtWidgets.QButtonGroup()
-        
-        self.no_filter_rb = QtWidgets.QRadioButton("No filtering")
-        self.no_filter_rb.setChecked(self.processing_params['filter_type'] == 'none')
-        self.no_filter_rb.toggled.connect(lambda *_: self._on_filter_type_changed())
-        self.filter_type_group.addButton(self.no_filter_rb, 0)
-        filter_layout.addWidget(self.no_filter_rb)
-        
-        # Fixed window filter
-        fixed_layout = QtWidgets.QHBoxLayout()
-        self.fixed_filter_rb = QtWidgets.QRadioButton("Fixed window:")
-        self.fixed_filter_rb.setChecked(self.processing_params['filter_type'] == 'fixed')
-        self.fixed_filter_rb.toggled.connect(lambda *_: self._on_filter_type_changed())
-        self.filter_type_group.addButton(self.fixed_filter_rb, 1)
-        fixed_layout.addWidget(self.fixed_filter_rb)
-        
-        self.fixed_window_spin = create_flexible_int_input(min_val=3, max_val=101, default=11)
-        # Set the value explicitly to ensure proper display
-        filter_window = self.processing_params.get('filter_window', 11)
-        self.fixed_window_spin.setValue(filter_window)
-        self.fixed_window_spin.valueChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
-        # Also react on raw text changes and editing finished for immediate feedback
-        if hasattr(self.fixed_window_spin, 'textChanged'):
-            try:
-                self.fixed_window_spin.textChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
-            except Exception:
-                pass
-        if hasattr(self.fixed_window_spin, 'editingFinished'):
-            try:
-                self.fixed_window_spin.editingFinished.connect(self._on_fixed_filter_params_changed)
-            except Exception:
-                pass
-        fixed_layout.addWidget(self.fixed_window_spin)
-        
-        fixed_layout.addWidget(QtWidgets.QLabel("order:"))
-        self.polyorder_spin = create_flexible_int_input(min_val=1, max_val=10, default=3)
-        self.polyorder_spin.setValue(self.processing_params['filter_order'])
-        self.polyorder_spin.valueChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
-        if hasattr(self.polyorder_spin, 'textChanged'):
-            try:
-                self.polyorder_spin.textChanged.connect(lambda *_: self._on_fixed_filter_params_changed())
-            except Exception:
-                pass
-        if hasattr(self.polyorder_spin, 'editingFinished'):
-            try:
-                self.polyorder_spin.editingFinished.connect(self._on_fixed_filter_params_changed)
-            except Exception:
-                pass
-        fixed_layout.addWidget(self.polyorder_spin)
-        
-        fixed_layout.addStretch()
-        filter_layout.addLayout(fixed_layout)
-        
-        # Wavelength-based filter
-        wave_layout = QtWidgets.QHBoxLayout()
-        self.wave_filter_rb = QtWidgets.QRadioButton("Wavelength-based:")
-        self.wave_filter_rb.setChecked(self.processing_params['filter_type'] == 'wavelength')
-        self.wave_filter_rb.toggled.connect(lambda *_: self._on_filter_type_changed())
-        self.filter_type_group.addButton(self.wave_filter_rb, 2)
-        wave_layout.addWidget(self.wave_filter_rb)
-        
-        self.wave_fwhm_spin = create_flexible_double_input(min_val=0.1, max_val=50.0, suffix=" Å FWHM", default=10.0)
-        self.wave_fwhm_spin.setValue(self.processing_params['filter_fwhm'])
-        self.wave_fwhm_spin.valueChanged.connect(lambda *_: self._on_wave_filter_params_changed())
-        if hasattr(self.wave_fwhm_spin, 'textChanged'):
-            try:
-                self.wave_fwhm_spin.textChanged.connect(lambda *_: self._on_wave_filter_params_changed())
-            except Exception:
-                pass
-        if hasattr(self.wave_fwhm_spin, 'editingFinished'):
-            try:
-                self.wave_fwhm_spin.editingFinished.connect(self._on_wave_filter_params_changed)
-            except Exception:
-                pass
-        wave_layout.addWidget(self.wave_fwhm_spin)
-
-        # Ensure any radio click triggers immediate preview
+        # Done rebuilding; now allow preview updates and force one now
+        self._rebuilding_options = False
         try:
-            self.filter_type_group.buttonClicked.connect(lambda *_: self._on_filter_type_changed())
+            self._update_preview()
         except Exception:
             pass
+    
+    # Step-0 UI handled in steps.step0_masking
+    
+    # Step-1 UI handled in steps.step1_filtering
+    
+    # Step-1 filter type change handled in steps.step1_filtering
 
-        # Initial enable/disable state for inputs
-        self._update_filter_inputs_enabled_state()
-        
-        wave_layout.addStretch()
-        filter_layout.addLayout(wave_layout)
-        
-        layout.addWidget(filter_group)
-    
-    def _on_filter_type_changed(self):
-        """Handle filter type radio button changes"""
-        if self.no_filter_rb.isChecked():
-            self.processing_params['filter_type'] = 'none'
-        elif self.fixed_filter_rb.isChecked():
-            self.processing_params['filter_type'] = 'fixed'
-        elif self.wave_filter_rb.isChecked():
-            self.processing_params['filter_type'] = 'wavelength'
-        try:
-            _LOGGER.debug(
-                f"Filter type changed → {self.processing_params['filter_type']}"
-            )
-        except Exception:
-            pass
-        # Enable/disable inputs based on selected type and update preview
-        self._update_filter_inputs_enabled_state()
-        self._update_preview()
+    # Step-1 enable/disable handled in steps.step1_filtering
 
-    def _update_filter_inputs_enabled_state(self):
-        """Enable/disable filter parameter inputs based on selected filter type."""
-        try:
-            fixed = self.processing_params.get('filter_type') == 'fixed'
-            wav = self.processing_params.get('filter_type') == 'wavelength'
-            if hasattr(self, 'fixed_window_spin') and self.fixed_window_spin is not None:
-                self.fixed_window_spin.setEnabled(fixed)
-            if hasattr(self, 'polyorder_spin') and self.polyorder_spin is not None:
-                self.polyorder_spin.setEnabled(fixed or wav)
-            if hasattr(self, 'wave_fwhm_spin') and self.wave_fwhm_spin is not None:
-                self.wave_fwhm_spin.setEnabled(wav)
-        except Exception:
-            pass
+    # Step-1 params change handled in steps.step1_filtering
 
-    def _on_fixed_filter_params_changed(self):
-        """Handle changes to fixed-window filter parameters and refresh preview immediately."""
-        # Update processing params for consistency/debug summary
-        try:
-            win_val = self.fixed_window_spin.value() if hasattr(self, 'fixed_window_spin') else None
-            if win_val is not None:
-                self.processing_params['filter_window'] = int(win_val)
-            order_val = self.polyorder_spin.value() if hasattr(self, 'polyorder_spin') else None
-            if order_val is not None:
-                self.processing_params['filter_order'] = int(order_val)
-            _LOGGER.debug(f"Fixed filter params: window={self.processing_params.get('filter_window')}, order={self.processing_params.get('filter_order')}")
-        except Exception:
-            pass
-        self._update_preview()
+    # (Removed wavelength-based filter handler)
+    
+    # Step-2 UI handled in steps.step2_rebinning
+    
+    # Step-2 flux scaling change handled in steps.step2_rebinning
 
-    def _on_wave_filter_params_changed(self):
-        """Handle changes to wavelength-based filter parameters and refresh preview immediately."""
-        try:
-            fwhm_val = self.wave_fwhm_spin.value() if hasattr(self, 'wave_fwhm_spin') else None
-            if fwhm_val is not None:
-                self.processing_params['filter_fwhm'] = float(fwhm_val)
-            order_val = self.polyorder_spin.value() if hasattr(self, 'polyorder_spin') else None
-            if order_val is not None:
-                self.processing_params['filter_order'] = int(order_val)
-            _LOGGER.debug(f"Wave filter params: fwhm={self.processing_params.get('filter_fwhm')} Å, order={self.processing_params.get('filter_order')}")
-        except Exception:
-            pass
-        self._update_preview()
+    # Step-0 aband toggled handled in steps.step0_masking
+
+    # Step-0 sky toggled handled in steps.step0_masking
+
+    # Step-0 sky width change handled in steps.step0_masking
+
+    # Step-4 apodize toggle handled in steps.step4_apodization
+
+    # Step-4 apod percent change handled in steps.step4_apodization
     
-    def _create_step_2_rebinning(self, layout):
-        """Create step 2: Log-wavelength Rebinning & Flux Scaling exactly like original"""
-        # Description
-        desc = QtWidgets.QLabel("Apply log-wavelength rebinning (required for SNID) and optional flux scaling.")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #64748b; font-size: 11pt; margin-bottom: 10px;")
-        layout.addWidget(desc)
-        
-        # Rebinning options
-        rebin_group = QtWidgets.QGroupBox("Rebinning Configuration")
-        rebin_layout = QtWidgets.QVBoxLayout(rebin_group)
-        
-        # Log rebinning (always enabled like original)
-        self.log_rebin_cb = QtWidgets.QCheckBox("Apply log-wavelength rebinning (required)")
-        self.log_rebin_cb.setChecked(True)
-        self.log_rebin_cb.setEnabled(False)  # Always required
-        rebin_layout.addWidget(self.log_rebin_cb)
-        
-        # Flux scaling - properly synchronized and connected
-        self.flux_scaling_cb = QtWidgets.QCheckBox("Scale flux to mean value")
-        self.flux_scaling_cb.setChecked(self.processing_params['flux_scaling'])
-        # Connect to both parameter update AND preview update
-        self.flux_scaling_cb.toggled.connect(self._on_flux_scaling_changed)
-        rebin_layout.addWidget(self.flux_scaling_cb)
-        
-        layout.addWidget(rebin_group)
-        
-        # Grid information
-        info_group = QtWidgets.QGroupBox("Grid Information")
-        info_layout = QtWidgets.QVBoxLayout(info_group)
-        
-        info_text = QtWidgets.QLabel(
-            f"Target grid: {NW if SNID_AVAILABLE else 1024} points\n"
-            f"Wavelength range: {MINW if SNID_AVAILABLE else 2500} - {MAXW if SNID_AVAILABLE else 10000} Å\n"
-            "Log-spacing: uniform in log(wavelength)"
-        )
-        info_text.setStyleSheet("color: #64748b; font-size: 10pt;")
-        info_layout.addWidget(info_text)
-        
-        layout.addWidget(info_group)
+    # Step-3 spline knots change handled in steps.step3_continuum
     
-    def _on_flux_scaling_changed(self):
-        """Handle flux scaling checkbox changes"""
-        self.processing_params['flux_scaling'] = self.flux_scaling_cb.isChecked()
-        self._update_preview()
+    # Gaussian option removed; spline is the only automatic method
     
-    def _on_spline_knots_changed(self):
-        """Handle spline knots parameter changes"""
-        if self.current_step == 3 and self.continuum_widget and \
-           self.processing_params['continuum_method'] == 'spline':
-            # Update continuum if not in interactive mode or no manual changes
-            if not self.continuum_widget.is_interactive_mode() or not self.continuum_widget.has_manual_changes():
-                knotnum = self.spline_knots_spin.value()
-                self.continuum_widget.update_continuum_from_fit(knotnum)
-        self._update_preview()
+    # Step-3 UI handled in steps.step3_continuum
     
-    def _on_gauss_sigma_changed(self):
-        """Handle Gaussian sigma parameter changes"""
-        if self.current_step == 3 and self.continuum_widget and \
-           self.processing_params['continuum_method'] == 'gaussian':
-            # Update continuum if not in interactive mode or no manual changes
-            if not self.continuum_widget.is_interactive_mode() or not self.continuum_widget.has_manual_changes():
-                sigma = self.gauss_sigma_spin.value()
-                self.continuum_widget.update_continuum_from_fit(sigma)
-        self._update_preview()
+
     
-    def _create_step_3_continuum(self, layout):
-        """Create step 3: Continuum Fitting & Interactive Editing exactly like original"""
-        # Description
-        desc = QtWidgets.QLabel("Fit and subtract the continuum. Use interactive editing for fine-tuning.")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #64748b; font-size: 11pt; margin-bottom: 10px;")
-        layout.addWidget(desc)
-        
-        # Continuum fitting method
-        method_group = QtWidgets.QGroupBox("Continuum Fitting Method")
-        method_layout = QtWidgets.QVBoxLayout(method_group)
-        
-        self.continuum_method_group = QtWidgets.QButtonGroup()
-        
-        # Spline method (default)
-        spline_layout = QtWidgets.QHBoxLayout()
-        self.spline_rb = QtWidgets.QRadioButton("Spline, knots:")
-        self.spline_rb.setChecked(self.processing_params['continuum_method'] == 'spline')
-        self.spline_rb.toggled.connect(self._on_continuum_method_changed)
-        self.continuum_method_group.addButton(self.spline_rb, 0)
-        spline_layout.addWidget(self.spline_rb)
-        
-        self.spline_knots_spin = create_flexible_int_input(min_val=3, max_val=50, default=13)
-        self.spline_knots_spin.setValue(self.processing_params['spline_knots'])
-        self.spline_knots_spin.valueChanged.connect(self._on_spline_knots_changed)
-        spline_layout.addWidget(self.spline_knots_spin)
-        
-        spline_layout.addStretch()
-        method_layout.addLayout(spline_layout)
-        
-        # Gaussian filter
-        gauss_layout = QtWidgets.QHBoxLayout()
-        self.gaussian_rb = QtWidgets.QRadioButton("Gaussian filter, σ:")
-        self.gaussian_rb.setChecked(self.processing_params['continuum_method'] == 'gaussian')
-        self.gaussian_rb.toggled.connect(self._on_continuum_method_changed)
-        self.continuum_method_group.addButton(self.gaussian_rb, 1)
-        gauss_layout.addWidget(self.gaussian_rb)
-        
-        self.gauss_sigma_spin = create_flexible_double_input(min_val=0.1, max_val=100.0, default=10.0)
-        self.gauss_sigma_spin.setValue(self.processing_params['continuum_sigma'])
-        self.gauss_sigma_spin.valueChanged.connect(self._on_gauss_sigma_changed)
-        gauss_layout.addWidget(self.gauss_sigma_spin)
-        
-        auto_sigma_btn = QtWidgets.QPushButton("Auto")
-        auto_sigma_btn.setObjectName("auto_sigma_btn")
-        auto_sigma_btn.clicked.connect(self._set_auto_sigma)
-        gauss_layout.addWidget(auto_sigma_btn)
-        
-        gauss_layout.addStretch()
-        method_layout.addLayout(gauss_layout)
-        
-        layout.addWidget(method_group)
-        
-        # Interactive continuum editing - now properly connected
-        if self.continuum_widget:
-            continuum_controls = self.continuum_widget.create_interactive_controls(self.options_frame)
-            layout.addWidget(continuum_controls)
-            
-            # Initialize continuum points when entering this step
-            self._initialize_continuum_points_if_needed()
-        else:
-            # Fallback when interactive continuum editing is not available
-            unavailable_group = QtWidgets.QGroupBox("Interactive Continuum Editing (Unavailable)")
-            unavailable_layout = QtWidgets.QVBoxLayout(unavailable_group)
-            
-            msg = QtWidgets.QLabel("Interactive continuum editing requires PyQtGraph.\nInstall with: pip install pyqtgraph")
-            msg.setStyleSheet("color: #f59e0b; font-style: italic;")
-            msg.setWordWrap(True)
-            unavailable_layout.addWidget(msg)
-            
-            layout.addWidget(unavailable_group)
+    # Step-3 initialization handled in steps.step3_continuum
     
-    def _on_continuum_method_changed(self):
-        """Handle continuum method radio button changes"""
-        if self.spline_rb.isChecked():
-            self.processing_params['continuum_method'] = 'spline'
-        elif self.gaussian_rb.isChecked():
-            self.processing_params['continuum_method'] = 'gaussian'
-        
-        # Update continuum widget with new method BEFORE preview update
-        if self.current_step == 3 and self.continuum_widget:
-            # Inform the widget about the method change
-            self.continuum_widget.set_current_method(self.processing_params['continuum_method'])
-            
-            # If not in interactive mode or no manual changes, recalculate continuum
-            if not self.continuum_widget.is_interactive_mode() or not self.continuum_widget.has_manual_changes():
-                # Get current parameter value
-                if self.processing_params['continuum_method'] == 'gaussian':
-                    try:
-                        sigma_str = self.gauss_sigma_spin.value() if hasattr(self, 'gauss_sigma_spin') else 10.0
-                        sigma = sigma_str if sigma_str != "auto" else None
-                    except:
-                        sigma = None
-                    self.continuum_widget.update_continuum_from_fit(sigma)
-                elif self.processing_params['continuum_method'] == 'spline':
-                    try:
-                        knotnum = self.spline_knots_spin.value() if hasattr(self, 'spline_knots_spin') else 13
-                    except:
-                        knotnum = 13
-                    self.continuum_widget.update_continuum_from_fit(knotnum)
-        
-        # Then update preview
-        self._update_preview()
-        
-        # Update continuum points for new method
-        if self.current_step == 3:
-            self._initialize_continuum_points_if_needed()
+    # Step-3 continuum points update handled in steps.step3_continuum
     
-    def _initialize_continuum_points_if_needed(self):
-        """Initialize continuum points when first entering step 3"""
-        if self.current_step == 3 and self.continuum_widget:
-            # Check if we already have continuum points
-            current_points = self.continuum_widget.get_continuum_points()
-            if not current_points:
-                # Force calculation of initial continuum with current settings
-                self._update_continuum_points_for_current_settings()
-                
-                # Also trigger a preview update to show the continuum
-                self._update_preview()
+    # Step-4 UI handled in steps.step4_apodization
     
-    def _update_continuum_points_for_current_settings(self):
-        """Update continuum points based on current method and parameters"""
-        if self.current_step == 3 and self.continuum_widget:
-            # Check if we have manual changes - don't overwrite them
-            if hasattr(self.continuum_widget, 'has_manual_changes') and \
-               self.continuum_widget.has_manual_changes():
-                return
-            
-            method = self.processing_params['continuum_method']
-            
-            # Set the current method in the interactive widget
-            self.continuum_widget.set_current_method(method)
-            
-            # Force reset to recalculate continuum with current parameters
-            self.continuum_widget.reset_to_fitted_continuum()
-            
-            _LOGGER.debug(f"Updated continuum points for {method} method")
-    
-    def _create_step_4_apodization(self, layout):
-        """Create step 4: Apodization exactly like original"""
-        # Description
-        desc = QtWidgets.QLabel("Apply edge tapering to prevent artifacts at spectrum boundaries.")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #64748b; font-size: 11pt; margin-bottom: 10px;")
-        layout.addWidget(desc)
-        
-        # Apodization options
-        apod_group = QtWidgets.QGroupBox("Apodization Configuration")
-        apod_layout = QtWidgets.QVBoxLayout(apod_group)
-        
-        self.apodize_cb = QtWidgets.QCheckBox("Apply edge apodization")
-        self.apodize_cb.setChecked(self.processing_params['apply_apodization'])
-        self.apodize_cb.toggled.connect(self._update_preview)
-        apod_layout.addWidget(self.apodize_cb)
-        
-        # Apodization parameters
-        param_layout = QtWidgets.QHBoxLayout()
-        param_layout.addWidget(QtWidgets.QLabel("Edge fraction:"))
-        
-        self.apod_percent_spin = create_flexible_double_input(min_val=1.0, max_val=50.0, suffix=" %", default=10.0)
-        self.apod_percent_spin.setValue(self.processing_params['apod_percent'])
-        self.apod_percent_spin.valueChanged.connect(self._update_preview)
-        param_layout.addWidget(self.apod_percent_spin)
-        
-        param_layout.addStretch()
-        apod_layout.addLayout(param_layout)
-        
-        layout.addWidget(apod_group)
-        
-        # Information
-        info_text = QtWidgets.QLabel(
-            "Apodization applies a smooth taper to the spectrum edges, "
-            "preventing discontinuities that could affect Fourier-based analysis."
-        )
-        info_text.setWordWrap(True)
-        info_text.setStyleSheet("color: #64748b; font-size: 10pt; font-style: italic;")
-        layout.addWidget(info_text)
-    
-    def _create_step_5_review(self, layout):
-        """Create step 5: Final Review exactly like original"""
-        # Description
-        desc = QtWidgets.QLabel("Review the complete preprocessing pipeline and finalize settings.")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #64748b; font-size: 11pt; margin-bottom: 10px;")
-        layout.addWidget(desc)
-        
-        # Summary
-        summary_group = QtWidgets.QGroupBox("Preprocessing Summary")
-        summary_layout = QtWidgets.QVBoxLayout(summary_group)
-        
-        self.summary_text = QtWidgets.QTextEdit()
-        self.summary_text.setReadOnly(True)
-        self.summary_text.setMaximumHeight(200)
-        self._update_summary()
-        summary_layout.addWidget(self.summary_text)
-        
-        layout.addWidget(summary_group)
-        
-        # Export options removed to simplify final step
+    # Step-5 UI handled in steps.step5_review
     
     # Note: Previous/Next navigation methods removed - steps only advance via Apply button
     
@@ -1195,17 +739,17 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             step_to_apply = self.current_step
             _LOGGER.debug(f"Applying step {step_to_apply}")
             
-            # Apply the step processing
-            if step_to_apply == 0:  # Masking & Clipping
-                self._apply_step_0()
-            elif step_to_apply == 1:  # Filtering
-                self._apply_step_1()
-            elif step_to_apply == 2:  # Rebinning
-                self._apply_step_2()
-            elif step_to_apply == 3:  # Continuum
-                self._apply_step_3()
-            elif step_to_apply == 4:  # Apodization
-                self._apply_step_4()
+            # Apply the step processing via modular handlers
+            if step_to_apply == 0:
+                apply_step0(self)
+            elif step_to_apply == 1:
+                apply_step1(self)
+            elif step_to_apply == 2:
+                apply_step2(self)
+            elif step_to_apply == 3:
+                apply_step3(self)
+            elif step_to_apply == 4:
+                apply_step4(self)
             
             # Immediately refresh plots to show the newly applied state in BOTH plots
             try:
@@ -1397,32 +941,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                                 flat_flux, continuum = fit_continuum(flux_before_continuum, method=method, knotnum=knotnum)
 
                                 break
-                        elif method == 'gaussian':
-                            sigma = step['kwargs'].get('sigma', None)
-
-                            # Prefer using the exact continuum used during preview (stored)
-                            stored = getattr(self.preview_calculator, 'stored_continuum', None)
-                            if stored is not None and len(stored) == len(final_flux):
-                                continuum = stored.copy()
-                            else:
-                                # Recompute using the SAME improved method to match preview results
-                                try:
-                                    temp_calc = type(self.preview_calculator)(self.original_wave, self.original_flux)
-                                    # Replay steps up to (but not including) the continuum step
-                                    for i, s in enumerate(applied_steps):
-                                        if s['type'] == 'continuum_fit':
-                                            break
-                                        step_kwargs = s['kwargs'].copy()
-                                        step_kwargs.pop('step_index', None)
-                                        temp_calc.apply_step(s['type'], **step_kwargs)
-                                    # Flux right before continuum removal
-                                    _, flux_before_continuum = temp_calc.get_current_state()
-                                    # Use the preview calculator's improved fitting for Gaussian
-                                    flat_flux, continuum = self.preview_calculator._fit_continuum_improved(
-                                        flux_before_continuum, method='gaussian', sigma=sigma
-                                    )
-                                except Exception:
-                                    continuum = None
+                        # Gaussian method removed; only spline and interactive are supported
                                 
                     except Exception as e:
 
@@ -1478,9 +997,30 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             # Determine what the final_flux actually represents based on the applied steps
             has_continuum_step = any(step['type'] in ['continuum_fit', 'interactive_continuum'] 
                                    for step in applied_steps)
+            # Also trust the calculator flag if available
+            try:
+                if hasattr(self.preview_calculator, 'has_continuum') and self.preview_calculator.has_continuum:
+                    has_continuum_step = True
+            except Exception:
+                pass
             
 
             
+            # Preserve flux just before continuum removal for correct Flux view
+            # Recompute it once here by replaying until the continuum step
+            flux_before_continuum_cache = None
+            try:
+                temp_calc = type(self.preview_calculator)(self.original_wave, self.original_flux)
+                for i, s in enumerate(applied_steps):
+                    if s['type'] == 'continuum_fit':
+                        break
+                    step_kwargs = s['kwargs'].copy()
+                    step_kwargs.pop('step_index', None)
+                    temp_calc.apply_step(s['type'], **step_kwargs)
+                _, flux_before_continuum_cache = temp_calc.get_current_state()
+            except Exception:
+                flux_before_continuum_cache = None
+
             if has_continuum_step and continuum is not None:
                 # final_flux is the flattened (continuum-removed) spectrum after continuum step
                 flat_spectrum = final_flux.copy()  # This is already flat (continuum-removed)
@@ -1506,9 +1046,12 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 display_flux = (flat_spectrum + 1.0) * recon_continuum
                 display_flat = flat_spectrum  # Already flattened
                 
-                # For log_flux, we need to reconstruct what the flux was before continuum removal
-                # This represents the scaled flux on log grid (after log rebinning and scaling)
-                log_flux = display_flux.copy()  # Reconstructed flux represents the log_flux
+                # For log_flux, use the flux before continuum removal (rebinned & scaled)
+                # This is the natural flux to show in Flux view
+                if flux_before_continuum_cache is not None:
+                    log_flux = flux_before_continuum_cache.copy()
+                else:
+                    log_flux = display_flux.copy()
                 
             else:
                 # No continuum step applied - final_flux represents the scaled flux after log rebinning
@@ -1523,189 +1066,130 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             
 
             
-            # CRITICAL FIX: Apply proper apodization to create tapered_flux
-            # This matches what standard preprocessing does and is required for forced redshift analysis
+        # Determine if apodization was already applied and which percent to use
+        apodize_already_applied = any(s.get('type') == 'apodization' for s in applied_steps)
+        # Use user-selected percent if available in UI; else check applied step; else default 10
+        selected_percent = None
+        try:
+            if hasattr(self, 'apod_percent_spin') and self.apod_percent_spin is not None:
+                selected_percent = float(self.apod_percent_spin.value())
+        except Exception:
+            selected_percent = None
+        if selected_percent is None:
+            try:
+                for s in applied_steps:
+                    if s.get('type') == 'apodization':
+                        selected_percent = float(s.get('kwargs', {}).get('percent', 10.0))
+                        break
+            except Exception:
+                selected_percent = None
+        if selected_percent is None:
+            selected_percent = 10.0
+
+        # Compute tapered_flux only if not already applied; otherwise keep flat_spectrum as-is
+        if not apodize_already_applied:
             nz = np.nonzero(flat_spectrum)[0]
             if nz.size:
-                l1, l2 = nz[0], nz[-1]
+                l1, l2 = int(nz[0]), int(nz[-1])
             else:
                 l1, l2 = 0, len(flat_spectrum) - 1
-                
-            # Import apodization function from SNID preprocessing
-            from snid_sage.snid.preprocessing import apodize
-            apodize_percent = 10.0  # Default apodization percentage
-            tapered_flux = apodize(flat_spectrum, l1, l2, percent=apodize_percent)
-            
-
-
-            # CRITICAL FIX: Update display versions to use apodized data like quick preprocessing
-            # Quick preprocessing uses: display_flat = tapered_flux (apodized continuum-removed)
-            # We need to match this behavior for consistency
-            if has_continuum_step and continuum is not None:
-                # For continuum case: display_flat should be the apodized flat spectrum (tapered_flux)
-                display_flat = tapered_flux  # Use apodized version like quick preprocessing
-                # display_flux should also be reconstructed from the apodized version
-                # Use the non-zero-extended continuum to avoid zeroing edges (especially for Gaussian)
-                display_flux = (tapered_flux + 1.0) * recon_continuum  # Reconstruct from apodized flat
-            else:
-                # For no-continuum case: both should use the apodized version
-                display_flat = tapered_flux  # Use apodized version
-                display_flux = tapered_flux  # Same data since no continuum
-
-            # Create processed spectrum dictionary like old GUI with proper display versions
-            processed_spectrum = {
-                'log_wave': final_wave,
-                'log_flux': log_flux,  # Scaled flux on log grid (or reconstructed if continuum was applied)
-                'flat_flux': flat_spectrum,  # Continuum-removed version (or same as log_flux if no continuum) - REQUIRED BY ANALYSIS
-                'tapered_flux': tapered_flux,  # FIXED: Properly apodized final version for FFT correlation - REQUIRED BY ANALYSIS
-                'continuum': continuum,  # Stored or unity continuum
-                'nonzero_mask': slice(left_edge, right_edge + 1),  # Slice for non-zero region - REQUIRED BY ANALYSIS
-                # Generate display versions correctly - NOW CONSISTENT WITH QUICK PREPROCESSING
-                'display_flux': display_flux,  # For flux view - reconstructed from apodized data
-                'display_flat': display_flat,  # For flat view - apodized continuum-removed (like quick preprocessing)
-                'advanced_preprocessing': True,
-                'preprocessing_type': 'advanced',
-                'left_edge': left_edge,  # Proper edge information for zero filtering
-                'right_edge': right_edge,  # Proper edge information for zero filtering
-                'input_spectrum': {'wave': self.original_wave, 'flux': self.original_flux},  # Store original input
-                'grid_params': {
-                    'NW': 1024,  # Standard SNID grid size
-                    'W0': 2500.0,  # Standard min wavelength
-                    'W1': 10000.0,  # Standard max wavelength 
-                    'DWLOG': np.log(10000.0 / 2500.0) / 1024  # Standard DWLOG calculation
-                }
-            }
-            
-
-            
-            # Store in parent GUI's app controller
-            if hasattr(self.parent(), 'app_controller'):
-                self.parent().app_controller.set_processed_spectrum(processed_spectrum)
-                _LOGGER.info("Processed spectrum stored in app controller")
-            
-            # Store results for dialog
-            self.result = {
-                'processed_wave': final_wave,
-                'processed_flux': final_flux,
-                'processing_steps': self.preview_calculator.applied_steps.copy(),
-                'mask_regions': self.masking_widget.get_mask_regions() if self.masking_widget else [],
-                'success': True
-            }
-            
-            self.accept()
+            tapered_flux = apodize(flat_spectrum, l1, l2, percent=selected_percent)
         else:
-            QtWidgets.QMessageBox.warning(self, "Error", "No preprocessing data available.")
+            tapered_flux = flat_spectrum.copy()
+
+        # Always define flat and flux view consistently regardless of continuum method
+        display_flat = tapered_flux  # apodized flat
+        # Reconstruct flux from apodized flat; if no continuum (no continuum step), use unity continuum
+        recon_for_display = recon_continuum if (has_continuum_step and continuum is not None) else np.ones_like(tapered_flux)
+        display_flux = (tapered_flux + 1.0) * recon_for_display
+
+        # Create processed spectrum dictionary like old GUI with proper display versions
+        # Ensure continuum stored is the extended, strictly-positive version used for reconstruction
+        try:
+            import numpy as _np
+            safe_continuum = _np.asarray(recon_continuum if (has_continuum_step and continuum is not None) else continuum, dtype=float).copy()
+            # Clip to small positive to avoid negative or zero continuum due to numeric issues
+            safe_continuum = _np.where(_np.isfinite(safe_continuum), safe_continuum, 0.0)
+            safe_continuum[safe_continuum <= 0] = 1e-12
+        except Exception:
+            safe_continuum = recon_continuum if (has_continuum_step and continuum is not None) else continuum
+
+        # Read real grid parameters instead of hard-coding
+        try:
+            NW_grid, W0, W1, DWLOG_grid = get_grid_params() if SNID_AVAILABLE else (1024, 2500.0, 10000.0, np.log(10000.0/2500.0)/1024)
+        except Exception:
+            NW_grid, W0, W1, DWLOG_grid = (1024, 2500.0, 10000.0, np.log(10000.0/2500.0)/1024)
+
+        processed_spectrum = {
+            'log_wave': final_wave,
+            'log_flux': log_flux,  # Scaled flux on log grid (or reconstructed if continuum was applied)
+            'flat_flux': flat_spectrum,  # Continuum-removed version (or zeros if no continuum)
+            'nonzero_mask': slice(left_edge, right_edge + 1),
+            'display_flux': display_flux,
+            'display_flat': display_flat,
+            'flux_view': display_flux,
+            'flat_view': display_flat,
+            'advanced_preprocessing': True,
+            'preprocessing_type': 'advanced',
+            'left_edge': left_edge,
+            'right_edge': right_edge,
+            'input_spectrum': {'wave': self.original_wave, 'flux': self.original_flux},
+            'grid_params': {
+                'NW': NW_grid,
+                'W0': W0,
+                'W1': W1,
+                'DWLOG': DWLOG_grid
+            },
+            'has_continuum': bool(has_continuum_step and continuum is not None)
+        }
+        # Only include continuum-dependent keys when continuum fitting actually occurred
+        if bool(has_continuum_step and continuum is not None):
+            processed_spectrum['tapered_flux'] = tapered_flux
+            processed_spectrum['continuum'] = safe_continuum
+            
+        # Store in parent GUI's app controller
+        if hasattr(self.parent(), 'app_controller'):
+            self.parent().app_controller.set_processed_spectrum(processed_spectrum)
+            _LOGGER.info("Processed spectrum stored in app controller")
+        
+        # Build a minimal result payload for GUI controller
+        flux_view = None
+        flat_view = None
+        try:
+            # Prefer proper flux/flat if continuum was applied
+            if hasattr(self.preview_calculator, 'has_continuum') and self.preview_calculator.has_continuum:
+                # Use final flattened spectrum as flat view
+                flat_view = final_flux.copy()
+                # Reconstruct flux from continuum if available
+                _, cont = self.preview_calculator.get_continuum_from_fit()
+                cont = np.asarray(cont, dtype=float)
+                if cont.shape == flat_view.shape and np.any(cont > 0):
+                    flux_view = (flat_view + 1.0) * cont
+                else:
+                    flux_view = flat_view.copy()
+            else:
+                # No continuum removal: flux and flat are the same
+                flux_view = final_flux.copy()
+                flat_view = np.zeros_like(final_flux)
+        except Exception:
+            flux_view = final_flux.copy()
+            flat_view = final_flux.copy()
+
+        # Pass both views forward; controller will select the right one
+        self.result = {
+            'processed_wave': final_wave,
+            'processed_flux': final_flux,
+            'flux_view': flux_view,
+            'flat_view': flat_view,
+            'success': True
+        }
+        
+        self.accept()
     
     # Step application methods matching original exactly
-    def _apply_step_0(self):
-        """Apply masking and clipping operations exactly like original"""
-        # Apply masking if any regions are defined
-        if self.masking_widget:
-            mask_regions = self.masking_widget.get_mask_regions()
-            if mask_regions:
-                self.preview_calculator.apply_step("masking", mask_regions=mask_regions, step_index=0)
-        
-        # Apply clipping operations with safe widget access
-        # CRITICAL FIX: Cache widget values safely to avoid accessing deleted C++ objects
-        apply_aband = False
-        apply_sky = False
-        sky_width = 40.0  # default fallback
-        
-        if hasattr(self, 'aband_cb') and self.aband_cb is not None:
-            try:
-                apply_aband = self.aband_cb.isChecked()
-            except RuntimeError as e:
-                _LOGGER.warning(f"Widget access error for aband_cb: {e}, using default value {apply_aband}")
-        
-        if hasattr(self, 'sky_cb') and self.sky_cb is not None:
-            try:
-                apply_sky = self.sky_cb.isChecked()
-            except RuntimeError as e:
-                _LOGGER.warning(f"Widget access error for sky_cb: {e}, using default value {apply_sky}")
-        
-        if hasattr(self, 'sky_width_spin') and self.sky_width_spin is not None:
-            try:
-                sky_width = self.sky_width_spin.value()
-            except RuntimeError as e:
-                _LOGGER.warning(f"Widget access error for sky_width_spin: {e}, using default value {sky_width}")
-        
-        if apply_aband:
-            self.preview_calculator.apply_step("clipping", clip_type="aband", step_index=0)
-        
-        if apply_sky:
-            self.preview_calculator.apply_step("clipping", clip_type="sky", width=sky_width, step_index=0)
+    # Step-0 application handled in steps.step0_masking
     
-    def _apply_step_1(self):
-        """Apply Savitzky-Golay filtering exactly like original"""
-        # Determine filter type directly from UI to avoid any stale processing_params state
-        try:
-            if hasattr(self, 'fixed_filter_rb') and self.fixed_filter_rb.isChecked():
-                filter_type = 'fixed'
-            elif hasattr(self, 'wave_filter_rb') and self.wave_filter_rb.isChecked():
-                filter_type = 'wavelength'
-            elif hasattr(self, 'no_filter_rb') and self.no_filter_rb.isChecked():
-                filter_type = 'none'
-            else:
-                filter_type = self.processing_params.get('filter_type', 'none')
-        except Exception:
-            filter_type = self.processing_params.get('filter_type', 'none')
-        
-        # CRITICAL FIX: Cache widget values immediately to avoid accessing deleted C++ objects
-        # This prevents the "Internal C++ object already deleted" error when widgets are cleaned up
-        try:
-            if filter_type == 'fixed':
-                # Cache values safely with proper error handling
-                window = 11  # default fallback
-                polyorder = 3  # default fallback
-                
-                if hasattr(self, 'fixed_window_spin') and self.fixed_window_spin is not None:
-                    try:
-                        window = self.fixed_window_spin.value()
-                    except RuntimeError as e:
-                        _LOGGER.warning(f"Widget access error for fixed_window_spin: {e}, using default value {window}")
-                
-                if hasattr(self, 'polyorder_spin') and self.polyorder_spin is not None:
-                    try:
-                        polyorder = self.polyorder_spin.value()
-                    except RuntimeError as e:
-                        _LOGGER.warning(f"Widget access error for polyorder_spin: {e}, using default value {polyorder}")
-                
-                _LOGGER.info(f"Applying Savitzky-Golay filter: type=fixed, window={window}, polyorder={polyorder}")
-                self.preview_calculator.apply_step("savgol_filter", filter_type="fixed", 
-                                                 value=window, polyorder=polyorder, step_index=1)
-                # Verify the state was updated
-                current_wave, current_flux = self.preview_calculator.get_current_state()
-                _LOGGER.info(f"After applying filter: {len(current_flux)} points")
-                
-            elif filter_type == 'wavelength':
-                # Cache values safely with proper error handling
-                fwhm = 5.0  # default fallback
-                polyorder = 3  # default fallback
-                
-                if hasattr(self, 'wave_fwhm_spin') and self.wave_fwhm_spin is not None:
-                    try:
-                        fwhm = self.wave_fwhm_spin.value()
-                    except RuntimeError as e:
-                        _LOGGER.warning(f"Widget access error for wave_fwhm_spin: {e}, using default value {fwhm}")
-                
-                if hasattr(self, 'polyorder_spin') and self.polyorder_spin is not None:
-                    try:
-                        polyorder = self.polyorder_spin.value()
-                    except RuntimeError as e:
-                        _LOGGER.warning(f"Widget access error for polyorder_spin: {e}, using default value {polyorder}")
-                
-                _LOGGER.info(f"Applying Savitzky-Golay filter: type=wavelength, fwhm={fwhm}, polyorder={polyorder}")
-                self.preview_calculator.apply_step("savgol_filter", filter_type="wavelength",
-                                                 value=fwhm, polyorder=polyorder, step_index=1)
-                # Verify the state was updated
-                current_wave, current_flux = self.preview_calculator.get_current_state()
-                _LOGGER.info(f"After applying filter: {len(current_flux)} points")
-            # If filter_type == 'none', don't apply anything
-            
-        except Exception as e:
-            _LOGGER.error(f"Error in _apply_step_1: {e}")
-            # Fallback: apply no filtering to prevent complete failure
-            pass
+    # Step-1 application handled in steps.step1_filtering
     
     def _apply_step_2(self):
         """Apply log-wavelength rebinning and flux scaling exactly like original"""
@@ -1747,19 +1231,6 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 
                 self.preview_calculator.apply_step("continuum_fit", method="spline", 
                                                  knotnum=knotnum, step_index=3)
-                                                 
-            elif method == 'gaussian':
-                # CRITICAL FIX: Cache widget values safely to avoid accessing deleted C++ objects
-                sigma = 10.0  # default fallback
-                
-                if hasattr(self, 'gauss_sigma_spin') and self.gauss_sigma_spin is not None:
-                    try:
-                        sigma = self.gauss_sigma_spin.value()
-                    except RuntimeError as e:
-                        _LOGGER.warning(f"Widget access error for gauss_sigma_spin: {e}, using default value {sigma}")
-                
-                self.preview_calculator.apply_step("continuum_fit", method="gaussian",
-                                                 sigma=sigma, step_index=3)
     
     def _apply_step_4(self):
         """Apply apodization exactly like original"""
@@ -1821,8 +1292,11 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 self.restart_btn.setEnabled(can_restart)
     
     def _update_preview(self):
-        """Update the plot preview with dual plots exactly like original Tkinter version"""
+        """Update the plot preview with dual plots"""
         if not self.preview_calculator or not self.plot_manager:
+            return
+        # Skip updates while rebuilding option widgets to avoid deleted object access
+        if getattr(self, '_rebuilding_options', False):
             return
         
         try:
@@ -1908,130 +1382,17 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
     
     def _calculate_current_step_preview(self):
         """Calculate preview for current step using PreviewCalculator exactly like original"""
-        if self.current_step == 0:  # Masking & Clipping Operations
-            # Start with current state
-            preview_wave, preview_flux = self.preview_calculator.get_current_state()
-            
-            # Apply masking first if any masks exist
-            if self.masking_widget:
-                mask_regions = self.masking_widget.get_mask_regions()
-                if mask_regions:
-                    preview_wave, preview_flux = self.preview_calculator.preview_step("masking", mask_regions=mask_regions)
-            
-            # Then apply clipping operations
-            if hasattr(self, 'aband_cb') and self.aband_cb.isChecked():
-                temp_calc = type(self.preview_calculator)(preview_wave, preview_flux)
-                preview_wave, preview_flux = temp_calc.preview_step("clipping", clip_type="aband")
-            
-            if hasattr(self, 'sky_cb') and self.sky_cb.isChecked():
-                try:
-                    width = self.sky_width_spin.value() if hasattr(self, 'sky_width_spin') else 40.0
-                    temp_calc = type(self.preview_calculator)(preview_wave, preview_flux)
-                    preview_wave, preview_flux = temp_calc.preview_step("clipping", clip_type="sky", width=width)
-                except:
-                    pass
-            
-            return preview_wave, preview_flux
-            
-        elif self.current_step == 1:  # Savitzky-Golay Filtering
-            # Get filter parameters from UI
-            filter_type = self.processing_params['filter_type']
-            if filter_type == "none":
-                return self.preview_calculator.get_current_state()
-            
-            try:
-                # Safely read polyorder
-                polyorder_val = None
-                if hasattr(self, 'polyorder_spin') and self.polyorder_spin is not None:
-                    try:
-                        polyorder_val = self.polyorder_spin.value()
-                    except Exception:
-                        polyorder_val = None
-                if polyorder_val is None:
-                    polyorder_val = self.processing_params.get('filter_order', 3)
-                try:
-                    polyorder = int(polyorder_val)
-                except Exception:
-                    polyorder = 3
-                
-                if filter_type == "fixed":
-                    # Safely read window length
-                    win_val = None
-                    if hasattr(self, 'fixed_window_spin') and self.fixed_window_spin is not None:
-                        try:
-                            win_val = self.fixed_window_spin.value()
-                        except Exception:
-                            win_val = None
-                    if win_val is None:
-                        win_val = self.processing_params.get('filter_window', 11)
-                    try:
-                        value = int(win_val)
-                    except Exception:
-                        value = 11
-                    try:
-                        _LOGGER.debug(f"Preview (filtering/fixed): window={value}, order={polyorder}")
-                    except Exception:
-                        pass
-                    return self.preview_calculator.preview_step("savgol_filter", 
-                                                              filter_type=filter_type, value=value, polyorder=polyorder)
-                elif filter_type == "wavelength":
-                    # Safely read FWHM
-                    fwhm_val = None
-                    if hasattr(self, 'wave_fwhm_spin') and self.wave_fwhm_spin is not None:
-                        try:
-                            fwhm_val = self.wave_fwhm_spin.value()
-                        except Exception:
-                            fwhm_val = None
-                    if fwhm_val is None:
-                        fwhm_val = self.processing_params.get('filter_fwhm', 5.0)
-                    try:
-                        value = float(fwhm_val)
-                    except Exception:
-                        value = 5.0
-                    try:
-                        _LOGGER.debug(f"Preview (filtering/wavelength): fwhm={value} Å, order={polyorder}")
-                    except Exception:
-                        pass
-                    return self.preview_calculator.preview_step("savgol_filter", 
-                                                              filter_type=filter_type, value=value, polyorder=polyorder)
-            except:
-                pass
-            
-            return self.preview_calculator.get_current_state()
-            
-        elif self.current_step == 2:  # Log-wavelength Rebinning & Flux Scaling
-            # Use the synchronized flux scaling parameter
-            scale_to_mean = self.processing_params['flux_scaling']
-            return self.preview_calculator.preview_step("log_rebin_with_scaling", scale_to_mean=scale_to_mean)
-            
-        elif self.current_step == 3:  # Continuum Fitting & Interactive Editing
-            # Get continuum parameters from UI
-            method = self.processing_params['continuum_method']
-            if method == "gaussian":
-                try:
-                    sigma = self.gauss_sigma_spin.value() if hasattr(self, 'gauss_sigma_spin') else 10.0
-                    return self.preview_calculator.preview_step("continuum_fit", method="gaussian", sigma=sigma)
-                except:
-                    pass
-            elif method == "spline":
-                try:
-                    knotnum = self.spline_knots_spin.value() if hasattr(self, 'spline_knots_spin') else 13
-                    return self.preview_calculator.preview_step("continuum_fit", method="spline", knotnum=knotnum)
-                except:
-                    pass
-            
-            return self.preview_calculator.get_current_state()
-            
-        elif self.current_step == 4:  # Apodization
-            if hasattr(self, 'apodize_cb') and self.apodize_cb.isChecked():
-                try:
-                    percent = self.apod_percent_spin.value() if hasattr(self, 'apod_percent_spin') else 10.0
-                    if 0 <= percent <= 50:
-                        return self.preview_calculator.preview_step("apodization", percent=percent)
-                except:
-                    pass
-        
-        # Fallback: return current state
+        # Delegate to modular calculators
+        if self.current_step == 0:
+            return calculate_step0_preview(self)
+        elif self.current_step == 1:
+            return calculate_step1_preview(self)
+        elif self.current_step == 2:
+            return calculate_step2_preview(self)
+        elif self.current_step == 3:
+            return calculate_step3_preview(self)
+        elif self.current_step == 4:
+            return calculate_step4_preview(self)
         return self.preview_calculator.get_current_state()
     
     def _is_continuum_step_applied(self):
@@ -2046,49 +1407,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 return True
         return False
     
-    def _update_summary(self):
-        """Update the preprocessing summary exactly like original"""
-        if not hasattr(self, 'summary_text') or not self.preview_calculator:
-            return
-        
-        summary = "Applied Preprocessing Steps:\n\n"
-        
-        if len(self.preview_calculator.applied_steps) == 0:
-            summary += "No preprocessing steps applied yet.\n"
-        else:
-            for i, step in enumerate(self.preview_calculator.applied_steps):
-                summary += f"{i+1}. {step['type'].replace('_', ' ').title()}\n"
-                if 'kwargs' in step:
-                    for key, value in step['kwargs'].items():
-                        if key != 'step_index':
-                            summary += f"   {key}: {value}\n"
-                summary += "\n"
-        
-        self.summary_text.setPlainText(summary)
-    
-    # Utility methods
-    def _set_auto_sigma(self):
-        """Set automatic sigma for Gaussian continuum fitting"""
-        if hasattr(self, 'gauss_sigma_spin') and self.preview_calculator:
-            try:
-                # Calculate automatic sigma based on current flux
-                current_wave, current_flux = self.preview_calculator.get_current_state()
-                if SNID_AVAILABLE:
-                    from snid_sage.snid.preprocessing import calculate_auto_gaussian_sigma
-                    auto_sigma = calculate_auto_gaussian_sigma(current_flux)
-                    self.gauss_sigma_spin.setValue(auto_sigma)
-                    
-                    # Trigger continuum update if we're on step 3
-                    if self.current_step == 3 and self.continuum_widget and \
-                       self.processing_params['continuum_method'] == 'gaussian':
-                        if not self.continuum_widget.is_interactive_mode() or not self.continuum_widget.has_manual_changes():
-                            self.continuum_widget.update_continuum_from_fit(auto_sigma)
-                else:
-                    # Fallback estimation
-                    auto_sigma = len(current_flux) * 0.01
-                    self.gauss_sigma_spin.setValue(auto_sigma)
-            except Exception as e:
-                _LOGGER.error(f"Error calculating auto sigma: {e}")
+    # Step-5 summary handled in steps.step5_review
     
     # Export functionality removed
     
@@ -2100,6 +1419,9 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             # Clean up interactive widgets
             if hasattr(self, 'masking_widget') and self.masking_widget:
                 try:
+                    # Ensure masking mode is stopped before cleanup
+                    if getattr(self.masking_widget, 'masking_active', False):
+                        self.masking_widget.stop_masking_mode()
                     if hasattr(self.masking_widget, 'cleanup'):
                         self.masking_widget.cleanup()
                     self.masking_widget = None
@@ -2108,6 +1430,9 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             
             if hasattr(self, 'continuum_widget') and self.continuum_widget:
                 try:
+                    # Ensure interactive mode is disabled before cleanup
+                    if hasattr(self.continuum_widget, 'is_interactive_mode') and self.continuum_widget.is_interactive_mode():
+                        self.continuum_widget.disable_interactive_mode()
                     if hasattr(self.continuum_widget, 'cleanup'):
                         self.continuum_widget.cleanup()
                     self.continuum_widget = None

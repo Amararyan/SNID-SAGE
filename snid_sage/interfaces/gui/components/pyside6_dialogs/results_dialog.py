@@ -3,7 +3,7 @@ SNID SAGE - Analysis Results Dialog - PySide6 Version
 ===================================================
 
 Comprehensive analysis results dialog for displaying SNID classification results.
-Based on the Tkinter cluster_summary.py implementation but using modern PySide6.
+PySide6 implementation of results summary.
 
 Features:
 - Clean classification summary with key results
@@ -35,7 +35,7 @@ try:
 except Exception:
     ENHANCED_BUTTONS_AVAILABLE = False
 
-# Import analysis utilities (avoid Tkinter-based modules)
+# Import analysis utilities
 try:
     from snid_sage.shared.utils.math_utils import get_best_metric_value, get_metric_name_for_match
 except ImportError:
@@ -86,11 +86,10 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
                     self.selected_cluster = self.all_candidates[cluster_index]
                 
                 # Create analyzer with the selected cluster
-                # Analyzer creation removed to avoid Tkinter dependency
         
         # Fallback: if no clustering results, try to create a single cluster from best_matches
         if not self.analyzer and analysis_results and hasattr(analysis_results, 'best_matches'):
-            # Fallback: simple pseudo-cluster without analyzer to avoid Tkinter dependency
+            # Fallback: simple pseudo-cluster without analyzer
             # Create a pseudo-cluster from the best matches
             self.selected_cluster = {
                 'type': getattr(analysis_results, 'consensus_type', 'Unknown'),

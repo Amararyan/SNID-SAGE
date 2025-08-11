@@ -4,8 +4,6 @@ SNID SAGE - PySide6 Preprocessing Controller
 
 Handles all spectrum preprocessing operations for the PySide6 GUI including quick preprocessing,
 manual preprocessing wizard, and SNID preprocessing pipeline.
-
-Adapted from the tkinter preprocessing controller for PySide6 compatibility.
 """
 
 import os
@@ -50,7 +48,7 @@ class PySide6PreprocessingController:
         try:
             # Update button state
             original_text = self.gui.preprocessing_btn.text()
-            self.gui.preprocessing_btn.setText("⏳ Processing...")
+            self.gui.preprocessing_btn.setText("Processing...")
             self.gui.preprocessing_btn.setEnabled(False)
             
             # Process the GUI to show the button state change
@@ -71,7 +69,7 @@ class PySide6PreprocessingController:
                 
                 # CRITICAL: Switch to Flat view to show the preprocessed (flat) spectrum
                 self.gui._on_view_change('flat')
-                _LOGGER.info("🔄 Automatically switched to Flat view after quick preprocessing")
+                _LOGGER.info("Automatically switched to Flat view after quick preprocessing")
                 
                 # Update the plot to show the new processed spectrum
                 self.gui._plot_spectrum()
@@ -133,7 +131,6 @@ class PySide6PreprocessingController:
                     spectrum_path=file_path,
                     # Default parameters for quick preprocessing
                     savgol_window=0,  # No Savitzky-Golay filtering by default
-                    savgol_fwhm=0.0,
                     savgol_order=3,
                     aband_remove=False,  # No A-band removal by default
                     skyclip=False,  # No sky line clipping by default
@@ -151,7 +148,6 @@ class PySide6PreprocessingController:
                     flux=flux,
                     # Default parameters for quick preprocessing
                     savgol_window=0,  # No Savitzky-Golay filtering by default
-                    savgol_fwhm=0.0,
                     savgol_order=3,
                     aband_remove=False,  # No A-band removal by default
                     skyclip=False,  # No sky line clipping by default
@@ -193,9 +189,11 @@ class PySide6PreprocessingController:
                 display_flux = (tapered_flux + 1.0) * recon_continuum  # Correct unflatten with extended continuum
                 display_flat = tapered_flux                      # Apodized continuum-removed
                 
-                # Store both versions in processed_spectrum for view switching
-                processed_spectrum['display_flux'] = display_flux   # For "Flux" button - apodized flux with continuum
-                processed_spectrum['display_flat'] = display_flat   # For "Flat" button - apodized continuum-removed
+                # Store simplified view arrays for GUI plotting
+                processed_spectrum['display_flux'] = display_flux   # legacy key
+                processed_spectrum['display_flat'] = display_flat   # legacy key
+                processed_spectrum['flux_view'] = display_flux      # preferred key
+                processed_spectrum['flat_view'] = display_flat      # preferred key
                 
                 _LOGGER.debug(f"Generated display versions for quick preprocessing:")
                 _LOGGER.debug(f"   • Flux view: (tapered_flux + 1.0) * continuum (correct unflatten formula)")

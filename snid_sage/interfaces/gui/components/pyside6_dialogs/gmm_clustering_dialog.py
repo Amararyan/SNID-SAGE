@@ -37,7 +37,6 @@ except ImportError:
     pg = None
 
 # Remove matplotlib imports since we're using PyQtGraph only for PySide
-# Matplotlib for 3D plotting (like the working tkinter implementation)
 # try:
 #     import matplotlib.pyplot as plt
 #     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -436,17 +435,18 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
                 return
             
             # Perform GMM clustering if available
-            if GMM_AVAILABLE and len(self.all_matches) >= 4:  # Need minimum matches for clustering
+            if GMM_AVAILABLE and len(self.all_matches) >= 1:  # Allow clustering with any matches
                 _LOGGER.info(f"Running GMM clustering on {len(self.all_matches)} template matches")
                 
                 self.clustering_results = perform_direct_gmm_clustering(
                     matches=self.all_matches,
-                    min_matches_per_type=2,
+                    min_matches_per_type=1,  # Accept any type with at least 1 match
                     quality_threshold=0.02,
                     max_clusters_per_type=10,
                     top_percentage=0.10,
                     verbose=True,
-                    use_rlap_cos=True  # Use RLAP-Cos for better discrimination
+                    use_rlap_cos=True,  # Use RLAP-Cos for better discrimination
+                    rlap_ccc_threshold=1.0  # Default RLAP-CCC threshold
                 )
                 
                 _LOGGER.info(f"GMM clustering completed successfully")

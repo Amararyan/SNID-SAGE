@@ -62,7 +62,7 @@ class PySide6EventHandlers(QtCore.QObject):
         self.setup_keyboard_shortcuts()
     
     def setup_keyboard_shortcuts(self):
-        """Setup comprehensive keyboard shortcuts matching Tkinter GUI functionality"""
+        """Setup comprehensive keyboard shortcuts"""
         try:
             # File operations
             QtGui.QShortcut("Ctrl+O", self.main_window, self.on_browse_file)
@@ -199,7 +199,7 @@ class PySide6EventHandlers(QtCore.QObject):
                 self.main_window,
                 "Load Spectrum File",
                 "",
-                "Spectrum Files (*.dat *.txt *.ascii *.fits);;All Files (*)"
+                "Spectrum Files (*.dat *.txt *.ascii *.asci *.fits *.flm);;All Files (*)"
             )
             
             if file_path:
@@ -255,8 +255,12 @@ class PySide6EventHandlers(QtCore.QObject):
         try:
             from snid_sage.interfaces.gui.components.pyside6_dialogs.preprocessing_dialog import PySide6PreprocessingDialog
             
-            # Check if spectrum is loaded
-            wave, flux = self.app_controller.get_spectrum_data()
+            # Prefer the ORIGINAL spectrum for preprocessing, not any processed/log-rebinned data
+            wave = getattr(self.app_controller, 'original_wave', None)
+            flux = getattr(self.app_controller, 'original_flux', None)
+            if wave is None or flux is None:
+                # Fallback to whatever is available
+                wave, flux = self.app_controller.get_spectrum_data()
             if wave is None or flux is None:
                 QtWidgets.QMessageBox.warning(
                     self.main_window, 
@@ -264,6 +268,51 @@ class PySide6EventHandlers(QtCore.QObject):
                     "Please load a spectrum file before preprocessing."
                 )
                 return
+
+            # If analysis was already run or overlays exist, warn user about reset
+            analysis_present = bool(getattr(self.app_controller, 'snid_results', None))
+            preprocessed_present = bool(getattr(self.app_controller, 'processed_spectrum', None))
+            if analysis_present or preprocessed_present:
+                reply = QtWidgets.QMessageBox.question(
+                    self.main_window,
+                    "Redo Preprocessing?",
+                    (
+                        "You are about to redo preprocessing.\n\n"
+                        "This will clear previous preprocessing, analysis results, overlays, and advanced views.\n"
+                        "The loaded spectrum will be kept, and the GUI will return to the preprocessing stage.\n\n"
+                        "Do you want to continue?"
+                    ),
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No
+                )
+                if reply != QtWidgets.QMessageBox.Yes:
+                    return
+
+                # Reset controller/UI back to FILE_LOADED while keeping spectrum
+                if hasattr(self.app_controller, 'reset_to_file_loaded_state'):
+                    self.app_controller.reset_to_file_loaded_state()
+
+                # Reset status labels to reflect file-loaded state
+                if hasattr(self.main_window, 'preprocess_status_label'):
+                    self.main_window.preprocess_status_label.setText("Preprocessing not run")
+                    self.main_window.preprocess_status_label.setStyleSheet(
+                        "font-style: italic; color: #475569; font-size: 10px !important; "
+                        "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                        "line-height: 1.0 !important;"
+                    )
+                if hasattr(self.main_window, 'status_label'):
+                    self.main_window.status_label.setText("Spectrum loaded - ready to preprocess")
+
+                # Ensure spectrum plot is shown without overlays in Flux view
+                self.on_view_change('flux')
+                self.main_window.plot_manager.plot_spectrum('flux')
+
+                # Re-fetch ORIGINAL spectrum after reset to ensure dialog starts from untouched data
+                wave = getattr(self.app_controller, 'original_wave', None)
+                flux = getattr(self.app_controller, 'original_flux', None)
+                if wave is None or flux is None:
+                    # As a last resort, fallback to current available data
+                    wave, flux = self.app_controller.get_spectrum_data()
             
             dialog = PySide6PreprocessingDialog(self.main_window, (wave, flux))
             result = dialog.exec()
@@ -311,6 +360,33 @@ class PySide6EventHandlers(QtCore.QObject):
                 )
                 return
             
+            # If analysis exists already, confirm re-running analysis with reset of previous results
+            analysis_present = bool(getattr(self.app_controller, 'snid_results', None))
+            if analysis_present:
+                reply = QtWidgets.QMessageBox.question(
+                    self.main_window,
+                    "Re-run Analysis?",
+                    (
+                        "You have already run an analysis.\n\n"
+                        "Re-running analysis will clear previous analysis results and overlays.\n"
+                        "Preprocessing will be kept so you can re-run with new settings.\n\n"
+                        "Do you want to continue?"
+                    ),
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No
+                )
+                if reply != QtWidgets.QMessageBox.Yes:
+                    return
+                # Clear only analysis state, keep preprocessing
+                if hasattr(self.app_controller, 'reset_analysis_state'):
+                    self.app_controller.reset_analysis_state()
+                
+                # Update UI: remove overlays, keep current view; refresh plot
+                from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PlotMode
+                if self.main_window.plot_manager.current_plot_mode != PlotMode.SPECTRUM:
+                    self.main_window.plot_manager.switch_to_plot_mode(PlotMode.SPECTRUM)
+                self.main_window.plot_manager.plot_spectrum(self.main_window.current_view)
+
             # Check if spectrum is preprocessed
             if not hasattr(self.app_controller, 'processed_spectrum') or self.app_controller.processed_spectrum is None:
                 # Ask user if they want to preprocess first
@@ -370,30 +446,17 @@ class PySide6EventHandlers(QtCore.QObject):
                     self.app_controller.current_config['analysis'].update(config_params)
                 
                 # Run the analysis with configured parameters
-                success = self._run_configured_analysis(config_params)
-                
-                if success:
-                    # Analysis completed successfully - enable advanced features
-                    from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
-                    self.app_controller.update_workflow_state(WorkflowState.ANALYSIS_COMPLETE)
-                    self.main_window.status_label.setText("SNID analysis completed successfully")
-                    
-                    # Enable analysis plot buttons
-                    for btn in self.main_window.analysis_plot_buttons:
-                        btn.setEnabled(True)
-                    for btn in self.main_window.nav_buttons:
-                        btn.setEnabled(True)
-                    
-                    # Enable advanced features
-                    self.main_window.emission_line_overlay_btn.setEnabled(True)
-                    self.main_window.ai_assistant_btn.setEnabled(True)
-                    
-                    _LOGGER.info("SNID analysis completed successfully")
+                started = self._run_configured_analysis(config_params)
+
+                if started:
+                    # Do not prematurely mark success; wait for completion signal
+                    self.main_window.status_label.setText("Running SNID analysis...")
+                    _LOGGER.info("SNID analysis started (waiting for completion)")
                 else:
                     QtWidgets.QMessageBox.critical(
                         self.main_window,
                         "Analysis Error",
-                        "Failed to run SNID analysis with configured parameters"
+                        "Failed to start SNID analysis with configured parameters"
                     )
                     
             except ImportError as e:

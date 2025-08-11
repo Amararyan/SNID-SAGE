@@ -3,8 +3,6 @@ Redshift Mode Selection Dialog - PySide6 Version
 
 This dialog appears after a user accepts a redshift in the manual redshift dialog,
 giving them options for how to use that redshift in the SNID analysis.
-
-Converted from Tkinter to PySide6 for modern Qt interface.
 """
 
 import PySide6.QtCore as QtCore
@@ -114,61 +112,12 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         self.setFixedSize(500, 450)  # Smaller, simpler size
         self.setModal(True)
         
-        # Apply clean, simple styling without problematic CSS
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {self.colors['bg_primary']};
-                color: {self.colors['text_primary']};
-                font-family: "Segoe UI", Arial, sans-serif;
-            }}
-            
-            QGroupBox {{
-                font-weight: bold;
-                font-size: 11pt;
-                border: 2px solid {self.colors['border']};
-                border-radius: 6px;
-                margin-top: 8px;
-                padding-top: 12px;
-                background: {self.colors['bg_secondary']};
-            }}
-            
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 8px;
-                background: {self.colors['bg_secondary']};
-            }}
-            
-            QRadioButton {{
-                font-size: 11pt;
-                spacing: 8px;
-                padding: 8px;
-                background: transparent;
-            }}
-            
-            QRadioButton::indicator {{
-                width: 16px;
-                height: 16px;
-                border-radius: 8px;
-                border: 2px solid {self.colors['border']};
-                background: {self.colors['bg_secondary']};
-            }}
-            
-            QRadioButton::indicator:checked {{
-                border: 2px solid {self.colors['accent_primary']};
-                background: {self.colors['accent_primary']};
-            }}
-            
-            /* Button styling handled by enhanced button system */
-            
-            QLineEdit {{
-                border: 2px solid {self.colors['border']};
-                border-radius: 4px;
-                padding: 6px 8px;
-                background: {self.colors['bg_secondary']};
-                font-size: 10pt;
-            }}
-            
+        # Apply theme manager styles and minimal custom styling for QLineEdit
+        from snid_sage.interfaces.gui.utils.pyside6_theme_manager import apply_theme_to_widget
+        apply_theme_to_widget(self)
+        
+        # Add minimal custom styling for QLineEdit focus states
+        self.setStyleSheet(self.styleSheet() + f"""
             QLineEdit:focus {{
                 border-color: {self.colors['accent_primary']};
                 background: white;
@@ -224,7 +173,6 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         
         # Fixed redshift option
         self.fixed_radio = QtWidgets.QRadioButton("Force Exact Redshift")
-        self.fixed_radio.setFont(QtGui.QFont("Segoe UI", 11, QtGui.QFont.Bold))
         self.fixed_radio.setChecked(True)  # Default selection
         self.mode_group.addButton(self.fixed_radio, 0)
         options_layout.addWidget(self.fixed_radio)
@@ -240,7 +188,6 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         
         # Search around redshift option
         self.search_radio = QtWidgets.QRadioButton("Search Around Redshift")
-        self.search_radio.setFont(QtGui.QFont("Segoe UI", 11, QtGui.QFont.Bold))
         self.mode_group.addButton(self.search_radio, 1)
         options_layout.addWidget(self.search_radio)
         

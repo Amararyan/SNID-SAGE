@@ -10,9 +10,7 @@ Provides:
 """
 
 from .config_controller import ConfigController
-from .gui_settings_controller import GUISettingsController
 
 __all__ = [
-    'ConfigController',
-    'GUISettingsController'
+    'ConfigController'
 ] 

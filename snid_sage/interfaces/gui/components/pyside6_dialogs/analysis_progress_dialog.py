@@ -220,11 +220,6 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         self.progress_bar.setFormat("%p%")
         progress_layout.addWidget(self.progress_bar)
         
-        # Time elapsed label
-        self.time_label = QtWidgets.QLabel("Elapsed: 0:00")
-        self.time_label.setMinimumWidth(80)
-        progress_layout.addWidget(self.time_label)
-        
         layout.addLayout(progress_layout)
         
         # Progress text area
@@ -272,11 +267,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         
         layout.addLayout(button_layout)
         
-        # Timer for elapsed time
-        self.start_time = time.time()
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self._update_elapsed_time)
-        self.timer.start(1000)  # Update every second
+        # No elapsed timer
     
     def _setup_initial_state(self):
         """Setup initial state"""
@@ -393,15 +384,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         except Exception as e:
             _LOGGER.warning(f"Error setting progress: {e}")
     
-    def _update_elapsed_time(self):
-        """Update elapsed time display"""
-        try:
-            elapsed = int(time.time() - self.start_time)
-            minutes = elapsed // 60
-            seconds = elapsed % 60
-            self.time_label.setText(f"Elapsed: {minutes}:{seconds:02d}")
-        except Exception as e:
-            _LOGGER.warning(f"Error updating elapsed time: {e}")
+    
     
     def _on_hide(self):
         """Handle hide button click"""
@@ -438,8 +421,6 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
             message: Completion message
         """
         try:
-            self.timer.stop()
-            
             if success:
                 self.set_stage("Analysis Complete", 100)
                 self.add_progress_line("🎉 SNID analysis completed successfully!", "success")
@@ -447,12 +428,12 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
                     self.add_progress_line(message, "success")
                 
                 # Change title and button
-                self.title_label.setText("✅ SNID Analysis Complete")
-                self.cancel_btn.setText("🔄 Close")
+                self.title_label.setText("SNID Analysis Complete")
+                self.cancel_btn.setText("Close")
                 self.cancel_btn.setObjectName("hide_btn")  # Change styling
                 self.cancel_btn.clicked.disconnect()
                 self.cancel_btn.clicked.connect(self.accept)
-                self.hide_btn.setText("📋 View Results")
+                self.hide_btn.setText("View Results")
                 
             else:
                 self.set_stage("Analysis Failed", self.progress_bar.value())
@@ -461,8 +442,8 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
                     self.add_progress_line(f"Error: {message}", "error")
                 
                 # Change title and button
-                self.title_label.setText("❌ SNID Analysis Failed")
-                self.cancel_btn.setText("🔄 Close")
+                self.title_label.setText("SNID Analysis Failed")
+                self.cancel_btn.setText("Close")
                 self.cancel_btn.clicked.disconnect()
                 self.cancel_btn.clicked.connect(self.reject)
                 
@@ -513,7 +494,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
             
             def run_game():
                 try:
-                    run_debris_game()
+                    run_debris_game(True)
                 except Exception as e:
                     _LOGGER.error(f"Error running space debris game: {e}")
             

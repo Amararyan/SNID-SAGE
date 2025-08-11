@@ -9,7 +9,6 @@ Part of the SNID SAGE GUI system.
 """
 
 from typing import Optional, Dict, Any
-# tkinter removed - using PySide6 message dialogs instead
 
 # Import the centralized logging system
 try:

@@ -227,7 +227,7 @@ class PySide6GamesDialog(QtWidgets.QDialog):
             # Start game in background thread
             def run_game():
                 try:
-                    run_debris_game()
+                    run_debris_game(True)
                 except Exception as e:
                     _LOGGER.error(f"Error running space debris game: {e}")
             

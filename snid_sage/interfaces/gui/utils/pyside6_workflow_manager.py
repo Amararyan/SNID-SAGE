@@ -2,8 +2,7 @@
 SNID SAGE - PySide6 Workflow Manager
 ====================================
 
-Manages button states and workflow progression for the PySide6 GUI,
-adapted from the Tkinter workflow system.
+Manages button states and workflow progression for the PySide6 GUI.
 
 This system provides:
 - Centralized button state management

@@ -206,7 +206,6 @@ DIALOG_BUTTON_PRESETS = {
     'preprocessing_dialog': {
         'apply_btn': {'type': 'apply', 'size_class': 'normal'},
         'restart_btn': {'type': 'reset', 'size_class': 'normal'},
-        'auto_sigma_btn': {'type': 'neutral', 'size_class': 'small'},
         'masking_toggle_btn': {
             'type': 'neutral', 
             'size_class': 'normal',

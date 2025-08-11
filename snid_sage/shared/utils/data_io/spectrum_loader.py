@@ -3,7 +3,7 @@ Spectrum Loader Module for SNID SAGE
 ====================================
 
 Unified spectrum loading functionality supporting multiple file formats:
-- ASCII/text files (.txt, .dat, .ascii, .asci, .csv)
+- ASCII/text files (.txt, .dat, .ascii, .asci, .csv, .flm)
 - FITS files (.fits, .fit)
 - Various delimited formats
 

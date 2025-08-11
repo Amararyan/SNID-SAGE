@@ -509,7 +509,7 @@ class UnifiedPySide6LayoutManager:
         gui_instance.load_spectrum_btn.setObjectName("unified_load_spectrum_btn")
 
         gui_instance.load_spectrum_btn.clicked.connect(gui_instance.browse_file)
-        gui_instance.load_spectrum_btn.setToolTip("Load a spectrum file for analysis\nSupported formats: .txt, .dat, .ascii, .fits")
+        gui_instance.load_spectrum_btn.setToolTip("Load a spectrum file for analysis\nSupported formats: .txt, .dat, .ascii, .asci, .fits")
         layout.addWidget(gui_instance.load_spectrum_btn)
         
         # File status label - add with reduced spacing
@@ -531,10 +531,52 @@ class UnifiedPySide6LayoutManager:
         # Add right-click functionality for quick preprocessing
         def preprocessing_context_menu(event):
             if event.button() == QtCore.Qt.RightButton:
-                if hasattr(gui_instance, 'preprocessing_controller') and hasattr(gui_instance.preprocessing_controller, 'run_quick_preprocessing'):
-                    gui_instance.preprocessing_controller.run_quick_preprocessing()
-                else:
-                    _LOGGER.info("Quick preprocessing not available")
+                try:
+                    appc = getattr(gui_instance, 'app_controller', None)
+                    preprocessed_present = bool(getattr(appc, 'processed_spectrum', None)) if appc else False
+                    analysis_present = bool(getattr(appc, 'snid_results', None)) if appc else False
+
+                    if preprocessed_present or analysis_present:
+                        reply = QtWidgets.QMessageBox.question(
+                            gui_instance,
+                            "Redo Preprocessing?",
+                            (
+                                "You are about to redo preprocessing.\n\n"
+                                "This will clear previous preprocessing, analysis results, overlays, and advanced views.\n"
+                                "The loaded spectrum will be kept, and the GUI will return to the preprocessing stage.\n\n"
+                                "Do you want to continue?"
+                            ),
+                            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                            QtWidgets.QMessageBox.No
+                        )
+                        if reply != QtWidgets.QMessageBox.Yes:
+                            return
+                        # Reset to FILE_LOADED while preserving spectrum
+                        if hasattr(appc, 'reset_to_file_loaded_state'):
+                            appc.reset_to_file_loaded_state()
+                        # Update labels and plot to flux without overlays
+                        if hasattr(gui_instance, 'preprocess_status_label'):
+                            gui_instance.preprocess_status_label.setText("Preprocessing not run")
+                            gui_instance.preprocess_status_label.setStyleSheet(
+                                "font-style: italic; color: #475569; font-size: 10px !important; "
+                                "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                                "line-height: 1.0 !important;"
+                            )
+                        if hasattr(gui_instance, 'status_label'):
+                            gui_instance.status_label.setText("Spectrum loaded - ready to preprocess")
+                        # Ensure spectrum plot without overlays in Flux view
+                        if hasattr(gui_instance, 'event_handlers'):
+                            gui_instance.event_handlers.on_view_change('flux')
+                        if hasattr(gui_instance, 'plot_manager'):
+                            gui_instance.plot_manager.plot_spectrum('flux')
+
+                    # Run quick preprocessing
+                    if hasattr(gui_instance, 'preprocessing_controller') and hasattr(gui_instance.preprocessing_controller, 'run_quick_preprocessing'):
+                        gui_instance.preprocessing_controller.run_quick_preprocessing()
+                    else:
+                        _LOGGER.info("Quick preprocessing not available")
+                except Exception as e:
+                    _LOGGER.warning(f"Right-click preprocessing handler error: {e}")
             else:
                 # Call the original mousePressEvent for normal button behavior
                 QtWidgets.QPushButton.mousePressEvent(gui_instance.preprocessing_btn, event)
@@ -600,10 +642,20 @@ class UnifiedPySide6LayoutManager:
         # Add right-click functionality for quick analysis
         def analysis_context_menu(event):
             if event.button() == QtCore.Qt.RightButton:
-                if hasattr(gui_instance, 'run_quick_analysis'):
-                    gui_instance.run_quick_analysis()
-                else:
-                    _LOGGER.info("Quick analysis not available")
+                # Preserve quick analysis behavior on right-click
+                # but still ensure the re-run confirmation if analysis already exists
+                try:
+                    appc = getattr(gui_instance, 'app_controller', None)
+                    has_results = bool(getattr(appc, 'snid_results', None)) if appc else False
+                    if has_results and hasattr(gui_instance, 'event_handlers'):
+                        # Reuse confirmation + reset logic from event handler
+                        gui_instance.event_handlers.on_run_analysis()
+                    elif hasattr(gui_instance, 'run_quick_analysis'):
+                        gui_instance.run_quick_analysis()
+                    else:
+                        _LOGGER.info("Quick analysis not available")
+                except Exception as e:
+                    _LOGGER.warning(f"Right-click analysis handler error: {e}")
             else:
                 # Call the original mousePressEvent for normal button behavior
                 QtWidgets.QPushButton.mousePressEvent(gui_instance.analysis_btn, event)

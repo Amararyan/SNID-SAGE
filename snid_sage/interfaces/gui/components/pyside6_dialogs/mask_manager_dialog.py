@@ -8,7 +8,7 @@ This module handles the wavelength mask management dialog functionality includin
 - Interactive masking integration
 - Save and load mask configurations
 
-Converted from Tkinter to PySide6 for modern Qt interface.
+Modern PySide6 Qt interface.
 """
 
 import PySide6.QtCore as QtCore
@@ -204,12 +204,12 @@ class PySide6MaskManagerDialog(QtWidgets.QDialog):
         remove_layout = QtWidgets.QHBoxLayout()
         remove_layout.addStretch()
         
-        self.remove_btn = QtWidgets.QPushButton("🗑️ Remove Selected")
+        self.remove_btn = QtWidgets.QPushButton("Remove Selected")
         self.remove_btn.setObjectName("danger_btn")
         self.remove_btn.clicked.connect(self._remove_selected_mask)
         remove_layout.addWidget(self.remove_btn)
         
-        self.clear_all_btn = QtWidgets.QPushButton("🧹 Clear All")
+        self.clear_all_btn = QtWidgets.QPushButton("Clear All")
         self.clear_all_btn.setObjectName("danger_btn")
         self.clear_all_btn.clicked.connect(self._clear_all_masks)
         remove_layout.addWidget(self.clear_all_btn)
@@ -239,7 +239,7 @@ class PySide6MaskManagerDialog(QtWidgets.QDialog):
         self.max_wave_input.setMaximumWidth(150)
         input_layout.addWidget(self.max_wave_input)
         
-        self.add_mask_btn = QtWidgets.QPushButton("➕ Add Mask")
+        self.add_mask_btn = QtWidgets.QPushButton("Add Mask")
         self.add_mask_btn.setObjectName("success_btn")
         self.add_mask_btn.clicked.connect(self._add_new_mask)
         input_layout.addWidget(self.add_mask_btn)
@@ -264,22 +264,22 @@ class PySide6MaskManagerDialog(QtWidgets.QDialog):
         button_layout.addStretch()
         
         # Save & Load buttons
-        self.save_btn = QtWidgets.QPushButton("💾 Save Masks")
+        self.save_btn = QtWidgets.QPushButton("Save Masks")
         self.save_btn.clicked.connect(self._save_masks)
         button_layout.addWidget(self.save_btn)
         
-        self.load_btn = QtWidgets.QPushButton("📂 Load Masks")
+        self.load_btn = QtWidgets.QPushButton("Load Masks")
         self.load_btn.clicked.connect(self._load_masks)
         button_layout.addWidget(self.load_btn)
         
         button_layout.addSpacing(20)
         
         # Cancel and Apply buttons
-        self.cancel_btn = QtWidgets.QPushButton("❌ Cancel")
+        self.cancel_btn = QtWidgets.QPushButton("Cancel")
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
         
-        self.apply_btn = QtWidgets.QPushButton("✅ Apply")
+        self.apply_btn = QtWidgets.QPushButton("Apply")
         self.apply_btn.setObjectName("primary_btn")
         self.apply_btn.clicked.connect(self._apply_masks)
         button_layout.addWidget(self.apply_btn)

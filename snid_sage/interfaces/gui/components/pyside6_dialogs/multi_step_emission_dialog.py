@@ -31,7 +31,6 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('gui.pyside6_emission_dialog_refactored')
 
-# Import supernova emission line constants
 from snid_sage.shared.constants.physical import SUPERNOVA_EMISSION_LINES, SN_LINE_CATEGORIES, SPEED_OF_LIGHT_KMS
 
 # Import platform configuration
@@ -251,6 +250,12 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.plot_widget.setLabel('bottom', 'Wavelength (Å)')
             self.plot_widget.setMinimumWidth(600)
             self.plot_widget.setMinimumHeight(400)
+
+            # Enable subtle grid matching main GUI style
+            try:
+                self.plot_item.showGrid(x=True, y=True, alpha=0.08)
+            except Exception:
+                pass
 
             # Improve fit within frame: add slight internal margins and view padding
             try:
@@ -880,7 +885,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             bottom_buttons_layout.addWidget(help_btn)
             
             # Back to step 1 button (bottom right)
-            back_btn = QtWidgets.QPushButton("← Back to Step 1")
+            back_btn = QtWidgets.QPushButton("Back to Step 1")
             back_btn.clicked.connect(self._back_to_step_1)
             back_btn.setStyleSheet("""
                 QPushButton {
@@ -985,7 +990,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         copy_summary_btn = QtWidgets.QPushButton("Copy Summary")
         summary_controls.addWidget(copy_summary_btn)
 
-        export_btn = QtWidgets.QPushButton("💾 Export Results")
+        export_btn = QtWidgets.QPushButton("Export Results")
         summary_controls.addWidget(export_btn)
 
         summary_controls.addStretch()

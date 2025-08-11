@@ -123,7 +123,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             self, 
             "Select Spectrum File",
             "",
-            "All Supported (*.txt *.dat *.ascii *.lnw *.fits);;Text Files (*.txt *.dat *.ascii);;SNID Files (*.lnw);;FITS Files (*.fits);;All Files (*.*)"
+            "All Supported (*.txt *.dat *.ascii *.asci *.lnw *.fits *.flm);;Text Files (*.txt *.dat *.ascii *.asci *.flm);;SNID Files (*.lnw);;FITS Files (*.fits);;FLM Files (*.flm);;All Files (*.*)"
         )
         
         if file_path:
@@ -304,6 +304,8 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
                 return self._load_fits_spectrum(file_path)
             elif file_path.endswith('.lnw'):
                 return self._load_lnw_spectrum(file_path)
+            elif file_path.endswith('.flm'):
+                return self._load_ascii_spectrum(file_path)  # FLM files are text-based
             else:
                 return self._load_ascii_spectrum(file_path)
         except Exception as e:

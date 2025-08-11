@@ -72,30 +72,21 @@ class EmissionDialogUIBuilder:
         mode_layout = QtWidgets.QVBoxLayout(mode_group)
         
         mode_buttons_layout = QtWidgets.QHBoxLayout()
-        self.dialog.sn_button = QtWidgets.QPushButton("🌟 SN Lines")
-        self.dialog.sn_button.setCheckable(True)
+        
+        # Create radio buttons for mode selection - pill styling is automatic now
+        self.dialog.sn_button = QtWidgets.QRadioButton("SN Lines")
         self.dialog.sn_button.setChecked(True)
-        # Apply blue styling for initial active state
-        self.dialog.sn_button.setStyleSheet("""
-            QPushButton {
-                background-color: #3b82f6;
-                color: white;
-                border: 2px solid #2563eb;
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2563eb;
-            }
-        """)
         self.dialog.sn_button.clicked.connect(self.dialog._set_sn_mode)
         mode_buttons_layout.addWidget(self.dialog.sn_button)
         
-        self.dialog.galaxy_button = QtWidgets.QPushButton("Galaxy Lines")
-        self.dialog.galaxy_button.setCheckable(True)
+        self.dialog.galaxy_button = QtWidgets.QRadioButton("Galaxy Lines")
         self.dialog.galaxy_button.clicked.connect(self.dialog._set_galaxy_mode)
         mode_buttons_layout.addWidget(self.dialog.galaxy_button)
+        
+        # Create button group for exclusive selection
+        self.dialog.mode_button_group = QtWidgets.QButtonGroup(self.dialog)
+        self.dialog.mode_button_group.addButton(self.dialog.sn_button, 0)
+        self.dialog.mode_button_group.addButton(self.dialog.galaxy_button, 1)
         
         mode_layout.addLayout(mode_buttons_layout)
         layout.addWidget(mode_group)
@@ -208,7 +199,7 @@ class EmissionDialogUIBuilder:
         # List controls
         list_controls = QtWidgets.QHBoxLayout()
         
-        remove_btn = QtWidgets.QPushButton("🗑️ Remove Selected")
+        remove_btn = QtWidgets.QPushButton("Remove Selected")
         remove_btn.clicked.connect(self.dialog._remove_selected_lines)
         remove_btn.setProperty("clearButton", True)
         list_controls.addWidget(remove_btn)
@@ -353,7 +344,7 @@ class EmissionDialogUIBuilder:
         """)
         controls_layout.addWidget(help_btn)
         
-        step2_btn = QtWidgets.QPushButton("→ Step 2: Analysis")
+        step2_btn = QtWidgets.QPushButton("Step 2: Analysis")
         step2_btn.clicked.connect(self.dialog._proceed_to_step_2)
         step2_btn.setStyleSheet("""
             QPushButton {
@@ -652,7 +643,7 @@ class EmissionDialogUIBuilder:
         """)
         info_layout.addWidget(clear_points_btn)
 
-        analyze_btn = QtWidgets.QPushButton("🔬 Analyze")
+        analyze_btn = QtWidgets.QPushButton("Analyze")
         analyze_btn.setStyleSheet("""
             QPushButton {
                 background-color: #10b981;

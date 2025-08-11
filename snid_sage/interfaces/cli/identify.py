@@ -20,7 +20,8 @@ from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResu
 from snid_sage.snid.io import read_spectrum
 from snid_sage.shared.utils.math_utils import (
     calculate_weighted_redshift_balanced,
-    calculate_weighted_age_estimate,
+    calculate_weighted_age,
+    apply_exponential_weighting,
     get_best_metric_value
 )
 
@@ -134,9 +135,6 @@ Examples:
   # With Savitzky-Golay smoothing (11-pixel window, 3rd order polynomial)
   snid identify spectrum.txt --output-dir results/ --savgol-window 11 --savgol-order 3
   
-  # With wavelength-based Savitzky-Golay smoothing (5 Angstrom FWHM)
-  snid identify spectrum.txt --output-dir results/ --savgol-fwhm 5.0 --savgol-order 3
-  
   # Minimal mode - main result file only, no additional outputs
   snid identify spectrum.txt --output-dir results/ --minimal
   
@@ -227,12 +225,6 @@ Examples:
         type=int, 
         default=3, 
         help="Savitzky-Golay filter polynomial order"
-    )
-    preproc_group.add_argument(
-        "--savgol-fwhm", 
-        type=float, 
-        default=0.0, 
-        help="Savitzky-Golay filter FWHM in Angstroms (alternative to --savgol-window, default: 0.0)"
     )
     preproc_group.add_argument(
         "--aband-remove", 
@@ -378,7 +370,7 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
     
     if winning_cluster:
         cluster_matches = winning_cluster.get('matches', [])
-        # Sort cluster matches by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+        # Sort cluster matches by best available metric (RLAP-CCC if available, otherwise RLAP) descending
         from snid_sage.shared.utils.math_utils import get_best_metric_value
         cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
     
@@ -386,12 +378,12 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
     if not cluster_matches:
         if hasattr(result, 'filtered_matches') and result.filtered_matches:
             cluster_matches = result.filtered_matches
-            # Sort by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+            # Sort by best available metric (RLAP-CCC if available, otherwise RLAP) descending
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
         elif hasattr(result, 'best_matches') and result.best_matches:
             cluster_matches = result.best_matches
-            # Sort by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+            # Sort by best available metric (RLAP-CCC if available, otherwise RLAP) descending
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
     
@@ -482,12 +474,14 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                 summary['cluster_redshift_weighted_uncertainty'] = np.nan
                 summary['cluster_redshift_scatter'] = 0.0
             
-            # Simple age estimation (no uncertainties)
+            # Age estimation with proper uncertainty calculation
             if ages_for_estimation:
-                age_final = calculate_weighted_age_estimate(ages_for_estimation, age_rlap_cos_values)
+                # Apply exponential weighting to RLAP-cos values for age calculation
+                age_weights = apply_exponential_weighting(np.array(age_rlap_cos_values))
+                age_final, age_uncertainty = calculate_weighted_age(ages_for_estimation, age_weights)
                 summary['cluster_age_weighted'] = age_final
-                summary['cluster_age_uncertainty'] = 0.0  # No uncertainty available for ages
-                summary['cluster_age_scatter'] = 0.0
+                summary['cluster_age_uncertainty'] = age_uncertainty
+                summary['cluster_age_scatter'] = 0.0  # Handled in uncertainty calculation
                 summary['redshift_age_covariance'] = 0.0  # Separate estimation, no covariance
             else:
                 # No valid age data
@@ -607,7 +601,7 @@ def _save_spectrum_outputs(
                     elif hasattr(result, 'best_matches') and result.best_matches:
                         plot_matches = result.best_matches
                 
-                # CRITICAL: Sort all plot matches by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+                # CRITICAL: Sort all plot matches by best available metric (RLAP-CCC if available, otherwise RLAP) descending
                 if plot_matches:
                     from snid_sage.shared.utils.math_utils import get_best_metric_value
                     plot_matches = sorted(plot_matches, key=get_best_metric_value, reverse=True)
@@ -802,13 +796,11 @@ def main(args: argparse.Namespace) -> int:
         
         # Prepare savgol filter parameters  
         savgol_window = args.savgol_window if args.savgol_window > 0 else 0
-        savgol_fwhm = args.savgol_fwhm if args.savgol_fwhm > 0 else 0.0
         
         # Preprocess spectrum
         processed_spectrum, preprocessing_trace = preprocess_spectrum(
             args.spectrum_path,
                 savgol_window=savgol_window,
-            savgol_fwhm=savgol_fwhm,
             savgol_order=args.savgol_order,
                 aband_remove=args.aband_remove,
                 skyclip=args.skyclip,

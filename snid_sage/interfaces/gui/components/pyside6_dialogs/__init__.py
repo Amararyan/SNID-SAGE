@@ -3,7 +3,6 @@ SNID SAGE PySide6 Dialogs
 =========================
 
 Collection of PySide6 dialog windows for the SNID SAGE GUI interface.
-These dialogs provide Qt-native alternatives to the Tkinter dialogs.
 
 Available dialogs:
 - PreprocessingDialog: Spectrum preprocessing configuration (Qt native)
@@ -36,8 +35,7 @@ from .multi_step_emission_dialog import PySide6MultiStepEmissionAnalysisDialog, 
 # Dialog manager
 from .dialog_manager import DialogManager
 
-# NOTE: The following dialogs use matplotlib and should be imported only when needed
-# to prevent TkAgg backend conflicts with PySide6:
+# NOTE: The following dialogs use matplotlib and should be imported only when needed:
 # - cluster_selection_dialog (uses matplotlib for 3D plots)
 # - redshift_age_dialog (uses matplotlib for scatter plots)
 # - subtype_proportions_dialog (uses matplotlib for pie charts)
@@ -46,7 +44,7 @@ from .dialog_manager import DialogManager
 
 # Conditional imports for matplotlib-using dialogs
 try:
-    # Only import these when specifically requested to avoid TkAgg conflicts
+    # Only import these when specifically requested
     pass
     # from .cluster_selection_dialog import PySide6ClusterSelectionDialog, show_cluster_selection_dialog
     # from .redshift_age_dialog import PySide6RedshiftAgeDialog, show_redshift_age_dialog

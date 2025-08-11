@@ -6,11 +6,9 @@ This package contains preprocessing-specific functionality for the SNID GUI,
 including core preprocessing classes and utilities.
 
 Components:
-- SpectrumPreprocessor: Core preprocessing functionality
+  (PySide6) PySide6PreviewCalculator for preview operations
 """
 
-from .spectrum_preprocessor import SpectrumPreprocessor
-
-__all__ = ['SpectrumPreprocessor']
+__all__ = []
 
 # Preprocessing Features Module 

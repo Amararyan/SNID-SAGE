@@ -19,11 +19,11 @@ from matplotlib.axes import Axes
 from typing import Optional, Dict, Any, Union, Tuple
 import numpy as np
 
-# Import font management
+# Import font management (optional; the module may be removed during Tk cleanup)
 try:
     from .unified_font_manager import get_font_manager, FontCategory
     FONT_MANAGER_AVAILABLE = True
-except ImportError:
+except Exception:
     FONT_MANAGER_AVAILABLE = False
 
 # Import centralized logging

@@ -3,7 +3,7 @@ PySide6 Shortcuts Dialog for SNID SAGE GUI
 ==========================================
 
 This module provides a PySide6 dialog to display keyboard shortcuts and hotkeys
-available in the SNID SAGE GUI interface, matching the Tkinter version functionality.
+available in the SNID SAGE GUI interface.
 """
 
 import platform

@@ -25,6 +25,13 @@ try:
 except ImportError:
     PYGAME_AVAILABLE = False
 
+# Check if PySide6 (Qt) is available for dialogs
+try:
+    from PySide6 import QtWidgets, QtCore
+    PYSIDE6_AVAILABLE = True
+except Exception:
+    PYSIDE6_AVAILABLE = False
+
 # Cross-platform window focusing
 class CrossPlatformGameFocus:
     """Cross-platform window focus management for games"""
@@ -121,6 +128,33 @@ SHIELD_COLOR = (0, 255, 255)     # Cyan shield
 POWERUP_SHIELD_COLOR = (0, 255, 200)  # Teal for shield powerup
 POWERUP_MULTISHOT_COLOR = (255, 0, 255)  # Magenta for multishot powerup
 # -----------------------------------------------------
+
+# Deluxe parallax starfield (for nicer background only)
+class _ParallaxStarLayer:
+    def __init__(self, count: int, speed_y: float, twinkle: bool):
+        self.points = [
+            [random.random() * DEBRIS_WIDTH, random.random() * DEBRIS_HEIGHT, random.random()]
+            for _ in range(count)
+        ]
+        self.speed_y = speed_y
+        self.twinkle = twinkle
+
+    def update(self):
+        for p in self.points:
+            p[1] += self.speed_y
+            if p[1] >= DEBRIS_HEIGHT:
+                p[0] = random.random() * DEBRIS_WIDTH
+                p[1] -= DEBRIS_HEIGHT
+
+    def draw(self, surface):
+        t = time.time()
+        for x, y, s in self.points:
+            size = 1 + (1 if s > 0.7 else 0)
+            if self.twinkle and int((t + s) * 5) % 4 == 0:
+                color = (200, 210, 255)
+            else:
+                color = (160, 170, 230) if s < 0.4 else (200, 210, 255)
+            surface.fill(color, (int(x), int(y), size, size))
 
 # Global analysis notification system
 _analysis_notifications = []
@@ -296,6 +330,11 @@ class SpaceStation:
         hull_points = [nose_tip, nose_left, mid_left, tail_left, tail_right, mid_right, nose_right]
         pygame.draw.polygon(surface, STATION_COLOR, hull_points, 2)
         
+        # Subtle detailing: center spine and panel line
+        tail_mid = ((tail_left[0] + tail_right[0]) / 2, (tail_left[1] + tail_right[1]) / 2)
+        pygame.draw.line(surface, (200, 240, 255), (nose_tip[0], nose_tip[1]), (tail_mid[0], tail_mid[1]), 1)
+        pygame.draw.line(surface, (170, 210, 235), (mid_left[0], mid_left[1]), (mid_right[0], mid_right[1]), 1)
+        
         # Draw wings/solar panels
         wing_offset = 6
         # Left wing
@@ -308,6 +347,8 @@ class SpaceStation:
         pygame.draw.polygon(surface, STATION_COLOR, [wing_left_inner, wing_left_outer, 
                            (wing_left_outer[0] + wing_width * math.cos(rad + math.pi/2), 
                             wing_left_outer[1] + wing_width * math.sin(rad + math.pi/2)), wing_left_tip], 2)
+        # Wing detailing line
+        pygame.draw.line(surface, (180, 220, 240), (wing_left_inner[0], wing_left_inner[1]), (wing_left_tip[0], wing_left_tip[1]), 1)
         
         # Right wing  
         wing_right_outer = (cx + wing_offset * math.sin(rad) - wing_length * math.cos(rad - math.pi/2), 
@@ -319,6 +360,8 @@ class SpaceStation:
         pygame.draw.polygon(surface, STATION_COLOR, [wing_right_inner, wing_right_outer,
                            (wing_right_outer[0] + wing_width * math.cos(rad - math.pi/2), 
                             wing_right_outer[1] + wing_width * math.sin(rad - math.pi/2)), wing_right_tip], 2)
+        # Wing detailing line
+        pygame.draw.line(surface, (180, 220, 240), (wing_right_inner[0], wing_right_inner[1]), (wing_right_tip[0], wing_right_tip[1]), 1)
         
         # Draw cockpit/command module
         cockpit_x = cx + 12 * math.cos(rad)
@@ -440,25 +483,35 @@ class EnergyBullet:
                            (int(self.pos[0]), int(self.pos[1])), 1)
 
 class BossBullet:
-    def __init__(self, pos, target_pos, wave_number=1):
+    def __init__(self, pos, target_pos=None, wave_number=1, *, initial_angle=None, speed=None):
         self.pos = pos
         self.life = BULLET_LIFE * 2  # Boss bullets last longer
         self.trail = []
         
-        # Calculate direction to target
-        dx = target_pos[0] - pos[0]
-        dy = target_pos[1] - pos[1]
-        distance_to_target = math.sqrt(dx*dx + dy*dy)
-        
         # Progressive bullet speed - slower for early waves
         speed_multiplier = 0.4 + (wave_number - 1) * 0.1  # Start at 40%, increase by 10% per wave
         speed_multiplier = min(speed_multiplier, 0.9)  # Cap at 90% of player bullet speed
-        
-        if distance_to_target > 0:
-            self.vel = (dx / distance_to_target * BULLET_SPEED * speed_multiplier, 
-                       dy / distance_to_target * BULLET_SPEED * speed_multiplier)
+        base_speed = BULLET_SPEED * speed_multiplier
+
+        if initial_angle is not None:
+            # Spawn by angle (rings, spreads)
+            s = speed if speed is not None else base_speed
+            self.vel = (math.cos(initial_angle) * s, math.sin(initial_angle) * s)
         else:
-            self.vel = (0, BULLET_SPEED * speed_multiplier)
+            # Aim at target position (legacy behavior)
+            if target_pos is None:
+                target_pos = (pos[0], pos[1] + 1)
+            dx = target_pos[0] - pos[0]
+            dy = target_pos[1] - pos[1]
+            distance_to_target = math.hypot(dx, dy)
+            if distance_to_target > 0:
+                self.vel = (dx / distance_to_target * base_speed, dy / distance_to_target * base_speed)
+            else:
+                self.vel = (0, base_speed)
+
+    @classmethod
+    def from_angle(cls, pos, angle_radians, wave_number=1, speed=None):
+        return cls(pos, None, wave_number, initial_angle=angle_radians, speed=speed)
 
     def update(self):
         # Add current position to trail
@@ -814,12 +867,42 @@ class BossSatellite:
         
         return components
 
-    def update(self):
-        # Move boss in a pattern
+    def update(self, target_pos=None):
+        # Rotate for visual interest
         self.angle += self.rotation_speed
         
-        # Sine wave movement
-        self.vel = (BOSS_SPEED * math.sin(self.angle * 0.02), BOSS_SPEED * 0.5)
+        if target_pos is not None:
+            # Target-aware pursuit with orbiting and noise
+            dx = target_pos[0] - self.pos[0]
+            dy = target_pos[1] - self.pos[1]
+            dist = math.hypot(dx, dy) + 1e-6
+            ux, uy = dx / dist, dy / dist
+            # Orbit perpendicular to pursuit
+            orbit_dir = 1 if (self.wave_number % 2 == 0) else -1
+            ox, oy = -uy * orbit_dir, ux * orbit_dir
+            
+            pursue_strength = 0.5 + 0.02 * self.wave_number + 0.15 * (self.phase - 1)
+            orbit_strength = 0.3 + 0.1 * (self.phase - 1)
+            standoff = self.size + 90
+            repel = 0.0
+            if dist < standoff:
+                repel = (standoff - dist) / standoff
+            
+            # Gentle procedural wobble
+            t = pygame.time.get_ticks() * 0.002
+            nx = 0.3 * math.sin(t + self.wave_number)
+            ny = 0.3 * math.cos(t * 1.3 + self.phase)
+            
+            desired_vx = BOSS_SPEED * (pursue_strength * ux + orbit_strength * ox - repel * ux) + nx
+            desired_vy = BOSS_SPEED * (pursue_strength * uy + orbit_strength * oy - repel * uy) + ny
+            
+            # Smoothly steer toward desired velocity
+            cur_vx, cur_vy = self.vel
+            self.vel = (cur_vx * 0.85 + desired_vx * 0.15, cur_vy * 0.85 + desired_vy * 0.15)
+        else:
+            # Fallback: sine wave drift
+            self.vel = (BOSS_SPEED * math.sin(self.angle * 0.02), BOSS_SPEED * 0.5)
+
         self.pos = wrap_position((self.pos[0] + self.vel[0], self.pos[1] + self.vel[1]))
         
         # Update phase based on health
@@ -841,11 +924,38 @@ class BossSatellite:
         return self.last_shot_time >= phase_cooldown.get(self.phase, 240)
 
     def shoot_at_target(self, target_pos):
-        """Create a bullet aimed at target position"""
-        if self.should_shoot(target_pos):
-            self.last_shot_time = 0
-            return BossBullet(self.pos, target_pos, self.wave_number)
-        return None
+        """Create bullets aimed at target position. Returns a list (may be empty)."""
+        if not self.should_shoot(target_pos):
+            return []
+        self.last_shot_time = 0
+        bullets = []
+        # Phase-based patterns
+        if self.phase == 1:
+            # Mostly single aimed shots; occasional 2-shot burst
+            bullets.append(BossBullet(self.pos, target_pos, self.wave_number))
+            if random.random() < 0.25:
+                # slight offset second shot
+                off = math.radians(random.choice([-8, 8]))
+                angle = math.atan2(target_pos[1] - self.pos[1], target_pos[0] - self.pos[0]) + off
+                bullets.append(BossBullet.from_angle(self.pos, angle, self.wave_number))
+        elif self.phase == 2:
+            # 3-shot spread
+            base_angle = math.atan2(target_pos[1] - self.pos[1], target_pos[0] - self.pos[0])
+            for off_deg in (-10, 0, 10):
+                bullets.append(BossBullet.from_angle(self.pos, base_angle + math.radians(off_deg), self.wave_number))
+        else:  # phase 3
+            # Ring burst or heavy spread (all straight)
+            if random.random() < 0.5:
+                count = 8
+                base = random.random() * math.tau
+                for i in range(count):
+                    ang = base + i * (math.tau / count)
+                    bullets.append(BossBullet.from_angle(self.pos, ang, self.wave_number, speed=BULLET_SPEED * 0.7))
+            else:
+                base_angle = math.atan2(target_pos[1] - self.pos[1], target_pos[0] - self.pos[0])
+                for off_deg in (-20, -10, 0, 10, 20):
+                    bullets.append(BossBullet.from_angle(self.pos, base_angle + math.radians(off_deg), self.wave_number))
+        return bullets
 
     def take_damage(self, bullet_pos):
         # Check which component was hit
@@ -995,7 +1105,7 @@ class BossSatellite:
             return 25
         return self.size * 0.8
 
-def run_debris_game():
+def run_debris_game(use_deluxe_background: bool = True):
     """
     Run the Space Debris Cleanup game - ENHANCED with Boss Battles and Power-ups!
     
@@ -1009,6 +1119,9 @@ def run_debris_game():
     - Chain reaction explosions
     - Shield and Multishot power-ups
     - Realistic physics and visuals
+    
+    Parameters:
+        use_deluxe_background: if True, render parallax starfield background from the demo
     """
     if not PYGAME_AVAILABLE:
         print("Pygame is not installed. Cannot run Space Debris game.")
@@ -1119,6 +1232,11 @@ def run_debris_game():
 
     font = pygame.font.SysFont(None, 24)
     big_font = pygame.font.SysFont(None, 48)
+
+    # Parallax starfield background setup (always on)
+    stars_far = _ParallaxStarLayer(count=120, speed_y=0.05, twinkle=False)
+    stars_mid = _ParallaxStarLayer(count=80, speed_y=0.10, twinkle=True)
+    stars_near = _ParallaxStarLayer(count=60, speed_y=0.18, twinkle=True)
     
     def create_chain_explosion(pos, debris_list, current_score):
         """Create chain reaction explosions"""
@@ -1343,12 +1461,12 @@ def run_debris_game():
 
             # Boss battle logic
             if boss and boss is not None:
-                boss.update()
+                boss.update(station.pos)
                 
-                # Boss shooting
-                boss_bullet = boss.shoot_at_target(station.pos)
-                if boss_bullet:
-                    boss_bullets.append(boss_bullet)
+                # Boss shooting (may return multiple bullets)
+                new_bullets = boss.shoot_at_target(station.pos)
+                if new_bullets:
+                    boss_bullets.extend(new_bullets)
                 
                 # Boss collision with bullets
                 for b in bullets[:]:
@@ -1415,29 +1533,10 @@ def run_debris_game():
         # Draw everything
         screen.fill(SPACE_BLUE)  # Deep space background
         
-        # Draw background nebula effect
-        for i in range(20):
-            nebula_x = (i * 73) % DEBRIS_WIDTH
-            nebula_y = (i * 111) % DEBRIS_HEIGHT
-            nebula_size = 30 + (i % 15)
-            nebula_alpha = 30 + (i % 20)
-            pygame.draw.circle(screen, (40, 20, 60), (nebula_x, nebula_y), nebula_size, 0)
-        
-        # Draw twinkling background stars
-        for i in range(100):
-            star_x = (i * 137) % DEBRIS_WIDTH
-            star_y = (i * 197) % DEBRIS_HEIGHT
-            twinkle = (i + int(time.time() * 2)) % 5
-            if twinkle == 0:
-                star_size = 2
-                star_color = STAR_COLOR
-            elif twinkle == 1:
-                star_size = 1
-                star_color = (200, 200, 255)
-            else:
-                star_size = 1
-                star_color = STAR_COLOR
-            pygame.draw.circle(screen, star_color, (star_x, star_y), star_size)
+        # Parallax starfield layers
+        stars_far.update(); stars_far.draw(screen)
+        stars_mid.update(); stars_mid.draw(screen)
+        stars_near.update(); stars_near.draw(screen)
         
         # Earth circle removed as requested
         
@@ -1599,280 +1698,204 @@ def run_asteroids_game():
 
 def show_game_menu_integrated(parent_window, callback=None):
     """
-    Show an integrated game selection dialog within the parent window.
+    Show an integrated game selection UI within a Qt parent window.
     Now only shows the Space Debris game.
-    
+
     Parameters:
-        parent_window: The parent tkinter window
-        callback: Optional callback function to call with selected game
-        
+        parent_window: The parent Qt widget (QWidget)
+        callback: Optional function called with selected game callable or None
+
     Returns:
-        The dialog frame that can be embedded in the parent
+        A Qt widget (QFrame) that can be embedded in the parent, or None if unavailable
     """
     if not PYGAME_AVAILABLE:
-        try:
-            import tkinter as tk
-            from tkinter import messagebox
-            messagebox.showwarning("Games Not Available", 
-                                 "Pygame is not installed. Games require pygame.\n\n"
-                                 "You can install it with: pip install pygame",
-                                 parent=parent_window)
-        except:
+        if PYSIDE6_AVAILABLE:
+            QtWidgets.QMessageBox.warning(
+                parent_window if isinstance(parent_window, QtWidgets.QWidget) else None,
+                "Games Not Available",
+                "Pygame is not installed. Games require pygame.\n\n"
+                "You can install it with: pip install pygame"
+            )
+        else:
             print("\nPygame is not installed. Games require pygame.")
             print("You can install it with: pip install pygame")
         return None
-    
-    try:
-        import tkinter as tk
-        
-        # Create game selection frame
-        game_frame = tk.Frame(parent_window, bg='#2c3e50', relief='raised', bd=2)
-        
-        # Title
-        title_label = tk.Label(game_frame, text="Space Debris Cleanup!", 
-                              font=('Arial', 14, 'bold'),
-                              bg='#2c3e50', fg='#ecf0f1')
-        title_label.pack(pady=(15, 5))
-        
-        # Subtitle
-        subtitle_label = tk.Label(game_frame, text="Realistic space simulation while SNID analysis runs", 
-                                 font=('Arial', 9),
-                                 bg='#2c3e50', fg='#bdc3c7')
-        subtitle_label.pack(pady=(0, 15))
-        
-        # Game buttons container
-        button_container = tk.Frame(game_frame, bg='#2c3e50')
-        button_container.pack(expand=True, fill='both', padx=20, pady=(0, 15))
-        
-        def select_and_start_game():
-            """Select and start the space debris game"""
-            try:
-                import threading
-                def run_game():
-                    run_debris_game()
-                
-                # Start game in background thread
-                game_thread = threading.Thread(target=run_game, daemon=True)
-                game_thread.start()
-                
-                # Hide the game selection frame
-                game_frame.pack_forget()
-                
-                # Call callback if provided
-                if callback:
-                    callback(run_debris_game)
-                    
-            except Exception as e:
-                print(f"Error starting game: {e}")
-        
-        def cancel_selection():
-            """Cancel game selection"""
-            game_frame.pack_forget()
-            if callback:
-                callback(None)
-        
-        # Space Debris game button
-        btn = tk.Button(button_container, text="Space Debris Cleanup",
-                       font=('Arial', 13, 'bold'),
-                       bg='#e74c3c', fg='white',
-                       relief='flat', bd=0, padx=15, pady=12,
-                       cursor='hand2',
-                       command=select_and_start_game)
-        btn.pack(fill='x', pady=8)
-        
-        # Description
-        desc = tk.Label(button_container, text="Pilot a detailed spacecraft with wings and thrusters\nClean up 4 types of realistic satellite debris\nEnergy bullets with particle trail effects\nDeep space background with twinkling stars\nEarth visible in the background\nSatellites with solar panels and antennas",
-                       font=('Arial', 10),
-                       bg='#2c3e50', fg='#95a5a6',
-                       justify='center')
-        desc.pack(pady=(0, 15))
-        
-        # Features list
-        features_label = tk.Label(button_container, text="Enhanced Features:\n- 4 types of realistic satellites\n- Detailed spacecraft with wings\n- Particle effects and animations\n- Deep space background",
-                                font=('Arial', 9),
-                                bg='#2c3e50', fg='#7fb3d3',
-                                justify='left')
-        features_label.pack(pady=(0, 15))
-        
-        # Cancel button
-        cancel_btn = tk.Button(button_container, text="❌ No Thanks",
-                              font=('Arial', 9),
-                              bg='#7f8c8d', fg='white',
-                              relief='flat', bd=0, padx=15, pady=6,
-                              cursor='hand2',
-                              command=cancel_selection)
-        cancel_btn.pack(fill='x', pady=(5, 0))
-        
-        return game_frame
-        
-    except Exception as e:
-        print(f"Error creating integrated game selection: {e}")
+
+    if not PYSIDE6_AVAILABLE:
+        # No Qt available to render integrated UI
         return None
+
+    # Create a container frame
+    frame = QtWidgets.QFrame(parent_window if isinstance(parent_window, QtWidgets.QWidget) else None)
+    frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
+    frame.setStyleSheet("background-color: #2c3e50;")
+
+    layout = QtWidgets.QVBoxLayout(frame)
+    layout.setContentsMargins(20, 15, 20, 15)
+
+    # Title
+    title = QtWidgets.QLabel("Space Debris Cleanup!")
+    title.setStyleSheet("color: #ecf0f1; font-weight: bold; font-size: 16px;")
+    layout.addWidget(title)
+
+    # Subtitle
+    subtitle = QtWidgets.QLabel("Realistic space simulation while SNID analysis runs")
+    subtitle.setStyleSheet("color: #bdc3c7; font-size: 11px;")
+    layout.addWidget(subtitle)
+
+    # Description
+    desc = QtWidgets.QLabel(
+        "Pilot a detailed spacecraft with wings and thrusters\n"
+        "Clean up 4 types of realistic satellite debris\n"
+        "Energy bullets with particle trail effects\n"
+        "Deep space background with twinkling stars\n"
+        "Satellites with solar panels and antennas"
+    )
+    desc.setAlignment(QtCore.Qt.AlignCenter)
+    desc.setStyleSheet("color: #95a5a6; font-size: 11px;")
+    layout.addWidget(desc)
+
+    # Buttons
+    button_row = QtWidgets.QHBoxLayout()
+    layout.addLayout(button_row)
+
+    start_btn = QtWidgets.QPushButton("Start Space Debris Cleanup")
+    start_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 8px; font-weight: bold;")
+    cancel_btn = QtWidgets.QPushButton("❌ No Thanks")
+    cancel_btn.setStyleSheet("background-color: #7f8c8d; color: white; padding: 6px;")
+    button_row.addWidget(start_btn)
+    button_row.addWidget(cancel_btn)
+
+    def on_start():
+        try:
+            t = threading.Thread(target=run_debris_game, daemon=True)
+            t.start()
+            frame.setVisible(False)
+            if callback:
+                callback(run_debris_game)
+        except Exception as e:
+            print(f"Error starting game: {e}")
+
+    def on_cancel():
+        frame.setVisible(False)
+        if callback:
+            callback(None)
+
+    start_btn.clicked.connect(on_start)
+    cancel_btn.clicked.connect(on_cancel)
+
+    return frame
 
 def show_game_menu() -> Optional[Callable]:
     """
-    Show a GUI dialog for the user to select the Space Debris game.
-    
+    Show a GUI dialog (Qt if available) to select the Space Debris game.
+
     Returns:
         Function to launch the Space Debris game or None if canceled
     """
     if not PYGAME_AVAILABLE:
-        try:
-            import tkinter as tk
-            from tkinter import messagebox
-            root = tk.Tk()
-            root.withdraw()  # Hide the main window
-            messagebox.showwarning("Games Not Available", 
-                                 "Pygame is not installed. Games require pygame.\n\n"
-                                 "You can install it with: pip install pygame")
-            root.destroy()
-        except:
+        if PYSIDE6_AVAILABLE:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Games Not Available",
+                "Pygame is not installed. Games require pygame.\n\n"
+                "You can install it with: pip install pygame"
+            )
+        else:
             print("\nPygame is not installed. Games require pygame.")
             print("You can install it with: pip install pygame")
         return None
-    
-    try:
-        import tkinter as tk
-        from tkinter import messagebox
-        
-        # Create a simple game selection dialog
-        root = tk.Tk()
-        root.withdraw()  # Hide the main window
-        
-        # Custom dialog for game selection
-        dialog = tk.Toplevel()
-        dialog.title("🛰️ Space Debris Cleanup")
-        dialog.geometry("450x400")
-        dialog.resizable(False, False)
-        dialog.configure(bg='#2c3e50')
-        
-        # Center the dialog
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
-        y = (dialog.winfo_screenheight() // 2) - (400 // 2)
-        dialog.geometry(f"450x400+{x}+{y}")
-        
-        # Make dialog modal
-        dialog.transient(root)
-        dialog.grab_set()
-        
-        # Store the selected game
-        selected_game = [None]
-        
-        # Title
-        title_label = tk.Label(dialog, text="🛰️ Space Debris Cleanup", 
-                              font=('Arial', 18, 'bold'),
-                              bg='#2c3e50', fg='#ecf0f1')
-        title_label.pack(pady=20)
-        
-        # Subtitle
-        subtitle_label = tk.Label(dialog, text="Advanced space simulation while SNID analysis runs", 
-                                 font=('Arial', 11),
-                                 bg='#2c3e50', fg='#bdc3c7')
-        subtitle_label.pack(pady=(0, 20))
-        
-        # Game description frame
-        desc_frame = tk.Frame(dialog, bg='#34495e', relief='raised', bd=2)
-        desc_frame.pack(fill='x', padx=30, pady=10)
-        
-        desc_text = """🚀 Pilot a detailed spacecraft with wings and thrusters
-🛰️ Clean up 4 types of realistic satellite debris
-⚡ Energy bullets with particle trail effects
-🌌 Deep space background with twinkling stars
-🌍 Earth visible in the background
-📡 Satellites with solar panels and antennas"""
-        
-        desc_label = tk.Label(desc_frame, text=desc_text,
-                            font=('Arial', 10),
-                            bg='#34495e', fg='#ecf0f1',
-                            justify='left')
-        desc_label.pack(padx=15, pady=15)
-        
-        # Game buttons
-        button_frame = tk.Frame(dialog, bg='#2c3e50')
-        button_frame.pack(expand=True, fill='both', padx=30, pady=20)
-        
-        def select_game():
-            selected_game[0] = run_debris_game
-            dialog.destroy()
-        
-        def cancel_selection():
-            selected_game[0] = None
-            dialog.destroy()
-        
-        # Main game button
-        game_btn = tk.Button(button_frame, text="🛰️ Start Space Debris Cleanup",
-                           font=('Arial', 14, 'bold'),
-                           bg='#e74c3c', fg='white',
-                           relief='flat', bd=0, padx=20, pady=15,
-                           cursor='hand2',
-                           command=select_game)
-        game_btn.pack(fill='x', pady=10)
-        
-        # Instructions
-        instructions_label = tk.Label(button_frame, text="Controls: Arrow keys to move • SPACE to fire • ESC to exit",
-                                    font=('Arial', 9),
-                                    bg='#2c3e50', fg='#95a5a6')
-        instructions_label.pack(pady=(5, 15))
-        
-        # Cancel button
-        cancel_btn = tk.Button(button_frame, text="❌ No Thanks",
-                              font=('Arial', 10),
-                              bg='#7f8c8d', fg='white',
-                              relief='flat', bd=0, padx=20, pady=8,
-                              cursor='hand2',
-                              command=cancel_selection)
-        cancel_btn.pack(fill='x', pady=(10, 0))
-        
-        # Handle window close
-        dialog.protocol("WM_DELETE_WINDOW", cancel_selection)
-        
-        # Wait for user selection
-        dialog.wait_window()
-        
-        # Clean up
-        root.destroy()
-        
-        return selected_game[0]
-        
-    except Exception as e:
-        # Fallback to console if GUI fails
-        print(f"GUI dialog failed ({e}), falling back to console...")
-        
-        # Check if we're in a non-interactive environment (CI, etc.)
-        import sys
-        import os
-        
-        # Check multiple indicators of non-interactive environment
-        is_noninteractive = (
-            not sys.stdin.isatty() or  # Standard check
-            os.environ.get('CI') or  # GitHub Actions, GitLab CI, etc.
-            os.environ.get('GITHUB_ACTIONS') or  # GitHub Actions specific
-            os.environ.get('RUNNER_OS') or  # GitHub Actions runner
-            os.environ.get('SNID_NONINTERACTIVE')  # Manual override
-        )
-        
-        if is_noninteractive:
-            print("Running in non-interactive environment, skipping game selection.")
+
+    if PYSIDE6_AVAILABLE:
+        try:
+            app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv if hasattr(sys, 'argv') else [])
+
+            dialog = QtWidgets.QDialog()
+            dialog.setWindowTitle("🛰️ Space Debris Cleanup")
+            dialog.setModal(True)
+            dialog.resize(480, 380)
+
+            layout = QtWidgets.QVBoxLayout(dialog)
+            layout.setContentsMargins(20, 20, 20, 20)
+
+            title = QtWidgets.QLabel("🛰️ Space Debris Cleanup")
+            title.setStyleSheet("font-size: 18px; font-weight: bold;")
+            layout.addWidget(title)
+
+            subtitle = QtWidgets.QLabel("Advanced space simulation while SNID analysis runs")
+            subtitle.setStyleSheet("color: gray;")
+            layout.addWidget(subtitle)
+
+            desc_text = (
+                "🚀 Pilot a detailed spacecraft with wings and thrusters\n"
+                "🛰️ Clean up 4 types of realistic satellite debris\n"
+                "⚡ Energy bullets with particle trail effects\n"
+                "🌌 Deep space background with twinkling stars\n"
+                "📡 Satellites with solar panels and antennas"
+            )
+            desc = QtWidgets.QLabel(desc_text)
+            desc.setAlignment(QtCore.Qt.AlignLeft)
+            desc.setStyleSheet("background:#34495e; color:#ecf0f1; padding:10px;")
+            layout.addWidget(desc)
+
+            btn_start = QtWidgets.QPushButton("Start Space Debris Cleanup")
+            btn_start.setStyleSheet("background:#e74c3c; color:white; padding:10px; font-weight: bold;")
+            btn_cancel = QtWidgets.QPushButton("❌ No Thanks")
+            btn_cancel.setStyleSheet("background:#7f8c8d; color:white; padding:8px;")
+
+            button_row = QtWidgets.QHBoxLayout()
+            button_row.addWidget(btn_start)
+            button_row.addWidget(btn_cancel)
+            layout.addLayout(button_row)
+
+            selected = {"fn": None}
+
+            def accept():
+                selected["fn"] = run_debris_game
+                dialog.accept()
+
+            def reject():
+                selected["fn"] = None
+                dialog.reject()
+
+            btn_start.clicked.connect(accept)
+            btn_cancel.clicked.connect(reject)
+
+            dialog.exec()
+            return selected["fn"]
+        except Exception as e:
+            print(f"Qt dialog failed ({e}), falling back to console...")
+
+    # Console fallback
+    is_noninteractive = (
+        not sys.stdin.isatty() or
+        os.environ.get('CI') or
+        os.environ.get('GITHUB_ACTIONS') or
+        os.environ.get('RUNNER_OS') or
+        os.environ.get('SNID_NONINTERACTIVE')
+    )
+
+    if is_noninteractive:
+        print("Running in non-interactive environment, skipping game selection.")
+        return None
+
+    print("\nWould you like to play Space Debris Cleanup while you wait?")
+    print("1. Space Debris Cleanup")
+    print("2. No thanks")
+
+    while True:
+        choice = input("Enter choice (1-2): ").strip()
+        if choice == '1':
+            return run_debris_game
+        elif choice == '2' or choice.lower() in ('n', 'no', 'q', 'quit'):
             return None
-        
-        print("\nWould you like to play Space Debris Cleanup while you wait?")
-        print("1. Space Debris Cleanup")
-        print("2. No thanks")
-        
-        while True:
-            choice = input("Enter choice (1-2): ").strip()
-            if choice == '1':
-                return run_debris_game
-            elif choice == '2' or choice.lower() in ('n', 'no', 'q', 'quit'):
-                return None
-            else:
-                print("Invalid choice. Please try again.")
+        else:
+            print("Invalid choice. Please try again.")
 
 def play_game_while_waiting(task_name: str = "SNID processing"):
     """
     Ask the user if they want to play the Space Debris game while waiting for a task to complete.
-    This function should be called in a separate thread.
+    This function is typically called from a background worker (thread or process).
     
     Parameters:
         task_name: Name of the task being waited for
@@ -1885,18 +1908,34 @@ def play_game_while_waiting(task_name: str = "SNID processing"):
         
 def run_game_in_thread(task_name: str = "SNID processing"):
     """
-    Run the Space Debris game in a separate thread while a task is running.
+    Run the Space Debris game while a task is running.
+    
+    On macOS, avoid running the Pygame window from a background thread (can crash with Cocoa/SDL).
+    Instead, launch a separate process so the game runs in that process's main thread.
     
     Parameters:
         task_name: Name of the task being waited for
     
     Returns:
-        threading.Thread: Game thread that can be monitored
+        threading.Thread | multiprocessing.Process: handle that can be monitored
     """
-    game_thread = threading.Thread(target=play_game_while_waiting, args=(task_name,))
-    game_thread.daemon = True  # Thread will be killed when the main program exits
-    game_thread.start()
-    return game_thread
+    try:
+        if sys.platform == 'darwin':
+            # Launch a separate process to keep the Pygame window on a main thread in that process
+            import multiprocessing as mp
+            game_proc = mp.Process(target=play_game_while_waiting, args=(task_name,))
+            game_proc.daemon = True
+            game_proc.start()
+            return game_proc
+        else:
+            game_thread = threading.Thread(target=play_game_while_waiting, args=(task_name,))
+            game_thread.daemon = True  # Thread will be killed when the main program exits
+            game_thread.start()
+            return game_thread
+    except Exception:
+        # Fallback: run synchronously if spawning fails
+        play_game_while_waiting(task_name)
+        return None
 
 def set_analysis_complete(result_summary=None):
     """Called by the analysis system when SNID analysis completes"""

@@ -1,240 +1,179 @@
 """
-Logo Manager Module for SNID SAGE GUI
-=====================================
+Logo Manager Module for SNID SAGE GUI (Qt/PySide6)
+==================================================
 
-Handles loading and management of logo images for both light and dark themes.
-Provides automatic theme switching and fallback handling.
-
-Features:
-- Light/dark mode logo support
-- Automatic theme detection
-- Graceful fallbacks for missing images
-- PIL/Pillow integration for image handling
+Qt-based logo loading and management for light/dark themes using QPixmap/QIcon.
 """
 
-import os
-import tkinter as tk
+from __future__ import annotations
 
-# Defer PIL import until needed to speed up startup
-_pil_imported = False
+from pathlib import Path
+from typing import Optional
 
 # Use centralized logging system
 try:
     from snid_sage.shared.utils.logging import get_logger
     _LOGGER = get_logger('gui.utils.logo_manager')
-except ImportError:
+except ImportError:  # pragma: no cover - fallback for environments without shared logger
     import logging
     _LOGGER = logging.getLogger('gui.utils.logo_manager')
 
-def _import_pil():
-    """Lazy import of PIL to speed up startup"""
-    global _pil_imported
-    if not _pil_imported:
-        try:
-            from PIL import Image, ImageTk
-            globals()['Image'] = Image
-            globals()['ImageTk'] = ImageTk
-        except ImportError:
-            # Fallback if PIL not available
-            globals()['Image'] = None
-            globals()['ImageTk'] = None
-        _pil_imported = True
-        return Image, ImageTk
-    else:
-        return globals()['Image'], globals()['ImageTk']
+from PySide6 import QtCore, QtGui, QtWidgets
 
 
-class LogoManager:
-    """Manager for handling logos and branding elements"""
-    
-    def __init__(self, gui_instance):
-        """Initialize logo manager"""
-        self.gui = gui_instance
-        self.logo_light = None
-        self.logo_dark = None
-        self.current_logo = None
-        self.logo_label = None
-        self.logo_height = 100  # Increased back to better size now that we have proper space allocation
-    
-    def load_logos(self):
-        """Load SNID SAGE logos for light and dark modes"""
+class QtLogoManager:
+    """Qt-based manager for handling logos and branding elements."""
+
+    def __init__(self) -> None:
+        self.pixmap_light: Optional[QtGui.QPixmap] = None
+        self.pixmap_dark: Optional[QtGui.QPixmap] = None
+        self.current_pixmap: Optional[QtGui.QPixmap] = None
+        self.logo_label: Optional[QtWidgets.QLabel] = None
+        self.logo_height: int = 100
+        self.max_logo_width: int = 180
+
+        # Load pixmaps at construction time if possible
         try:
-            # Import PIL for image handling
-            Image, ImageTk = _import_pil()
-            
-            # Get the path to the images directory
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # From interfaces/gui/utils -> interfaces/gui -> interfaces -> project_root
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-            images_dir = os.path.join(project_root, 'snid_sage', 'images')
-            
-            # Support multiple naming conventions for logos - prioritize icon.png
-            light_logo_candidates = [
-                os.path.join(images_dir, 'icon.png'),       # PRIMARY: icon.png should be first choice
-                os.path.join(images_dir, 'light.png'),
-                os.path.join(images_dir, 'logo.png'),
-                os.path.join(images_dir, 'snid_logo.png')
-            ]
-            
-            dark_logo_candidates = [
-                os.path.join(images_dir, 'icon_dark.png'),  # PRIMARY: icon_dark.png should be first choice
-                os.path.join(images_dir, 'dark.png'),       # Standard dark variant
-                os.path.join(images_dir, '@dark.png'),      # iOS/macOS convention
-                os.path.join(images_dir, 'logo@dark.png'),  # Alternative iOS convention
-                os.path.join(images_dir, 'snid_logo_dark.png')
-            ]
-            
-            # Find and load light mode logo
-            self.logo_light = self._load_logo_file(light_logo_candidates, "light")
-            
-            # Find and load dark mode logo
-            self.logo_dark = self._load_logo_file(dark_logo_candidates, "dark")
-            
-            # Fallback to light logo for dark mode if no dark variant exists
-            if not self.logo_dark and self.logo_light:
-                self.logo_dark = self.logo_light
-            
-            # Set initial logo based on current mode
-            self._set_initial_logo()
-            
-        except Exception as e:
-            _LOGGER.warning(f"Error loading logos: {e}")
-            _LOGGER.debug("Logo loading error details:", exc_info=True)
-            self.logo_light = None
-            self.logo_dark = None
-            self.current_logo = None
-    
-    def _load_logo_file(self, candidates, mode_name):
-        """Load logo from candidate file paths"""
+            self.load_pixmaps()
+        except Exception as exc:  # pragma: no cover
+            _LOGGER.warning(f"Error initializing logo pixmaps: {exc}")
+
+    def _images_dir(self) -> Optional[Path]:
+        """Locate the images directory inside the installed package.
+
+        Returns None if not found.
+        """
         try:
-            Image, ImageTk = _import_pil()
-            
-            # Find existing logo file
-            logo_path = None
-            for path in candidates:
-                if os.path.exists(path):
-                    logo_path = path
-                    break
-            
-            if logo_path:
-                try:
-                    image = Image.open(logo_path)
-                    # Resize logo to appropriate size (maintain aspect ratio) with proper space allocation
-                    aspect_ratio = image.width / image.height
-                    logo_width = int(self.logo_height * aspect_ratio)
-                    
-                    # More generous width limit since we now have dedicated space
-                    max_logo_width = 180  # Increased from 120 to 180 for better logo display
-                    if logo_width > max_logo_width:
-                        logo_width = max_logo_width
-                        self.logo_height = int(max_logo_width / aspect_ratio)
-                    
-                    image = image.resize((logo_width, self.logo_height), Image.Resampling.LANCZOS)
-                    logo_image = ImageTk.PhotoImage(image)
-                    _LOGGER.info(f"✅ Logo loaded: {logo_width}x{self.logo_height} from {logo_path}")
-                    return logo_image
-                except Exception as e:
-                    _LOGGER.warning(f"Failed to load {mode_name} logo: {e}")
-                    return None
-            else:
-                # Only log if no logo files found at all
-                return None
-                
-        except Exception as e:
-            _LOGGER.warning(f"Error loading {mode_name} logo file: {e}")
+            import snid_sage as _pkg
+            pkg_dir = Path(_pkg.__file__).resolve().parent
+            images = pkg_dir / 'images'
+            return images if images.exists() else None
+        except Exception as exc:  # pragma: no cover
+            _LOGGER.debug(f"Could not resolve images directory: {exc}")
             return None
-    
-    def _set_initial_logo(self):
-        """Set initial logo - always light mode"""
+
+    def _first_existing(self, candidates: list[Path]) -> Optional[Path]:
+        for path in candidates:
+            if path.exists():
+                return path
+        return None
+
+    def get_icon_path(self) -> Optional[Path]:
+        """Return a path to the preferred light-mode application icon if available."""
+        images_dir = self._images_dir()
+        if not images_dir:
+            return None
+
+        candidates = [
+            images_dir / 'icon.png',
+            images_dir / 'light.png',
+            images_dir / 'logo.png',
+            images_dir / 'snid_logo.png',
+        ]
+        return self._first_existing(candidates)
+
+    def _dark_icon_path(self) -> Optional[Path]:
+        images_dir = self._images_dir()
+        if not images_dir:
+            return None
+        candidates = [
+            images_dir / 'icon_dark.png',
+            images_dir / 'dark.png',
+            images_dir / '@dark.png',
+            images_dir / 'logo@dark.png',
+            images_dir / 'snid_logo_dark.png',
+        ]
+        return self._first_existing(candidates)
+
+    def _load_scaled_pixmap(self, image_path: Path) -> Optional[QtGui.QPixmap]:
         try:
-            # Always use light mode
-            self.current_logo = self.logo_light
-                
-        except Exception as e:
-            _LOGGER.warning(f"Error setting initial logo: {e}")
-            self.current_logo = self.logo_light
-    
-    def update_logo(self, dark_mode_enabled=None):
-        """Update the logo - simplified for light mode only"""
+            pm = QtGui.QPixmap(str(image_path))
+            if pm.isNull():
+                return None
+            aspect_ratio = pm.width() / pm.height() if pm.height() else 1.0
+            target_width = int(self.logo_height * aspect_ratio)
+            if target_width > self.max_logo_width:
+                target_width = self.max_logo_width
+                self.logo_height = int(self.max_logo_width / max(aspect_ratio, 1e-6))
+            return pm.scaled(
+                target_width,
+                self.logo_height,
+                QtCore.Qt.KeepAspectRatio,
+                QtCore.Qt.SmoothTransformation,
+            )
+        except Exception as exc:  # pragma: no cover
+            _LOGGER.warning(f"Failed to load pixmap from {image_path}: {exc}")
+            return None
+
+    def load_pixmaps(self) -> None:
+        """Load SNID SAGE logos for light and dark modes using QPixmap."""
         try:
-            # Always use light logo (since we removed dark/light toggle)
-            new_logo = self.logo_light if self.logo_light else None
-            theme_name = 'light'
-            
-            _LOGGER.debug(f"Updating logo for {theme_name} theme")
-            
-            # Update current_logo reference
-            if new_logo:
-                self.current_logo = new_logo
-                _LOGGER.debug(f"Logo updated for {theme_name} theme")
-            
-            # Only update if we have a new logo and a logo label
-            if new_logo and self.logo_label and self.logo_label.winfo_exists():
-                try:
-                    self.logo_label.configure(image=self.current_logo, text="")  # Clear text when image is set
-                    _LOGGER.info(f"✅ Logo label updated with icon.png for {theme_name} mode")
-                    
-                    # Force a refresh of the GUI to ensure changes are visible
-                    self.logo_label.update_idletasks()
-                    self.gui.master.update_idletasks()
-                    
-                except Exception as e:
-                    _LOGGER.warning(f"Error updating logo label: {e}")
-                    
-            elif not new_logo:
-                _LOGGER.warning(f"❌ No logo available for {theme_name} mode - check if icon.png exists")
-                # Fallback to text display
-                if self.logo_label and self.logo_label.winfo_exists():
-                    self.logo_label.configure(image="", text="SNID SAGE")
-            elif not self.logo_label:
-                _LOGGER.debug(f"Logo label not initialized yet (will be set when interface is created)")
-            else:
-                _LOGGER.debug(f"Logo label no longer exists")
-                
-        except Exception as e:
-            _LOGGER.warning(f"Error updating logo: {e}")
-            _LOGGER.debug("Logo update error details:", exc_info=True)
-    
-    def set_logo_label(self, logo_label):
-        """Set the logo label widget reference"""
+            light_path = self.get_icon_path()
+            dark_path = self._dark_icon_path()
+
+            self.pixmap_light = self._load_scaled_pixmap(light_path) if light_path else None
+            self.pixmap_dark = self._load_scaled_pixmap(dark_path) if dark_path else None
+
+            if not self.pixmap_dark and self.pixmap_light:
+                self.pixmap_dark = self.pixmap_light
+
+            self._set_initial_logo()
+        except Exception as exc:  # pragma: no cover
+            _LOGGER.warning(f"Error loading logo pixmaps: {exc}")
+            self.pixmap_light = None
+            self.pixmap_dark = None
+            self.current_pixmap = None
+
+    def _set_initial_logo(self) -> None:
+        """Set initial logo - current implementation always uses light mode."""
+        self.current_pixmap = self.pixmap_light
+
+    def update_logo(self, dark_mode_enabled: Optional[bool] = None) -> None:
+        """Update the current logo. Currently defaults to light logo."""
+        new_pm = self.pixmap_light if self.pixmap_light is not None else None
+        self.current_pixmap = new_pm
+
+        if new_pm and self.logo_label is not None:
+            try:
+                self.logo_label.setPixmap(new_pm)
+            except Exception as exc:  # pragma: no cover
+                _LOGGER.warning(f"Error updating logo label: {exc}")
+
+    def set_logo_label(self, logo_label: QtWidgets.QLabel) -> None:
         self.logo_label = logo_label
-    
-    def get_current_logo(self):
-        """Get the current logo for display"""
-        return self.current_logo
-    
-    def has_logos(self):
-        """Check if any logos are available"""
-        return self.logo_light is not None or self.logo_dark is not None
-    
-    def create_logo_widget(self, parent, bg_color):
-        """Create and return a logo widget for the given parent"""
-        try:
-            if self.current_logo:
-                logo_label = tk.Label(parent, image=self.current_logo, bg=bg_color)
-                self.set_logo_label(logo_label)
-                return logo_label
-            else:
-                # Fallback to text if logos not available
-                logo_label = tk.Label(parent, text="SNID SAGE",
-                                    font=('Segoe UI', 20, 'bold'),
-                                    bg=bg_color)
-                return logo_label
-                
-        except Exception as e:
-            _LOGGER.warning(f"Error creating logo widget: {e}")
-            # Return a simple text label as fallback
-            return tk.Label(parent, text="SNID SAGE", 
-                          font=('Segoe UI', 16, 'bold'), bg=bg_color)
-    
-    def cleanup(self):
-        """Clean up logo resources"""
-        try:
-            self.logo_light = None
-            self.logo_dark = None
-            self.current_logo = None
-            self.logo_label = None
-            _LOGGER.debug("Logo manager cleanup completed")
-            
-        except Exception as e:
-            _LOGGER.warning(f"Error during logo manager cleanup: {e}") 
+
+    def get_current_logo(self) -> Optional[QtGui.QPixmap]:
+        return self.current_pixmap
+
+    def has_logos(self) -> bool:
+        return (self.pixmap_light is not None) or (self.pixmap_dark is not None)
+
+    def create_logo_widget(self, parent: QtWidgets.QWidget) -> QtWidgets.QLabel:
+        """Create and return a QLabel configured with the current logo, or text fallback."""
+        label = QtWidgets.QLabel(parent)
+        if self.current_pixmap is not None:
+            label.setPixmap(self.current_pixmap)
+        else:
+            label.setText("SNID SAGE")
+            label.setAlignment(QtCore.Qt.AlignCenter)
+            label.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.set_logo_label(label)
+        return label
+
+    def cleanup(self) -> None:
+        self.pixmap_light = None
+        self.pixmap_dark = None
+        self.current_pixmap = None
+        self.logo_label = None
+        _LOGGER.debug("Logo manager cleanup completed")
+
+
+_qt_logo_manager: Optional[QtLogoManager] = None
+
+
+def get_logo_manager() -> QtLogoManager:
+    """Return a singleton QtLogoManager instance."""
+    global _qt_logo_manager
+    if _qt_logo_manager is None:
+        _qt_logo_manager = QtLogoManager()
+    return _qt_logo_manager

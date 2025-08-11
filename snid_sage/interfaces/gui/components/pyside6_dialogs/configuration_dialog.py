@@ -111,6 +111,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             'age_max': 9999,   # Default maximum age (shows "No maximum") 
             'lapmin': 0.3,
             'rlapmin': 5.0,
+            'rlap_ccc_threshold': 1.0,  # NEW: RLAP-CCC threshold for clustering
             'max_output_templates': 10,
             
             
@@ -143,7 +144,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         self.resize(900, 700)
         self.setMinimumSize(800, 600)
         
-        # Apply modern styling
+        # Apply modern styling (avoid overriding checkbox/radio indicators)
         self.setStyleSheet("""
             QDialog {
                 background: #f8fafc;
@@ -222,23 +223,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
                 border: 2px solid #2563eb;
             }
             
-            QCheckBox {
-                font-size: 10pt;
-                spacing: 8px;
-            }
-            
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-                border: 2px solid #e2e8f0;
-                border-radius: 3px;
-                background: #ffffff;
-            }
-            
-            QCheckBox::indicator:checked {
-                background: #3b82f6;
-                border: 2px solid #3b82f6;
-            }
+            /* Checkbox/radio indicators inherit from global theme manager */
             
             QLabel {
                 color: #1e293b;
@@ -304,7 +289,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         button_layout.addStretch()
         
         # Reset to defaults button
-        reset_btn = QtWidgets.QPushButton("🔄 Reset to Defaults")
+        reset_btn = QtWidgets.QPushButton("Reset to Defaults")
         reset_btn.setObjectName("reset_btn")
         reset_btn.clicked.connect(self._reset_to_defaults)
         button_layout.addWidget(reset_btn)
@@ -312,7 +297,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         button_layout.addSpacing(10)
         
         # Cancel button
-        cancel_btn = QtWidgets.QPushButton("❌ Cancel")
+        cancel_btn = QtWidgets.QPushButton("Cancel")
         cancel_btn.setObjectName("cancel_btn")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
@@ -402,6 +387,10 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         self.widgets['rlapmin'].setToolTip("Minimum relative overlap for a good match (any precision)")
         correlation_layout.addRow("Minimum Relative Overlap (rlapmin):", self.widgets['rlapmin'])
         
+        self.widgets['rlap_ccc_threshold'] = create_flexible_double_input(min_val=0.0, max_val=50.0, default=1.0)
+        self.widgets['rlap_ccc_threshold'].setToolTip("Minimum RLAP-CCC value required for clustering (default: 1.0, any precision)")
+        correlation_layout.addRow("RLAP-CCC Clustering Threshold:", self.widgets['rlap_ccc_threshold'])
+        
         # Removed Peak Window Size option from configuration UI
         
         layout.addWidget(correlation_group)
@@ -467,9 +456,9 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         
         # Select/Deselect all buttons
         button_layout = QtWidgets.QHBoxLayout()
-        select_all_btn = QtWidgets.QPushButton("✅ Select All")
+        select_all_btn = QtWidgets.QPushButton("Select All")
         select_all_btn.clicked.connect(self._select_all_types)
-        deselect_all_btn = QtWidgets.QPushButton("❌ Deselect All")
+        deselect_all_btn = QtWidgets.QPushButton("Deselect All")
         deselect_all_btn.clicked.connect(self._deselect_all_types)
         
         button_layout.addWidget(select_all_btn)
@@ -616,7 +605,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         self.widgets['output_dir'].setToolTip("Directory for saving plots and results")
         output_dir_layout.addWidget(self.widgets['output_dir'])
         
-        browse_btn = QtWidgets.QPushButton("📁 Browse...")
+        browse_btn = QtWidgets.QPushButton("Browse...")
         browse_btn.clicked.connect(self._browse_output_dir)
         output_dir_layout.addWidget(browse_btn)
         
@@ -863,7 +852,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
                 _LOGGER.debug(f"Configuration dialog: Redshift mode is '{mode}', not using forced redshift")
         
         # Load basic parameters
-        for key in ['zmin', 'zmax', 'lapmin', 'rlapmin', 'age_min', 'age_max', 
+        for key in ['zmin', 'zmax', 'lapmin', 'rlapmin', 'rlap_ccc_threshold', 'age_min', 'age_max', 
                    'max_output_templates']:
             if key in params and key in self.widgets and params[key] is not None:
                 try:
@@ -962,6 +951,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             result['zmax'] = self.widgets['zmax'].value()
             result['lapmin'] = self.widgets['lapmin'].value()
             result['rlapmin'] = self.widgets['rlapmin'].value()
+            result['rlap_ccc_threshold'] = self.widgets['rlap_ccc_threshold'].value()
             result['max_output_templates'] = self.widgets['max_output_templates'].value()
             # Peak Window Size option removed; no longer captured
             

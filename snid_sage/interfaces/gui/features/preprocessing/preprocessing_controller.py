@@ -8,7 +8,7 @@ manual preprocessing wizard, and SNID preprocessing pipeline.
 
 import os
 import json
-# Use PySide6 message dialogs instead of tkinter
+# Use PySide6 message dialogs
 from snid_sage.interfaces.gui.utils.pyside6_message_utils import messagebox
 from snid_sage.snid.snid import preprocess_spectrum
 import logging
@@ -181,7 +181,6 @@ class PreprocessingController:
                 # Reset to default preprocessing parameters
                 default_params = {
                     'savgol_window': '0',
-                    'savgol_fwhm': '0.0',
                     'savgol_order': '3',
                     'aband_remove': False,
                     'skyclip': False,
@@ -239,7 +238,6 @@ class PreprocessingController:
                 # Get parameters from GUI with safe parsing
                 # Using Savitzky-Golay parameters
                 savgol_window=self._safe_int(self.gui.params.get('savgol_window', ''), 0),
-                savgol_fwhm=self._safe_float(self.gui.params.get('savgol_fwhm', ''), 0.0),
                 savgol_order=self._safe_int(self.gui.params.get('savgol_order', ''), 3),
                 aband_remove=self._safe_bool(self.gui.params.get('aband_remove', '')),
                 skyclip=self._safe_bool(self.gui.params.get('skyclip', '')),
@@ -276,7 +274,7 @@ class PreprocessingController:
             
             # Generate flux version: reconstruct from apodized flat spectrum using the correct unflatten formula
             # The flattened spectrum is defined as flux/continuum - 1, so to reconstruct: (flat + 1) * continuum
-            # Extend continuum to edges if it was zeroed outside valid range (common in Gaussian continuum)
+            # Extend continuum to edges if it was zeroed outside valid range
             recon_continuum = continuum.copy()
             try:
                 nz = (recon_continuum > 0).nonzero()[0]

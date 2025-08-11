@@ -684,12 +684,11 @@ class PySide6PlotManager:
             else:
                 redshift_text = f"z = {redshift:.6f}"
             
-            # Use RLAP-cos if available, otherwise RLAP
-            rlap_cos = current_match.get('rlap_cos')
-            if rlap_cos is not None:
-                metric_text = f"RLAP-cos = {rlap_cos:.2f}"
-            else:
-                metric_text = f"RLAP = {rlap:.2f}"
+            # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+            from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+            best_metric_value = get_best_metric_value(current_match)
+            metric_name = get_best_metric_name(current_match)
+            metric_text = f"{metric_name} = {best_metric_value:.2f}"
             
             # Create multi-line info text like the original
             info_text = (f"Template {current_index}/{total_matches}: {template_name}\n"

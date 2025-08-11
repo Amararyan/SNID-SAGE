@@ -109,7 +109,7 @@ class EmissionLineStep2Analysis:
         copy_summary_btn.clicked.connect(self.copy_summary)
         summary_controls.addWidget(copy_summary_btn)
         
-        export_btn = QtWidgets.QPushButton("💾 Export Results")
+        export_btn = QtWidgets.QPushButton("Export Results")
         export_btn.clicked.connect(self.export_results)
         summary_controls.addWidget(export_btn)
         

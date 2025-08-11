@@ -1,3 +1,12 @@
+# Ignore SNID Fortran sources (covers snid-5 and snid-5.0 at repo root)
+/snid-5*/
+
+# Ignore local scripts directory at repo root
+/scripts/
+
+# Ignore external NGSF source tree at repo root
+/NGSF-main/
+
 # SNID SAGE - .gitignore
 # Prevent sensitive data and development artifacts from being committed
 
@@ -190,11 +199,8 @@ space_debris_highscore.txt
 
 # ===== DATA FILES =====
 # Large data files that shouldn't be in version control
-data/*.fits
-data/*.asci
-data/*.ascii
-data/*.txt
-# Note: .dat files in data/ are example datasets and should be included
+# Ignore the entire data directory
+data/
 
 # ===== TEMPLATE FILES =====
 # Individual template files (large binary files) - exclude the entire folder

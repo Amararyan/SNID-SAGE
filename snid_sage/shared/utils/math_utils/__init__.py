@@ -21,8 +21,10 @@ from .weighted_statistics import (
 )
 
 from .similarity_metrics import (
-    cosine_similarity,
-    compute_rlap_cos_metric,
+    concordance_correlation_coefficient,
+    compute_rlap_ccc_metric,
+    compute_locality_metric,
+    compute_chi_square_metric,
     get_best_metric_value,
     get_best_metric_name,
     get_metric_name_for_match,
@@ -44,8 +46,10 @@ __all__ = [
     'validate_joint_result',
     'validate_weighted_calculation',
     # Similarity metrics
-    'cosine_similarity',
-    'compute_rlap_cos_metric',
+    'concordance_correlation_coefficient',
+    'compute_rlap_ccc_metric',
+    'compute_locality_metric',
+    'compute_chi_square_metric',
     'get_best_metric_value',
     'get_best_metric_name',
     'get_metric_name_for_match',

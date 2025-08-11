@@ -2,8 +2,7 @@
 PySide6 Settings Dialog for SNID SAGE GUI
 =========================================
 
-This module provides a PySide6 dialog for GUI settings and preferences,
-matching the functionality of the Tkinter version.
+This module provides a PySide6 dialog for GUI settings and preferences.
 
 Features:
 - Font size and display options
@@ -128,27 +127,9 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         self.resize(800, 600)
         self.setModal(True)
         
-        # Apply colors
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {self.colors['bg_primary']};
-                color: {self.colors['text_primary']};
-            }}
-            QGroupBox {{
-                font-weight: bold;
-                border: 2px solid {self.colors['border']};
-                border-radius: 6px;
-                margin-top: 8px;
-                padding-top: 12px;
-                background: {self.colors['bg_secondary']};
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 8px;
-                background: {self.colors['bg_secondary']};
-            }}
-        """)
+        # Apply theme manager styles
+        from snid_sage.interfaces.gui.utils.pyside6_theme_manager import apply_theme_to_widget
+        apply_theme_to_widget(self)
         
         # Main layout
         main_layout = QtWidgets.QVBoxLayout(self)

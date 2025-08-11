@@ -18,6 +18,7 @@ class SpectrumFormat(Enum):
     FITS = "fits"
     TEXT = "text"
     DAT = "dat"
+    FLM = "flm"
     UNKNOWN = "unknown"
 
 

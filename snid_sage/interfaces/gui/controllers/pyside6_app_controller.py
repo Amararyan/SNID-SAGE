@@ -56,7 +56,7 @@ except ImportError:
 
 
 class WorkflowState(Enum):
-    """Workflow state enumeration matching Tkinter implementation"""
+    """Workflow state enumeration"""
     INITIAL = "initial"
     FILE_LOADED = "file_loaded"
     PREPROCESSED = "preprocessed"
@@ -224,26 +224,31 @@ class PySide6AppController(QtCore.QObject):
             log_wave = self.processed_spectrum.get('log_wave')
             
             if view_type.lower() == 'flat':
-                # Return flat (continuum-removed) version
-                if 'display_flat' in self.processed_spectrum:
+                # Simplified preferred key
+                if 'flat_view' in self.processed_spectrum:
+                    flux_data = self.processed_spectrum['flat_view']
+                    _LOGGER.debug(f"Using flat_view for flat view")
+                elif 'display_flat' in self.processed_spectrum:
                     flux_data = self.processed_spectrum['display_flat']
                     _LOGGER.debug(f"Using display_flat for flat view")
+                elif 'tapered_flux' in self.processed_spectrum:
+                    flux_data = self.processed_spectrum['tapered_flux']
+                    _LOGGER.debug(f"Using tapered_flux for flat view")
                 elif 'flat_flux' in self.processed_spectrum:
                     flux_data = self.processed_spectrum['flat_flux']
                     _LOGGER.debug(f"Using flat_flux for flat view")
                 else:
-                    flux_data = self.processed_spectrum['log_flux']
+                    flux_data = self.processed_spectrum.get('log_flux')
                     _LOGGER.debug(f"Fallback to log_flux for flat view")
             else:
-                # Return flux version
-                if 'display_flux' in self.processed_spectrum:
-                    flux_data = self.processed_spectrum['display_flux']
-                    _LOGGER.debug(f"Using display_flux for flux view")
-                elif 'tapered_flux' in self.processed_spectrum and 'continuum' in self.processed_spectrum:
-                    # Prefer reconstructing from apodized flat spectrum to match visual display
+                # Prefer reconstructing from apodized flat + continuum only when a continuum fit exists
+                if (
+                    self.processed_spectrum.get('has_continuum') is True
+                    and 'tapered_flux' in self.processed_spectrum
+                    and 'continuum' in self.processed_spectrum
+                ):
                     tapered_flat = self.processed_spectrum['tapered_flux']
                     continuum = self.processed_spectrum['continuum']
-                    # Extend continuum edges if it was zeroed outside valid range (e.g., Gaussian)
                     recon_continuum = continuum.copy()
                     try:
                         nz = (recon_continuum > 0).nonzero()[0]
@@ -256,26 +261,15 @@ class PySide6AppController(QtCore.QObject):
                     except Exception:
                         pass
                     flux_data = (tapered_flat + 1.0) * recon_continuum
-                    _LOGGER.debug(f"Reconstructed flux from tapered_flat + extended continuum for flux view")
-                elif 'flat_flux' in self.processed_spectrum and 'continuum' in self.processed_spectrum:
-                    # Fallback: reconstruct from non-apodized flat spectrum
-                    flat_flux = self.processed_spectrum['flat_flux']
-                    continuum = self.processed_spectrum['continuum']
-                    # Extend continuum edges if it was zeroed outside valid range
-                    recon_continuum = continuum.copy()
-                    try:
-                        nz = (recon_continuum > 0).nonzero()[0]
-                        if nz.size:
-                            c0, c1 = int(nz[0]), int(nz[-1])
-                            if c0 > 0:
-                                recon_continuum[:c0] = recon_continuum[c0]
-                            if c1 < recon_continuum.size - 1:
-                                recon_continuum[c1+1:] = recon_continuum[c1]
-                    except Exception:
-                        pass
-                    flux_data = (flat_flux + 1.0) * recon_continuum
-                    _LOGGER.debug(f"Reconstructed flux from flat_flux + extended continuum for flux view")
+                    _LOGGER.debug(f"Reconstructed flux from tapered_flat + extended continuum for flux view (preferred)")
+                elif 'flux_view' in self.processed_spectrum:
+                    flux_data = self.processed_spectrum['flux_view']
+                    _LOGGER.debug(f"Using flux_view (apodized) for flux view")
+                elif 'display_flux' in self.processed_spectrum:
+                    flux_data = self.processed_spectrum['display_flux']
+                    _LOGGER.debug(f"Using display_flux for flux view")
                 else:
+                    # Final fallback to scaled log_flux (may include negatives if present)
                     flux_data = self.processed_spectrum.get('log_flux')
                     _LOGGER.debug(f"Fallback to log_flux for flux view")
             
@@ -365,7 +359,6 @@ class PySide6AppController(QtCore.QObject):
                     spectrum_path=self.current_file_path,
                     # Default parameters for quick preprocessing
                     savgol_window=kwargs.get('savgol_window', 0),
-                    savgol_fwhm=kwargs.get('savgol_fwhm', 0.0),
                     savgol_order=kwargs.get('savgol_order', 3),
                     aband_remove=kwargs.get('aband_remove', False),
                     skyclip=kwargs.get('skyclip', False),
@@ -377,10 +370,9 @@ class PySide6AppController(QtCore.QObject):
                     verbose=kwargs.get('verbose', False)
                 )
             else:
-                # Preprocess from arrays
+                # Preprocess from arrays using input_spectrum API
                 processed_spectrum, trace = preprocess_spectrum(
-                    wave=self.original_wave,
-                    flux=self.original_flux,
+                    input_spectrum=(self.original_wave, self.original_flux),
                     skip_steps=kwargs.get('skip_steps', []),
                     verbose=kwargs.get('verbose', False)
                 )
@@ -690,14 +682,30 @@ class PySide6AppController(QtCore.QObject):
             
             # Complete analysis workflow directly if no clustering
             self._complete_analysis_workflow(self.snid_results)
-            
-            progress_callback("Analysis completed successfully!", 100)
-            self.analysis_running = False
-            
-            # Emit signal for GUI update
-            self.analysis_completed.emit(True)
-            
-            _LOGGER.info("SNID analysis completed successfully")
+
+            # Determine final success considering cluster quality
+            has_good_cluster = self._has_good_cluster(self.snid_results)
+            clustering_attempted = self._was_clustering_attempted(self.snid_results)
+            is_engine_success = bool(self.snid_results and getattr(self.snid_results, 'success', False))
+            num_best = 0
+            try:
+                if self.snid_results and hasattr(self.snid_results, 'best_matches') and self.snid_results.best_matches:
+                    num_best = len(self.snid_results.best_matches)
+            except Exception:
+                num_best = 0
+            # Treat as success only if engine succeeded AND (a good cluster exists OR we have any matches)
+            final_success = bool(is_engine_success and (has_good_cluster or num_best >= 1))
+
+            if final_success:
+                progress_callback("Analysis completed successfully!", 100)
+                self.analysis_running = False
+                self.analysis_completed.emit(True)
+                _LOGGER.info("SNID analysis completed successfully (valid cluster found)")
+            else:
+                progress_callback("Analysis inconclusive: no reliable cluster found", 100)
+                self.analysis_running = False
+                self.analysis_completed.emit(False)
+                _LOGGER.info("SNID analysis inconclusive - no proper matching cluster")
             
         except InterruptedError:
             # Graceful cancellation path
@@ -826,12 +834,7 @@ class PySide6AppController(QtCore.QObject):
             return True
         return False
     
-    def next_template(self) -> bool:
-        """Navigate to next template"""
-        if self.current_template < self.max_templates - 1:
-            self.current_template += 1
-            return True
-        return False
+    # Duplicate next_template removed
     
     # Masking operations
     def add_mask_region(self, min_wave: float, max_wave: float):
@@ -910,6 +913,97 @@ class PySide6AppController(QtCore.QObject):
         self.update_workflow_state(WorkflowState.INITIAL)
         
         _LOGGER.info("Application reset to initial state - all persistent settings and states cleared")
+
+    def reset_to_file_loaded_state(self):
+        """Reset application back to 'file loaded' state while preserving the loaded spectrum.
+
+        This clears preprocessing products, analysis results, overlays/navigation state, and
+        any redshift configuration so the user can restart from preprocessing, but it keeps
+        the original spectrum and file path intact.
+        """
+        try:
+            # Stop any blinking effects first
+            self._stop_blinking_effects()
+
+            # Preserve: current_file_path, original_wave, original_flux
+            # Clear preprocessing/analysis-related state
+            self.processed_spectrum = None
+            self.preprocessing_trace = None if hasattr(self, 'preprocessing_trace') else None
+            self.snid_results = None
+            self.analysis_trace = None
+            self.analysis_results = None
+            self.galaxy_redshift_result = None
+            self.current_template = 0
+            self.max_templates = 0
+            self.analysis_running = False
+            self.analysis_cancelled = False
+            self.cancel_event.clear()
+
+            # Clear redshift and mode configs
+            if hasattr(self, 'redshift_mode_config'):
+                self.redshift_mode_config = None
+            if hasattr(self, 'manual_redshift'):
+                self.manual_redshift = None
+            if hasattr(self, 'forced_redshift'):
+                self.forced_redshift = None
+
+            # Reset auto-cluster behavior
+            if hasattr(self, 'auto_select_best_cluster'):
+                self.auto_select_best_cluster = False
+
+            # View state back to flux
+            if hasattr(self, 'current_view'):
+                self.current_view = 'flux'
+
+            # Preprocessing flag (if used)
+            if hasattr(self, 'is_preprocessed'):
+                self.is_preprocessed = False
+
+            # Keep any user masks as they may be part of preprocessing workflow; don't clear mask_regions
+
+            # Workflow moves back to FILE_LOADED
+            self.update_workflow_state(WorkflowState.FILE_LOADED)
+
+            _LOGGER.info("Application reset to FILE_LOADED state (spectrum preserved; analysis cleared)")
+        except Exception as e:
+            _LOGGER.error(f"Error resetting to file-loaded state: {e}")
+
+    def reset_analysis_state(self):
+        """Clear only analysis-related state and overlays while preserving preprocessing.
+
+        Keeps the currently loaded spectrum and any processed_spectrum intact so the
+        user can immediately re-run analysis. Workflow state is set to PREPROCESSED
+        if processed data exists; otherwise falls back to FILE_LOADED.
+        """
+        try:
+            # Stop any blinking effects first
+            self._stop_blinking_effects()
+
+            # Clear analysis-only state
+            self.snid_results = None
+            self.analysis_trace = None
+            self.analysis_results = None
+            self.current_template = 0
+            self.max_templates = 0
+            self.analysis_running = False
+            self.analysis_cancelled = False
+            self.cancel_event.clear()
+
+            # Preserve preprocessing output (processed_spectrum) and original spectrum
+            # Clear redshift estimates derived from analysis but preserve manual settings
+            self.galaxy_redshift_result = None
+
+            # Determine appropriate workflow state
+            if getattr(self, 'processed_spectrum', None) is not None:
+                self.update_workflow_state(WorkflowState.PREPROCESSED)
+            elif self.original_wave is not None and self.original_flux is not None:
+                self.update_workflow_state(WorkflowState.FILE_LOADED)
+            else:
+                self.update_workflow_state(WorkflowState.INITIAL)
+
+            _LOGGER.info("Analysis state cleared (preprocessing preserved)")
+        except Exception as e:
+            _LOGGER.error(f"Error resetting analysis state: {e}")
     
     def _stop_blinking_effects(self):
         """Stop any blinking effects that might be active"""
@@ -964,6 +1058,39 @@ class PySide6AppController(QtCore.QObject):
         except Exception as e:
             _LOGGER.error(f"Error checking clustering availability: {e}")
             return False
+
+    def _has_good_cluster(self, result) -> bool:
+        """Determine if analysis produced a proper matching cluster.
+
+        Returns True only if clustering succeeded and a best_cluster with
+        any valid matches is available (changed from >= 3 to >= 1).
+        """
+        try:
+            if not result or not hasattr(result, 'clustering_results'):
+                return False
+            clustering_results = result.clustering_results
+            if not clustering_results or not clustering_results.get('success', False):
+                return False
+            best_cluster = clustering_results.get('best_cluster')
+            if not best_cluster:
+                return False
+            matches = best_cluster.get('matches', [])
+            return isinstance(matches, list) and len(matches) >= 1  # Accept any valid matches
+        except Exception:
+            return False
+
+    def _was_clustering_attempted(self, result) -> bool:
+        """Return True if the analysis attempted clustering.
+
+        Uses the presence of a non-'none' clustering_method when available.
+        """
+        try:
+            if not result:
+                return False
+            method = getattr(result, 'clustering_method', 'none')
+            return method is not None and str(method).lower() != 'none'
+        except Exception:
+            return False
     
     def _complete_analysis_workflow(self, result):
         """Complete the analysis workflow after cluster selection (or if no clustering)"""
@@ -982,8 +1109,13 @@ class PySide6AppController(QtCore.QObject):
                 _LOGGER.warning("Analysis completed but no template matches found")
             
             # THREADING FIX: Instead of directly calling GUI methods (which can be from background thread),
-            # emit a signal to schedule GUI updates on the main thread
-            if result and hasattr(result, 'success') and result.success:
+            # emit a signal to schedule GUI updates on the main thread.
+            # Only schedule GUI updates for successful results when either clustering was not attempted
+            # or a good cluster exists.
+            if (
+                result and hasattr(result, 'success') and result.success and
+                (not self._was_clustering_attempted(result) or self._has_good_cluster(result))
+            ):
                 # Store the result for the signal handler to access
                 self._pending_gui_update_result = result
                 
@@ -1057,14 +1189,14 @@ class PySide6AppController(QtCore.QObject):
             if hasattr(result, 'best_matches') and selected_cluster.get('matches'):
                 cluster_matches = selected_cluster.get('matches', [])
                 
-                # Sort cluster matches by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+                # Sort cluster matches by best available metric (RLAP-CCC if available, otherwise RLAP) descending
                 try:
                     from snid_sage.shared.utils.math_utils import get_best_metric_value
                     cluster_matches_sorted = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
                 except ImportError:
                     # Fallback sorting if math utils not available
                     cluster_matches_sorted = sorted(cluster_matches, 
-                                                  key=lambda m: m.get('rlap_cos', m.get('rlap', 0)), 
+                                                  key=lambda m: m.get('rlap_ccc', m.get('rlap', 0)), 
                                                   reverse=True)
                 
                 # Update best_matches to only contain cluster templates
@@ -1089,7 +1221,7 @@ class PySide6AppController(QtCore.QObject):
                     result.redshift = best_cluster_match.get('redshift', 0.0)
                     result.rlap = best_cluster_match.get('rlap', 0.0)
                     
-                    # Update RLAP-Cos if available
+                    # Update RLAP-CCC if available
                     if 'rlap_cos' in best_cluster_match:
                         result.rlap_cos = best_cluster_match.get('rlap_cos', 0.0)
                     

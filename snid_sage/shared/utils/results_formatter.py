@@ -70,7 +70,7 @@ class UnifiedResultsFormatter:
         self.metric_name = "RLAP"
         if hasattr(result, 'clustering_results') and result.clustering_results:
             self.use_rlap_cos = result.clustering_results.get('use_rlap_cos', False)
-            self.metric_name = result.clustering_results.get('metric_used', 'RLAP-Cos' if self.use_rlap_cos else 'RLAP')
+            self.metric_name = result.clustering_results.get('metric_used', 'RLAP-CCC' if self.use_rlap_cos else 'RLAP')
         
         # Create standardized summary data
         self.summary_data = self._create_standardized_summary()
@@ -133,7 +133,7 @@ class UnifiedResultsFormatter:
         cluster_matches = []
         if winning_cluster:
             cluster_matches = winning_cluster.get('matches', [])
-            # Sort by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+            # Sort by best available metric (RLAP-CCC if available, otherwise RLAP) descending
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
         
@@ -389,7 +389,7 @@ class UnifiedResultsFormatter:
             winning_cluster = self._get_active_cluster()
             if winning_cluster:
                 cluster_matches = winning_cluster.get('matches', [])
-                # Sort by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+                # Sort by best available metric (RLAP-CCC if available, otherwise RLAP) descending
                 from snid_sage.shared.utils.math_utils import get_best_metric_value
                 matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
         
@@ -433,7 +433,7 @@ class UnifiedResultsFormatter:
                 'best_metric_value': get_best_metric_value(match)
             }
             
-            # Add RLAP-Cos specific fields if available
+            # Add RLAP-CCC specific fields if available
             if 'rlap_cos' in metric_values:
                 formatted_match.update({
                     'rlap_cos': metric_values['rlap_cos'],

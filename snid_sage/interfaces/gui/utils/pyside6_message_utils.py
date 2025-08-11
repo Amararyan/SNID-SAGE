@@ -2,8 +2,7 @@
 SNID SAGE - PySide6 Message Utilities
 ====================================
 
-Utility functions to replace tkinter messageboxes with PySide6 equivalents.
-This helps in the migration from tkinter to PySide6 throughout the codebase.
+Utility functions providing message dialogs using PySide6 equivalents.
 """
 
 import sys
@@ -47,7 +46,7 @@ def _get_app_and_parent():
 
 
 def showerror(title: str, message: str, parent: Optional[Any] = None) -> None:
-    """Show error message dialog (replacement for tkinter.messagebox.showerror)"""
+    """Show error message dialog"""
     if not PYSIDE6_AVAILABLE:
         print(f"ERROR [{title}]: {message}")
         return
@@ -71,7 +70,7 @@ def showerror(title: str, message: str, parent: Optional[Any] = None) -> None:
 
 
 def showwarning(title: str, message: str, parent: Optional[Any] = None) -> None:
-    """Show warning message dialog (replacement for tkinter.messagebox.showwarning)"""
+    """Show warning message dialog"""
     if not PYSIDE6_AVAILABLE:
         print(f"WARNING [{title}]: {message}")
         return
@@ -95,7 +94,7 @@ def showwarning(title: str, message: str, parent: Optional[Any] = None) -> None:
 
 
 def showinfo(title: str, message: str, parent: Optional[Any] = None) -> None:
-    """Show info message dialog (replacement for tkinter.messagebox.showinfo)"""
+    """Show info message dialog"""
     if not PYSIDE6_AVAILABLE:
         print(f"INFO [{title}]: {message}")
         return

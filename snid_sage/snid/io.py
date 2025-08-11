@@ -29,7 +29,7 @@ def read_spectrum(filename: str, apodize: bool = False) -> Tuple[np.ndarray, np.
     Read a spectrum from a file.
     
     Supports multiple file formats:
-    - ASCII/text files (.txt, .dat, .ascii, .asci, .csv)
+    - ASCII/text files (.txt, .dat, .ascii, .asci, .csv, .flm)
     - FITS files (.fits, .fit)
     
     Parameters:
@@ -639,7 +639,7 @@ def write_detailed_result(result: Any, filename: str) -> None:
             elif hasattr(result, 'best_matches') and result.best_matches:
                 cluster_matches = result.best_matches
         
-        # Sort cluster matches by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+        # Sort cluster matches by best available metric (RLAP-CCC if available, otherwise RLAP) descending
         from snid_sage.shared.utils.math_utils import get_best_metric_value
         cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
         
@@ -1371,7 +1371,7 @@ def add_template(library_path: str, spectrum_file: str, template_info: Dict[str,
     if template_info.get('flatten', True) or force_rebin:
         # Apply log rebinning and continuum fitting
         log_wave, log_flux = log_rebin(wave, flux)
-        flat_flux, cont = fit_continuum(log_flux, method="spline", sigma=50)
+        flat_flux, cont = fit_continuum(log_flux, method="spline")
         
         # Use flattened spectrum
         wave = log_wave

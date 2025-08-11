@@ -70,7 +70,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
         self.roi = None
         
         # Additional state
-        self._current_method: str = "spline"  # Track current continuum method
+        self._current_method: str = "spline"  # Only spline supported
         self._has_manual_changes: bool = False
         
         # Callbacks
@@ -115,7 +115,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
         buttons_layout = QtWidgets.QHBoxLayout()
         
         # Enable/Disable button
-        self.toggle_button = QtWidgets.QPushButton("🎨 Enable Editing")
+        self.toggle_button = QtWidgets.QPushButton("Enable Editing")
         self.toggle_button.clicked.connect(self.toggle_interactive_mode)
         self.toggle_button.setToolTip("Drag the square handles to modify continuum points.\nClick on the red dashed line to add a new handle at that position.")
         self.toggle_button.setStyleSheet(f"""
@@ -134,7 +134,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
         buttons_layout.addWidget(self.toggle_button)
         
         # Reset button
-        reset_button = QtWidgets.QPushButton("🔄 Reset")
+        reset_button = QtWidgets.QPushButton("Reset")
         reset_button.clicked.connect(self.reset_to_fitted_continuum)
         reset_button.setStyleSheet(f"""
             QPushButton {{
@@ -207,7 +207,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
         self.interactive_mode = True
         
         # Update button appearance
-        self.toggle_button.setText("🔴 Stop Editing")
+        self.toggle_button.setText("Stop Editing")
         self.toggle_button.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors.get('danger', '#ef4444')};
@@ -253,7 +253,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
         self.interactive_mode = False
         
         # Update button appearance
-        self.toggle_button.setText("🎨 Enable Editing")
+        self.toggle_button.setText("Enable Editing")
         self.toggle_button.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors.get('accent', '#3b82f6')};
@@ -420,11 +420,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
             method = getattr(self, '_current_method', 'spline')
             
             # Calculate fresh continuum using the current method
-            if method == "gaussian":
-                # Use last known sigma or default
-                sigma = getattr(self, '_last_sigma', 10.0)
-                flat_flux, fitted_continuum = self.preview_calculator._fit_continuum_improved(current_flux, method="gaussian", sigma=sigma)
-            elif method == "spline":
+            if method == "spline":
                 # Use last known knotnum or default
                 knotnum = getattr(self, '_last_knotnum', 13)
                 flat_flux, fitted_continuum = self.preview_calculator._fit_continuum_improved(current_flux, method="spline", knotnum=knotnum)
@@ -479,7 +475,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
         Update continuum from current method and parameters
         
         Args:
-            parameter_value: Sigma value for gaussian or knotnum for spline (None for auto)
+            parameter_value: knotnum for spline (None for default)
         """
         try:
             # Get current spectrum state
@@ -490,21 +486,7 @@ class PySide6InteractiveContinuumWidget(QtCore.QObject):
             
             # CRITICAL FIX: Force a fresh continuum calculation regardless of existing state
             # We need to calculate the continuum on the current spectrum state
-            if method == "gaussian":
-                if parameter_value is None:
-                    # Auto sigma calculation
-                    flat_flux, continuum = self.preview_calculator._fit_continuum_improved(current_flux, method="gaussian", sigma=None)
-                    # Store the auto-calculated sigma for reset function
-                    try:
-                        from snid_sage.snid.preprocessing import calculate_auto_gaussian_sigma
-                        self._last_sigma = calculate_auto_gaussian_sigma(current_flux)
-                    except:
-                        self._last_sigma = 10.0
-                else:
-                    # Specific sigma value
-                    flat_flux, continuum = self.preview_calculator._fit_continuum_improved(current_flux, method="gaussian", sigma=parameter_value)
-                    self._last_sigma = parameter_value
-            elif method == "spline":
+            if method == "spline":
                 knotnum = parameter_value if parameter_value is not None else 13
                 flat_flux, continuum = self.preview_calculator._fit_continuum_improved(current_flux, method="spline", knotnum=knotnum)
                 self._last_knotnum = knotnum

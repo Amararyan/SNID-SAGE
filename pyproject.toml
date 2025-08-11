@@ -73,10 +73,6 @@ gui = [
     "PySide6>=6.7,<6.9.1",  # 6.9.0 works; allow slightly lower but block 6.9.1+
     "pyqtgraph>=0.13.0",  # High-performance plotting for PySide6
 ]
-tk = [
-    "ttkbootstrap>=1.10.0",
-    "tkinter-tooltip>=2.0.0; sys_platform == 'darwin'",
-]
 dev = [
     "pytest>=6.0.0",
     "pytest-cov>=2.10.0",
@@ -151,6 +147,7 @@ exclude = [
     "data/*.txt", 
     "data/*.ascii",
     "data/*.asci",
+    "data/*.flm",
     "images/*.png", 
     "images/*.jpg", 
     "custom_templates/*.md"

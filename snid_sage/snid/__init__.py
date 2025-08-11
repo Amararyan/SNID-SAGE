@@ -6,7 +6,7 @@ from .io              import (read_spectrum, read_template,
                               load_templates, write_result,
                               write_detailed_result)
 from .preprocessing    import (apodize, log_rebin,
-                               medwfilt, medfilt,
+                               medfilt,
                                apply_wavelength_mask,
                                fit_continuum_spline)                      # new thin wrapper
 from .fft_tools        import (    # <<< was .correlation

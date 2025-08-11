@@ -45,6 +45,7 @@ class SimplePlotWidget(pg.PlotWidget):
     Simple PyQtGraph PlotWidget with only disabled context menus (no save functionality)
     
     Used for dialogs where save functionality is not desired, like preprocessing previews.
+    Features enhanced tick styling from the demo.
     """
     
     def __init__(self, *args, **kwargs):
@@ -54,6 +55,15 @@ class SimplePlotWidget(pg.PlotWidget):
         # Disable context menus completely
         self.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         
+        # Ensure consistent drag-and-drop event sequence to avoid Qt warnings
+        # Accept drops at both widget and viewport levels
+        try:
+            self.setAcceptDrops(True)
+            if hasattr(self, 'viewport') and callable(self.viewport):
+                self.viewport().setAcceptDrops(True)
+        except Exception:
+            pass
+        
         # Disable plot item and viewbox menus
         plot_item = self.getPlotItem()
         if plot_item:
@@ -61,6 +71,77 @@ class SimplePlotWidget(pg.PlotWidget):
             vb = plot_item.getViewBox()
             if vb:
                 vb.setMenuEnabled(False)
+        
+        # Apply enhanced tick styling
+        self._apply_tick_styling()
+
+    # Drag-and-drop handlers to keep Qt from emitting dragLeave before dragEnter warnings
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:  # type: ignore[override]
+        event.acceptProposedAction()
+
+    def dragMoveEvent(self, event: QtGui.QDragMoveEvent) -> None:  # type: ignore[override]
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event: QtGui.QDragLeaveEvent) -> None:  # type: ignore[override]
+        event.accept()
+
+    def dropEvent(self, event: QtGui.QDropEvent) -> None:  # type: ignore[override]
+        # We do not handle drops here; just ignore after a consistent accept sequence
+        event.ignore()
+    
+    def _apply_tick_styling(self):
+        """Apply enhanced tick styling from the demo"""
+        try:
+            plot_item = self.getPlotItem()
+            if not plot_item:
+                return
+            
+            # Configure enhanced axis styling similar to tick demo
+            axis_font = QtGui.QFont("Segoe UI", 9)
+            
+            for name in ('left', 'bottom'):
+                axis = plot_item.getAxis(name)
+                axis.setPen(pg.mkPen(color='black', width=1))
+                axis.setTextPen(pg.mkPen(color='black'))
+                axis.setTickFont(axis_font)
+            
+            # Enhanced grid with stronger alpha like the demo
+            plot_item.showGrid(x=True, y=True, alpha=0.3)
+            
+            _LOGGER.debug("Enhanced tick styling applied to SimplePlotWidget")
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to apply tick styling to SimplePlotWidget: {e}")
+    
+    def apply_wavelength_ticks(self, wavelength_range: tuple):
+        """Apply custom wavelength tick styling"""
+        try:
+            plot_item = self.getPlotItem()
+            if not plot_item:
+                return
+            
+            min_wave, max_wave = wavelength_range
+            # Major ticks every 1000 Å, minor every 500 Å like the demo
+            major_step = 1000
+            minor_step = 500
+            
+            # Calculate major tick positions
+            start_major = int((min_wave // major_step + 1) * major_step)
+            end_major = int((max_wave // major_step) * major_step)
+            major_ticks = [(w, f"{w}") for w in range(start_major, end_major + 1, major_step)]
+            
+            # Calculate minor tick positions (excluding major tick positions)
+            start_minor = int((min_wave // minor_step + 1) * minor_step)
+            end_minor = int((max_wave // minor_step) * minor_step)
+            minor_ticks = [(w, "") for w in range(start_minor, end_minor + 1, minor_step) 
+                           if w % major_step != 0]
+            
+            plot_item.getAxis('bottom').setTicks([major_ticks, minor_ticks])
+            
+            _LOGGER.debug(f"Custom wavelength ticks applied for range {wavelength_range}")
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to apply wavelength ticks: {e}")
 
 
 class EnhancedPlotWidget(pg.PlotWidget):
@@ -81,6 +162,15 @@ class EnhancedPlotWidget(pg.PlotWidget):
         # Disable context menus completely
         self.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         
+        # Ensure consistent drag-and-drop event sequence to avoid Qt warnings
+        # Accept drops at both widget and viewport levels
+        try:
+            self.setAcceptDrops(True)
+            if hasattr(self, 'viewport') and callable(self.viewport):
+                self.viewport().setAcceptDrops(True)
+        except Exception:
+            pass
+        
         # Disable plot item and viewbox menus
         plot_item = self.getPlotItem()
         if plot_item:
@@ -95,6 +185,23 @@ class EnhancedPlotWidget(pg.PlotWidget):
         
         # Initialize save functionality after a short delay to ensure plot is ready
         QtCore.QTimer.singleShot(100, self._setup_save_functionality)
+        
+        # Apply enhanced tick styling
+        self._apply_tick_styling()
+
+    # Drag-and-drop handlers to keep Qt from emitting dragLeave before dragEnter warnings
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:  # type: ignore[override]
+        event.acceptProposedAction()
+
+    def dragMoveEvent(self, event: QtGui.QDragMoveEvent) -> None:  # type: ignore[override]
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event: QtGui.QDragLeaveEvent) -> None:  # type: ignore[override]
+        event.accept()
+
+    def dropEvent(self, event: QtGui.QDropEvent) -> None:  # type: ignore[override]
+        # We do not handle drops here; just ignore after a consistent accept sequence
+        event.ignore()
     
     def _setup_save_functionality(self):
         """Setup save button after plot is fully initialized"""
@@ -179,7 +286,7 @@ class EnhancedPlotWidget(pg.PlotWidget):
         """)
         
         # Add image export action
-        image_action = menu.addAction("📷 Save as High-Res Image (300 DPI)")
+        image_action = menu.addAction("📷 Save as High-Res Image (Screen Resolution)")
         image_action.triggered.connect(self._save_high_res_image)
         
         # Add SVG export action
@@ -198,7 +305,7 @@ class EnhancedPlotWidget(pg.PlotWidget):
             menu.exec(QtWidgets.QCursor.pos())
     
     def _save_high_res_image(self):
-        """Save plot as high-resolution image (300 DPI)"""
+        """Save plot as high-resolution image (100 DPI for screen-like appearance)"""
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, "Save Plot as High-Resolution Image", "snid_sage_plot.png",
             "PNG Files (*.png);;JPEG Files (*.jpg);;All Files (*)"
@@ -214,9 +321,16 @@ class EnhancedPlotWidget(pg.PlotWidget):
                 import pyqtgraph.exporters
                 plot_item = self.getPlotItem()
                 
-                # Calculate 300 DPI resolution for ~8 inch width
+                # Use 100 DPI to match screen appearance and avoid thin lines
+                # Calculate width based on current widget size and 100 DPI
+                current_width = self.width()
+                current_height = self.height()
+                
+                # Scale to 100 DPI (approximately screen resolution)
+                # This ensures lines appear the same thickness as on screen
                 exporter = pyqtgraph.exporters.ImageExporter(plot_item)
-                exporter.parameters()['width'] = 2400  # 300 DPI for 8-inch width
+                exporter.parameters()['width'] = current_width
+                exporter.parameters()['height'] = current_height
                 exporter.export(filename)
                 
                 _LOGGER.info(f"Plot saved as high-resolution image: {filename}")
@@ -298,3 +412,71 @@ class EnhancedPlotWidget(pg.PlotWidget):
                 pass
         except Exception as e:
             _LOGGER.debug(f"Error applying theme to save button: {e}")
+    
+    def _apply_tick_styling(self):
+        """Apply enhanced tick styling from the demo"""
+        try:
+            plot_item = self.getPlotItem()
+            if not plot_item:
+                return
+            
+            # Configure enhanced axis styling similar to tick demo
+            axis_font = QtGui.QFont("Segoe UI", 9)
+            
+            for name in ('left', 'bottom'):
+                axis = plot_item.getAxis(name)
+                axis.setPen(pg.mkPen(color='black', width=1))
+                axis.setTextPen(pg.mkPen(color='black'))
+                axis.setTickFont(axis_font)
+            
+            # Enhanced grid with stronger alpha like the demo
+            plot_item.showGrid(x=True, y=True, alpha=0.3)
+            
+            _LOGGER.debug("Enhanced tick styling applied to EnhancedPlotWidget")
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to apply tick styling to EnhancedPlotWidget: {e}")
+    
+    def apply_enhanced_tick_styling(self, wavelength_range: Optional[tuple] = None):
+        """Apply enhanced tick styling from tick demo"""
+        try:
+            plot_item = self.getPlotItem()
+            if not plot_item:
+                return
+            
+            # Configure enhanced axis styling similar to tick demo
+            axis_font = QtGui.QFont("Segoe UI", 9)
+            
+            for name in ('left', 'bottom'):
+                axis = plot_item.getAxis(name)
+                axis.setPen(pg.mkPen(color='black', width=1))
+                axis.setTextPen(pg.mkPen(color='black'))
+                axis.setTickFont(axis_font)
+            
+            # Enhanced grid with stronger alpha like the demo
+            plot_item.showGrid(x=True, y=True, alpha=0.3)
+            
+            # Apply custom wavelength ticks if range is provided
+            if wavelength_range:
+                min_wave, max_wave = wavelength_range
+                # Major ticks every 1000 Å, minor every 500 Å like the demo
+                major_step = 1000
+                minor_step = 500
+                
+                # Calculate major tick positions
+                start_major = int((min_wave // major_step + 1) * major_step)
+                end_major = int((max_wave // major_step) * major_step)
+                major_ticks = [(w, f"{w}") for w in range(start_major, end_major + 1, major_step)]
+                
+                # Calculate minor tick positions (excluding major tick positions)
+                start_minor = int((min_wave // minor_step + 1) * minor_step)
+                end_minor = int((max_wave // minor_step) * minor_step)
+                minor_ticks = [(w, "") for w in range(start_minor, end_minor + 1, minor_step) 
+                               if w % major_step != 0]
+                
+                plot_item.getAxis('bottom').setTicks([major_ticks, minor_ticks])
+            
+            _LOGGER.debug("Enhanced tick styling applied successfully")
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to apply enhanced tick styling: {e}")

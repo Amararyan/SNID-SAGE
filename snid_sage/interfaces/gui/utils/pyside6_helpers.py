@@ -5,8 +5,7 @@ SNID SAGE - PySide6 Helper Utilities
 Collection of helper functions for GUI operations, data validation,
 and common UI tasks specific to the PySide6 interface.
 
-This module provides framework-agnostic utilities that were previously
-in the Tkinter-specific OLD_gui_helpers.py file.
+This module provides framework-agnostic utilities.
 """
 
 import numpy as np

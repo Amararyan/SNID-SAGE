@@ -8,8 +8,6 @@ This module provides a modern AI assistant interface with:
 - User metadata input form
 - Enhanced SNID context awareness
 - Modern Qt design
-
-Converted from Tkinter to PySide6 for modern Qt interface.
 """
 
 import PySide6.QtCore as QtCore
@@ -84,7 +82,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.resize(1200, 800)
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowMaximizeButtonHint)
         
-        # Apply dialog styling
+        # Apply dialog styling (do not override checkbox/radio indicators)
         self.setStyleSheet(f"""
             QDialog {{
                 background: {self.colors['bg_primary']};
@@ -243,23 +241,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
                 background: {self.colors['text_secondary']};
             }}
             
-            QCheckBox {{
-                spacing: 8px;
-                font-size: 10pt;
-            }}
-            
-            QCheckBox::indicator {{
-                width: 16px;
-                height: 16px;
-                border: 2px solid {self.colors['border']};
-                border-radius: 3px;
-                background: {self.colors['bg_secondary']};
-            }}
-            
-            QCheckBox::indicator:checked {{
-                background: {self.colors['btn_primary']};
-                border: 2px solid {self.colors['btn_primary']};
-            }}
+            /* Checkbox/radio indicators inherit from global theme manager */
             
             QProgressBar {{
                 border: 2px solid {self.colors['border']};
@@ -1097,7 +1079,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     def _on_model_test_success(self, model_id, model_name):
         """Handle successful model test"""
         self.test_model_btn.setEnabled(True)
-        self.test_model_btn.setText("🧪 Test Selected")
+        self.test_model_btn.setText("Test Selected")
         
         # Update the status column in the table
         for row in range(self.model_table.rowCount()):
@@ -1120,7 +1102,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     def _on_model_test_error(self, model_id, error_message):
         """Handle model test error"""
         self.test_model_btn.setEnabled(True)
-        self.test_model_btn.setText("🧪 Test Selected")
+        self.test_model_btn.setText("Test Selected")
         
         # Update the status column in the table
         for row in range(self.model_table.rowCount()):

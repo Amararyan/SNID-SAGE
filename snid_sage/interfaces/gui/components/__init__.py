@@ -4,14 +4,12 @@ GUI Components Package
 This package contains reusable GUI components organized by functionality.
 """
 
-# Import plot components
-from .plots import SpectrumPlotter
+# No legacy plot components exported; PySide6 code imports explicit PySide6 modules
+SpectrumPlotter = None
 
 # Import dialog components
-# Old tkinter dialogs moved to OLD_ - use PySide6 versions instead
-# from .dialogs import MaskManagerDialog, AISummaryDialog
 
-# Import analysis components
-from .analysis import AnalysisPlotter
+# Do not import legacy Tk analysis components in PySide6
+AnalysisPlotter = None
 
-__all__ = ['SpectrumPlotter', 'MaskManagerDialog', 'AISummaryDialog', 'AnalysisPlotter'] 
+__all__ = [] 

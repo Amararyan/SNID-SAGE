@@ -122,7 +122,7 @@ snid identify data/sn2003jo.dat -o results/ --no-plots
 ## Supported Data Formats
 
 - **FITS files** (.fits, .fit)
-- **ASCII tables** (.dat, .txt, .ascii, .asci)
+- **ASCII tables** (.dat, .txt, .ascii, .asci, .flm)
 - **Space-separated values** with flexible column detection
 - **Custom formats** with configurable parsers
 

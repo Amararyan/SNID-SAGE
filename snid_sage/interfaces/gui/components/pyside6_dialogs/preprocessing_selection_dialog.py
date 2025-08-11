@@ -4,8 +4,6 @@ SNID SAGE - Preprocessing Selection Dialog - PySide6 Version
 
 Simple dialog to choose between quick and advanced preprocessing options.
 Uses radio button style similar to redshift selection dialog.
-
-Converted from Tkinter to PySide6 for modern Qt interface.
 """
 
 import PySide6.QtCore as QtCore
@@ -69,7 +67,7 @@ class PySide6PreprocessingSelectionDialog(QtWidgets.QDialog):
         self.resize(600, 480)
         self.setFixedSize(600, 480)  # Non-resizable to match original
         
-        # Apply dialog styling
+        # Apply dialog styling (do not override global indicator styling)
         self.setStyleSheet(f"""
             QDialog {{
                 background: {self.colors['bg']};
@@ -101,27 +99,7 @@ class PySide6PreprocessingSelectionDialog(QtWidgets.QDialog):
                 color: {self.colors['text_primary']};
             }}
             
-            QRadioButton::indicator {{
-                width: 18px;
-                height: 18px;
-                border: 2px solid {self.colors['border']};
-                border-radius: 9px;
-                background: {self.colors['panel_bg']};
-            }}
-            
-            QRadioButton::indicator:checked {{
-                background: {self.colors['primary']};
-                border: 2px solid {self.colors['primary']};
-            }}
-            
-            QRadioButton::indicator:checked::after {{
-                content: '';
-                width: 8px;
-                height: 8px;
-                border-radius: 4px;
-                background: white;
-                margin: 3px;
-            }}
+            /* Radio indicators inherit from theme manager to keep emission style */
             
             QPushButton {{
                 border: 2px solid {self.colors['border']};

@@ -6,7 +6,6 @@ Interactive dialog for manual galaxy redshift determination.
 Allows users to identify galaxy lines by dragging to adjust redshift
 and calculates redshift based on the identified lines.
 
-Converted from Tkinter to PySide6 with PyQtGraph for modern Qt interface.
 Features drag-to-adjust redshift functionality from galaxy_redshift_demo.py.
 """
 

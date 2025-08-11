@@ -23,7 +23,8 @@ import numpy as np
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
 from snid_sage.shared.utils.math_utils import (
     calculate_weighted_redshift_balanced,
-    calculate_weighted_age_estimate,
+    calculate_weighted_age,
+    apply_exponential_weighting,
     get_best_metric_value
 )
 
@@ -243,7 +244,6 @@ def process_single_spectrum_optimized(
         processed_spectrum, _ = preprocess_spectrum(
             spectrum_path=spectrum_path,
             savgol_window=getattr(args, 'savgol_window', 0),
-            savgol_fwhm=getattr(args, 'savgol_fwhm', 0.0),
             savgol_order=getattr(args, 'savgol_order', 3),
             aband_remove=getattr(args, 'aband_remove', False),
             skyclip=getattr(args, 'skyclip', False),
@@ -377,7 +377,7 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
         
         if winning_cluster:
             cluster_matches = winning_cluster.get('matches', [])
-            # Sort cluster matches by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+            # Sort cluster matches by best available metric (RLAP-CCC if available, otherwise RLAP) descending
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
     
@@ -385,12 +385,12 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
     if not cluster_matches:
         if hasattr(result, 'filtered_matches') and result.filtered_matches:
             cluster_matches = result.filtered_matches
-            # Sort by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+            # Sort by best available metric (RLAP-CCC if available, otherwise RLAP) descending
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
         elif hasattr(result, 'best_matches') and result.best_matches:
             cluster_matches = result.best_matches
-            # Sort by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+            # Sort by best available metric (RLAP-CCC if available, otherwise RLAP) descending
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             cluster_matches = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
     
@@ -481,12 +481,14 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                 summary['cluster_redshift_weighted_uncertainty'] = np.nan
                 summary['cluster_redshift_scatter'] = 0.0
             
-            # Simple age estimation (no uncertainties)
+            # Age estimation with proper uncertainty calculation
             if ages_for_estimation:
-                age_final = calculate_weighted_age_estimate(ages_for_estimation, age_rlap_cos_values)
+                # Apply exponential weighting to RLAP-cos values for age calculation
+                age_weights = apply_exponential_weighting(np.array(age_rlap_cos_values))
+                age_final, age_uncertainty = calculate_weighted_age(ages_for_estimation, age_weights)
                 summary['cluster_age_weighted'] = age_final
-                summary['cluster_age_uncertainty'] = 0.0  # No uncertainty available for ages
-                summary['cluster_age_scatter'] = 0.0
+                summary['cluster_age_uncertainty'] = age_uncertainty
+                summary['cluster_age_scatter'] = 0.0  # Handled in uncertainty calculation
                 summary['redshift_age_covariance'] = 0.0  # Separate estimation, no covariance
             else:
                 # No valid age data
@@ -626,7 +628,7 @@ def _save_spectrum_outputs(
                     elif hasattr(result, 'best_matches') and result.best_matches:
                         plot_matches = result.best_matches
                 
-                # CRITICAL: Sort all plot matches by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+                # CRITICAL: Sort all plot matches by best available metric (RLAP-CCC if available, otherwise RLAP) descending
                 if plot_matches:
                     from snid_sage.shared.utils.math_utils import get_best_metric_value
                     plot_matches = sorted(plot_matches, key=get_best_metric_value, reverse=True)
@@ -882,16 +884,16 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         report.append("INDIVIDUAL SPECTRUM RESULTS")
         report.append("-"*50)
         report.append("Each spectrum represents a different astronomical object.")
-        report.append("Results are sorted by analysis quality (RLAP-Cos) - highest quality first.")
+        report.append("Results are sorted by analysis quality (RLAP-CCC) - highest quality first.")
         report.append("")
         
         # Header
-        header = f"{'Spectrum':<25} {'Type':<8} {'Subtype':<10} {'Template':<18} {'z':<8} {'RLAP-Cos':<8} {'C':<1}"
+        header = f"{'Spectrum':<25} {'Type':<8} {'Subtype':<10} {'Template':<18} {'z':<8} {'RLAP-CCC':<8} {'C':<1}"
         report.append(header)
         report.append("-" * len(header))
         report.append("Legend: * = Cluster-based analysis, z = redshift")
         
-        # Sort results by RLAP-Cos descending (highest quality first)
+        # Sort results by RLAP-CCC descending (highest quality first)
         from snid_sage.shared.utils.math_utils import get_best_metric_value
         successful_results_sorted = sorted(successful_results, 
                                          key=lambda x: get_best_metric_value(x[3]), reverse=True)
@@ -909,7 +911,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             else:
                 redshift = f"{summary.get('redshift', 0):.6f}"
             
-            # Use RLAP-Cos if available, otherwise RLAP
+            # Use best available metric (RLAP-CCC if available, otherwise RLAP)
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             rlap_cos = f"{get_best_metric_value(summary):.1f}"
             cluster_marker = "*" if summary.get('has_clustering', False) else " "
@@ -919,7 +921,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         
         report.append("")
         
-        # Detailed analysis (sorted by RLAP-Cos - highest quality first)
+        # Detailed analysis (sorted by RLAP-CCC - highest quality first)
         report.append("DETAILED INDIVIDUAL ANALYSIS")
         report.append("-"*50)
         report.append("Detailed results for each spectrum (sorted by analysis quality):")
@@ -954,7 +956,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             else:
                 report.append(f"   Redshift: {summary.get('redshift', 0):.6f} ± {summary.get('redshift_error', 0):.6f}")
             
-            # Use RLAP-Cos if available, otherwise RLAP
+            # Use best available metric (RLAP-CCC if available, otherwise RLAP)
             from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
             metric_value = get_best_metric_value(summary)
             metric_name = get_best_metric_name(summary)
@@ -976,7 +978,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         report.append("These statistics describe the quality of the batch processing, not the science.")
         report.append("")
         
-        # RLAP-Cos distribution (analysis quality)
+        # RLAP-CCC distribution (analysis quality)
         from snid_sage.shared.utils.math_utils import get_best_metric_value
         all_metrics = [get_best_metric_value(summary) for _, _, _, summary in successful_results]
         avg_metric = sum(all_metrics) / len(all_metrics) if all_metrics else 0
@@ -984,8 +986,9 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         medium_quality = sum(1 for metric in all_metrics if 5.0 <= metric < 10.0)
         low_quality = sum(1 for metric in all_metrics if metric < 5.0)
         
-        # Determine metric name (RLAP-Cos if available, otherwise RLAP)
-        metric_name = "RLAP-Cos" if any('rlap_cos' in summary for _, _, _, summary in successful_results) else "RLAP"
+        # Determine metric name (RLAP-CCC if available, otherwise RLAP)
+        from snid_sage.shared.utils.math_utils import get_best_metric_name
+        metric_name = get_best_metric_name(successful_results[0][3]) if successful_results else "RLAP"
         
         report.append(f"ANALYSIS QUALITY ({metric_name} Distribution):")
         report.append(f"   Average {metric_name}: {avg_metric:.2f}")
@@ -1117,7 +1120,7 @@ def main(args: argparse.Namespace) -> int:
             print(f"   Files: {len(input_files)} spectra")
             print(f"   Mode: {mode}")
             print(f"   Analysis: GUI-style cluster-aware (winning cluster)")
-            print(f"   Sorting: All results/plots sorted by RLAP-Cos (highest quality first)")
+            print(f"   Sorting: All results/plots sorted by RLAP-CCC (highest quality first)")
             print(f"   Output: {args.output_dir}")
             print(f"   Redshift Range: {args.zmin:.3f} to {args.zmax:.3f}")
             if args.forced_redshift:
@@ -1206,14 +1209,15 @@ def main(args: argparse.Namespace) -> int:
                         redshift = summary.get('redshift', 0)
                         z_marker = ""
 
-                    # Use RLAP-Cos if available, otherwise RLAP
-                    from snid_sage.shared.utils.math_utils import get_best_metric_value
-                    rlap_cos = get_best_metric_value(summary)
+                    # Use best available metric (RLAP-CCC > RLAP-Cos > RLAP)
+                    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+                    best_metric_value = get_best_metric_value(summary)
+                    best_metric_name = get_best_metric_name(summary)
 
                     # Format subtype display
                     type_display = f"{consensus_type} {consensus_subtype}".strip()
 
-                    print(f"      {name}: {type_display} z={redshift:.6f} RLAP-Cos={rlap_cos:.1f} {z_marker}")
+                    print(f"      {name}: {type_display} z={redshift:.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
                 else:
                     if not is_quiet:
                         print(f"      {name}: success")
@@ -1242,7 +1246,7 @@ def main(args: argparse.Namespace) -> int:
             print(f"Individual results in: {output_dir}/")
             if args.complete:
                 print(f"   3D Plots: Static PNG files with optimized viewing angle")
-                print(f"   Top 5 templates: Sorted by RLAP-Cos (highest quality first)")
+                print(f"   Top 5 templates: Sorted by RLAP-CCC (highest quality first)")
             
         return 0 if failed_count == 0 else 1
         

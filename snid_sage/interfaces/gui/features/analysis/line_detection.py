@@ -22,7 +22,7 @@ except ImportError:
 
 # Import manual redshift dialog
 try:
-    from snid_sage.interfaces.gui.components.dialogs import show_manual_redshift_dialog
+    from snid_sage.interfaces.gui.components.pyside6_dialogs import show_manual_redshift_dialog
 except ImportError:
     _LOGGER.warning("Manual redshift dialog not available")
     show_manual_redshift_dialog = None
@@ -318,9 +318,13 @@ class LineDetectionController:
                         
                         if galaxy_matches:
                             try:
-                                # Sort by correlation quality (rlap) - with extra validation
-                                _LOGGER.debug("🔄 Sorting galaxy matches by RLAP...")
-                                galaxy_matches.sort(key=lambda x: x.get('rlap', 0) if isinstance(x, dict) else 0, reverse=True)
+                                # Sort by best available metric (RLAP-CCC if available, otherwise RLAP) - with extra validation
+                                _LOGGER.debug("🔄 Sorting galaxy matches by best metric...")
+                                try:
+                                    from snid_sage.shared.utils.math_utils import get_best_metric_value
+                                    galaxy_matches.sort(key=lambda x: get_best_metric_value(x) if isinstance(x, dict) else 0, reverse=True)
+                                except ImportError:
+                                    galaxy_matches.sort(key=lambda x: x.get('rlap_ccc', x.get('rlap', 0)) if isinstance(x, dict) else 0, reverse=True)
                                 _LOGGER.debug("✅ Successfully sorted galaxy matches")
                                 
                                 # Get the best match for the dialog

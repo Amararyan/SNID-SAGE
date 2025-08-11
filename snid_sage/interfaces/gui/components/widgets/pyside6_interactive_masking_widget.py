@@ -115,7 +115,7 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         interactive_layout = QtWidgets.QVBoxLayout(interactive_group)
         
         # Toggle button
-        self.toggle_button = QtWidgets.QPushButton("🎯 Start Interactive Masking")
+        self.toggle_button = QtWidgets.QPushButton("Start Interactive Masking")
         self.toggle_button.clicked.connect(self.toggle_masking_mode)
         self.toggle_button.setToolTip("Click on start and end points for selecting a region to mask.\nRed shading shows masked regions.")
         # Styling will be handled by enhanced button system
@@ -204,7 +204,7 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         self.masking_active = True
         
         # Update button
-        self.toggle_button.setText("🔴 Stop Interactive Masking")
+        self.toggle_button.setText("Stop Interactive Masking")
         # Styling will be handled by enhanced button system
         
         # Connect mouse events
@@ -220,7 +220,7 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         self.masking_active = False
         
         # Update button
-        self.toggle_button.setText("🎯 Start Interactive Masking")
+        self.toggle_button.setText("Start Interactive Masking")
         # Styling will be handled by enhanced button system
         
         # Disconnect mouse events
@@ -477,21 +477,22 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         try:
             # Check if the masks_list widget still exists and is valid
             if hasattr(self, 'masks_list') and self.masks_list is not None:
-                # Use sip.isdeleted to check if the C++ object still exists
+                # Prefer PySide6 validity check via shiboken6 when available
+                is_valid = True
                 try:
-                    from sip import isdeleted
-                    if not isdeleted(self.masks_list):
-                        self.masks_list.clear()
-                        for i, (start, end) in enumerate(self.mask_regions):
-                            self.masks_list.addItem(f"Mask {i+1}: {start:.2f} - {end:.2f} Å")
-                except ImportError:
-                    # Fallback if sip is not available
+                    import shiboken6  # type: ignore[reportMissingImports]
+                    is_valid = shiboken6.isValid(self.masks_list)
+                except Exception:
+                    # If shiboken6 is unavailable, proceed and let runtime errors be caught below
+                    is_valid = True
+
+                if is_valid:
                     try:
                         self.masks_list.clear()
                         for i, (start, end) in enumerate(self.mask_regions):
                             self.masks_list.addItem(f"Mask {i+1}: {start:.2f} - {end:.2f} Å")
                     except RuntimeError:
-                        # Object has been deleted
+                        # Object may have been deleted; ignore safely
                         pass
         except (RuntimeError, AttributeError):
             # Widget has been deleted or doesn't exist, skip updating

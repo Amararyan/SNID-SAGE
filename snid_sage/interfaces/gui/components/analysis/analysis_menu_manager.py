@@ -313,16 +313,17 @@ class AnalysisMenuManager:
                     self.app_controller.current_config['analysis'].update(config_params)
                 
                 # Run the analysis with configured parameters
-                success = self._run_configured_analysis(config_params)
-                
-                if success:
-                    self._handle_analysis_success()
-                    _LOGGER.info("Advanced SNID analysis completed successfully")
+                started = self._run_configured_analysis(config_params)
+
+                if started:
+                    # Defer success handling to completion signal; update inline status only
+                    self.main_window.status_label.setText("Running SNID analysis with configured settings...")
+                    _LOGGER.info("Advanced SNID analysis started (waiting for completion)")
                 else:
                     QtWidgets.QMessageBox.critical(
                         self.main_window,
                         "Analysis Error",
-                        "Failed to run SNID analysis with configured parameters"
+                        "Failed to start SNID analysis with configured parameters"
                     )
                     
             except ImportError as e:
@@ -497,14 +498,14 @@ class AnalysisMenuManager:
                     if hasattr(snid_results, 'best_matches') and selected_cluster.get('matches'):
                         cluster_matches = selected_cluster.get('matches', [])
                         
-                        # Sort cluster matches by best available metric (RLAP-Cos if available, otherwise RLAP) descending
+                        # Sort cluster matches by best available metric (RLAP-CCC if available, otherwise RLAP) descending
                         try:
                             from snid_sage.shared.utils.math_utils import get_best_metric_value
                             cluster_matches_sorted = sorted(cluster_matches, key=get_best_metric_value, reverse=True)
                         except ImportError:
                             # Fallback sorting if math utils not available
                             cluster_matches_sorted = sorted(cluster_matches, 
-                                                          key=lambda m: m.get('rlap_cos', m.get('rlap', 0)), 
+                                                          key=lambda m: m.get('rlap_ccc', m.get('rlap', 0)), 
                                                           reverse=True)
                         
                         # Update best_matches to only contain cluster templates
@@ -529,7 +530,7 @@ class AnalysisMenuManager:
                             snid_results.redshift = best_cluster_match.get('redshift', 0.0)
                             snid_results.rlap = best_cluster_match.get('rlap', 0.0)
                             
-                            # Update RLAP-Cos if available
+                            # Update RLAP-CCC if available
                             if 'rlap_cos' in best_cluster_match:
                                 snid_results.rlap_cos = best_cluster_match.get('rlap_cos', 0.0)
                             

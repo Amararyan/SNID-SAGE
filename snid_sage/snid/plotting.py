@@ -22,10 +22,9 @@ try:
 except ImportError:
     THEME_SUPPORT = False
 
-# Import unified systems for consistent GUI plot styling
+# Import no-title plot manager for GUI styling (optional)
 try:
     from snid_sage.interfaces.gui.utils.no_title_plot_manager import apply_no_title_styling, get_plot_manager
-    from snid_sage.interfaces.gui.utils.unified_font_manager import get_font_manager, FontCategory
     UNIFIED_SYSTEMS_AVAILABLE = True
 except ImportError:
     UNIFIED_SYSTEMS_AVAILABLE = False
@@ -434,7 +433,14 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
             info_text += f" ± {result.consensus_redshift_error:.4f}"
         info_text += "\n"
     
-    info_text += f"RLAP: {result.rlap:.2f}\n"
+    # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+    if hasattr(result, 'best_matches') and result.best_matches:
+        best_metric_value = get_best_metric_value(result.best_matches[0])
+        metric_name = get_best_metric_name(result.best_matches[0])
+        info_text += f"{metric_name}: {best_metric_value:.2f}\n"
+    else:
+        info_text += f"RLAP: {result.rlap:.2f}\n"
     info_text += f"LAP: {result.lap:.2f}\n\n"
     
     # Template info
@@ -490,7 +496,11 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
     
     template_info += f"Age: {template_age:.1f} days\n"
     template_info += f"z = {z_template:.4f}\n"
-    template_info += f"RLAP = {rlap_value:.1f}"
+    # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+    best_metric_value = get_best_metric_value(best_match)
+    metric_name = get_best_metric_name(best_match)
+    template_info += f"{metric_name} = {best_metric_value:.1f}"
     
     ax_top.text(0.02, 0.98, template_info, transform=ax_top.transAxes,
              verticalalignment='top', horizontalalignment='left',
@@ -940,7 +950,11 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
     if template_age is not None and np.isfinite(template_age):
         template_info += f"Age: {template_age:.1f} days\n"
     template_info += f"z = {redshift:.6f}\n"
-    template_info += f"RLAP = {rlap:.1f}"
+    # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+    best_metric_value = get_best_metric_value(best_match)
+    metric_name = get_best_metric_name(best_match)
+    template_info += f"{metric_name} = {best_metric_value:.1f}"
     
     # Add the annotation with a semi-transparent background
     ax.text(0.02, 0.98, template_info, transform=ax.transAxes,
@@ -1434,10 +1448,11 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
         template_info_lines.append(f"z = {z_template:.6f} ±{redshift_error:.6f}")
     else:
         template_info_lines.append(f"z = {z_template:.6f}")
-    if rlap_cos_value is not None:
-        template_info_lines.append(f"RLAP-cos = {rlap_cos_value:.2f}")
-    else:
-        template_info_lines.append(f"RLAP = {rlap_value:.2f}")
+    # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+    best_metric_value = get_best_metric_value(match)
+    metric_name = get_best_metric_name(match)
+    template_info_lines.append(f"{metric_name} = {best_metric_value:.2f}")
     template_info = "\n".join(template_info_lines)
     ax.text(0.98, 0.98, template_info, transform=ax.transAxes,
             verticalalignment='top', horizontalalignment='right',
@@ -1641,10 +1656,11 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
         template_info_lines.append(f"z = {z_template:.6f} ±{redshift_error:.6f}")
     else:
         template_info_lines.append(f"z = {z_template:.6f}")
-    if rlap_cos_value is not None:
-        template_info_lines.append(f"RLAP-cos = {rlap_cos_value:.2f}")
-    else:
-        template_info_lines.append(f"RLAP = {rlap_value:.2f}")
+    # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+    best_metric_value = get_best_metric_value(match)
+    metric_name = get_best_metric_name(match)
+    template_info_lines.append(f"{metric_name} = {best_metric_value:.2f}")
     template_info = "\n".join(template_info_lines)
     ax.text(0.98, 0.98, template_info, transform=ax.transAxes,
             verticalalignment='top', horizontalalignment='right',
@@ -1818,7 +1834,11 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
     if template_age is not None and np.isfinite(template_age):
         template_info += f"Age: {template_age:.1f} days\n"
     template_info += f"z = {z_template:.4f}\n"
-    template_info += f"RLAP = {rlap_value:.1f}"
+    # Use best available metric (RLAP-CCC if available, otherwise RLAP)
+    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+    best_metric_value = get_best_metric_value(match)
+    metric_name = get_best_metric_name(match)
+    template_info += f"{metric_name} = {best_metric_value:.1f}"
     
     # Add the annotation with a semi-transparent background
     ax.text(0.02, 0.98, template_info, transform=ax.transAxes,
