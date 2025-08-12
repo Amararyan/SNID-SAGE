@@ -110,16 +110,25 @@ class TwemojiManager:
         "🐌": "1f40c",          # Snail (used in logs)
     }
     
-    def __init__(self, cache_dir: Optional[Path] = None, icon_size: int = 16):
+    def __init__(self, cache_dir: Optional[Path] = None, icon_size: int = 16, allow_network_downloads: Optional[bool] = None):
         """
         Initialize the Twemoji manager.
         
         Args:
             cache_dir: Directory to cache downloaded icons (defaults to user cache)
             icon_size: Size in pixels for the icons (default 16 for buttons)
+            allow_network_downloads: If True, allow CDN fallback; if False, never
+                perform network operations. Defaults to environment variable
+                SNID_SAGE_TWEMOJI_NETWORK (off by default).
         """
         self.icon_size = icon_size
         self.cache: Dict[str, QtGui.QIcon] = {}
+        # By default, do not perform network access unless explicitly enabled
+        if allow_network_downloads is None:
+            env_flag = os.environ.get("SNID_SAGE_TWEMOJI_NETWORK", "").strip().lower()
+            self.allow_network_downloads = env_flag in {"1", "true", "yes", "on"}
+        else:
+            self.allow_network_downloads = bool(allow_network_downloads)
         
         # Set up cache directory
         if cache_dir is None:
@@ -196,7 +205,12 @@ class TwemojiManager:
         if cache_file.exists():
             return cache_file
 
-        # 3) As a last resort, download to cache
+        # 3) As a last resort, optionally download to cache (never on UI thread by default)
+        if not self.allow_network_downloads:
+            _LOGGER.debug(
+                f"Twemoji '{emoji}' ({codepoint}) not packaged or cached; network downloads disabled"
+            )
+            return None
         url = f"{self.TWEMOJI_CDN_BASE}{codepoint}.svg"
         try:
             _LOGGER.info(f"Downloading Twemoji icon for '{emoji}' from: {url}")
@@ -455,13 +469,16 @@ class TwemojiManager:
         Returns:
             Number of icons successfully preloaded
         """
+        # IMPORTANT: avoid doing GUI work off the main thread. This preload method
+        # only ensures the SVG files are resolvable (packaged or cached), but does
+        # not create QIcon objects. Actual QIcon creation happens on demand in the
+        # UI thread via get_icon().
         loaded = 0
-        
         for emoji in self.EMOJI_MAPPING.keys():
-            if self.get_icon(emoji):
+            svg_path = self.get_svg_path_for_emoji(emoji)
+            if svg_path is not None and svg_path.exists():
                 loaded += 1
-        
-        _LOGGER.info(f"Preloaded {loaded}/{len(self.EMOJI_MAPPING)} Twemoji icons")
+        _LOGGER.info(f"Preloaded Twemoji assets (paths resolved): {loaded}/{len(self.EMOJI_MAPPING)}")
         return loaded
     
     def clear_cache(self) -> None:

@@ -86,6 +86,24 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         # Colors for masking visualization
         self.mask_color = QtGui.QColor(255, 100, 100, 100)  # Semi-transparent red
         self.selection_color = QtGui.QColor(255, 150, 150, 150)  # Lighter red for selection
+
+        # Optional shiboken validity helper
+        try:
+            import shiboken6  # type: ignore[reportMissingImports]
+            self._shiboken = shiboken6
+        except Exception:
+            self._shiboken = None
+
+    def _is_alive(self, obj: Optional[QtCore.QObject]) -> bool:
+        """Return True if the Qt object appears to still be valid/alive."""
+        if obj is None:
+            return False
+        try:
+            if self._shiboken is not None:
+                return bool(self._shiboken.isValid(obj))
+        except Exception:
+            pass
+        return True
     
     def set_update_callback(self, callback: Callable):
         """
@@ -174,6 +192,26 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         layout.addWidget(masks_group)
         
         return self.controls_frame
+
+    def release_ui_references(self):
+        """Drop references to UI controls; call before the options panel deletes them.
+
+        This avoids later accesses to deleted C++ objects during step transitions.
+        """
+        try:
+            self.controls_frame = None
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'toggle_button'):
+                self.toggle_button = None
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'masks_list'):
+                self.masks_list = None
+        except Exception:
+            pass
     
     def toggle_masking_mode(self):
         """Toggle interactive masking mode"""
@@ -204,7 +242,11 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         self.masking_active = True
         
         # Update button
-        self.toggle_button.setText("Stop Interactive Masking")
+        try:
+            if hasattr(self, 'toggle_button') and self._is_alive(self.toggle_button):
+                self.toggle_button.setText("Stop Interactive Masking")
+        except RuntimeError:
+            pass
         # Styling will be handled by enhanced button system
         
         # Connect mouse events
@@ -220,7 +262,11 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         self.masking_active = False
         
         # Update button
-        self.toggle_button.setText("Start Interactive Masking")
+        try:
+            if hasattr(self, 'toggle_button') and self._is_alive(self.toggle_button):
+                self.toggle_button.setText("Start Interactive Masking")
+        except RuntimeError:
+            pass
         # Styling will be handled by enhanced button system
         
         # Disconnect mouse events
@@ -229,27 +275,41 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         
         # Clear any active selection
         if self.selection_item:
-            self.plot_widget.removeItem(self.selection_item)
+            try:
+                if self._is_alive(self.plot_widget):
+                    self.plot_widget.removeItem(self.selection_item)
+            except RuntimeError:
+                pass
             self.selection_item = None
         
         # Reset selection state
         self.selection_start = None
         
         # Emit signal
-        self.masking_mode_changed.emit(False)
+        try:
+            self.masking_mode_changed.emit(False)
+        except RuntimeError:
+            pass
         
         _LOGGER.info("Interactive masking mode stopped")
     
     def _connect_mouse_events(self):
         """Connect mouse events for interactive selection"""
-        if self.plot_widget:
-            self.mouse_press_connection = self.plot_widget.scene().sigMouseClicked.connect(self._on_mouse_press)
+        if self._is_alive(self.plot_widget):
+            try:
+                self.mouse_press_connection = self.plot_widget.scene().sigMouseClicked.connect(self._on_mouse_press)
+            except RuntimeError:
+                self.mouse_press_connection = None
             # Note: PyQtGraph doesn't have separate mouse move events, we'll handle in press/release
     
     def _disconnect_mouse_events(self):
         """Disconnect mouse events"""
         if self.mouse_press_connection:
-            self.plot_widget.scene().sigMouseClicked.disconnect(self._on_mouse_press)
+            try:
+                if self._is_alive(self.plot_widget):
+                    self.plot_widget.scene().sigMouseClicked.disconnect(self._on_mouse_press)
+            except (RuntimeError, TypeError):
+                pass
             self.mouse_press_connection = None
     
     def _on_mouse_press(self, event):
@@ -293,7 +353,10 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
                     self._create_selection_visual(x_coord, x_coord)
                     
                     # Connect mouse move events for drag selection
-                    self.mouse_move_connection = self.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_move)
+                    try:
+                        self.mouse_move_connection = self.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_move)
+                    except RuntimeError:
+                        self.mouse_move_connection = None
                     # Note: PyQtGraph GraphicsScene doesn't have sigMouseReleased, use sigMouseClicked for completion
                 else:
                     # Complete selection on second click
@@ -341,7 +404,11 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
     def _create_selection_visual(self, start_x: float, end_x: float):
         """Create visual representation of current selection"""
         if self.selection_item:
-            self.plot_widget.removeItem(self.selection_item)
+            try:
+                if self._is_alive(self.plot_widget):
+                    self.plot_widget.removeItem(self.selection_item)
+            except RuntimeError:
+                pass
         
         # Create a semi-transparent rectangle for the selection
         self.selection_item = pg.LinearRegionItem(
@@ -349,7 +416,11 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
             brush=self.selection_color,
             movable=False
         )
-        self.plot_widget.addItem(self.selection_item)
+        if self._is_alive(self.plot_widget):
+            try:
+                self.plot_widget.addItem(self.selection_item)
+            except RuntimeError:
+                pass
     
     def _update_selection_visual(self, start_x: float, end_x: float):
         """Update visual representation of current selection during drag"""
@@ -398,7 +469,11 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
             brush=self.mask_color,
             movable=False
         )
-        self.plot_widget.addItem(mask_item)
+        if self._is_alive(self.plot_widget):
+            try:
+                self.plot_widget.addItem(mask_item)
+            except RuntimeError:
+                pass
         self.mask_fill_items.append(mask_item)
     
     def add_mask_from_input(self):
@@ -438,7 +513,11 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
             # Remove visual
             if current_row < len(self.mask_fill_items):
                 item = self.mask_fill_items.pop(current_row)
-                self.plot_widget.removeItem(item)
+                try:
+                    if self._is_alive(self.plot_widget):
+                        self.plot_widget.removeItem(item)
+                except RuntimeError:
+                    pass
             
             # Update UI
             self._update_masks_list()
@@ -457,7 +536,11 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         
         # Clear visuals
         for item in self.mask_fill_items:
-            self.plot_widget.removeItem(item)
+            try:
+                if self._is_alive(self.plot_widget):
+                    self.plot_widget.removeItem(item)
+            except RuntimeError:
+                pass
         self.mask_fill_items.clear()
         
         # Update UI
@@ -515,9 +598,36 @@ class PySide6InteractiveMaskingWidget(QtCore.QObject):
         """Refresh all mask visuals (useful after plot updates)"""
         # Clear existing visuals
         for item in self.mask_fill_items:
-            self.plot_widget.removeItem(item)
+            try:
+                if self._is_alive(self.plot_widget):
+                    self.plot_widget.removeItem(item)
+            except RuntimeError:
+                pass
         self.mask_fill_items.clear()
         
         # Recreate visuals
         for start, end in self.mask_regions:
             self._create_mask_visual(start, end) 
+
+    def cleanup(self):
+        """Clean up connections and references to avoid accessing deleted Qt objects."""
+        try:
+            if getattr(self, 'masking_active', False):
+                self.stop_masking_mode()
+        except Exception:
+            pass
+        try:
+            self._disconnect_mouse_events()
+        except Exception:
+            pass
+        try:
+            self._disconnect_drag_events()
+        except Exception:
+            pass
+        # Drop references to UI elements that may be deleted by parent layouts
+        if hasattr(self, 'controls_frame'):
+            self.controls_frame = None
+        if hasattr(self, 'toggle_button'):
+            self.toggle_button = None
+        if hasattr(self, 'masks_list'):
+            self.masks_list = None

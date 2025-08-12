@@ -379,22 +379,18 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
         
-        # Performance group
+        # Performance group (informational)
         performance_group = QtWidgets.QGroupBox("Performance")
         performance_layout = QtWidgets.QGridLayout(performance_group)
-        
-        # Thread count
-        performance_layout.addWidget(QtWidgets.QLabel("Analysis Threads:"), 0, 0)
-        self.widgets['thread_count'] = create_flexible_int_input(min_val=1, max_val=16, default=4)
-        self.widgets['thread_count'].setValue(4)
-        performance_layout.addWidget(self.widgets['thread_count'], 0, 1)
-        
-        # Memory limit
-        performance_layout.addWidget(QtWidgets.QLabel("Memory Limit (GB):"), 1, 0)
-        self.widgets['memory_limit'] = create_flexible_double_input(min_val=1.0, max_val=64.0, suffix=" GB", default=8.0)
-        self.widgets['memory_limit'].setValue(8.0)
-        performance_layout.addWidget(self.widgets['memory_limit'], 1, 1)
-        
+
+        info_label = QtWidgets.QLabel(
+            "CPU usage is managed by NumPy/BLAS.\n"
+            "To limit CPU threads, set environment variables such as \n"
+            "OMP_NUM_THREADS, MKL_NUM_THREADS, or OPENBLAS_NUM_THREADS before launching."
+        )
+        info_label.setWordWrap(True)
+        performance_layout.addWidget(info_label, 0, 0, 1, 2)
+
         layout.addWidget(performance_group)
         
         # Debug group
@@ -563,8 +559,6 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
             'auto_preprocess': False,
             'show_progress': True,
             'max_templates': 10,
-            'thread_count': 4,
-            'memory_limit': 8.0,
             'log_level': 'INFO',
             'debug_mode': False,
             # AI settings

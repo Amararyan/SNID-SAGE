@@ -77,10 +77,14 @@ class EmissionDialogUIBuilder:
         self.dialog.sn_button = QtWidgets.QRadioButton("SN Lines")
         self.dialog.sn_button.setChecked(True)
         self.dialog.sn_button.clicked.connect(self.dialog._set_sn_mode)
+        # Hint tooltip for quick line preview
+        self.dialog.sn_button.setToolTip("Hold Shift to quickly preview all available lines as an overlay")
         mode_buttons_layout.addWidget(self.dialog.sn_button)
         
         self.dialog.galaxy_button = QtWidgets.QRadioButton("Galaxy Lines")
         self.dialog.galaxy_button.clicked.connect(self.dialog._set_galaxy_mode)
+        # Hint tooltip for quick line preview
+        self.dialog.galaxy_button.setToolTip("Hold Shift to quickly preview all available lines as an overlay")
         mode_buttons_layout.addWidget(self.dialog.galaxy_button)
         
         # Create button group for exclusive selection
@@ -89,6 +93,14 @@ class EmissionDialogUIBuilder:
         self.dialog.mode_button_group.addButton(self.dialog.galaxy_button, 1)
         
         mode_layout.addLayout(mode_buttons_layout)
+
+        # Inline hint under the mode selection
+        hint_label = QtWidgets.QLabel("Tip: Hold Shift to quickly preview all available lines")
+        hint_label.setWordWrap(True)
+        hint_label.setStyleSheet(
+            f"color: {self.dialog.colors.get('text_secondary', '#64748b')}; font-style: italic; margin-top: 6px; font-size: 9pt;"
+        )
+        mode_layout.addWidget(hint_label)
         layout.addWidget(mode_group)
     
     def create_quick_presets(self, layout):

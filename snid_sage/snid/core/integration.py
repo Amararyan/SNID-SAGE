@@ -8,7 +8,7 @@ Replaces complex caching with a single unified storage approach.
 
 import logging
 import time
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Callable
 import numpy as np
 from pathlib import Path
 
@@ -20,9 +20,10 @@ except ImportError:
     _LOG = logging.getLogger('snid_sage.snid.integration')
 
 # Global unified storage instance
-_GLOBAL_STORAGE: Optional['TemplateFFTStorage'] = None
+# Global storage instance (type left un-annotated to avoid import-time issues)
+_GLOBAL_STORAGE = None
 
-def get_unified_storage(template_dir: str) -> 'TemplateFFTStorage':
+def get_unified_storage(template_dir: str):
     """
     Get or create unified storage instance.
     
@@ -51,7 +52,7 @@ def get_unified_storage(template_dir: str) -> 'TemplateFFTStorage':
 def integrate_fft_optimization(templates: List[Dict[str, Any]],
                              k1: int, k2: int, k3: int, k4: int,
                              use_vectorized: Optional[bool] = None,
-                             config: Optional['SNIDConfig'] = None) -> 'SimpleFFTCorrelator':
+                              config: Optional[Any] = None) -> 'SimpleFFTCorrelator':
     """
     Create an FFT correlator from templates with optimization options.
     
@@ -146,7 +147,7 @@ class SimpleFFTCorrelator:
             # Pre-compute bandpass filter mask (same for all templates)
             self.filter_mask = self._compute_filter_mask()
             
-            _LOG.info(f"🚀 Optimized vectorized FFT correlator ready with {len(self.template_names)} templates")
+            _LOG.debug(f"🚀 Optimized vectorized FFT correlator ready with {len(self.template_names)} templates")
         else:
             # Legacy mode: store individual FFTs in dictionaries
             self.template_ffts = {}
@@ -321,7 +322,8 @@ class SimpleTemplateWrapper:
 def load_templates_unified(template_dir: str, 
                           type_filter: Optional[List[str]] = None,
                           template_names: Optional[List[str]] = None,
-                          exclude_templates: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+                          exclude_templates: Optional[List[str]] = None,
+                          progress_callback: Optional[Callable[[str, float], None]] = None) -> List[Dict[str, Any]]:
     """
     Load templates using unified storage - OPTIMIZED VERSION.
     Templates are already rebinned to standard grid, so no rebinning needed during SNID runs.
@@ -400,7 +402,8 @@ def load_templates_unified(template_dir: str,
     template_entries = storage.get_templates(
         type_filter=type_filter,
         template_names=enhanced_template_names,  # Use enhanced names
-        use_prefetching=True  # Enable prefetching for better performance
+        use_prefetching=True,  # Enable prefetching for better performance
+        progress_callback=progress_callback
     )
     
     # Get the standard wavelength grid (same for all templates)
@@ -528,7 +531,7 @@ def patch_load_templates():
     """Legacy compatibility - patch load_templates to use unified storage."""
     try:
         from ..io import load_templates as original_load_templates
-        import snid_sage.snid.io
+        import snid_sage.snid.io as snid_io
         
         def unified_load_templates(template_dir: str, flatten: bool = True) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
             """Unified storage version of load_templates."""
@@ -544,7 +547,7 @@ def patch_load_templates():
             return templates, type_stats
         
         # Replace the original function
-        snid.io.load_templates = unified_load_templates
+        snid_io.load_templates = unified_load_templates
         _LOG.info("Successfully patched load_templates to use unified storage")
         return True
         

@@ -64,45 +64,49 @@ class PySide6EventHandlers(QtCore.QObject):
     def setup_keyboard_shortcuts(self):
         """Setup comprehensive keyboard shortcuts"""
         try:
+            # Platform-aware helper
+            from snid_sage.interfaces.gui.utils.cross_platform_window import (
+                CrossPlatformWindowManager as CPW,
+            )
+
             # File operations
-            QtGui.QShortcut("Ctrl+O", self.main_window, self.on_browse_file)
-            QtGui.QShortcut("Ctrl+Shift+O", self.main_window, self.on_open_configuration_dialog)
-            
+            CPW.standard_shortcut(self.main_window, QtGui.QKeySequence.StandardKey.Open, self.on_browse_file)
+            CPW.create_shortcut(self.main_window, "Ctrl+Shift+O", self.on_open_configuration_dialog)
+
             # Quick workflow (combined preprocessing + analysis)
-            QtGui.QShortcut("Ctrl+Return", self.main_window, self.on_run_quick_workflow)
-            QtGui.QShortcut("Ctrl+Enter", self.main_window, self.on_run_quick_workflow)
-            
+            CPW.create_shortcut(self.main_window, "Ctrl+Return", self.on_run_quick_workflow)
+            CPW.create_shortcut(self.main_window, "Ctrl+Enter", self.on_run_quick_workflow)
+
             # Extended quick workflow (preprocessing + analysis + auto cluster selection)
-            QtGui.QShortcut("Ctrl+Shift+Return", self.main_window, self.on_run_quick_workflow_with_auto_cluster)
-            QtGui.QShortcut("Ctrl+Shift+Enter", self.main_window, self.on_run_quick_workflow_with_auto_cluster)
-            
+            CPW.create_shortcut(self.main_window, "Ctrl+Shift+Return", self.on_run_quick_workflow_with_auto_cluster)
+            CPW.create_shortcut(self.main_window, "Ctrl+Shift+Enter", self.on_run_quick_workflow_with_auto_cluster)
+
             # Analysis operations
             QtGui.QShortcut("F5", self.main_window, self.on_run_analysis)
-            QtGui.QShortcut("Ctrl+R", self.main_window, self.on_run_analysis)
+            CPW.create_shortcut(self.main_window, "Ctrl+R", self.on_run_analysis)
             QtGui.QShortcut("F6", self.main_window, self.on_open_preprocessing_dialog)
-            
+
             # Settings and configuration
-            QtGui.QShortcut("Ctrl+,", self.main_window, self.on_open_settings_dialog)
-            
+            CPW.standard_shortcut(self.main_window, QtGui.QKeySequence.StandardKey.Preferences, self.on_open_settings_dialog)
+
             # Template navigation
             QtGui.QShortcut("Left", self.main_window, self.on_previous_template)
             QtGui.QShortcut("Right", self.main_window, self.on_next_template)
-            
-            
+
             # View toggles
             QtGui.QShortcut("F", self.main_window, lambda: self.on_view_change('flux'))
             QtGui.QShortcut("T", self.main_window, lambda: self.on_view_change('flat'))
             QtGui.QShortcut("Space", self.main_window, self.on_switch_view_mode)
-            
+
             # Reset functionality
-            QtGui.QShortcut("Ctrl+Shift+R", self.main_window, self.on_reset_to_initial_state)
-            
+            CPW.create_shortcut(self.main_window, "Ctrl+Shift+R", self.on_reset_to_initial_state)
+
             # Help and documentation
             QtGui.QShortcut("F1", self.main_window, self.on_show_shortcuts_dialog)
-            QtGui.QShortcut("Ctrl+/", self.main_window, self.on_show_shortcuts_dialog)
-            
+            CPW.create_shortcut(self.main_window, "Ctrl+/", self.on_show_shortcuts_dialog)
+
             _LOGGER.debug("Keyboard shortcuts setup completed")
-            
+
         except Exception as e:
             _LOGGER.error(f"Error setting up keyboard shortcuts: {e}")
     
@@ -359,6 +363,28 @@ class PySide6EventHandlers(QtCore.QObject):
                     "Please load a spectrum file before running analysis."
                 )
                 return
+            
+            # If an analysis is already running, do not start another
+            try:
+                if hasattr(self.app_controller, 'is_analysis_running') and self.app_controller.is_analysis_running():
+                    # Prefer updating existing progress dialog if available
+                    dlg = getattr(self.main_window, 'progress_dialog', None)
+                    if dlg:
+                        try:
+                            dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
+                            dlg.raise_()
+                            dlg.activateWindow()
+                        except Exception:
+                            pass
+                    else:
+                        QtWidgets.QMessageBox.information(
+                            self.main_window,
+                            "Analysis In Progress",
+                            "An analysis is already running. Please wait for it to finish or cancel it."
+                        )
+                    return
+            except Exception:
+                pass
             
             # If analysis exists already, confirm re-running analysis with reset of previous results
             analysis_present = bool(getattr(self.app_controller, 'snid_results', None))

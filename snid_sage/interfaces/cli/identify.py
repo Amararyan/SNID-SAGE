@@ -778,8 +778,6 @@ def main(args: argparse.Namespace) -> int:
             import logging
             # Suppress the most verbose loggers that users don't need to see
             logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
-            logging.getLogger('snid_sage.snid.pipeline').setLevel(logging.WARNING)
-            logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
             logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
         
         if args.verbose:
@@ -980,7 +978,7 @@ def main(args: argparse.Namespace) -> int:
                     print(formatter.get_display_summary())
                     print("="*80)
                 except ImportError:
-                    print(f"\n{spectrum_name}: {result.consensus_type} z={result.redshift:.4f} RLAP={result.rlap:.1f}")
+                    print(f"\n{spectrum_name}: {result.consensus_type} z={result.redshift:.6f} RLAP={result.rlap:.1f}")
                     print("-"*80)
             
 

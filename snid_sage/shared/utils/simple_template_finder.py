@@ -38,7 +38,7 @@ def find_templates_directory() -> Optional[Path]:
                     # Convert to Path and validate
                     templates_dir = Path(str(templates_package))
                     if _validate_templates_directory(templates_dir):
-                        logger.info(f"✅ Found templates in installed package (files API): {templates_dir}")
+                        logger.debug(f"✅ Found templates in installed package (files API): {templates_dir}")
                         return templates_dir
             except Exception as e:
                 logger.debug(f"Files API with snid_sage failed: {e}")
@@ -50,7 +50,7 @@ def find_templates_directory() -> Optional[Path]:
                     if templates_package.exists():
                         templates_dir = Path(str(templates_package))
                         if _validate_templates_directory(templates_dir):
-                            logger.info(f"✅ Found templates in package {pkg_name} (files API): {templates_dir}")
+                            logger.debug(f"✅ Found templates in package {pkg_name} (files API): {templates_dir}")
                             return templates_dir
                 except Exception as e:
                     logger.debug(f"Files API with {pkg_name} failed: {e}")
@@ -69,7 +69,7 @@ def find_templates_directory() -> Optional[Path]:
                     else:
                         templates_dir = template_path.parent
                     if _validate_templates_directory(templates_dir):
-                        logger.info(f"✅ Found templates in package {pkg_name} (path API): {templates_dir}")
+                        logger.debug(f"✅ Found templates in package {pkg_name} (path API): {templates_dir}")
                         return templates_dir
             except Exception as e:
                 logger.debug(f"Path API with {pkg_structure} failed: {e}")
@@ -90,7 +90,7 @@ def find_templates_directory() -> Optional[Path]:
                     if pkg_dir.exists():
                         templates_dir = pkg_dir / 'templates'
                         if _validate_templates_directory(templates_dir):
-                            logger.info(f"✅ Found templates in site-packages: {templates_dir}")
+                            logger.debug(f"✅ Found templates in site-packages: {templates_dir}")
                             return templates_dir
     except Exception as e:
         logger.debug(f"Site-packages search failed: {e}")
@@ -99,14 +99,14 @@ def find_templates_directory() -> Optional[Path]:
     cwd = Path.cwd()
     templates_dir = cwd / 'templates'
     if _validate_templates_directory(templates_dir):
-        logger.info(f"✅ Found templates in current directory: {templates_dir}")
+        logger.debug(f"✅ Found templates in current directory: {templates_dir}")
         return templates_dir
     
     # Strategy 4: Check relative to snid_sage package in current directory
     cwd = Path.cwd()
     templates_dir = cwd / 'snid_sage' / 'templates'
     if _validate_templates_directory(templates_dir):
-        logger.info(f"✅ Found templates in current directory snid_sage package: {templates_dir}")
+        logger.debug(f"✅ Found templates in current directory snid_sage package: {templates_dir}")
         return templates_dir
     
     # Strategy 5: Find project root by looking for key files
@@ -117,12 +117,12 @@ def find_templates_directory() -> Optional[Path]:
             # Check for snid_sage package structure first
             templates_dir = current / 'snid_sage' / 'templates'
             if _validate_templates_directory(templates_dir):
-                logger.info(f"✅ Found templates in project snid_sage package: {templates_dir}")
+                logger.debug(f"✅ Found templates in project snid_sage package: {templates_dir}")
                 return templates_dir
             # Fallback to root templates directory
             templates_dir = current / 'templates'
             if _validate_templates_directory(templates_dir):
-                logger.info(f"✅ Found templates relative to project root: {templates_dir}")
+                logger.debug(f"✅ Found templates relative to project root: {templates_dir}")
                 return templates_dir
         current = current.parent
         if current == current.parent:  # Reached filesystem root
@@ -134,7 +134,7 @@ def find_templates_directory() -> Optional[Path]:
         # Check for snid_sage package structure
         templates_dir = current / 'snid_sage' / 'templates'
         if _validate_templates_directory(templates_dir):
-            logger.info(f"✅ Found templates in snid_sage package relative to module: {templates_dir}")
+            logger.debug(f"✅ Found templates in snid_sage package relative to module: {templates_dir}")
             return templates_dir
         # Check for templates directory
         templates_dir = current / 'templates'
@@ -160,14 +160,14 @@ def find_templates_directory() -> Optional[Path]:
             pattern = template_path.name
             try:
                 for candidate in parent.glob(pattern):
-                    if _validate_templates_directory(candidate):
-                        logger.info(f"✅ Found templates in common path: {candidate}")
+                        if _validate_templates_directory(candidate):
+                            logger.debug(f"✅ Found templates in common path: {candidate}")
                         return candidate
             except Exception:
                 continue
         else:
             if _validate_templates_directory(template_path):
-                logger.info(f"✅ Found templates in common path: {template_path}")
+                logger.debug(f"✅ Found templates in common path: {template_path}")
                 return template_path
     
     logger.warning("No valid templates directory found")

@@ -36,18 +36,17 @@ except ImportError:
     PYQTGRAPH_AVAILABLE = False
     pg = None
 
-# Remove matplotlib imports since we're using PyQtGraph only for PySide
-# try:
-#     import matplotlib.pyplot as plt
-#     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-#     from matplotlib.figure import Figure
-#     from mpl_toolkits.mplot3d import Axes3D
-#     MATPLOTLIB_AVAILABLE = True
-# except ImportError:
-#     MATPLOTLIB_AVAILABLE = False
-#     plt = None
-#     FigureCanvas = None
-#     Figure = None
+# Matplotlib for 3D plotting (Qt helper, consistent with other dialogs)
+try:
+    from snid_sage.interfaces.gui.utils.matplotlib_qt import get_qt_mpl
+    plt, Figure, FigureCanvas, _NavigationToolbar = get_qt_mpl()
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+    MATPLOTLIB_AVAILABLE = True
+except Exception:
+    MATPLOTLIB_AVAILABLE = False
+    plt = None
+    FigureCanvas = None
+    Figure = None
 
 try:
     from snid_sage.shared.utils.logging import get_logger
@@ -89,6 +88,8 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
             analysis_results: SNID analysis results object
         """
         super().__init__(parent)
+        # Ensure full cleanup on close to avoid stale Matplotlib/Qt references when reopening
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
         
         self.parent_gui = parent
         self.analysis_results = analysis_results
@@ -285,13 +286,19 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
         plot_group = QtWidgets.QGroupBox("3D GMM Clustering Visualization")
         plot_layout = QtWidgets.QVBoxLayout(plot_group)
         
-        # Use matplotlib with Qt backend for 3D plotting (no OpenGL required)
-        try:
-            import matplotlib.pyplot as plt
-            from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-            from matplotlib.figure import Figure
-            from mpl_toolkits.mplot3d import Axes3D
-            
+        # Guard against headless environments or missing Matplotlib
+        screens = QtGui.QGuiApplication.screens()
+        if not screens or not MATPLOTLIB_AVAILABLE:
+            fallback_label = QtWidgets.QLabel(
+                ("No display screens available" if not screens else "Matplotlib Required for 3D Plotting") +
+                "\n\n3D GMM clustering visualization is unavailable in the current environment.\n\n"
+                "Clustering analysis will still be available in the text summary."
+            )
+            fallback_label.setAlignment(QtCore.Qt.AlignCenter)
+            fallback_label.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 12pt;")
+            fallback_label.setWordWrap(True)
+            plot_layout.addWidget(fallback_label)
+        else:
             # Create matplotlib figure with white background
             self.fig = Figure(figsize=(10, 8), facecolor='white')
             self.fig.patch.set_facecolor('white')
@@ -300,23 +307,11 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
             self.ax = self.fig.add_subplot(111, projection='3d')
             self.ax.set_facecolor('white')
             
-            # Create Qt canvas widget
+            # Create Qt canvas widget (ownership managed by layout)
             self.plot_widget = FigureCanvas(self.fig)
             self.plot_widget.setMinimumHeight(400)
             
             plot_layout.addWidget(self.plot_widget)
-            
-        except ImportError:
-            # Fallback message
-            fallback_label = QtWidgets.QLabel(
-                "Matplotlib Required for 3D Plotting\n\n"
-                "3D GMM clustering visualization requires matplotlib.\n\n"
-                "Clustering analysis will still be available in the text summary."
-            )
-            fallback_label.setAlignment(QtCore.Qt.AlignCenter)
-            fallback_label.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 12pt;")
-            fallback_label.setWordWrap(True)
-            plot_layout.addWidget(fallback_label)
         
         layout.addWidget(plot_group, 2)  # 2/3 of width
     
@@ -564,7 +559,7 @@ Fallback type-based grouping may be available in the table below.
                 lines.append(
                     f"   {i+1}. {cluster.get('type', 'Unknown')}: "
                     f"{cluster.get('size', 0)} templates, "
-                    f"z={cluster.get('mean_redshift', 0):.4f}{winner_mark}"
+                    f"z={cluster.get('mean_redshift', 0):.6f}{winner_mark}"
                 )
         
         lines.extend([

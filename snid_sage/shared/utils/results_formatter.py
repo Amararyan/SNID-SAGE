@@ -62,8 +62,20 @@ class UnifiedResultsFormatter:
             spectrum_path: Path to spectrum file (optional)
         """
         self.result = result
-        self.spectrum_name = spectrum_name or getattr(result, 'spectrum_name', 'Unknown')
-        self.spectrum_path = spectrum_path or getattr(result, 'spectrum_path', '')
+        # Prefer explicit path; fall back to attributes on result
+        path_from_result = getattr(result, 'spectrum_path', '') or getattr(result, 'input_file', '')
+        self.spectrum_path = spectrum_path or path_from_result
+
+        # Determine spectrum name with robust fallbacks
+        if spectrum_name:
+            self.spectrum_name = spectrum_name
+        elif self.spectrum_path:
+            try:
+                self.spectrum_name = Path(self.spectrum_path).stem
+            except Exception:
+                self.spectrum_name = getattr(result, 'spectrum_name', 'Unknown')
+        else:
+            self.spectrum_name = getattr(result, 'spectrum_name', 'Unknown')
         
         # Determine which metric is being used
         self.use_rlap_cos = False
@@ -667,23 +679,71 @@ class UnifiedResultsFormatter:
         # Template matches - show ALL from winning cluster with detailed info and improved formatting
         if s['template_matches']:
             cluster_note = f" (from {s['cluster_label']})" if s['has_clustering'] else ""
+
+            # Determine display metric name from first match (RLAP-CCC if available, else RLAP)
+            try:
+                first_metric_name = s['template_matches'][0].get('metric_name', self.metric_name)
+            except Exception:
+                first_metric_name = self.metric_name
+
+            # Compact, consistently aligned columns
+            rank_w = 3
+            template_w = 16
+            type_w = 6
+            subtype_w = 9
+            metric_w = max(8, len(str(first_metric_name)))
+            redshift_w = 11
+            error_w = 11
+            age_w = 6
+
+            header = (
+                f"{'#':>{rank_w}} "
+                f"{'Template':<{template_w}} "
+                f"{'Type':<{type_w}} "
+                f"{'Subtype':<{subtype_w}} "
+                f"{first_metric_name:>{metric_w}} "
+                f"{'Redshift':>{redshift_w}} "
+                f"{'±Error':>{error_w}} "
+                f"{'Age':>{age_w}}"
+            )
+
             lines.extend([
                 f"TEMPLATE MATCHES{cluster_note}:",
-                f"{'#':<3} {'Template':<18} {'Type':<8} {'Subtype':<10} {self.metric_name:<8}     {'Redshift':<12}     {'±Error':<10}     {'Age':<8}",
-                "-" * 105,
+                header,
+                "-" * len(header),
             ])
             
             for match in s['template_matches']:
-                age_str = f"{match['age_days']:.1f}" if match['age_days'] is not None else "N/A"
-                redshift_error_str = f"{match.get('redshift_error', 0):.6f}" if match.get('redshift_error', 0) > 0 else "N/A"
+                age_val = match['age_days'] if match['age_days'] is not None else None
+                redshift_error_val = match.get('redshift_error', 0)
                 
                 # Use best available metric value
                 metric_value = match.get('best_metric_value', match['rlap'])
                 
+                # Prepare fields with alignment and truncation
+                template_name = (match['template_name'] or '')[:template_w]
+                full_type = (match['full_type'] or '')[:type_w]
+                subtype = (match['subtype'] or '')[:subtype_w]
+
+                if isinstance(redshift_error_val, (int, float)) and redshift_error_val > 0:
+                    redshift_error_str = f"{redshift_error_val:.6f}"
+                else:
+                    redshift_error_str = "N/A"
+
+                if isinstance(age_val, (int, float)):
+                    age_str = f"{age_val:.1f}"
+                else:
+                    age_str = "N/A"
+
                 lines.append(
-                    f"{match['rank']:<3} {match['template_name'][:17]:<18} "
-                    f"{match['full_type'][:7]:<8} {match['subtype'][:9]:<10} {metric_value:<8.1f}     "
-                    f"{match['redshift']:<12.6f}     {redshift_error_str:<10}     {age_str:<8}"
+                    f"{match['rank']:>{rank_w}} "
+                    f"{template_name:<{template_w}} "
+                    f"{full_type:<{type_w}} "
+                    f"{subtype:<{subtype_w}} "
+                    f"{metric_value:>{metric_w}.1f} "
+                    f"{match['redshift']:>{redshift_w}.6f} "
+                    f"{redshift_error_str:>{error_w}} "
+                    f"{age_str:>{age_w}}"
                 )
         
         # Filter out empty strings and join
@@ -714,7 +774,7 @@ class UnifiedResultsFormatter:
         else:
             best_metric = s['rlap']
         
-        return f"{self.spectrum_name}: {type_display} z={redshift:.4f} {self.metric_name}={best_metric:.1f} {z_marker}"
+        return f"{self.spectrum_name}: {type_display} z={redshift:.6f} {self.metric_name}={best_metric:.1f} {z_marker}"
     
     def save_to_file(self, filename: str, format_type: str = 'txt'):
         """Save results to file in specified format"""

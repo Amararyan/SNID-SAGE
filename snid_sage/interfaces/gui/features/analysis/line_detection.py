@@ -165,20 +165,20 @@ class LineDetectionController:
                                 'mode': 'forced',
                                 'forced_redshift': forced_redshift
                             })
-                            _LOGGER.info(f"✅ Manual redshift applied with FORCED mode: z = {forced_redshift:.4f}")
+                            _LOGGER.info(f"✅ Manual redshift applied with FORCED mode: z = {forced_redshift:.6f}")
                         else:
                             self.gui.analysis_controller.redshift_config.update({
                                 'mode': 'automatic',
                                 'forced_redshift': None,
                                 'search_range': search_range
                             })
-                            _LOGGER.info(f"✅ Manual redshift applied with SEARCH mode: z = {redshift_value:.4f} ±{search_range:.4f}")
+                            _LOGGER.info(f"✅ Manual redshift applied with SEARCH mode: z = {redshift_value:.6f} ±{search_range:.6f}")
 
                     self._apply_manual_redshift(redshift_value, result_redshift)
                 else:
                     # Old format - just a float redshift value (backward compatibility)
                     self._apply_manual_redshift(result_redshift)
-                    _LOGGER.info(f"✅ Manual redshift applied: z = {result_redshift:.4f}")
+                    _LOGGER.info(f"✅ Manual redshift applied: z = {result_redshift:.6f}")
             else:
                 _LOGGER.info("❌ Redshift selection cancelled")
 
@@ -471,7 +471,7 @@ class LineDetectionController:
                 try:
                     # If redshift_entry is a Qt widget with setText
                     if hasattr(self.gui.redshift_entry, 'setText'):
-                        self.gui.redshift_entry.setText(f"{redshift:.4f}")
+                        self.gui.redshift_entry.setText(f"{redshift:.6f}")
                 except Exception:
                     pass
             
@@ -518,7 +518,7 @@ class LineDetectionController:
                 self.gui.update_button_states()
             
             # Log the redshift application without disrupting themes
-            _LOGGER.info(f"✅ Manual redshift applied: z = {redshift:.4f}")
+            _LOGGER.info(f"✅ Manual redshift applied: z = {redshift:.6f}")
             
             
             
@@ -546,6 +546,8 @@ class LineDetectionController:
         )
         msg.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
         res = msg.exec()
+
+        # Do not change existing redshift status label; lack of match is a normal condition
         
         if res == QtWidgets.QMessageBox.Yes:  # Yes - manual redshift
             self.open_combined_redshift_selection()

@@ -19,19 +19,6 @@ Developed by Fiorenzo Stoppa for SNID SAGE
 import os
 import sys
 
-
-# This must be set before ANY GUI imports happen anywhere in the codebase
-os.environ['SNID_SAGE_GUI_BACKEND'] = 'PySide6'
-
-# Comprehensive Qt software rendering for WSL/Linux compatibility
-# These environment variables force Qt to use software rendering instead of OpenGL/hardware acceleration
-os.environ['QT_OPENGL'] = 'software'
-os.environ['QT_QUICK_BACKEND'] = 'software'
-os.environ['QT_XCB_FORCE_SOFTWARE_OPENGL'] = '1'
-os.environ['LIBGL_ALWAYS_SOFTWARE'] = '1'
-os.environ['QT_DEBUG_PLUGINS'] = '0'  # Reduce debug output
-os.environ['QT_LOGGING_RULES'] = 'qt.qpa.gl.debug=false'
-
 import json
 import numpy as np
 from pathlib import Path
@@ -884,53 +871,29 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
     def start_games_menu(self):
         """Start the games menu like in the old GUI"""
         try:
-            # Check if pygame is available
-            try:
-                from snid_sage.snid.games import PYGAME_AVAILABLE, show_game_menu, run_debris_game
-                if not PYGAME_AVAILABLE:
-                    QtWidgets.QMessageBox.warning(
+            import sys
+            # On macOS start immediately; on other platforms show the dialog like before
+            if sys.platform == 'darwin':
+                self._start_space_debris_game()
+            else:
+                # Create games selection dialog or fallback to simple question
+                try:
+                    from snid_sage.interfaces.gui.components.pyside6_dialogs.games_dialog import PySide6GamesDialog
+                    dialog = PySide6GamesDialog(self)
+                    result = dialog.exec()
+                    if result == QtWidgets.QDialog.Accepted:
+                        pass
+                except ImportError:
+                    reply = QtWidgets.QMessageBox.question(
                         self,
-                        "Games Not Available",
-                        "Pygame is not installed. Games require pygame.\n\n"
-                        "You can install it with: pip install pygame"
+                        "🎮 Play Games",
+                        "Would you like to play Space Debris Cleanup while running analysis?\n\n"
+                        "Controls: Arrow keys to move, SPACE to fire, ESC to exit",
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                        QtWidgets.QMessageBox.Yes
                     )
-                    return
-            except ImportError:
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Games Not Available", 
-                    "Games module not found. Please ensure SNID SAGE is properly installed."
-                )
-                return
-            
-            # Create games selection dialog or fallback to simple question
-            try:
-                from snid_sage.interfaces.gui.components.pyside6_dialogs.games_dialog import PySide6GamesDialog
-                dialog = PySide6GamesDialog(self)
-                result = dialog.exec()
-                
-                if result == QtWidgets.QDialog.Accepted:
-                    # User selected to play games - game already started by dialog
-                    pass  # Game was already started by the dialog
-            except ImportError:
-                # Fallback to simple message if games dialog not available
-                reply = QtWidgets.QMessageBox.question(
-                    self,
-                    "🎮 Play Games",
-                    "Would you like to play Space Debris Cleanup while running analysis?\n\n"
-                    "This is an advanced space simulation with:\n"
-                    "• Realistic spacecraft with wings and thrusters\n"
-                    "• 4 types of satellite debris to clean up\n" 
-                    "• Energy bullets with particle effects\n"
-                    "• Deep space background with Earth and stars\n"
-                    "• Full-screen gameplay in 1024x768 window\n\n"
-                    "Controls: Arrow keys to move, SPACE to fire, ESC to exit",
-                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                    QtWidgets.QMessageBox.Yes
-                )
-                
-                if reply == QtWidgets.QMessageBox.Yes:
-                    self._start_space_debris_game()
+                    if reply == QtWidgets.QMessageBox.Yes:
+                        self._start_space_debris_game()
                 
         except Exception as e:
             _LOGGER.error(f"Error starting games menu: {e}")
@@ -941,21 +904,35 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             )
     
     def _start_space_debris_game(self):
-        """Start the Space Debris Cleanup game in a macOS-safe way"""
+        """Start the Space Debris Cleanup game in a separate process (macOS-safe)."""
         try:
-            # Launch pygame directly in a background thread to avoid creating Qt widgets
-            # from a worker thread. We bypass menus and start the game window only.
-            from snid_sage.snid.games import run_debris_game
-            import threading
-            threading.Thread(target=run_debris_game, daemon=True).start()
-            # Update status
-            self.status_label.setText("🎮 Space Debris Cleanup game started!")
-            _LOGGER.info("Space Debris Cleanup game started successfully")
+            import sys
+            import subprocess
+            if sys.platform == 'darwin':
+                # Launch the game in a fresh process, tuning window size and HiDPI for macOS
+                cmd = (
+                    "import os; "
+                    "os.environ.setdefault('SDL_HINT_VIDEO_HIGHDPI','1'); "
+                    "os.environ.setdefault('SDL_VIDEO_HIGHDPI','1'); "
+                    "from snid_sage.snid import games as g; "
+                    "g.DEBRIS_WIDTH=960; g.DEBRIS_HEIGHT=640; "
+                    "g.run_debris_game()"
+                )
+                subprocess.Popen([sys.executable, "-c", cmd], close_fds=True)
+            else:
+                # Original behavior works on Windows/Linux
+                from snid_sage.snid.games import run_debris_game
+                import threading
+                threading.Thread(target=run_debris_game, daemon=True).start()
+            # Update status if available
+            if hasattr(self, "status_label"):
+                self.status_label.setText("🎮 Space Debris Cleanup game started!")
+            _LOGGER.info("Space Debris Cleanup game started via subprocess")
         except Exception as e:
             _LOGGER.error(f"Error starting Space Debris game: {e}")
             QtWidgets.QMessageBox.critical(
                 self,
-                "Game Error", 
+                "Game Error",
                 f"Failed to start Space Debris game: {str(e)}"
             )
     
@@ -1181,8 +1158,15 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     stage = "Initialization"
                 elif "preprocess" in normalized:
                     stage = "Preprocessing"
-                elif any(k in normalized for k in ["templates", "loading configuration", "loading templates"]):
-                    stage = "Cross-correlating spectra"
+                elif any(k in normalized for k in [
+                    "loading configuration",
+                    "loading template library",
+                    "loading templates",
+                    "templates loaded",
+                    "preparing to load"
+                ]):
+                    # Treat template library load as part of Initialization so the bar advances meaningfully
+                    stage = "Initialization"
                 elif any(k in normalized for k in ["correlation", "template matching", "running template"]):
                     stage = "Correlation Analysis"
                 elif any(k in normalized for k in ["processing analysis results", "clustering", "gmm", "statistics"]):
@@ -1536,7 +1520,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 summary = (f"SNID Analysis Complete!\n\n"
                           f"Best match: {getattr(result, 'template_name', 'Unknown')}\n"
                           f"Type: {getattr(result, 'consensus_type', 'Unknown')}\n"
-                          f"Redshift: {getattr(result, 'redshift', 0.0):.4f}\n"
+                          f"Redshift: {getattr(result, 'redshift', 0.0):.6f}\n"
                           f"{metric_text}{cluster_info}")
                 
                 # Show non-blocking message as fallback
@@ -1915,7 +1899,12 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             _LOGGER.debug("PySide6 Shortcuts dialog shown")
         except ImportError:
             # Fallback to simple message box if PySide6 dialog not available
-            shortcuts_text = """
+            try:
+                from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager as CPW
+                mod = CPW.platform_modifier_label()
+            except Exception:
+                mod = "Cmd" if sys.platform == "darwin" else "Ctrl"
+            shortcuts_text = f"""
             <h3>SNID SAGE - Keyboard Shortcuts</h3>
             <p><b>Navigation:</b></p>
             <ul>
@@ -1926,9 +1915,9 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             </ul>
             <p><b>Analysis:</b></p>
             <ul>
-            <li>Ctrl+O : Load spectrum file</li>
-            <li>Ctrl+R : Run analysis</li>
-            <li>Ctrl+, : Open settings</li>
+            <li>{mod}+O : Load spectrum file</li>
+            <li>{mod}+R : Run analysis</li>
+            <li>{mod}+, : Open settings</li>
             </ul>
             <p><b>Note:</b></p>
             <ul>
@@ -1936,7 +1925,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             </ul>
             <p><b>Help:</b></p>
             <ul>
-            <li>F1 or Ctrl+/ : Show this help</li>
+            <li>F1 or {mod}+/ : Show this help</li>
             </ul>
             """
             

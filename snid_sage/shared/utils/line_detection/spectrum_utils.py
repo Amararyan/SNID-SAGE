@@ -114,7 +114,7 @@ def plot_spectrum(ax, wavelength, flux, original_wave=None, original_flux=None,
         # Plot with different style
         ax.plot(template_wave_adjusted, template_flux, 
                color='red', linewidth=1.0, alpha=0.8, linestyle='--',
-               label=f'Template (z={redshift:.3f})')
+               label=f'Template (z={redshift:.6f})')
     
     # Add legend
     ax.legend(loc='upper right')

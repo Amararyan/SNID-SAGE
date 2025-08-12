@@ -487,15 +487,24 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
             self.games_btn.setToolTip("Games module not available")
     
     def _start_space_debris_game(self):
-        """Start the Space Debris Cleanup game in a macOS-safe way"""
+        """Start the Space Debris Cleanup game in a separate process (macOS-safe)."""
         try:
-            # Start the pygame window without creating any Qt widgets from a worker thread
-            # to avoid Qt threading violations. We bypass the menu and launch directly.
-            from snid_sage.snid.games import run_debris_game
-            import threading
-            t = threading.Thread(target=run_debris_game, daemon=True)
-            t.start()
-            # Add log entry to progress
+            import sys
+            import subprocess
+            if sys.platform == 'darwin':
+                cmd = (
+                    "import os; "
+                    "os.environ.setdefault('SDL_HINT_VIDEO_HIGHDPI','1'); "
+                    "os.environ.setdefault('SDL_VIDEO_HIGHDPI','1'); "
+                    "from snid_sage.snid import games as g; "
+                    "g.DEBRIS_WIDTH=960; g.DEBRIS_HEIGHT=640; "
+                    "g.run_debris_game()"
+                )
+                subprocess.Popen([sys.executable, "-c", cmd], close_fds=True)
+            else:
+                from snid_sage.snid.games import run_debris_game
+                import threading
+                threading.Thread(target=run_debris_game, daemon=True).start()
             self.add_progress_line("🎮 Space Debris Cleanup game started!", "info")
             _LOGGER.info("Space Debris Cleanup game started from analysis progress dialog")
         except Exception as e:

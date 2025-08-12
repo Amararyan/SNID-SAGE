@@ -70,6 +70,8 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             callback: Callback function when cluster is selected
         """
         super().__init__(parent)
+        # Ensure this dialog fully deletes its widgets when closed to avoid stale references
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
         
         # Store input data
         self.all_candidates = clusters or []
@@ -369,9 +371,8 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         self.ax = self.fig.add_subplot(111, projection='3d')
         self.ax.set_facecolor('white')
         
-        # Create Qt canvas widget
+        # Create Qt canvas widget (parent will be managed by the layout/container)
         self.plot_widget = FigureCanvas(self.fig)
-        self.plot_widget.setParent(self.parent())
         self.plot_widget.setMinimumHeight(300)  # Smaller minimum height for initial size
         
         # Add canvas to layout
@@ -415,7 +416,6 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             
             # Embed in Qt widget
             self.matches_canvas = FigureCanvas(self.matches_fig)
-            self.matches_canvas.setParent(self.parent())
             matches_layout.addWidget(self.matches_canvas)
         else:
             # Fallback text widget

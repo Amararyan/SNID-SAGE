@@ -532,11 +532,13 @@ class PySide6ThemeManager:
         QCheckBox {{
             spacing: 8px;  /* Better spacing to prevent text overlap */
             font-size: 10pt;
+            background: transparent;  /* Ensure label area inherits parent (usually white) */
         }}
         
         QRadioButton {{
             spacing: 8px;  /* Better spacing to prevent text overlap */
             font-size: 10pt;
+            background: transparent;  /* Ensure label area inherits parent (usually white) */
         }}
         
         /* Checkbox indicator - pill-style square with moving inner indicator */

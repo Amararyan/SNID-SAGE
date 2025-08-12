@@ -199,6 +199,27 @@ class AnalysisMenuManager:
                 else:
                     return
             
+            # If an analysis is already running, do not start another
+            try:
+                if hasattr(self.app_controller, 'is_analysis_running') and self.app_controller.is_analysis_running():
+                    dlg = getattr(self.main_window, 'progress_dialog', None)
+                    if dlg:
+                        try:
+                            dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
+                            dlg.raise_()
+                            dlg.activateWindow()
+                        except Exception:
+                            pass
+                    else:
+                        QtWidgets.QMessageBox.information(
+                            self.main_window,
+                            "Analysis In Progress",
+                            "An analysis is already running. Please wait for it to finish or cancel it."
+                        )
+                    return
+            except Exception:
+                pass
+
             # Show comprehensive progress dialog
             try:
                 from snid_sage.interfaces.gui.components.pyside6_dialogs.analysis_progress_dialog import show_analysis_progress_dialog
@@ -279,6 +300,27 @@ class AnalysisMenuManager:
                 else:
                     return  # User cancelled
             
+            # If an analysis is already running, do not open dialog to start another
+            try:
+                if hasattr(self.app_controller, 'is_analysis_running') and self.app_controller.is_analysis_running():
+                    dlg = getattr(self.main_window, 'progress_dialog', None)
+                    if dlg:
+                        try:
+                            dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
+                            dlg.raise_()
+                            dlg.activateWindow()
+                        except Exception:
+                            pass
+                    else:
+                        QtWidgets.QMessageBox.information(
+                            self.main_window,
+                            "Analysis In Progress",
+                            "An analysis is already running. Please wait for it to finish or cancel it."
+                        )
+                    return
+            except Exception:
+                pass
+
             # Directly open configuration dialog
             try:
                 from snid_sage.interfaces.gui.components.pyside6_dialogs.configuration_dialog import show_configuration_dialog
@@ -535,7 +577,7 @@ class AnalysisMenuManager:
                                 snid_results.rlap_cos = best_cluster_match.get('rlap_cos', 0.0)
                             
                             _LOGGER.info(f"🎯 Updated result properties: {snid_results.template_name} ({snid_results.consensus_type}) "
-                                        f"z={snid_results.redshift:.4f}, RLAP={snid_results.rlap:.2f}")
+                                        f"z={snid_results.redshift:.6f}, RLAP={snid_results.rlap:.2f}")
                     
                     # Update the main GUI display with the new results
                     self._update_gui_after_cluster_selection(snid_results, selected_cluster, cluster_changed)

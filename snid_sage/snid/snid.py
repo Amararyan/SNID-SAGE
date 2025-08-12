@@ -792,13 +792,13 @@ def _run_forced_redshift_analysis_optimized(
         else:
             batches = [type_templates]
 
-        _LOG.info(f"🔄 Type {sn_type}: {len(type_templates)} templates split into {len(batches)} batch(es) (forced z={forced_redshift:.4f})")
+        _LOG.info(f"🔄 Type {sn_type}: {len(type_templates)} templates split into {len(batches)} batch(es) (forced z={forced_redshift:.6f})")
 
         # Process each batch
         for batch_idx, batch_templates in enumerate(batches, start=1):
             # Progress update before processing batch
             batch_start_progress = (processed_templates / total_templates) * 100
-            report_progress(f"Processing {sn_type} batch {batch_idx}/{len(batches)} (forced z={forced_redshift:.4f})", batch_start_progress)
+            report_progress(f"Processing {sn_type} batch {batch_idx}/{len(batches)} (forced z={forced_redshift:.6f})", batch_start_progress)
 
             # Track time for this batch
             batch_start_time = time.time()
@@ -1304,11 +1304,23 @@ def run_snid_analysis(
     # Skip template loading for forced redshift analysis (new method handles its own loading)
     if forced_redshift is None:
         # NORMAL ANALYSIS: Load templates here
-        report_progress("Loading template library")
+        # Start template loading phase (will drive overall progress from ~25% to 100%)
+        report_progress("Loading template library", 25)
         
         # Use unified storage for loading templates
         try:
-            templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
+            # Wire progress through to GUI: template loading will report incremental percentages
+            # Scale template-loading progress to fit within overall analysis range (~50–75%)
+            templates = load_templates_unified(
+                templates_dir,
+                type_filter=type_filter,
+                template_names=template_filter,
+                exclude_templates=exclude_templates,
+                progress_callback=lambda msg, pct: report_progress(
+                    f"{msg}",
+                    25 + (0.75 * float(pct or 0.0))
+                )
+            )
             _LOG.info(f"✅ Loaded {len(templates)} templates using UNIFIED STORAGE")
         except Exception as e:
             _LOG.warning(f"Unified storage failed, falling back to legacy loader: {e}")
@@ -1379,7 +1391,7 @@ def run_snid_analysis(
     if _LOG.isEnabledFor(logging.DEBUG):
         z_lz1 = np.exp((lz1-mid)*DWLOG_grid)-1
         z_lz2 = np.exp((lz2-mid)*DWLOG_grid)-1
-        _LOG.debug(f"Step 8: Redshift bin range: {lz1-mid} to {lz2-mid} (z = {z_lz1:.3f} to {z_lz2:.3f})")
+    _LOG.debug(f"Step 8: Redshift bin range: {lz1-mid} to {lz2-mid} (z = {z_lz1:.6f} to {z_lz2:.6f})")
 
     # ============================================================================
     # STEP 9: PREPARE SPECTRUM FFT FOR CORRELATION
@@ -1429,7 +1441,7 @@ def run_snid_analysis(
         # NORMAL CORRELATION MODE: Full redshift search
         report_progress(f"Starting correlation analysis for {len(templates)} templates")
         _LOG.info(f"Phase 1: Processing {len(templates)} templates for correlation analysis...")
-        _LOG.info(f"  → Searching redshift range {zmin:.3f} to {zmax:.3f}")
+        _LOG.info(f"  → Searching redshift range {zmin:.6f} to {zmax:.6f}")
         
         matches = []
         
@@ -2422,7 +2434,7 @@ def run_snid(
     _LOG.info("="*80)
     _LOG.info(f"Input spectrum: {spectrum_path}")
     _LOG.info(f"Templates directory: {templates_dir}")
-    _LOG.info(f"Redshift range: {zmin:.3f} - {zmax:.3f}")
+    _LOG.info(f"Redshift range: {zmin:.6f} - {zmax:.6f}")
     _LOG.info(f"RLAP threshold: {rlapmin}")
     _LOG.info("="*80)
     

@@ -366,6 +366,8 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         age_layout.addRow("Minimum Age (days):", self.widgets['age_min'])
         
         self.widgets['age_max'] = CustomAgeSpinBox()
+        # Hide up/down arrow buttons for a cleaner input field
+        self.widgets['age_max'].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.widgets['age_max'].setRange(-9999, 9999)
         self.widgets['age_max'].setSingleStep(1)
         self.widgets['age_max'].setDecimals(1)

@@ -972,6 +972,9 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                                 f"Auto-detected redshift: z = {best_redshift:.6f}")
                         
                         _LOGGER.info(f"✅ Applied weak galaxy redshift match: z = {best_redshift:.6f} from template {template_name}")
+                    else:
+                        # User declined weak match: do not change existing redshift status
+                        pass
                     
                     # Clean up temporary data
                     processed_spectrum = None
@@ -980,13 +983,19 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                 
             else:
                 progress.close()
-                QtWidgets.QMessageBox.information(self, "Auto Search", 
-                    "❌ No good galaxy template matches found.\n\n"
-                    "This could mean:\n"
-                    "• The spectrum is not a galaxy\n"
-                    "• The galaxy type is not in the template library\n"
-                    "• The spectrum quality is too low\n\n"
-                    "Try manual redshift adjustment instead.")
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Auto Search",
+                    (
+                        "❌ No good galaxy template matches found.\n\n"
+                        "This could mean:\n"
+                        "• The spectrum is not a galaxy\n"
+                        "• The galaxy type is not in the template library\n"
+                        "• The spectrum quality is too low\n\n"
+                        "Try manual redshift adjustment instead."
+                    )
+                )
+                # Do not change existing redshift status; this is a normal outcome
                 
                 # Clean up temporary data on no matches
                 processed_spectrum = None

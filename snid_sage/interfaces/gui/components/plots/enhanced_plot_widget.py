@@ -47,6 +47,16 @@ except ImportError:
     _LOGGER = logging.getLogger('gui.enhanced_plot_widget')
 
 
+def _get_ui_font_family() -> str:
+    """Return a UI font family that exists on the current platform."""
+    if sys.platform == 'darwin':
+        return 'Helvetica Neue'
+    if sys.platform == 'win32':
+        return 'Segoe UI'
+    # Linux and others: pick commonly available sans
+    return 'DejaVu Sans'
+
+
 class SimplePlotWidget(pg.PlotWidget):
     """
     Simple PyQtGraph PlotWidget with only disabled context menus (no save functionality)
@@ -104,7 +114,7 @@ class SimplePlotWidget(pg.PlotWidget):
                 return
             
             # Configure enhanced axis styling similar to tick demo
-            axis_font = QtGui.QFont(self._ui_font_family(), 9)
+            axis_font = QtGui.QFont(_get_ui_font_family(), 9)
             
             for name in ('left', 'bottom'):
                 axis = plot_item.getAxis(name)
@@ -438,7 +448,7 @@ class EnhancedPlotWidget(pg.PlotWidget):
                 return
             
             # Configure enhanced axis styling similar to tick demo
-            axis_font = QtGui.QFont(self._ui_font_family(), 9)
+            axis_font = QtGui.QFont(_get_ui_font_family(), 9)
             
             for name in ('left', 'bottom'):
                 axis = plot_item.getAxis(name)
@@ -462,7 +472,7 @@ class EnhancedPlotWidget(pg.PlotWidget):
                 return
             
             # Configure enhanced axis styling similar to tick demo
-            axis_font = QtGui.QFont(self._ui_font_family(), 9)
+            axis_font = QtGui.QFont(_get_ui_font_family(), 9)
             
             for name in ('left', 'bottom'):
                 axis = plot_item.getAxis(name)
@@ -498,11 +508,4 @@ class EnhancedPlotWidget(pg.PlotWidget):
         except Exception as e:
             _LOGGER.error(f"Failed to apply enhanced tick styling: {e}")
 
-    @staticmethod
-    def _ui_font_family() -> str:
-        """Pick a UI font family available on the current platform."""
-        if sys.platform == 'darwin':
-            return 'Helvetica Neue'
-        if sys.platform == 'win32':
-            return 'Segoe UI'
-        return 'DejaVu Sans'
+    

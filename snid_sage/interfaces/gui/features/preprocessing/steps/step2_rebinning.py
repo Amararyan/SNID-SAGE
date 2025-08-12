@@ -2,7 +2,7 @@ from PySide6 import QtWidgets
 
 
 def create_options(dialog, layout: QtWidgets.QVBoxLayout) -> None:
-    desc = QtWidgets.QLabel("Apply log-wavelength rebinning (required for SNID) and optional flux scaling.")
+    desc = QtWidgets.QLabel("Apply log-wavelength rebinning and optional flux scaling.")
     desc.setWordWrap(True)
     desc.setStyleSheet("color: #64748b; font-size: 11pt; margin-bottom: 10px;")
     layout.addWidget(desc)
@@ -13,7 +13,7 @@ def create_options(dialog, layout: QtWidgets.QVBoxLayout) -> None:
     rebin_layout.setSpacing(15)
     rebin_layout.setContentsMargins(15, 20, 15, 20)
 
-    dialog.log_rebin_cb = QtWidgets.QCheckBox("Apply log-wavelength rebinning (required)")
+    dialog.log_rebin_cb = QtWidgets.QCheckBox("Apply log-wavelength rebinning")
     dialog.log_rebin_cb.setChecked(True)
     dialog.log_rebin_cb.setEnabled(False)
     rebin_layout.addWidget(dialog.log_rebin_cb)
@@ -38,11 +38,11 @@ def create_options(dialog, layout: QtWidgets.QVBoxLayout) -> None:
         info_text = QtWidgets.QLabel(
             f"Target grid: {NW} points\n"
             f"Wavelength range: {MINW} - {MAXW} Å\n"
-            "Log-spacing: uniform in log(wavelength)"
+            "Log spacing: uniform in log wavelength"
         )
     except Exception:
         info_text = QtWidgets.QLabel(
-            "Target grid: 1024 points\nWavelength range: 2500 - 10000 Å\nLog-spacing: uniform in log(wavelength)"
+            "Target grid: 1024 points\nWavelength range: 2500 - 10000 Å\nLog spacing: uniform in log wavelength"
         )
     info_text.setStyleSheet("color: #64748b; font-size: 10pt;")
     info_layout.addWidget(info_text)

@@ -50,9 +50,10 @@ dependencies = [
     
     # Networking
     "requests>=2.25.0",
-    
-    # Image processing - early install
-    "pillow>=8.0.0",
+
+    # GUI stack (install by default so a single install supports GUI and CLI)
+    "PySide6>=6.7,<6.9.1",  # 6.9.0 works; allow slightly lower but block 6.9.1+
+    "pyqtgraph>=0.13.0",    # High-performance plotting for PySide6
 
     # Games and multimedia support – required for the built-in mini-games and sound handling
     "pygame>=2.3.0",
@@ -62,32 +63,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-astro = [
-    "astroquery>=0.4.0",
-]
-llm = [
-    "openai>=1.0.0",
-]
-gui = [
-    "pillow>=8.0.0",
-    "PySide6>=6.7,<6.9.1",  # 6.9.0 works; allow slightly lower but block 6.9.1+
-    "pyqtgraph>=0.13.0",  # High-performance plotting for PySide6
-]
 dev = [
-    "pytest>=6.0.0",
-    "pytest-cov>=2.10.0",
-    "black>=21.0.0",
-    "flake8>=3.8.0",
-    "mypy>=0.800",
-    "sphinx>=4.0.0",
-    "sphinx-rtd-theme>=1.0.0",
-    "twine>=4.0.0",
-    "build>=0.8.0",
-]
-all = [
-    "astroquery>=0.4.0",
-    "openai>=1.0.0",
-    "pillow>=8.0.0",
     "pytest>=6.0.0",
     "pytest-cov>=2.10.0",
     "black>=21.0.0",
@@ -108,9 +84,10 @@ Repository = "https://github.com/FiorenSt/SNID-SAGE.git"
 
 [project.scripts]
 snid = "snid_sage.interfaces.cli.main:main"
-snid-gui = "snid_sage.interfaces.gui.launcher:main"
 snid-sage = "snid_sage.interfaces.gui.launcher:main"
 snid-template = "snid_sage.interfaces.cli.template:main"
+snid-lines = "snid_sage.interfaces.line_manager.launcher:main"
+snid-templates = "snid_sage.interfaces.template_manager.launcher:main"
 
 [tool.setuptools]
 include-package-data = true

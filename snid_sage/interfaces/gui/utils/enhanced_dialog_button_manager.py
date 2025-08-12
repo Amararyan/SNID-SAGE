@@ -189,6 +189,12 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             button: The button to update
             enabled: Whether the button should be enabled
         """
+        # Guard against deleted objects
+        try:
+            button.objectName()
+        except RuntimeError:
+            return
+
         button.setEnabled(enabled)
         
         object_name = button.objectName()
@@ -370,6 +376,14 @@ class EnhancedDialogButtonManager(QtCore.QObject):
     
     def update_toggle_button(self, button: QtWidgets.QPushButton, new_state: bool):
         """Update a toggle button's visual state"""
+        # Guard against deleted objects
+        if button is None:
+            return
+        try:
+            button.objectName()
+        except RuntimeError:
+            return
+
         object_name = button.objectName()
         if object_name not in self.button_configs:
             _LOGGER.warning(f"Button {object_name} not registered for toggle updates")
@@ -385,7 +399,11 @@ class EnhancedDialogButtonManager(QtCore.QObject):
         
         # Reapply styling with new state
         button_type = config['type']
-        self._apply_button_styling(button, button_type, config)
+        try:
+            self._apply_button_styling(button, button_type, config)
+        except RuntimeError:
+            # Silently ignore if button is gone during update
+            pass
     
     def register_toggle_button(
         self, 

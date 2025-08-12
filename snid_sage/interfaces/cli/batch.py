@@ -266,6 +266,8 @@ def process_single_spectrum_optimized(
             }
         
         # STEP 3: Run SNID analysis using first-class API with preloaded templates
+        # NOTE: run_snid_analysis currently manages template loading internally.
+        # We do not pass preloaded templates here to avoid interface mismatch.
         result, _ = run_snid_analysis(
             processed_spectrum=processed_spectrum,
             templates_dir=template_manager.templates_dir,
@@ -274,8 +276,7 @@ def process_single_spectrum_optimized(
             forced_redshift=args.forced_redshift,
             verbose=False,
             show_plots=False,
-            save_plots=False,  # Avoid internal saving to prevent duplicates; CLI handles all plots
-            preloaded_templates=filtered_templates
+            save_plots=False
         )
         
         # STEP 4: Generate outputs if requested
@@ -916,7 +917,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             rlap_cos = f"{get_best_metric_value(summary):.1f}"
             cluster_marker = "*" if summary.get('has_clustering', False) else " "
             
-            row = f"{spectrum:<25} {cons_type:<8} {cons_subtype:<10} {template:<18} {redshift:<8} {rlap_cos:<8} {cluster_marker}"
+            row = f"{spectrum:<25} {cons_type:<8} {cons_subtype:<10} {template:<18} {redshift:<10} {rlap_cos:<8} {cluster_marker}"
             report.append(row)
         
         report.append("")
@@ -1114,20 +1115,6 @@ def main(args: argparse.Namespace) -> int:
         else:
             mode = "Standard (main outputs)"
         
-        # Simple startup message
-        if not is_quiet:
-            print("SNID Batch Analysis - Cluster-aware & optimized")
-            print(f"   Files: {len(input_files)} spectra")
-            print(f"   Mode: {mode}")
-            print(f"   Analysis: GUI-style cluster-aware (winning cluster)")
-            print(f"   Sorting: All results/plots sorted by RLAP-CCC (highest quality first)")
-            print(f"   Output: {args.output_dir}")
-            print(f"   Redshift Range: {args.zmin:.3f} to {args.zmax:.3f}")
-            if args.forced_redshift:
-                print(f"   Forced Redshift: {args.forced_redshift:.6f}")
-            print(f"   Error Handling: {'Stop on first failure' if args.stop_on_error else 'Continue on failures (default)'}")
-            print("")
-        
         # Resolve output directory from CLI or unified config
         if not args.output_dir:
             try:
@@ -1138,6 +1125,20 @@ def main(args: argparse.Namespace) -> int:
                 args.output_dir = str(Path.cwd() / 'results')
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Simple startup message (after resolving output_dir)
+        if not is_quiet:
+            print("SNID Batch Analysis - Cluster-aware & optimized")
+            print(f"   Files: {len(input_files)} spectra")
+            print(f"   Mode: {mode}")
+            print(f"   Analysis: GUI-style cluster-aware (winning cluster)")
+            print(f"   Sorting: All results/plots sorted by RLAP-CCC (highest quality first)")
+            print(f"   Output: {args.output_dir}")
+            print(f"   Redshift Range: {args.zmin:.6f} to {args.zmax:.6f}")
+            if args.forced_redshift is not None:
+                print(f"   Forced Redshift: {args.forced_redshift:.6f}")
+            print(f"   Error Handling: {'Stop on first failure' if args.stop_on_error else 'Continue on failures (default)'}")
+            print("")
         
         # ============================================================================
         # OPTIMIZATION: Load templates ONCE for the entire batch
@@ -1187,10 +1188,8 @@ def main(args: argparse.Namespace) -> int:
                         print(f"      {name}: No good matches found")
                 else:
                     # Actual error
-                    if args.verbose and not is_quiet:
+                    if not is_quiet:
                         print(f"      [ERROR] {name}: {message}")
-                    elif not is_quiet:
-                        print(f"      [ERROR] {name}: error")
                 if args.stop_on_error:
                     if not is_quiet:
                         print("Stopping due to error.")

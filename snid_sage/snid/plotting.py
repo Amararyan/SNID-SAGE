@@ -306,7 +306,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
                 template_flux,
                 'r-',
                 linewidth=1.5,
-                label=f'Template (z={z_template:.4f})'
+                label=f'Template (z={z_template:.6f})'
             )
             
             # Create a secondary x-axis for rest wavelength
@@ -331,7 +331,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
                     ax_top.plot(redshifted_wave[valid_indices], 
                                original_template_data['flux'][valid_indices], 
                                'r-', linewidth=1.5,
-                               label=f'Template (z={z_template:.4f}, fallback)')
+                               label=f'Template (z={z_template:.6f}, fallback)')
                     
                     ax_top_twin = ax_top.twiny()
                     ax_top_twin.set_xlim([x/(1+z_template) for x in ax_top.get_xlim()])
@@ -390,7 +390,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
         
         # Mark the best redshift
         ax_corr.axvline(x=z_template, color='r', linestyle=':', linewidth=1.5, 
-                       label=f'z = {z_template:.4f}', alpha=0.8)
+                       label=f'z = {z_template:.6f}', alpha=0.8)
         
         # Set axis limits based on available data
         if 'z_axis_full' in corr_data:
@@ -495,7 +495,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
         template_info += "\n"
     
     template_info += f"Age: {template_age:.1f} days\n"
-    template_info += f"z = {z_template:.4f}\n"
+    template_info += f"z = {z_template:.6f}\n"
     # Use best available metric (RLAP-CCC if available, otherwise RLAP)
     from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
     best_metric_value = get_best_metric_value(best_match)
@@ -1775,7 +1775,7 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
         
         # Mark the best redshift
         ax.axvline(x=z_template, color='r', linestyle=':', linewidth=1.5, 
-                  label=f'z = {z_template:.4f}', alpha=0.8)
+                 label=f'z = {z_template:.6f}', alpha=0.8)
         
         # Set axis limits based on available data
         if 'z_axis_full' in corr_data:
@@ -1795,7 +1795,7 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
             
             # Add vertical line at best redshift
             ax.axvline(x=z_template, color='r', linestyle=':', linewidth=1.5, 
-                      label=f'z = {z_template:.4f}', alpha=0.8)
+                      label=f'z = {z_template:.6f}', alpha=0.8)
             
             # Set x-axis limits to focus on the relevant region
             z_min, z_max = np.min(result.redshift_axis), np.max(result.redshift_axis)
@@ -1809,7 +1809,7 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
             
             # Add vertical line at best redshift
             ax.axvline(x=z_template, color='r', linestyle=':', linewidth=1.5, 
-                      label=f'z = {z_template:.4f}', alpha=0.8)
+                      label=f'z = {z_template:.6f}', alpha=0.8)
             
             # Set x-axis limits to focus on the relevant region
             z_min, z_max = np.min(corr_data['z_axis']), np.max(corr_data['z_axis'])
@@ -1833,7 +1833,7 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
     
     if template_age is not None and np.isfinite(template_age):
         template_info += f"Age: {template_age:.1f} days\n"
-    template_info += f"z = {z_template:.4f}\n"
+    template_info += f"z = {z_template:.6f}\n"
     # Use best available metric (RLAP-CCC if available, otherwise RLAP)
     from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
     best_metric_value = get_best_metric_value(match)
@@ -1862,7 +1862,7 @@ def plot_correlation_view(match: Dict[str, Any], result: Any,
     # Set y-axis limits to show full correlation range with some padding
     y_data = []
     for line in ax.get_lines():
-        if line.get_label() not in ['z = {:.4f}'.format(z_template)]:  # Skip vertical line
+        if line.get_label() not in ['z = {:.6f}'.format(z_template)]:  # Skip vertical line
             y_data.extend(line.get_ydata())
     
     if y_data:

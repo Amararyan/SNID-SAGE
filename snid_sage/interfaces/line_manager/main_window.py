@@ -338,6 +338,13 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         )
         if file_path:
             self.file_path_edit.setText(file_path)
+            # Immediately load and plot the spectrum
+            try:
+                wave, flux = self._load_spectrum(file_path)
+                self.current_spectrum = {'wave': np.asarray(wave), 'flux': np.asarray(flux)}
+                self._update_plot()
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load spectrum: {e}")
 
     def _open_preprocessing_dialog(self) -> None:
         try:
@@ -361,7 +368,16 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             wave, flux = self._load_spectrum(spectrum_file)
             dialog = PySide6PreprocessingDialog(self, (wave, flux))
             if dialog.exec() == QtWidgets.QDialog.Accepted:
-                self.current_spectrum = dialog.result
+                # Normalize dialog result into a structure _extract_wave_flux understands
+                res = dialog.result or {}
+                proc_wave = res.get('processed_wave')
+                # Prefer flux_view if available, else processed_flux, else display_flux
+                proc_flux = res.get('flux_view') or res.get('processed_flux') or res.get('display_flux')
+                if proc_wave is not None and proc_flux is not None:
+                    self.current_spectrum = {'wave': np.asarray(proc_wave), 'flux': np.asarray(proc_flux)}
+                else:
+                    # Fallback: keep previous spectrum
+                    self.current_spectrum = {'wave': np.asarray(wave), 'flux': np.asarray(flux)}
                 QtWidgets.QMessageBox.information(self, "Success", "Preprocessing completed and stored.")
                 self._update_plot()
         except Exception as e:
@@ -639,8 +655,24 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             wave = spectrum['input_spectrum'].get('wave')
             flux = spectrum['input_spectrum'].get('flux')
         else:
-            wave = spectrum.get('wave') or spectrum.get('wavelength')
-            flux = spectrum.get('flux') or spectrum.get('flat') or spectrum.get('fluxed')
+            # Accept several variants from preprocessing and loaders
+            wave = (
+                spectrum.get('wave')
+                or spectrum.get('wavelength')
+                or spectrum.get('processed_wave')
+                or spectrum.get('log_wave')
+            )
+            flux = (
+                spectrum.get('flux')
+                or spectrum.get('flux_view')
+                or spectrum.get('display_flux')
+                or spectrum.get('processed_flux')
+                or spectrum.get('flat')
+                or spectrum.get('flat_view')
+                or spectrum.get('display_flat')
+                or spectrum.get('fluxed')
+                or spectrum.get('log_flux')
+            )
         try:
             wave_arr = np.asarray(wave) if wave is not None else None
             flux_arr = np.asarray(flux) if flux is not None else None

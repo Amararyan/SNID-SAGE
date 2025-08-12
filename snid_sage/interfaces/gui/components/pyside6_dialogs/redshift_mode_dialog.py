@@ -158,7 +158,7 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
             background: {self.colors['bg_secondary']};
             border: 2px solid {self.colors['accent_primary']};
             border-radius: 6px;
-            padding: 8px;
+            padding: 4px 8px;
             color: {self.colors['accent_primary']};
         """)
         layout.addWidget(redshift_info)
@@ -217,10 +217,25 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         self.range_input.setToolTip("Search range around redshift (any precision)")
         range_layout.addWidget(self.range_input)
         
-        range_help = QtWidgets.QLabel("(typical: 0.0005-0.01)")
-        range_help.setFont(QtGui.QFont(self._ui_font_family(), 8))
-        range_help.setStyleSheet(f"color: {self.colors['text_secondary']};")
-        range_layout.addWidget(range_help)
+        # Live hint showing the actual redshift interval that will be searched
+        self.range_help = QtWidgets.QLabel("")
+        self.range_help.setFont(QtGui.QFont(self._ui_font_family(), 8))
+        self.range_help.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        range_layout.addWidget(self.range_help)
+
+        # Update the hint initially and whenever the value changes
+        def _update_range_help_label():
+            value = self.range_input.value() or 0.0
+            zmin = max(0.0, self.redshift_value - value)
+            zmax = self.redshift_value + value
+            self.range_help.setText(f"Will search z in [{zmin:.6f}, {zmax:.6f}]")
+
+        _update_range_help_label()
+        # Connect both text and value changes to be robust to partial edits
+        if hasattr(self.range_input, 'valueChanged'):
+            self.range_input.valueChanged.connect(lambda _v: _update_range_help_label())
+        if hasattr(self.range_input, 'textChanged'):
+            self.range_input.textChanged.connect(lambda _t: _update_range_help_label())
         
         range_layout.addStretch()
         options_layout.addLayout(range_layout)

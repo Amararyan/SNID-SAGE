@@ -216,13 +216,13 @@ class EmissionLineOverlayController:
                 best_match = self.gui.snid_results.best_matches[0]
                 if 'redshift' in best_match:
                     estimated_z = float(best_match['redshift'])
-                    _LOGGER.debug(f"Using SNID result redshift: z={estimated_z:.4f}")
+                    _LOGGER.debug(f"Using SNID result redshift: z={estimated_z:.6f}")
                     return estimated_z
             
             # Try other redshift sources
             if hasattr(self.gui, 'estimated_redshift') and self.gui.estimated_redshift is not None:
                 estimated_z = float(self.gui.estimated_redshift)
-                _LOGGER.debug(f"Using GUI estimated redshift: z={estimated_z:.4f}")
+                _LOGGER.debug(f"Using GUI estimated redshift: z={estimated_z:.6f}")
                 return estimated_z
             
             # Default to zero
@@ -351,6 +351,6 @@ class EmissionLineOverlayController:
         
         estimated_z = self._get_estimated_redshift()
         if estimated_z > 0:
-            return f"Ready (estimated z={estimated_z:.4f})"
+            return f"Ready (estimated z={estimated_z:.6f})"
         else:
             return "Ready (no redshift estimate)" 

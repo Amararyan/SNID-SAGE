@@ -382,7 +382,7 @@ class DialogManager:
                 status_text = f"z = {redshift_value:.6f} (forced)"
             else:
                 search_range = result.get('search_range', 0.001)
-                status_text = f"z = {redshift_value:.6f} (±{search_range:.3f})"
+                status_text = f"z = {redshift_value:.6f} (±{search_range:.6f})"
             
             self.main_window.redshift_status_label.setText(status_text)
             self._update_status("redshift", None, success_style=True)
@@ -449,17 +449,23 @@ class DialogManager:
     
     def _show_shortcuts_fallback(self):
         """Show shortcuts fallback dialog"""
-        shortcuts_text = """
+        try:
+            from snid_sage.interfaces.gui.utils.cross_platform_window import CrossPlatformWindowManager as CPW
+            mod = CPW.platform_modifier_label()
+        except Exception:
+            import sys
+            mod = "Cmd" if sys.platform == "darwin" else "Ctrl"
+        shortcuts_text = f"""
 🔧 Keyboard Shortcuts
 
 File Operations:
-• Ctrl+O: Load Spectrum
-• Ctrl+Shift+O: Configuration
+• {mod}+O: Load Spectrum
+• {mod}+Shift+O: Configuration
 
 Analysis:
-• F5 or Ctrl+R: Run Analysis
+• F5 or {mod}+R: Run Analysis
 • F6: Preprocessing
-• Ctrl+Enter: Quick Analysis
+• {mod}+Enter: Quick Analysis
 
 View:
 • F: Flux View
@@ -470,9 +476,9 @@ Navigation:
 • Arrow Keys: Navigate Templates
 
 Other:
-• Ctrl+,: Settings
+• {mod}+,: Settings
 • F1: This Help
-• Ctrl+Shift+R: Reset
+• {mod}+Shift+R: Reset
         """
         QtWidgets.QMessageBox.information(self.main_window, "Keyboard Shortcuts", shortcuts_text)
     

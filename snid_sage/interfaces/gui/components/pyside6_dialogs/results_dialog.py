@@ -324,7 +324,18 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
                 spectrum_name = self.analysis_results.spectrum_name
             
             # Create formatter and get CLI-style summary
-            formatter = create_unified_formatter(self.analysis_results, spectrum_name)
+            spectrum_path = None
+            try:
+                if hasattr(self.parent_gui, 'app_controller') and getattr(self.parent_gui.app_controller, 'current_file_path', None):
+                    spectrum_path = self.parent_gui.app_controller.current_file_path
+                elif hasattr(self.analysis_results, 'input_file') and self.analysis_results.input_file:
+                    spectrum_path = self.analysis_results.input_file
+                elif hasattr(self.analysis_results, 'spectrum_path') and self.analysis_results.spectrum_path:
+                    spectrum_path = self.analysis_results.spectrum_path
+            except Exception:
+                spectrum_path = None
+
+            formatter = create_unified_formatter(self.analysis_results, spectrum_name, spectrum_path)
             cli_summary_text = formatter.get_display_summary()
             
             # Set the CLI-style text

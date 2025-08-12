@@ -196,46 +196,36 @@ class PySide6GamesDialog(QtWidgets.QDialog):
             _LOGGER.warning(f"Failed to apply enhanced button styling: {e}")
     
     def _check_pygame_availability(self):
-        """Check if pygame is available and update UI accordingly"""
-        try:
-            from snid_sage.snid.games import PYGAME_AVAILABLE
-            
-            if PYGAME_AVAILABLE:
-                self.availability_label.setText("Ready to play!")
-                self.availability_label.setStyleSheet("color: #059669; font-weight: bold;")
-                self.play_button.setEnabled(True)
-            else:
-                self.availability_label.setText("Pygame not installed")
-                self.availability_label.setStyleSheet("color: #dc2626; font-weight: bold;")
-                self.play_button.setEnabled(False)
-                self.play_button.setText("Install Pygame First")
-                
-        except ImportError:
-            self.availability_label.setText("Games module not available")
-            self.availability_label.setStyleSheet("color: #dc2626; font-weight: bold;")
-            self.play_button.setEnabled(False)
-            self.play_button.setText("Games Not Available")
+        """Update UI without importing pygame in this process."""
+        # Assume ready; the subprocess will own pygame initialization and report errors separately
+        self.availability_label.setText("Ready to play!")
+        self.availability_label.setStyleSheet("color: #059669; font-weight: bold;")
+        self.play_button.setEnabled(True)
     
     def _start_game(self):
         """Start the selected game"""
         try:
-            from snid_sage.snid.games import run_debris_game
-            
+            import sys
+            import subprocess
             # Close dialog first
             self.accept()
-            
-            # Start game in background thread
-            def run_game():
-                try:
-                    run_debris_game(True)
-                except Exception as e:
-                    _LOGGER.error(f"Error running space debris game: {e}")
-            
-            game_thread = threading.Thread(target=run_game, daemon=True)
-            game_thread.start()
-            
+            if sys.platform == 'darwin':
+                # macOS: adjust resolution and enable HiDPI
+                cmd = (
+                    "import os; "
+                    "os.environ.setdefault('SDL_HINT_VIDEO_HIGHDPI','1'); "
+                    "os.environ.setdefault('SDL_VIDEO_HIGHDPI','1'); "
+                    "from snid_sage.snid import games as g; "
+                    "g.DEBRIS_WIDTH=960; g.DEBRIS_HEIGHT=640; "
+                    "g.run_debris_game()"
+                )
+                subprocess.Popen([sys.executable, "-c", cmd], close_fds=True)
+            else:
+                # Other platforms: keep prior behavior within this process using a thread
+                from snid_sage.snid.games import run_debris_game
+                import threading
+                threading.Thread(target=run_debris_game, daemon=True).start()
             _LOGGER.info("Space Debris Cleanup game started from PySide6 dialog")
-            
         except Exception as e:
             _LOGGER.error(f"Error starting game from dialog: {e}")
             QtWidgets.QMessageBox.critical(

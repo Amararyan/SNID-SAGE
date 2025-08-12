@@ -412,6 +412,32 @@ class PySide6AppController(QtCore.QObject):
                 _LOGGER.error("No spectrum data loaded for analysis")
                 return False
             
+            # Prevent concurrent analysis runs
+            try:
+                already_running = bool(self.is_analysis_running()) or (
+                    self.analysis_thread is not None and getattr(self.analysis_thread, 'is_alive', lambda: False)()
+                )
+            except Exception:
+                already_running = False
+            
+            if already_running:
+                _LOGGER.warning("Analysis start requested while another analysis is running - ignoring")
+                try:
+                    # Prefer progress dialog line if available
+                    if getattr(self, 'main_window', None) and getattr(self.main_window, 'progress_dialog', None):
+                        self.main_window.progress_dialog.add_progress_line(
+                            "Analysis already running; please wait or cancel the current run.", "warning"
+                        )
+                    elif getattr(self, 'main_window', None):
+                        QtWidgets.QMessageBox.information(
+                            self.main_window,
+                            "Analysis In Progress",
+                            "An analysis is already running. Please wait for it to finish or cancel it."
+                        )
+                except Exception:
+                    pass
+                return False
+            
             # Create progress dialog for analysis tracking (if not already created)
             try:
                 from snid_sage.interfaces.gui.components.pyside6_dialogs.analysis_progress_dialog import show_analysis_progress_dialog
@@ -450,6 +476,8 @@ class PySide6AppController(QtCore.QObject):
             self.analysis_cancelled = False
 
             # Run analysis in separate thread
+            # Set running flag early to avoid race conditions from rapid clicks
+            self.analysis_running = True
             self.analysis_thread = threading.Thread(
                 target=self._run_analysis_thread, 
                 args=(kwargs,)
@@ -461,6 +489,8 @@ class PySide6AppController(QtCore.QObject):
             
         except Exception as e:
             _LOGGER.error(f"Error starting analysis: {e}")
+            # Ensure running flag is reset on failure to start
+            self.analysis_running = False
             return False
 
     def run_snid_analysis(self, config_params: Dict[str, Any]) -> bool:
@@ -553,7 +583,7 @@ class PySide6AppController(QtCore.QObject):
                 raise InterruptedError("Analysis cancelled by user")
 
             # Get templates directory from configuration
-            progress_callback("Loading configuration and templates...", 20)
+            progress_callback("Loading configuration and templates...", 15)
             try:
                 # Force garbage collection before template loading
                 import gc
@@ -576,7 +606,7 @@ class PySide6AppController(QtCore.QObject):
                 except PermissionError:
                     raise ValueError(f"Permission denied accessing templates directory: {templates_dir}")
                 
-                progress_callback(f"Templates loaded from: {templates_dir}", 30)
+                progress_callback(f"Templates loaded from: {templates_dir}", 20)
                 _LOGGER.info(f"Running SNID analysis with templates from: {templates_dir}")
                 
             except Exception as e:
@@ -857,7 +887,7 @@ class PySide6AppController(QtCore.QObject):
         self.galaxy_redshift_result = redshift
         if redshift is not None:
             self.update_workflow_state(WorkflowState.REDSHIFT_SET)
-            _LOGGER.info(f"Redshift set to z = {redshift:.4f}")
+            _LOGGER.info(f"Redshift set to z = {redshift:.6f}")
         else:
             _LOGGER.info("Redshift cleared")
     
@@ -1126,7 +1156,7 @@ class PySide6AppController(QtCore.QObject):
                     QtCore.Qt.QueuedConnection
                 )
                 
-                _LOGGER.info(f"✅ Analysis complete: {getattr(result, 'consensus_type', 'Unknown')} at z={getattr(result, 'redshift', 0.0):.4f}")
+                _LOGGER.info(f"✅ Analysis complete: {getattr(result, 'consensus_type', 'Unknown')} at z={getattr(result, 'redshift', 0.0):.6f}")
             
         except Exception as e:
             _LOGGER.error(f"Error completing analysis workflow: {e}")
@@ -1226,7 +1256,7 @@ class PySide6AppController(QtCore.QObject):
                         result.rlap_cos = best_cluster_match.get('rlap_cos', 0.0)
                     
                     _LOGGER.info(f"🎯 Updated result properties: {result.template_name} ({result.consensus_type}) "
-                                f"z={result.redshift:.4f}, RLAP={result.rlap:.2f}")
+                                f"z={result.redshift:.6f}, RLAP={result.rlap:.2f}")
             
             _LOGGER.info(f"✅ User selected cluster {cluster_index + 1}: {selected_cluster.get('type')} "
                         f"(Size: {len(selected_cluster.get('matches', []))}, "

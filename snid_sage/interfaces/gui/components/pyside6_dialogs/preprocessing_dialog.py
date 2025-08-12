@@ -615,9 +615,19 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
     
     def _on_masking_mode_changed(self, is_active: bool):
         """Handle masking mode state changes"""
-        if hasattr(self, 'masking_toggle_button') and hasattr(self, 'button_manager'):
-            # Use the proper toggle button update method
-            self.button_manager.update_toggle_button(self.masking_toggle_button, is_active)
+        btn = getattr(self, 'masking_toggle_button', None)
+        mgr = getattr(self, 'button_manager', None)
+        if not btn or not mgr:
+            return
+        # Use the proper toggle button update method with robust guards
+        try:
+            mgr.update_toggle_button(btn, is_active)
+        except (RuntimeError, AttributeError):
+            # Button may have been deleted or is invalid; drop reference silently
+            try:
+                self.masking_toggle_button = None
+            except Exception:
+                pass
     
     def _on_mask_updated(self):
         """Callback when mask regions are updated"""
@@ -651,6 +661,20 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
         # Clear current options
         layout = self.options_frame.layout()
         if layout:
+            # Before deleting child widgets, ensure interactive widgets drop references
+            try:
+                if self.masking_widget and hasattr(self.masking_widget, 'release_ui_references'):
+                    self.masking_widget.release_ui_references()
+            except Exception:
+                pass
+            try:
+                if self.continuum_widget and hasattr(self.continuum_widget, 'release_ui_references'):
+                    self.continuum_widget.release_ui_references()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            # Also drop our cached per-step control references now
+            if hasattr(self, 'masking_toggle_button'):
+                self.masking_toggle_button = None
             while layout.count():
                 child = layout.takeAt(0)
                 if child.widget():
@@ -789,7 +813,7 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 
                 self.current_step += 1
                 
-                # Update step display - wrapped in try-catch for button deletion issues
+        # Update step display - wrapped in try-catch for button deletion issues
                 try:
                     self._update_step_display()
                 except RuntimeError as e:

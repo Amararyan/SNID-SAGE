@@ -1946,7 +1946,6 @@ jobs:
           echo "Testing basic help commands..."
           snid --help
           # Skip snid-sage --help as it's a GUI launcher, not a CLI command
-          # Skip snid-gui --help as it tries to initialize the full GUI
           
           echo "Testing command-specific help..."
           snid identify --help
@@ -1964,7 +1963,6 @@ jobs:
           snid --help
           
           # Skip snid-sage --help as it's a GUI launcher, not a CLI command
-          # Skip snid-gui --help as it tries to initialize the full GUI
           
           Write-Host "Testing command-specific help..."
           snid identify --help
@@ -2299,7 +2297,6 @@ jobs:
           # Test that entry points are working
           which snid || echo "snid command not found in PATH"
           which snid-sage || echo "snid-sage command not found in PATH"
-          which snid-gui || echo "snid-gui command not found in PATH"
           
           # Test version reporting
           snid --version

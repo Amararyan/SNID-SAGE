@@ -17,10 +17,17 @@
 
 ### Option 1: Install from PyPI (Recommended)
 
-The easiest way to install SNID SAGE is directly from PyPI:
+Choose the install that fits your use case:
 
 ```bash
+# CLI-only (no GUI)
 pip install snid-sage
+
+# Full GUI (PySide6 + pyqtgraph)
+pip install "snid-sage[gui]"
+
+# Everything (GUI + optional features)
+pip install "snid-sage[all]"
 ```
 
  
@@ -40,8 +47,12 @@ snid_env\Scripts\activate
 # macOS/Linux:
 source snid_env/bin/activate
 
-# Install SNID SAGE
+# Install SNID SAGE (choose one)
 pip install snid-sage
+# or
+pip install "snid-sage[gui]"
+# or
+pip install "snid-sage[all]"
  
 ```
 
@@ -51,8 +62,12 @@ pip install snid-sage
 conda create -n snid_sage python=3.10
 conda activate snid_sage
 
-# Install SNID SAGE
+# Install SNID SAGE (choose one)
 pip install snid-sage
+# or
+pip install "snid-sage[gui]"
+# or
+pip install "snid-sage[all]"
  
 ```
 
@@ -67,7 +82,15 @@ pip install -i https://test.pypi.org/simple/ snid-sage
 # Or install from source
 git clone https://github.com/FiorenSt/SNID-SAGE.git
 cd SNID-SAGE
+
+# For CLI-only
 pip install -e .
+
+# For the full GUI
+pip install -e .[gui]
+
+# For everything (GUI + optional features)
+pip install -e .[all]
 ```
 
 **Note:** If you choose global installation, we recommend using `pip install --user` to install in your user directory rather than system-wide.
@@ -79,8 +102,6 @@ pip install -e .
 ### Launch the GUI (Recommended)
 ```bash
 # Using installed entry point
-snid-gui
-# or
 snid-sage
 ```
 

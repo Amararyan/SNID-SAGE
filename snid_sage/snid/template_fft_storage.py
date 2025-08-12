@@ -25,7 +25,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple, Union, Callable
 from dataclasses import dataclass
 import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -166,7 +166,8 @@ class TemplateFFTStorage:
                      subtype_filter: Optional[List[str]] = None,
                      age_range: Optional[Tuple[float, float]] = None,
                      template_names: Optional[List[str]] = None,
-                     use_prefetching: bool = True) -> List[TemplateEntry]:
+                     use_prefetching: bool = True,
+                     progress_callback: Optional[Callable[[str, float], None]] = None) -> List[TemplateEntry]:
         """
         Get templates with fast filtering and optional prefetching.
         
@@ -200,11 +201,18 @@ class TemplateFFTStorage:
         if not candidate_names:
             return []
         
+        # Notify initial state
+        try:
+            if progress_callback is not None:
+                progress_callback(f"Preparing to load {len(candidate_names)} templates", 0.0)
+        except Exception:
+            pass
+
         # Load templates from storage
         if use_prefetching:
-            return self._load_templates_with_prefetching(candidate_names)
+            return self._load_templates_with_prefetching(candidate_names, progress_callback)
         else:
-            return self._load_templates_from_storage(candidate_names)
+            return self._load_templates_from_storage(candidate_names, progress_callback)
     
     def get_template_fft(self, template_name: str) -> Optional[np.ndarray]:
         """
@@ -579,8 +587,8 @@ class TemplateFFTStorage:
         
         return candidates
     
-    def _load_templates_with_prefetching(self, template_names: List[str]) -> List[TemplateEntry]:
-        """Load templates with prefetching for better performance."""
+    def _load_templates_with_prefetching(self, template_names: List[str], progress_callback: Optional[Callable[[str, float], None]] = None) -> List[TemplateEntry]:
+        """Load templates with prefetching for better performance (with optional progress reporting)."""
         templates = []
         
         # Group template names by their storage file
@@ -597,11 +605,33 @@ class TemplateFFTStorage:
         
         # Start prefetching all files (lazy initialization)
         self._ensure_prefetch_executor()
+        
+        # Progress tracking across threads
+        total_to_load = sum(len(v) for v in templates_by_file.values()) or 1
+        progress_lock = threading.Lock()
+        progress_state = {'loaded': 0, 'last_pct': -1}
+
+        def _progress_hook(increment: int = 1):
+            if increment <= 0:
+                increment = 1
+            with progress_lock:
+                progress_state['loaded'] += increment
+                # Throttle: only report every 50 templates and at completion
+                should_emit = (progress_state['loaded'] % 50 == 0) or (progress_state['loaded'] >= total_to_load)
+                if progress_callback is not None and should_emit:
+                    pct = int((progress_state['loaded'] / total_to_load) * 100)
+                    if pct != progress_state['last_pct']:
+                        progress_state['last_pct'] = pct
+                        try:
+                            progress_callback(f"Loading templates {progress_state['loaded']}/{total_to_load}", float(pct))
+                        except Exception:
+                            pass
         for storage_file_path, file_template_names in templates_by_file.items():
             future = self._prefetch_executor.submit(
                 self._load_templates_from_single_file, 
                 storage_file_path, 
-                file_template_names
+                file_template_names,
+                _progress_hook
             )
             file_futures[storage_file_path] = future
         
@@ -613,9 +643,16 @@ class TemplateFFTStorage:
             except Exception as e:
                 _LOG.error(f"Failed to load templates from storage file: {e}")
             
+        # Ensure completion is reported
+        try:
+            if progress_callback is not None:
+                progress_callback("Template loading complete", 100.0)
+        except Exception:
+            pass
+
         return templates
     
-    def _load_templates_from_storage(self, template_names: List[str]) -> List[TemplateEntry]:
+    def _load_templates_from_storage(self, template_names: List[str], progress_callback: Optional[Callable[[str, float], None]] = None) -> List[TemplateEntry]:
         """Load specific templates from type-specific HDF5 storage files (NO prefetching)."""
         templates = []
         
@@ -628,15 +665,41 @@ class TemplateFFTStorage:
                     templates_by_file[storage_file] = []
                 templates_by_file[storage_file].append(name)
         
+        # Setup sequential progress tracker
+        total_to_load = sum(len(v) for v in templates_by_file.values()) or 1
+        loaded = 0
+
+        def _progress_hook(increment: int = 1):
+            nonlocal loaded
+            if increment <= 0:
+                increment = 1
+            loaded += increment
+            if progress_callback is not None:
+                # Throttle: emit only every 50 templates or at completion
+                should_emit = (loaded % 50 == 0) or (loaded >= total_to_load)
+                if should_emit:
+                    try:
+                        pct = float(int((loaded / total_to_load) * 100))
+                        progress_callback(f"Loading templates {loaded}/{total_to_load}", pct)
+                    except Exception:
+                        pass
+
         # Load from each storage file
         for storage_file_path, file_template_names in templates_by_file.items():
-            file_templates = self._load_templates_from_single_file(storage_file_path, file_template_names)
+            file_templates = self._load_templates_from_single_file(storage_file_path, file_template_names, _progress_hook)
             templates.extend(file_templates)
         
+        # Ensure completion is reported
+        try:
+            if progress_callback is not None:
+                progress_callback("Template loading complete", 100.0)
+        except Exception:
+            pass
+
         return templates
     
-    def _load_templates_from_single_file(self, storage_file_path: str, template_names: List[str]) -> List[TemplateEntry]:
-        """Load templates from a single HDF5 file."""
+    def _load_templates_from_single_file(self, storage_file_path: str, template_names: List[str], progress_hook: Optional[Callable[[int], None]] = None) -> List[TemplateEntry]:
+        """Load templates from a single HDF5 file (optionally invoking a progress hook per template)."""
         templates = []
         
         try:
@@ -708,6 +771,13 @@ class TemplateFFTStorage:
                     )
                     
                     templates.append(template)
+
+                    # progress per-template loaded
+                    if progress_hook is not None:
+                        try:
+                            progress_hook(1)
+                        except Exception:
+                            pass
         
         except Exception as e:
             _LOG.error(f"Failed to load templates from storage file {storage_file_path}: {e}")

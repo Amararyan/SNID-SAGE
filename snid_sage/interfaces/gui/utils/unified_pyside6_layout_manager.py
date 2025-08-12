@@ -157,6 +157,43 @@ class UnifiedPySide6LayoutManager:
         self._config_file = self._get_config_file_path()
         _LOGGER.info("Unified layout manager initialized")
     
+    def setup_main_window(self, window: QtWidgets.QMainWindow) -> None:
+        """Apply standard window setup (size, icon, centering).
+
+        This method provides a minimal, cross-interface hook so other
+        layout managers can delegate common window setup here.
+        """
+        try:
+            min_w, min_h = self.settings.minimum_window_size
+            window.setMinimumSize(min_w, min_h)
+        except Exception as exc:
+            _LOGGER.debug(f"Could not set minimum window size: {exc}")
+
+        try:
+            def_w, def_h = self.settings.default_window_size
+            window.resize(def_w, def_h)
+        except Exception as exc:
+            _LOGGER.debug(f"Could not apply default window size: {exc}")
+
+        # Best-effort window icon
+        try:
+            from PySide6 import QtGui  # local import to avoid hard dependency at module load
+            from .logo_manager import get_logo_manager  # type: ignore
+            icon_path = get_logo_manager().get_icon_path()
+            if icon_path:
+                window.setWindowIcon(QtGui.QIcon(str(icon_path)))
+        except Exception as exc:
+            _LOGGER.debug(f"Could not set window icon: {exc}")
+
+        # Center window on the available screen
+        try:
+            screen_geom = QtWidgets.QApplication.primaryScreen().availableGeometry()
+            win_geom = window.frameGeometry()
+            win_geom.moveCenter(screen_geom.center())
+            window.move(win_geom.topLeft())
+        except Exception as exc:
+            _LOGGER.debug(f"Could not center window: {exc}")
+
     def _get_config_file_path(self) -> Path:
         """Get the configuration file path"""
         try:
@@ -1100,9 +1137,24 @@ class UnifiedPySide6LayoutManager:
                 _LOGGER.warning("Could not initialize Twemoji manager")
                 return 0
             
-            # Preload common icons for better performance
-            _LOGGER.info("Preloading common Twemoji icons...")
-            twemoji_manager.preload_common_icons()
+            # Preload common icons for better performance without blocking the UI
+            # Schedule on idle and run the preload in a background thread
+            _LOGGER.info("Scheduling background preload of common Twemoji assets...")
+            try:
+                from PySide6 import QtCore
+                import threading
+
+                def _background_preload():
+                    try:
+                        count = twemoji_manager.preload_common_icons()
+                        _LOGGER.debug(f"Background Twemoji preload completed: {count} assets")
+                    except Exception as exc:
+                        _LOGGER.debug(f"Background Twemoji preload skipped/failed: {exc}")
+
+                QtCore.QTimer.singleShot(0, lambda: threading.Thread(target=_background_preload, daemon=True).start())
+            except Exception:
+                # Fall back silently if scheduling fails (e.g., during headless tests)
+                pass
             
             # Convert all buttons in the main window
             _LOGGER.info("Converting buttons to use Twemoji icons...")

@@ -469,12 +469,15 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.chat_input.setPlaceholderText("Type your question here...")
         layout.addWidget(self.chat_input)
 
-        # Add keyboard shortcut: Ctrl+Enter to send
+        # Add keyboard shortcut: Ctrl/Cmd+Enter to send (platform-aware)
         try:
-            send_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self.chat_input)
-            send_shortcut.activated.connect(self._send_chat_message)
-            send_shortcut2 = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Enter"), self.chat_input)
-            send_shortcut2.activated.connect(self._send_chat_message)
+            from snid_sage.interfaces.gui.utils.cross_platform_window import (
+                CrossPlatformWindowManager as CPW,
+            )
+            for combo in ("Ctrl+Return", "Ctrl+Enter"):
+                sc = CPW.create_shortcut(self.chat_input, combo, self._send_chat_message)
+                # Avoid linter complaining about unused variable in some environments
+                _ = sc
         except Exception:
             pass
         
