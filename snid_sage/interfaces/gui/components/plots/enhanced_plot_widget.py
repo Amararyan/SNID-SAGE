@@ -23,6 +23,13 @@ import PySide6.QtCore as QtCore
 import PySide6.QtGui as QtGui
 import PySide6.QtWidgets as QtWidgets
 
+# Twemoji support
+try:
+    from snid_sage.interfaces.gui.utils.twemoji_manager import get_emoji_pixmap
+    _TWEMOJI_AVAILABLE = True
+except Exception:
+    _TWEMOJI_AVAILABLE = False
+
 # PyQtGraph imports
 try:
     import pyqtgraph as pg
@@ -97,7 +104,7 @@ class SimplePlotWidget(pg.PlotWidget):
                 return
             
             # Configure enhanced axis styling similar to tick demo
-            axis_font = QtGui.QFont("Segoe UI", 9)
+            axis_font = QtGui.QFont(self._ui_font_family(), 9)
             
             for name in ('left', 'bottom'):
                 axis = plot_item.getAxis(name)
@@ -216,24 +223,34 @@ class EnhancedPlotWidget(pg.PlotWidget):
         if not plot_item:
             return
         
-        # Create a QLabel with save emoji - no button background for clean look
-        save_emoji = QtWidgets.QLabel("💾")
-        save_emoji.setFixedSize(14, 14)  # Made one point smaller
+        # Create a QLabel with save icon/emoji - no button background for clean look
+        save_emoji = QtWidgets.QLabel()
+        save_emoji.setFixedSize(16, 16)
         save_emoji.setToolTip("Save plot as image")
         save_emoji.setAlignment(QtCore.Qt.AlignCenter)
         save_emoji.setStyleSheet("""
-            QLabel {
-                background-color: transparent;
-                border: none;
-                font-size: 13px;
-                color: #333;
-                font-weight: bold;
-            }
-            QLabel:hover {
-                background-color: rgba(200, 200, 200, 0.5);
-                border-radius: 8px;
-            }
+            QLabel { background-color: transparent; border: none; }
+            QLabel:hover { background-color: rgba(200, 200, 200, 0.5); border-radius: 8px; }
         """)
+
+        # Prefer packaged Twemoji icon; fallback to text glyph
+        used_pixmap = False
+        if _TWEMOJI_AVAILABLE:
+            try:
+                icon = get_emoji_pixmap("💾", size=16)
+                if icon is not None:
+                    pixmap = icon.pixmap(16, 16)  # type: ignore[attr-defined]
+                    if hasattr(pixmap, 'isNull') and not pixmap.isNull():  # type: ignore[attr-defined]
+                        save_emoji.setPixmap(pixmap)
+                        used_pixmap = True
+            except Exception:
+                used_pixmap = False
+        if not used_pixmap:
+            save_emoji.setText("💾")
+            save_emoji.setStyleSheet("""
+                QLabel { background-color: transparent; border: none; font-size: 13px; color: #333; font-weight: bold; }
+                QLabel:hover { background-color: rgba(200, 200, 200, 0.5); border-radius: 8px; }
+            """)
         
         # Make it clickable
         save_emoji.mousePressEvent = lambda event: self._show_export_menu()
@@ -421,7 +438,7 @@ class EnhancedPlotWidget(pg.PlotWidget):
                 return
             
             # Configure enhanced axis styling similar to tick demo
-            axis_font = QtGui.QFont("Segoe UI", 9)
+            axis_font = QtGui.QFont(self._ui_font_family(), 9)
             
             for name in ('left', 'bottom'):
                 axis = plot_item.getAxis(name)
@@ -445,7 +462,7 @@ class EnhancedPlotWidget(pg.PlotWidget):
                 return
             
             # Configure enhanced axis styling similar to tick demo
-            axis_font = QtGui.QFont("Segoe UI", 9)
+            axis_font = QtGui.QFont(self._ui_font_family(), 9)
             
             for name in ('left', 'bottom'):
                 axis = plot_item.getAxis(name)
@@ -480,3 +497,12 @@ class EnhancedPlotWidget(pg.PlotWidget):
             
         except Exception as e:
             _LOGGER.error(f"Failed to apply enhanced tick styling: {e}")
+
+    @staticmethod
+    def _ui_font_family() -> str:
+        """Pick a UI font family available on the current platform."""
+        if sys.platform == 'darwin':
+            return 'Helvetica Neue'
+        if sys.platform == 'win32':
+            return 'Segoe UI'
+        return 'DejaVu Sans'

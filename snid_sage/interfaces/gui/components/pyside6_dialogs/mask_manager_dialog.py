@@ -69,12 +69,12 @@ class PySide6MaskManagerDialog(QtWidgets.QDialog):
         self.resize(600, 500)
         self.setMinimumSize(500, 400)
         
-        # Apply dialog styling
+        # Apply dialog styling (use platform-aware font stack)
         self.setStyleSheet(f"""
             QDialog {{
                 background: {self.colors['bg_primary']};
                 color: {self.colors['text_primary']};
-                font-family: "Segoe UI", Arial, sans-serif;
+                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
             }}
             
             QGroupBox {{

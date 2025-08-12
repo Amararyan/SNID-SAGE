@@ -83,11 +83,12 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowMaximizeButtonHint)
         
         # Apply dialog styling (do not override checkbox/radio indicators)
+        # Use platform-aware font stack for macOS
         self.setStyleSheet(f"""
             QDialog {{
                 background: {self.colors['bg_primary']};
                 color: {self.colors['text_primary']};
-                font-family: "Segoe UI", Arial, sans-serif;
+                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
                 font-size: 10pt;
             }}
             

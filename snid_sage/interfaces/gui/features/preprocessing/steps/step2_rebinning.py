@@ -9,6 +9,9 @@ def create_options(dialog, layout: QtWidgets.QVBoxLayout) -> None:
 
     rebin_group = QtWidgets.QGroupBox("Rebinning Configuration")
     rebin_layout = QtWidgets.QVBoxLayout(rebin_group)
+    # Add more vertical spacing to increase the area
+    rebin_layout.setSpacing(15)
+    rebin_layout.setContentsMargins(15, 20, 15, 20)
 
     dialog.log_rebin_cb = QtWidgets.QCheckBox("Apply log-wavelength rebinning (required)")
     dialog.log_rebin_cb.setChecked(True)
@@ -20,10 +23,16 @@ def create_options(dialog, layout: QtWidgets.QVBoxLayout) -> None:
     dialog.flux_scaling_cb.toggled.connect(lambda *_: _on_flux_scaling_changed(dialog))
     rebin_layout.addWidget(dialog.flux_scaling_cb)
 
+    # Add some extra vertical space at the bottom
+    rebin_layout.addStretch(1)
     layout.addWidget(rebin_group)
 
     info_group = QtWidgets.QGroupBox("Grid Information")
     info_layout = QtWidgets.QVBoxLayout(info_group)
+    # Add more vertical spacing to increase the area
+    info_layout.setSpacing(15)
+    info_layout.setContentsMargins(15, 20, 15, 20)
+    
     try:
         from snid_sage.snid.snid import NW, MINW, MAXW
         info_text = QtWidgets.QLabel(
@@ -37,6 +46,9 @@ def create_options(dialog, layout: QtWidgets.QVBoxLayout) -> None:
         )
     info_text.setStyleSheet("color: #64748b; font-size: 10pt;")
     info_layout.addWidget(info_text)
+    
+    # Add some extra vertical space at the bottom
+    info_layout.addStretch(1)
     layout.addWidget(info_group)
 
 

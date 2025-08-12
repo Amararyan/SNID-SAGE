@@ -150,6 +150,8 @@ exclude = [
     "data/*.flm",
     "images/*.png", 
     "images/*.jpg", 
+    "images/*.svg",
+    "images/twemoji/*.svg",
     "custom_templates/*.md"
 ]
 

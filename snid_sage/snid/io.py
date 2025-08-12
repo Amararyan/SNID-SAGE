@@ -1256,63 +1256,25 @@ def get_template_info(library_path: str) -> Dict[str, Any]:
             _LOG.info("Using H5 unified storage for template info")
             return storage.get_template_info_for_gui()
         else:
-            _LOG.debug("H5 unified storage not available, falling back to .lnw files")
+            _LOG.error("Unified storage index/files missing. SNID-SAGE expects prebuilt HDF5/index; legacy .lnw fallback is disabled.")
+            return {
+                'path': library_path,
+                'total': 0,
+                'types': {},
+                'templates': []
+            }
     except ImportError:
-        _LOG.debug("H5 unified storage not available, using .lnw files")
+        _LOG.error("Template storage module not available. Ensure installation includes HDF5/index support.")
     except Exception as e:
-        _LOG.debug(f"Error accessing H5 storage: {e}, falling back to .lnw files")
+        _LOG.error(f"Error accessing H5 storage: {e}")
     
-    # Fallback to legacy .lnw file processing
-    # Initialize info dictionary
-    info = {
+    # No legacy fallback; return empty info structure to signal missing storage
+    return {
         'path': library_path,
         'total': 0,
         'types': {},
         'templates': []
     }
-    
-    # Check metadata file
-    metadata_file = os.path.join(library_path, 'metadata.json')
-    if os.path.exists(metadata_file):
-        try:
-            with open(metadata_file, 'r') as f:
-                metadata = json.load(f)
-            
-            # Add metadata to info
-            info.update({
-                'name': metadata.get('name', os.path.basename(library_path)),
-                'description': metadata.get('description', ''),
-                'created': metadata.get('created', '')
-            })
-        except Exception as e:
-            logging.warning(f"Error reading metadata for {library_path}: {e}")
-    
-    # Get template files
-    template_files = glob.glob(os.path.join(library_path, '*.lnw'))
-    info['total'] = len(template_files)
-    
-    # Read template info
-    for filename in template_files:
-        try:
-            template = read_template(filename)
-            info['templates'].append({
-                'name': template['name'],
-                'type': template.get('type', 'Unknown'),
-                'subtype': template.get('subtype', 'Unknown'),
-                'age': template.get('age', None),
-                'file': os.path.basename(filename)
-            })
-            
-            # Count by type
-            t_type = template.get('type', 'Unknown')
-            if t_type not in info['types']:
-                info['types'][t_type] = 0
-            info['types'][t_type] += 1
-            
-        except Exception as e:
-            logging.warning(f"Error reading template {filename}: {e}")
-    
-    return info
 
 
 def create_template_library(output_dir: str, name: str) -> str:

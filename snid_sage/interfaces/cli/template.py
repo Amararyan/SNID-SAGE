@@ -239,13 +239,13 @@ def merge_libraries_func(args):
 
 def visualize_templates_func(args):
     """Visualize templates in a library."""
-    print("Template visualization not yet implemented.")
+    # TODO: Implement template visualization
     return 0
 
 
 def convert_spectrum_func(args):
     """Convert spectrum to template format."""
-    print("Spectrum conversion not yet implemented.")
+    # TODO: Implement spectrum conversion
     return 0
 
 

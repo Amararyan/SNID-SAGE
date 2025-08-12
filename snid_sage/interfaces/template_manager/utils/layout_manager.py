@@ -213,9 +213,12 @@ class TemplateManagerLayoutManager:
             
             for index, emoji in tab_icons.items():
                 if index < tab_widget.count():
-                    pixmap = self.twemoji_manager.get_emoji_pixmap(emoji, size=16)
-                    if pixmap:
-                        tab_widget.setTabIcon(index, pixmap)
+                    try:
+                        icon = self.twemoji_manager.get_icon(emoji)  # QIcon
+                    except Exception:
+                        icon = None
+                    if icon:
+                        tab_widget.setTabIcon(index, icon)
         except Exception as e:
             _LOGGER.warning(f"Could not apply tab icons: {e}")
     
@@ -244,8 +247,14 @@ class TemplateManagerLayoutManager:
         button = QtWidgets.QPushButton()
         
         # Set text with emoji if available
-        if emoji and self.twemoji_manager:
+        if emoji:
             button.setText(f"{emoji} {text}")
+            if self.twemoji_manager:
+                try:
+                    # Use packaged Twemoji icon if available
+                    self.twemoji_manager.set_button_icon(button, emoji, keep_text=True)
+                except Exception:
+                    pass
         else:
             button.setText(text)
         
@@ -260,6 +269,11 @@ class TemplateManagerLayoutManager:
         button = QtWidgets.QPushButton(text)
         button.setMinimumHeight(self.settings.create_button_height)
         button.setObjectName("create_btn")  # For CSS styling
+        if text.startswith("✨") and self.twemoji_manager:
+            try:
+                self.twemoji_manager.set_button_icon(button, "✨", keep_text=True)
+            except Exception:
+                pass
         
         return button
     
@@ -268,6 +282,11 @@ class TemplateManagerLayoutManager:
         button = QtWidgets.QPushButton(text)
         button.setMinimumHeight(self.settings.action_button_height)
         button.setObjectName("compare_btn")  # For CSS styling
+        if text.startswith("🔍") and self.twemoji_manager:
+            try:
+                self.twemoji_manager.set_button_icon(button, "🔍", keep_text=True)
+            except Exception:
+                pass
         
         return button
     

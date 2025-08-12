@@ -143,11 +143,12 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
         self.setModal(False)  # Allow interaction with main window
         
         # Apply styling
+        # Use platform-aware font stack for macOS
         self.setStyleSheet(f"""
             QDialog {{
                 background: {self.colors['bg']};
                 color: {self.colors['text_primary']};
-                font-family: "Segoe UI", Arial, sans-serif;
+                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
             }}
             
             QGroupBox {{

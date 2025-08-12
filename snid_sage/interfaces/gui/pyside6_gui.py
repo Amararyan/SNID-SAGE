@@ -941,25 +941,16 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             )
     
     def _start_space_debris_game(self):
-        """Start the Space Debris Cleanup game in a separate thread"""
+        """Start the Space Debris Cleanup game in a macOS-safe way"""
         try:
+            # Launch pygame directly in a background thread to avoid creating Qt widgets
+            # from a worker thread. We bypass menus and start the game window only.
             from snid_sage.snid.games import run_debris_game
             import threading
-            
-            def run_game():
-                try:
-                    run_debris_game(True)
-                except Exception as e:
-                    _LOGGER.error(f"Error running space debris game: {e}")
-            
-            # Start game in background thread
-            game_thread = threading.Thread(target=run_game, daemon=True)
-            game_thread.start()
-            
+            threading.Thread(target=run_debris_game, daemon=True).start()
             # Update status
             self.status_label.setText("🎮 Space Debris Cleanup game started!")
             _LOGGER.info("Space Debris Cleanup game started successfully")
-            
         except Exception as e:
             _LOGGER.error(f"Error starting Space Debris game: {e}")
             QtWidgets.QMessageBox.critical(

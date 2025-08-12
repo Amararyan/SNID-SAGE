@@ -15,9 +15,7 @@ Key Features:
 
 Usage:
     storage = TemplateFFTStorage('/path/to/templates')
-    storage.build_storage()  # One-time build with rebinning
-    
-    # Fast loading with prefetching
+    # Storage is expected to be prebuilt (HDF5 + index present)
     templates = storage.get_templates(type_filter=['Ia'], age_range=(0, 50))
 """
 
@@ -140,13 +138,7 @@ class TemplateFFTStorage:
         return True
     
     def needs_rebuild(self) -> bool:
-        """Check if storage needs rebuilding due to template changes - FAST startup version."""
-        if not self.is_built():
-            return True
-        
-        # FAST CHECK: If we have HDF5 storage files, we don't need to rebuild unless explicitly requested
-        # The storage is already built and should be used as-is. Full validation deferred to analysis time.
-        _LOG.debug("HDF5 storage index exists, assuming build is complete for startup")
+        """Rebuild disabled; templates are expected to be prebuilt."""
         return False
     
     def _get_storage_file_for_type(self, sn_type: str) -> Path:
@@ -165,44 +157,9 @@ class TemplateFFTStorage:
         return self.standard_log_wave.copy()
     
     def build_storage(self, force: bool = False) -> None:
-        """
-        Build unified storage from template directory WITH REBINNING.
-        
-        Parameters
-        ----------
-        force : bool, optional
-            Force rebuild even if not needed
-        """
-        if not force and not self.needs_rebuild():
-            _LOG.info("Storage is up to date, skipping build")
-            return
-        
-        _LOG.info("Building unified template storage WITH REBINNING...")
-        start_time = time.time()
-        
-        # Load all templates from directory and rebin them
-        templates = self._load_all_templates_with_rebinning()
-        
-        # Group templates by type
-        templates_by_type = {}
-        for template in templates:
-            sn_type = template.type
-            if sn_type not in templates_by_type:
-                templates_by_type[sn_type] = []
-            templates_by_type[sn_type].append(template)
-        
-        # Build separate storage files by type
-        total_templates = 0
-        for sn_type, type_templates in templates_by_type.items():
-            _LOG.info(f"Building storage for Type {sn_type}: {len(type_templates)} templates")
-            self._build_hdf5_storage_for_type(sn_type, type_templates)
-            total_templates += len(type_templates)
-        
-        # Build unified index file
-        self._build_index(templates_by_type)
-        
-        build_time = time.time() - start_time
-        _LOG.info(f"Built {len(templates_by_type)} type-specific storage files with {total_templates} templates in {build_time:.2f}s")
+        """Rebuild disabled; no action taken."""
+        _LOG.info("Unified template storage rebuild is disabled. Ensure HDF5 and index files are provided.")
+        return
         
     def get_templates(self, 
                      type_filter: Optional[List[str]] = None,
@@ -232,7 +189,7 @@ class TemplateFFTStorage:
             Templates with flux already rebinned to standard grid
         """
         if not self.is_fully_built():
-            _LOG.error("Storage not fully built. Call build_storage() first.")
+            _LOG.error("Unified storage index/files missing. Ensure prebuilt HDF5 and index exist.")
             return []
         
         # Filter templates by metadata
@@ -865,6 +822,5 @@ def create_unified_storage(template_dir: str, force_rebuild: bool = False, outpu
         Unified storage instance
     """
     storage = TemplateFFTStorage(template_dir, output_dir=output_dir)
-    if force_rebuild or storage.needs_rebuild():
-        storage.build_storage(force=force_rebuild)
-    return storage 
+    # Rebuild disabled; just return the storage instance
+    return storage

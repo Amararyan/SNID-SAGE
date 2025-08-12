@@ -16,6 +16,9 @@ Developed by Fiorenzo Stoppa for SNID SAGE
 
 from typing import Dict, Any, Optional
 import platform
+import os
+from pathlib import Path
+from importlib import resources
 
 # Import logging
 try:
@@ -31,6 +34,12 @@ try:
     _PLATFORM_CONFIG = get_platform_config()
 except ImportError:
     _PLATFORM_CONFIG = None
+
+# Image discovery for absolute resource paths (works in dev and installed package)
+try:
+    from snid_sage.shared.utils.simple_template_finder import find_images_directory
+except Exception:
+    find_images_directory = None  # type: ignore
 
 
 class PySide6ThemeManager:
@@ -53,6 +62,10 @@ class PySide6ThemeManager:
         
         # Apply platform-specific adjustments
         self._apply_platform_adjustments()
+        
+        # Precompute platform-aware font stack and tick icon URL for QSS
+        self._font_css_stack = self._compute_font_css_stack()
+        self._tick_svg_url = self._resolve_tick_svg_url()
         
         _LOGGER.debug("PySide6 Theme Manager initialized")
     
@@ -157,6 +170,59 @@ class PySide6ThemeManager:
         """Get all theme colors as a dictionary"""
         return self.theme_colors.copy()
     
+    def _compute_font_css_stack(self) -> str:
+        """Return a universal CSS font-family stack that works on all platforms."""
+        # Universal font stack that works everywhere without Qt warnings
+        return '"Arial", "Helvetica", "Segoe UI", "Ubuntu", "DejaVu Sans", sans-serif'
+    
+    def _resolve_tick_svg_url(self) -> str:
+        """Resolve a robust file path for tick_white.svg usable in Qt stylesheets.
+        Returns an absolute, forward-slashed file system path to avoid Qt "file:" URI mishandling on Windows.
+        Resolution priority:
+        1) importlib.resources from installed package
+        2) helper-based discovery (dev run)
+        3) best-effort package-relative path
+        """
+        resolved_path: Optional[Path] = None
+
+        # 1) Try importlib.resources (works for installed wheels and source runs)
+        try:
+            with resources.as_file(resources.files('snid_sage.images') / 'tick_white.svg') as p:
+                if p.exists():
+                    resolved_path = p.resolve()
+        except Exception as exc:
+            _LOGGER.debug(f"importlib.resources failed for tick_white.svg: {exc}")
+
+        # 2) Try discovery helper (dev convenience)
+        if resolved_path is None:
+            try:
+                images_dir = find_images_directory() if find_images_directory is not None else None
+                if images_dir:
+                    candidate = Path(images_dir) / 'tick_white.svg'
+                    if candidate.exists():
+                        resolved_path = candidate.resolve()
+            except Exception as exc:
+                _LOGGER.debug(f"Discovery helper failed for tick_white.svg: {exc}")
+
+        # 3) Last resort: compute package-relative path
+        if resolved_path is None:
+            try:
+                # This file is snid_sage/interfaces/gui/utils/pyside6_theme_manager.py
+                # Go up to package root and into images/
+                pkg_root = Path(__file__).resolve().parents[3]
+                candidate = pkg_root / 'images' / 'tick_white.svg'
+                if candidate.exists():
+                    resolved_path = candidate.resolve()
+            except Exception:
+                resolved_path = None
+
+        # Final fallback: keep relative path (dev only)
+        if resolved_path is None:
+            return 'snid_sage/images/tick_white.svg'
+
+        # Normalize to forward-slashed absolute path for Qt stylesheets
+        return resolved_path.as_posix()
+    
     def generate_qt_stylesheet(self) -> str:
         """
         Generate complete Qt stylesheet for the application
@@ -166,12 +232,14 @@ class PySide6ThemeManager:
         """
         colors = self.theme_colors
         
+        tick_url = self._tick_svg_url
+        font_stack = self._font_css_stack
         stylesheet = f"""
         /* Global widget styling */
         QWidget {{ 
             background: {colors['bg_primary']}; 
             color: {colors['text_primary']}; 
-            font-family: "Segoe UI", "Arial", sans-serif;
+            font-family: {font_stack};
             font-size: 9pt;
         }}
         
@@ -489,20 +557,20 @@ class PySide6ThemeManager:
             /* Filled accent background with white tick */
             background: {colors['accent_primary']};
             border: 2px solid {colors['btn_primary_hover']};
-            image: url(snid_sage/images/tick_white.svg);
+            image: url("{tick_url}");
         }}
         
         QCheckBox::indicator:checked:hover {{
             background: {colors['btn_primary_hover']};
             border-color: {colors['btn_primary_hover']};
-            image: url(snid_sage/images/tick_white.svg);
+            image: url("{tick_url}");
         }}
 
         /* Preserve appearance when disabled but checked (mandatory options) */
         QCheckBox::indicator:checked:disabled {{
             background: {colors['accent_primary']};
             border: 2px solid {colors['btn_primary_hover']};
-            image: url(snid_sage/images/tick_white.svg);
+            image: url("{tick_url}");
         }}
         
         QCheckBox::indicator:disabled {{
@@ -545,7 +613,7 @@ class PySide6ThemeManager:
         QCheckBox[accent="success"]::indicator:checked {{
             background: {colors['btn_success']};
             border-color: {colors['btn_success_hover']};
-            image: url(snid_sage/images/tick_white.svg);
+            image: url("{tick_url}");
         }}
         
         QCheckBox[accent="success"]::indicator:checked:hover {{
@@ -555,7 +623,7 @@ class PySide6ThemeManager:
         QCheckBox[accent="warning"]::indicator:checked {{
             background: {colors['btn_warning']};
             border-color: {colors['btn_warning_hover']};
-            image: url(snid_sage/images/tick_white.svg);
+            image: url("{tick_url}");
         }}
         
         QCheckBox[accent="warning"]::indicator:checked:hover {{
@@ -565,7 +633,7 @@ class PySide6ThemeManager:
         QCheckBox[accent="danger"]::indicator:checked {{
             background: {colors['btn_danger']};
             border-color: {colors['btn_danger_hover']};
-            image: url(snid_sage/images/tick_white.svg);
+            image: url("{tick_url}");
         }}
         
         QCheckBox[accent="danger"]::indicator:checked:hover {{
@@ -575,7 +643,7 @@ class PySide6ThemeManager:
         QCheckBox[accent="neutral"]::indicator:checked {{
             background: {colors['btn_neutral']};
             border-color: {colors['btn_neutral_hover']};
-            image: url(snid_sage/images/tick_white.svg);
+            image: url("{tick_url}");
         }}
         
         QCheckBox[accent="neutral"]::indicator:checked:hover {{
@@ -659,10 +727,11 @@ class PySide6ThemeManager:
         Returns:
             CSS stylesheet string with cross-platform enhancements
         """
-        return """
+        font_stack = self._font_css_stack
+        styles = """
         /* Cross-platform font and sizing improvements */
         QWidget {
-            font-family: "Segoe UI", "Arial", "Helvetica", sans-serif;
+            font-family: FONT_STACK;
         }
         QPushButton {
             font-size: 9pt;
@@ -952,7 +1021,7 @@ class PySide6ThemeManager:
             color: white !important;
             padding: 2px 4px !important;
             font-weight: bold !important;
-            font-family: "Segoe UI", "Arial", sans-serif !important;
+            font-family: FONT_STACK !important;
             font-size: 14px !important;
             min-width: 24px !important;
             max-width: 24px !important;
@@ -973,6 +1042,7 @@ class PySide6ThemeManager:
             outline: none !important;
         }
         """
+        return styles.replace("FONT_STACK", font_stack)
     
     def generate_complete_stylesheet(self) -> str:
         """

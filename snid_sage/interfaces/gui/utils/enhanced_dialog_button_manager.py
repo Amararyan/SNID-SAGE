@@ -78,6 +78,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
         'neutral': '#003F5C',         # Hide, Test, Browse - matches AI button
         'neutral_hover': '#003A54',
         'neutral_pressed': '#00344B',
+        'neutral_pressed': '#00344B',
         
         # Accent actions - same green as apply per user preference
         'accent': '#048c36',          # Special actions
@@ -232,7 +233,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;
@@ -338,7 +339,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
                 font-size: {font_size};
                 padding: {padding};
                 min-height: {height};
-                font-family: "Segoe UI", Arial, sans-serif;
+                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
             }}
             QPushButton:hover {{
                 background-color: {hover_color};
@@ -532,8 +533,13 @@ class EnhancedDialogButtonManager(QtCore.QObject):
         button_type = button.property("enhanced_type")
         config = button.property("enhanced_config") or {}
         
-        if config.get('is_toggle', False) and config.get('toggle_state', False):
-            pressed_color = self.BUTTON_COLORS['toggle_active_hover']
+        if config.get('is_toggle', False):
+            # Darken whichever color is currently shown (active or inactive)
+            current_color = (
+                config.get('active_color') if config.get('toggle_state', False)
+                else config.get('inactive_color')
+            ) or button.property("enhanced_base_color") or self.BUTTON_COLORS.get(button_type, '#6E6E6E')
+            pressed_color = self._darken_color(current_color, 0.15)
         else:
             pressed_color = self.BUTTON_COLORS.get(
                 f"{button_type}_pressed", 
@@ -596,7 +602,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;
@@ -637,7 +643,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;
@@ -675,7 +681,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;

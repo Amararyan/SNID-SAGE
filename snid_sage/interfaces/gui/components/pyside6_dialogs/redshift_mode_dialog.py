@@ -5,6 +5,7 @@ This dialog appears after a user accepts a redshift in the manual redshift dialo
 giving them options for how to use that redshift in the SNID analysis.
 """
 
+import sys
 import PySide6.QtCore as QtCore
 import PySide6.QtGui as QtGui
 import PySide6.QtWidgets as QtWidgets
@@ -151,7 +152,7 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         """Create header section"""
         # Show current redshift value
         redshift_info = QtWidgets.QLabel(f"Selected Redshift: z = {self.redshift_value:.6f}")
-        redshift_info.setFont(QtGui.QFont("Segoe UI", 11, QtGui.QFont.Bold))
+        redshift_info.setFont(QtGui.QFont(self._ui_font_family(), 11, QtGui.QFont.Weight.Bold))
         redshift_info.setAlignment(QtCore.Qt.AlignCenter)
         redshift_info.setStyleSheet(f"""
             background: {self.colors['bg_secondary']};
@@ -181,7 +182,7 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
             f"Use exactly z = {self.redshift_value:.6f} for all template matching.\n"
             "Faster analysis with precise redshift constraint."
         )
-        fixed_desc.setFont(QtGui.QFont("Segoe UI", 9))
+        fixed_desc.setFont(QtGui.QFont(self._ui_font_family(), 9))
         fixed_desc.setStyleSheet(f"color: {self.colors['text_secondary']}; margin-left: 20px; margin-bottom: 8px;")
         fixed_desc.setWordWrap(True)
         options_layout.addWidget(fixed_desc)
@@ -195,7 +196,7 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
             f"Search for optimal redshift near z = {self.redshift_value:.6f}.\n"
             "Standard SNID analysis with initial guess (recommended)."
         )
-        search_desc.setFont(QtGui.QFont("Segoe UI", 9))
+        search_desc.setFont(QtGui.QFont(self._ui_font_family(), 9))
         search_desc.setStyleSheet(f"color: {self.colors['text_secondary']}; margin-left: 20px;")
         search_desc.setWordWrap(True)
         options_layout.addWidget(search_desc)
@@ -205,19 +206,19 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         range_layout.setContentsMargins(20, 8, 0, 0)
         
         range_label = QtWidgets.QLabel("Search Range: ±")
-        range_label.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Bold))
+        range_label.setFont(QtGui.QFont(self._ui_font_family(), 9, QtGui.QFont.Weight.Bold))
         range_layout.addWidget(range_label)
         
         self.range_input = FlexibleNumberInput()
         self.range_input.setValue(0.0005)
         self.range_input.setRange(0.0, 1.0)
         self.range_input.setMaximumWidth(80)
-        self.range_input.setFont(QtGui.QFont("Segoe UI", 9))
+        self.range_input.setFont(QtGui.QFont(self._ui_font_family(), 9))
         self.range_input.setToolTip("Search range around redshift (any precision)")
         range_layout.addWidget(self.range_input)
         
         range_help = QtWidgets.QLabel("(typical: 0.0005-0.01)")
-        range_help.setFont(QtGui.QFont("Segoe UI", 8))
+        range_help.setFont(QtGui.QFont(self._ui_font_family(), 8))
         range_help.setStyleSheet(f"color: {self.colors['text_secondary']};")
         range_layout.addWidget(range_help)
         
@@ -238,7 +239,7 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         self.cancel_btn = QtWidgets.QPushButton("Cancel")
         self.cancel_btn.setObjectName("cancel_btn")
         self.cancel_btn.setMinimumWidth(100)
-        self.cancel_btn.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Bold))
+        self.cancel_btn.setFont(QtGui.QFont(self._ui_font_family(), 10, QtGui.QFont.Weight.Bold))
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
         
@@ -246,7 +247,7 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
         self.apply_btn = QtWidgets.QPushButton("Continue Analysis")
         self.apply_btn.setObjectName("primary_btn")
         self.apply_btn.setMinimumWidth(140)
-        self.apply_btn.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Bold))
+        self.apply_btn.setFont(QtGui.QFont(self._ui_font_family(), 10, QtGui.QFont.Weight.Bold))
         self.apply_btn.clicked.connect(self._on_apply)
         self.apply_btn.setDefault(True)
         button_layout.addWidget(self.apply_btn)
@@ -315,6 +316,16 @@ class PySide6RedshiftModeDialog(QtWidgets.QDialog):
     def get_result(self) -> Optional[Dict[str, Any]]:
         """Get the result redshift mode configuration"""
         return self.result
+
+    @staticmethod
+    def _ui_font_family() -> str:
+        """Return a UI font family that exists on the current platform."""
+        if sys.platform == 'darwin':
+            return 'Helvetica Neue'
+        if sys.platform == 'win32':
+            return 'Segoe UI'
+        # Linux and others: pick commonly available sans
+        return 'DejaVu Sans'
 
 
 def show_redshift_mode_dialog(parent, redshift_value: float) -> Optional[Dict[str, Any]]:

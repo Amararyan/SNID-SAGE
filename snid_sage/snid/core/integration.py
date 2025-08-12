@@ -42,10 +42,9 @@ def get_unified_storage(template_dir: str) -> 'TemplateFFTStorage':
         from ..template_fft_storage import TemplateFFTStorage
         _GLOBAL_STORAGE = TemplateFFTStorage(template_dir)
         
-        # Build storage if needed
-        if _GLOBAL_STORAGE.needs_rebuild():
-            _LOG.info("Building unified FFT storage...")
-            _GLOBAL_STORAGE.build_storage()
+        # Rebuild disabled; expect HDF5/index to be present
+        if not _GLOBAL_STORAGE.is_built():
+            _LOG.warning("Unified storage index not found. Ensure HDF5 and index files exist in the template directory.")
     
     return _GLOBAL_STORAGE
 

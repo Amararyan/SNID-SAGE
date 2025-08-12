@@ -138,7 +138,7 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
             QDialog {{
                 background: {self.colors['bg']};
                 color: {self.colors['text_primary']};
-                font-family: "Segoe UI", Arial, sans-serif;
+                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
             }}
             
             QGroupBox {{

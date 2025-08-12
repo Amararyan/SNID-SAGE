@@ -7,6 +7,7 @@ available in the SNID SAGE GUI interface.
 """
 
 import platform
+import sys
 import PySide6.QtWidgets as QtWidgets
 import PySide6.QtCore as QtCore
 import PySide6.QtGui as QtGui
@@ -214,12 +215,12 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
         for row, shortcut_info in enumerate(category_data["shortcuts"]):
             # Action column
             action_item = QtWidgets.QTableWidgetItem(shortcut_info["action"])
-            action_item.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
+            action_item.setFont(QtGui.QFont(self._ui_font_family(), 10, QtGui.QFont.Weight.Bold))
             table.setItem(row, 0, action_item)
             
             # Shortcut column  
             shortcut_item = QtWidgets.QTableWidgetItem(shortcut_info["shortcut"])
-            shortcut_item.setFont(QtGui.QFont("Consolas", 10))
+            shortcut_item.setFont(QtGui.QFont(self._mono_font_family(), 10))
             shortcut_item.setBackground(QtGui.QColor(240, 248, 255))  # Light blue background
             table.setItem(row, 1, shortcut_item)
             
@@ -234,6 +235,21 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
         table.setMinimumHeight(table_height)
         
         layout.addWidget(table)
+    @staticmethod
+    def _ui_font_family() -> str:
+        if sys.platform == 'darwin':
+            return 'Helvetica Neue'
+        if sys.platform == 'win32':
+            return 'Segoe UI'
+        return 'DejaVu Sans'
+
+    @staticmethod
+    def _mono_font_family() -> str:
+        if sys.platform == 'win32':
+            return 'Consolas'
+        if sys.platform == 'darwin':
+            return 'Menlo'
+        return 'DejaVu Sans Mono'
     
     def _create_tips_section(self, layout):
         """Create tips section at the bottom"""

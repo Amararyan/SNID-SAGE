@@ -269,7 +269,7 @@ class UnifiedPySide6LayoutManager:
                 border-radius: 4px;
                 padding: 2px 4px;
                 font-weight: bold;
-                font-family: "Segoe UI", "Arial", sans-serif;
+                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
                 font-size: 14px;
                 color: white;
             }
@@ -1107,9 +1107,10 @@ class UnifiedPySide6LayoutManager:
             # Convert all buttons in the main window
             _LOGGER.info("Converting buttons to use Twemoji icons...")
             converted = twemoji_manager.convert_all_buttons(gui_instance)
+
             
             if converted > 0:
-                _LOGGER.info(f"✅ Successfully converted {converted} buttons to use Twemoji icons")
+                _LOGGER.info(f"✅ Twemoji applied - buttons converted: {converted}")
             else:
                 _LOGGER.info("No buttons found that need Twemoji conversion")
             

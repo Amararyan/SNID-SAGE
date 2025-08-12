@@ -947,9 +947,7 @@ def create_3d_visualization_data(clustering_results: Dict[str, Any]) -> Dict[str
 
 
 
-    print("   • ✅ Weighted voting for robust subtype determination")
-    print("   • ✅ Statistical confidence assessment")
-    print("   • ✅ Matches transformation_comparison_test.py approach exactly")
+
 
 
 def find_winning_cluster_top5_method(

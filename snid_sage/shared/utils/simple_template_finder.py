@@ -328,20 +328,20 @@ def _validate_images_directory(images_dir: Path) -> bool:
     try:
         if not images_dir.exists() or not images_dir.is_dir():
             return False
-        
-        # Check for common image files
-        image_extensions = ['*.png', '*.ico', '*.icns', '*.jpg', '*.jpeg']
+
+        # Check for common image files (include SVG for QSS icons)
+        image_extensions = ['*.png', '*.ico', '*.icns', '*.jpg', '*.jpeg', '*.svg']
         image_files = []
         for ext in image_extensions:
             image_files.extend(list(images_dir.glob(ext)))
-        
+
         if image_files:
             logger.debug(f"Found {len(image_files)} image files in {images_dir}")
             return True
-        
+
         logger.debug(f"No image files found in {images_dir}")
         return False
-        
+
     except Exception as e:
         logger.debug(f"Error validating images directory {images_dir}: {e}")
         return False

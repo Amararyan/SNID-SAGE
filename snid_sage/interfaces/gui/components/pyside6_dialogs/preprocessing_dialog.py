@@ -567,12 +567,15 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                         
                         # Register with enhanced button system
                         self.button_manager.register_button(
-                            button, 
+                            button,
                             'neutral',
                             {
                                 'is_toggle': True,
                                 'toggle_state': False,
-                                'size_class': 'normal'
+                                'size_class': 'normal',
+                                # Use ochre/amber for both inactive and active states
+                                'active_color': '#FFA600',
+                                'inactive_color': '#FFA600'
                             }
                         )
                         

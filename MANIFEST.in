@@ -18,7 +18,9 @@ recursive-include snid_sage *.py
 # Templates: only hdf5 files and json, exclude Individual_templates folder
 recursive-include snid_sage/templates *.hdf5 *.json
 recursive-include snid_sage/data *.fits *.dat *.txt *.ascii *.asci *.flm
-recursive-include snid_sage/images *.png *.ico
+recursive-include snid_sage/images *.png *.ico *.svg
+recursive-include snid_sage/images/twemoji *.svg
+include snid_sage/images/twemoji/ATTRIBUTION.txt
 recursive-include snid_sage/custom_templates *.md
 
 # Include scripts
