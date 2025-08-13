@@ -359,7 +359,7 @@ Please run the analysis first to see classification results.
     def _show_error(self, error_msg):
         """Show error message"""
         error_text = f"""
-❌ Error Loading Results
+Error Loading Results
 
 {error_msg}
 

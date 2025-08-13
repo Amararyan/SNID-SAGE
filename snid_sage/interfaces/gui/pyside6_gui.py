@@ -138,7 +138,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         try:
             converted_count = self.unified_layout_manager.enable_twemoji_icons(self, icon_size=16)
             if converted_count > 0:
-                _LOGGER.info(f"✅ TWEMOJI SUCCESS: Converted {converted_count} buttons to use Twemoji icons")
+                _LOGGER.info(f"TWEMOJI SUCCESS: Converted {converted_count} buttons to use Twemoji icons")
             else:
                 _LOGGER.info("ℹ️ TWEMOJI: No emoji buttons found to convert")
         except Exception as e:
@@ -362,8 +362,10 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         
         # Set window icon
         try:
-            icon_path = Path(__file__).parent / "images" / "icon.png"
-            if icon_path.exists():
+            # Use centralized logo manager so paths work in dev and installed package
+            from snid_sage.interfaces.ui_core.logo import get_logo_manager
+            icon_path = get_logo_manager().get_icon_path()
+            if icon_path:
                 self.setWindowIcon(QtGui.QIcon(str(icon_path)))
                 _LOGGER.debug(f"Window icon set from {icon_path}")
         except Exception as e:
@@ -697,7 +699,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     }
                     """
                     self.flux_btn.setStyleSheet(flux_blue_style)
-                    _LOGGER.info("✅ Forced Flux button to active state with blue styling")
+                    _LOGGER.info("Forced Flux button to active state with blue styling")
                     
                 if self.flat_btn.isEnabled() or self.flat_btn.isChecked():
                     _LOGGER.warning("🚨 Layout manager incorrectly enabled/checked Flat button - forcing correct state")
@@ -716,7 +718,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     }
                     """
                     self.flat_btn.setStyleSheet(flat_gray_style)
-                    _LOGGER.info("✅ Forced Flat button to inactive state")
+                    _LOGGER.info("Forced Flat button to inactive state")
                     
                 # Final verification
                 _LOGGER.info(f"🔍 FINAL STATE: flux_btn enabled={self.flux_btn.isEnabled()}, checked={self.flux_btn.isChecked()}")
@@ -811,9 +813,9 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         
         try:
             if hasattr(self, 'dialog_manager'):
-                _LOGGER.info("✅ Dialog manager found - delegating to dialog_manager.open_emission_line_dialog")
+                _LOGGER.info("Dialog manager found - delegating to dialog_manager.open_emission_line_dialog")
                 self.dialog_manager.open_emission_line_dialog()
-                _LOGGER.info("✅ Dialog manager call completed successfully")
+                _LOGGER.info("Dialog manager call completed successfully")
             else:
                 _LOGGER.error("❌ Dialog manager not available")
                 
@@ -1020,14 +1022,14 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     if success:
                         if has_good_cluster:
                             # If clustering is available, close progress dialog immediately to show cluster selection
-                            self.progress_dialog.analysis_completed(True, "✅ Analysis completed - selecting cluster...")
+                            self.progress_dialog.analysis_completed(True, "Analysis completed - selecting cluster...")
                             QtCore.QTimer.singleShot(100, self.progress_dialog.accept)  # Close quickly for cluster selection
                         else:
                             # No clustering - show completion and keep open briefly
-                            self.progress_dialog.analysis_completed(True, "✅ Analysis completed successfully!")
+                            self.progress_dialog.analysis_completed(True, "Analysis completed successfully!")
                             QtCore.QTimer.singleShot(2000, self.progress_dialog.accept)  # Auto-close after 2 seconds
                     else:
-                        self.progress_dialog.analysis_completed(False, "❌ Analysis failed - see logs for details")
+                        self.progress_dialog.analysis_completed(False, "Analysis failed - see logs for details")
                 except Exception as e:
                     _LOGGER.warning(f"Error updating progress dialog: {e}")
             
@@ -1038,7 +1040,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 # Update workflow state
                 from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
                 self.app_controller.update_workflow_state(WorkflowState.ANALYSIS_COMPLETE)
-                self.status_label.setText("✅ SNID analysis completed successfully")
+                self.status_label.setText("SNID analysis completed successfully")
                 
                 # Enable analysis plot buttons
                 for btn in self.analysis_plot_buttons:
@@ -1080,7 +1082,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 
                 _LOGGER.info("🎉 GUI updated after successful analysis completion")
             else:
-                self.status_label.setText("❌ SNID analysis failed")
+                self.status_label.setText("SNID analysis failed")
                 self.config_status_label.setText("Analysis Failed")
                 self.config_status_label.setStyleSheet("font-style: italic; color: #ef4444;")
                 
@@ -1373,7 +1375,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 _LOGGER.debug("🔄 Workflow manager button states refreshed after results available")
             
             # Update status
-            self.status_label.setText(f"✅ Best: {getattr(result, 'template_name', 'Unknown')} ({getattr(result, 'consensus_type', 'Unknown')})")
+            self.status_label.setText(f"Best: {getattr(result, 'template_name', 'Unknown')} ({getattr(result, 'consensus_type', 'Unknown')})")
             
             # Enable plot buttons if available
             for btn in getattr(self, 'analysis_plot_buttons', []):
@@ -1392,7 +1394,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             _LOGGER.info("🎯 Plotting template overlays in main GUI after analysis completion")
             self._plot_spectrum()  # This will now show template overlays since we have results
             
-            _LOGGER.debug(f"✅ Results display updated - best match: {getattr(result, 'template_name', 'Unknown')}")
+            _LOGGER.debug(f"Results display updated - best match: {getattr(result, 'template_name', 'Unknown')}")
             
         except Exception as e:
             _LOGGER.error(f"Error updating results display: {e}")
@@ -1413,7 +1415,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 self.workflow_manager.refresh_button_states()
                 _LOGGER.debug("🔄 Workflow manager button states refreshed in enable_plot_navigation")
             
-            _LOGGER.debug("✅ Plot navigation enabled")
+            _LOGGER.debug("Plot navigation enabled")
             
         except Exception as e:
             _LOGGER.error(f"Error enabling plot navigation: {e}")
@@ -1441,7 +1443,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 elif snid_results.clustering_results.get('winning_cluster'):
                     cluster_info = " [User Updated]"
             
-            status_text = f"✅ Best: {template_name} ({consensus_type}){cluster_info}"
+            status_text = f"Best: {template_name} ({consensus_type}){cluster_info}"
             self.status_label.setText(status_text)
             
             # Update config status
@@ -1458,7 +1460,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             if hasattr(self, 'workflow_manager'):
                 self.workflow_manager.refresh_button_states()
             
-            _LOGGER.info("✅ Results displays refreshed successfully")
+            _LOGGER.info("Results displays refreshed successfully")
             
         except Exception as e:
             _LOGGER.error(f"❌ Error refreshing results displays: {e}")
@@ -2040,6 +2042,14 @@ def main(verbosity_args=None):
     
     # Create Qt application
     app = QtWidgets.QApplication(sys.argv)
+    # Set a default application icon for all windows/dialogs
+    try:
+        from snid_sage.interfaces.ui_core.logo import get_logo_manager
+        _icon_path = get_logo_manager().get_icon_path()
+        if _icon_path:
+            app.setWindowIcon(QtGui.QIcon(str(_icon_path)))
+    except Exception:
+        pass
     
     # Install custom message handler to suppress specific Qt warnings
     def qt_message_handler(mode, context, message):

@@ -111,7 +111,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             'age_max': 9999,   # Default maximum age (shows "No maximum") 
             'lapmin': 0.3,
             'rlapmin': 5.0,
-            'rlap_ccc_threshold': 1.0,  # NEW: RLAP-CCC threshold for clustering
+            'rlap_ccc_threshold': 1.5,  # NEW: RLAP-CCC threshold for clustering
             'max_output_templates': 10,
             
             
@@ -390,8 +390,8 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         self.widgets['rlapmin'].setToolTip("Minimum relative overlap for a good match (any precision)")
         correlation_layout.addRow("Minimum Relative Overlap (rlapmin):", self.widgets['rlapmin'])
         
-        self.widgets['rlap_ccc_threshold'] = create_flexible_double_input(min_val=0.0, max_val=50.0, default=1.0)
-        self.widgets['rlap_ccc_threshold'].setToolTip("Minimum RLAP-CCC value required for clustering (default: 1.0, any precision)")
+        self.widgets['rlap_ccc_threshold'] = create_flexible_double_input(min_val=0.0, max_val=50.0, default=1.5)
+        self.widgets['rlap_ccc_threshold'].setToolTip("Minimum RLAP-CCC value required for clustering (default: 1.5, any precision)")
         correlation_layout.addRow("RLAP-CCC Clustering Threshold:", self.widgets['rlap_ccc_threshold'])
         
         # Removed Peak Window Size option from configuration UI
@@ -642,34 +642,27 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
                 _LOGGER.warning(f"Templates directory not found: {templates_dir}")
                 return
             
-            # Load template information
+            # Load template information using unified storage (merged index with overrides)
             self.available_templates = []
-            
-            # Look for HDF5 template files
-            import glob
-            hdf5_files = glob.glob(os.path.join(templates_dir, "*.hdf5"))
-            
-            for hdf5_file in hdf5_files:
-                try:
-                    import h5py
-                    with h5py.File(hdf5_file, 'r') as f:
-                        if 'templates' in f:
-                            for template_name in f['templates'].keys():
-                                template_data = f['templates'][template_name]
-                                sn_type = template_data.attrs.get('type', 'Unknown')
-                                subtype = template_data.attrs.get('subtype', 'Unknown')
-                                
-                                display_name = f"{template_name} ({sn_type}/{subtype})"
-                                self.available_templates.append({
-                                    'name': template_name,
-                                    'display_name': display_name,
-                                    'type': sn_type,
-                                    'subtype': subtype
-                                })
-                                
-                except Exception as e:
-                    _LOGGER.debug(f"Could not read template file {hdf5_file}: {e}")
-            
+            try:
+                from snid_sage.snid.io import get_template_info
+                info = get_template_info(templates_dir)
+                templates_list = info.get('templates', []) or []
+                for t in templates_list:
+                    name = t.get('name', 'Unknown')
+                    sn_type = t.get('type', 'Unknown')
+                    subtype = t.get('subtype', 'Unknown')
+                    display_name = f"{name} ({sn_type}/{subtype})"
+                    self.available_templates.append({
+                        'name': name,
+                        'display_name': display_name,
+                        'type': sn_type,
+                        'subtype': subtype
+                    })
+            except Exception as e:
+                _LOGGER.error(f"Failed to load templates via unified storage: {e}")
+                self.available_templates = []
+
             # Sort templates by name
             self.available_templates.sort(key=lambda x: x['name'])
             

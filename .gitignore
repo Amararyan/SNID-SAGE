@@ -134,14 +134,7 @@ site/
 # for deployment to GitHub Pages
 
 # ===== DOCUMENTATION SUBDIRECTORIES =====
-# Exclude incomplete documentation subdirectories
-docs/ai/
-docs/cli/
-docs/tutorials/
-docs/reference/
-docs/gui/
-docs/dev/
-docs/data/
+# Keep all documentation tracked; only ignore build output
 
 # ===== JUPYTER NOTEBOOKS =====
 .ipynb_checkpoints
@@ -342,9 +335,5 @@ examples/
 spectral_lines/
 wise_spectra/
 
-# ===== MARKDOWN FILES TO IGNORE =====
-# Ignore all markdown files except main readmes and docs root files
-*.md
-!README.md
-!README_BETA_TESTING.md
-!docs/*.md 
+# ===== MARKDOWN FILES =====
+# Track markdown files (remove previous global ignore). No entries here on purpose.

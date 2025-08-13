@@ -946,7 +946,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                         self.parent_gui.redshift_status_label.setText(
                             f"Auto-detected redshift: z = {best_redshift:.6f}")
                     
-                    _LOGGER.info(f"✅ Applied automatic galaxy redshift: z = {best_redshift:.6f} from template {template_name} (correlation: {rlap_score:.2f})")
+                    _LOGGER.info(f"Applied automatic galaxy redshift: z = {best_redshift:.6f} from template {template_name} (correlation: {rlap_score:.2f})")
                     
                     # Clean up temporary data
                     processed_spectrum = None
@@ -971,7 +971,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                             self.parent_gui.redshift_status_label.setText(
                                 f"Auto-detected redshift: z = {best_redshift:.6f}")
                         
-                        _LOGGER.info(f"✅ Applied weak galaxy redshift match: z = {best_redshift:.6f} from template {template_name}")
+                        _LOGGER.info(f"Applied weak galaxy redshift match: z = {best_redshift:.6f} from template {template_name}")
                     else:
                         # User declined weak match: do not change existing redshift status
                         pass
@@ -987,7 +987,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                     self,
                     "Auto Search",
                     (
-                        "❌ No good galaxy template matches found.\n\n"
+                        "No good galaxy template matches found.\n\n"
                         "This could mean:\n"
                         "• The spectrum is not a galaxy\n"
                         "• The galaxy type is not in the template library\n"
@@ -1015,7 +1015,7 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
             if 'progress' in locals():
                 progress.close()
             QtWidgets.QMessageBox.critical(self, "Auto Search Error", 
-                f"❌ Error during automatic search:\n\n{str(e)}\n\n"
+                f"Error during automatic search:\n\n{str(e)}\n\n"
                 f"Please try manual redshift determination or check your spectrum file.")
             _LOGGER.error(f"Auto search error: {e}")
             # Clean up any temporary processing data
@@ -1073,10 +1073,10 @@ How to use this tool:
             mode_result = show_redshift_mode_dialog(self, self.overlay_redshift)
             if mode_result is not None:
                 self.result = mode_result  # This will contain both redshift and mode info
-                _LOGGER.info(f"✅ Accepted redshift configuration: z = {self.overlay_redshift:.6f}, Mode: {mode_result.get('mode', 'search')}")
+                _LOGGER.info(f"Accepted redshift configuration: z = {self.overlay_redshift:.6f}, Mode: {mode_result.get('mode', 'search')}")
                 self.accept()
             else:
-                _LOGGER.info("❌ Redshift mode selection cancelled")
+                _LOGGER.info("Redshift mode selection cancelled")
                 # Don't close the dialog - user can try again
         except ImportError:
             # Fallback to simple redshift acceptance if redshift mode dialog not available

@@ -23,11 +23,11 @@ from snid_sage.shared.utils.line_detection.user_line_store import (
 )
 
 # Reuse Template Manager theme/layout for consistency
-from snid_sage.interfaces.template_manager.utils.theme_manager import (
-    get_template_theme_manager,
-)
-from snid_sage.interfaces.template_manager.utils.layout_manager import (
-    get_template_layout_manager,
+# Use shared UI core to avoid cross-GUI dependencies
+from snid_sage.interfaces.ui_core import (
+    get_theme_manager,
+    get_layout_manager,
+    get_logo_manager,
 )
 
 # Plotting (pyqtgraph, optional)
@@ -36,6 +36,14 @@ try:
     PYQTGRAPH_AVAILABLE = True
 except Exception:
     PYQTGRAPH_AVAILABLE = False
+
+# Enhanced plot widget (if available)
+try:
+    from snid_sage.interfaces.gui.components.plots.enhanced_plot_widget import (
+        EnhancedPlotWidget,
+    )
+except Exception:
+    EnhancedPlotWidget = None  # type: ignore
 
 # Category colors
 from snid_sage.shared.constants.physical import CATEGORY_COLORS
@@ -50,19 +58,44 @@ except Exception:
 class SNIDLineManagerGUI(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.theme_manager = get_template_theme_manager()
-        self.layout_manager = get_template_layout_manager()
+        self.theme_manager = get_theme_manager()
+        self.layout_manager = get_layout_manager()
         self.current_spectrum: Dict[str, Any] | None = None
         self._user_presets: Dict[str, Any] = load_user_presets().get("presets", {})
         self._user_lines: List[Dict[str, Any]] = load_user_lines()
         self._build_ui()
         self._refresh_tables()
 
+    def _select_wave_flux_from_result(self, res: Dict[str, Any]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        """Safely pick wave/flux arrays from a preprocessing dialog result without truth-testing arrays."""
+        def _first_present(d: Dict[str, Any], keys: List[str]) -> Any:
+            for k in keys:
+                if k in d:
+                    v = d.get(k)
+                    if v is not None:
+                        return v
+            return None
+
+        wave_candidates = ['processed_wave', 'wave', 'wavelength', 'log_wave']
+        flux_candidates = ['flux_view', 'processed_flux', 'display_flux', 'flux', 'flat', 'display_flat', 'fluxed', 'log_flux']
+
+        wave = _first_present(res, wave_candidates)
+        flux = _first_present(res, flux_candidates)
+        try:
+            wave_arr = np.asarray(wave) if wave is not None else None
+            flux_arr = np.asarray(flux) if flux is not None else None
+            return wave_arr, flux_arr
+        except Exception:
+            return None, None
+
     def _build_ui(self) -> None:
         self.setWindowTitle("SNID Line Manager")
         try:
-            from snid_sage.interfaces.gui.utils.logo_manager import get_logo_manager
-            self.setWindowIcon(QtGui.QIcon(str(get_logo_manager().get_icon_path())))
+            icon_path = get_logo_manager().get_icon_path()
+            if icon_path:
+                self.setWindowIcon(QtGui.QIcon(str(icon_path)))
+            else:
+                self.setWindowIcon(QtGui.QIcon())
         except Exception:
             self.setWindowIcon(QtGui.QIcon())
 
@@ -74,21 +107,58 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
 
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
-        main_layout = QtWidgets.QVBoxLayout(central)
+        main_layout = QtWidgets.QHBoxLayout(central)
         self.layout_manager.apply_panel_layout(central, main_layout)
 
-        tabs = QtWidgets.QTabWidget()
-        main_layout.addWidget(tabs)
+        # Main splitter: controls on the left, big plot on the right
+        splitter = self.layout_manager.create_main_splitter()
+        main_layout.addWidget(splitter)
 
-        # Lines Tab (now contains two sub-tabs: Available Lines and Test Spectrum)
-        self.lines_tab = self._build_lines_tab()
-        tabs.addTab(self.lines_tab, "📏 Lines")
-
-        # Presets Tab
-        self.presets_tab = self._build_presets_tab()
-        tabs.addTab(self.presets_tab, "🧰 Presets")
+        left_panel = self._build_left_panel()
+        right_panel = self._build_right_panel()
+        splitter.addWidget(left_panel)
+        splitter.addWidget(right_panel)
+        try:
+            splitter.setStretchFactor(0, 1)
+            splitter.setStretchFactor(1, 2)
+        except Exception:
+            pass
 
         self._build_status_bar()
+
+    def _build_left_panel(self) -> QtWidgets.QWidget:
+        """Create left-side controls with tabs for lines and presets"""
+        panel = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(panel)
+        self.layout_manager.apply_panel_layout(panel, layout)
+
+        tabs = QtWidgets.QTabWidget()
+        layout.addWidget(tabs)
+
+        # Lines (available lines and editor)
+        tabs.addTab(self._build_available_lines_panel(), "📏 Lines")
+
+        # Presets manager
+        tabs.addTab(self._build_presets_tab(), "🧰 Presets")
+
+        # Spectrum file selection and preprocessing controls (moved from right)
+        try:
+            layout.addWidget(self._build_spectrum_controls_group())
+        except Exception:
+            pass
+
+        return panel
+
+    def _build_right_panel(self) -> QtWidgets.QWidget:
+        """Create right-side visualization panel with a large spectrum plot"""
+        panel = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(panel)
+        self.layout_manager.apply_panel_layout(panel, layout)
+
+        # Only the preview/editor lives on the right side
+        layout.addWidget(self._build_preview_group())
+
+        return panel
 
     def _build_status_bar(self) -> None:
         status = self.statusBar()
@@ -129,9 +199,6 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         search_layout.addWidget(self.search_edit)
         vlayout.addLayout(search_layout)
 
-        splitter = self.layout_manager.create_main_splitter()
-        vlayout.addWidget(splitter)
-
         # Table of effective lines (built-in + user)
         left = QtWidgets.QWidget()
         left_layout = QtWidgets.QVBoxLayout(left)
@@ -160,45 +227,13 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             btns.addWidget(b)
         left_layout.addLayout(btns)
 
-        splitter.addWidget(left)
-
-        # Editor on the right
-        right = QtWidgets.QWidget()
-        form = QtWidgets.QFormLayout(right)
-        self.layout_manager.setup_form_layout(form)
-        self.name_edit = QtWidgets.QLineEdit()
-        self.air_spin = QtWidgets.QDoubleSpinBox()
-        self.air_spin.setRange(0.0, 50000.0)
-        self.air_spin.setDecimals(3)
-        self.vac_spin = QtWidgets.QDoubleSpinBox()
-        self.vac_spin.setRange(0.0, 50000.0)
-        self.vac_spin.setDecimals(3)
-        self.category_combo = QtWidgets.QComboBox()
-        self.category_combo.addItems(list(_category_list()))
-        self.origin_combo = QtWidgets.QComboBox()
-        self.origin_combo.addItems(["sn", "galaxy", "stellar", "alias"]) 
-        self.sn_types_edit = QtWidgets.QLineEdit()
-        self.note_edit = QtWidgets.QLineEdit()
-        form.addRow("Name:", self.name_edit)
-        form.addRow("Air (Å):", self.air_spin)
-        form.addRow("Vac (Å):", self.vac_spin)
-        form.addRow("Category:", self.category_combo)
-        form.addRow("Origin:", self.origin_combo)
-        form.addRow("SN Types (comma):", self.sn_types_edit)
-        form.addRow("Note:", self.note_edit)
-        self.apply_btn = QtWidgets.QPushButton("Apply Changes")
-        self.apply_btn.clicked.connect(self._apply_editor_changes)
-        form.addRow(self.apply_btn)
-        splitter.addWidget(right)
+        # Use full panel width (no internal splitter needed)
+        vlayout.addWidget(left)
 
         return panel
 
-    def _build_test_spectrum_panel(self) -> QtWidgets.QWidget:
-        panel = QtWidgets.QWidget()
-        vlayout = QtWidgets.QVBoxLayout(panel)
-        self.layout_manager.apply_panel_layout(panel, vlayout)
-
-        # Spectrum input and lightweight preprocessing controls
+    def _build_spectrum_controls_group(self) -> QtWidgets.QGroupBox:
+        """Build the spectrum file selection and preprocessing controls (left side)"""
         spectrum_group = QtWidgets.QGroupBox("Test Spectrum")
         self.layout_manager.setup_group_box(spectrum_group)
         spectrum_vbox = QtWidgets.QVBoxLayout(spectrum_group)
@@ -222,15 +257,85 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         info_label = QtWidgets.QLabel("This tool does not require log-rebinning, padding, or rescaling.")
         info_label.setStyleSheet("color: #64748b; font-style: italic;")
         spectrum_vbox.addWidget(info_label)
+        return spectrum_group
 
-        vlayout.addWidget(spectrum_group)
-
-        # Preview plot with in-range toggle
+    def _build_preview_group(self) -> QtWidgets.QGroupBox:
+        """Build the preview/editor group (right side)"""
         preview_group = QtWidgets.QGroupBox("Spectrum Preview")
         self.layout_manager.setup_group_box(preview_group)
         preview_vbox = QtWidgets.QVBoxLayout(preview_group)
+
+        # Collapsible editor header
+        editor_header = QtWidgets.QHBoxLayout()
+        self.editor_toggle_btn = QtWidgets.QToolButton()
+        self.editor_toggle_btn.setText("Line Editor ▾")
+        self.editor_toggle_btn.setCheckable(True)
+        self.editor_toggle_btn.setChecked(True)
+        self.editor_toggle_btn.clicked.connect(self._toggle_editor_visible)
+        editor_header.addWidget(self.editor_toggle_btn)
+        editor_header.addStretch()
+        preview_vbox.addLayout(editor_header)
+
+        # Compact horizontal editor bar
+        self.editor_container = QtWidgets.QWidget()
+        toolbar = QtWidgets.QHBoxLayout(self.editor_container)
+        toolbar.setContentsMargins(0, 0, 0, 0)
+        toolbar.setSpacing(8)
+
+        self.name_edit = QtWidgets.QLineEdit()
+        self.name_edit.setPlaceholderText("Name")
+        self.air_spin = QtWidgets.QDoubleSpinBox()
+        self.air_spin.setRange(0.0, 50000.0)
+        self.air_spin.setDecimals(2)
+        self.air_spin.setPrefix("Air ")
+        self.vac_spin = QtWidgets.QDoubleSpinBox()
+        self.vac_spin.setRange(0.0, 50000.0)
+        self.vac_spin.setDecimals(2)
+        self.vac_spin.setPrefix("Vac ")
+        self.category_combo = QtWidgets.QComboBox()
+        self.category_combo.addItems(list(_category_list()))
+        self.apply_btn = QtWidgets.QPushButton("Save")
+        self.apply_btn.clicked.connect(self._apply_editor_changes)
+
+        # Advanced toggle
+        self.advanced_toggle_btn = QtWidgets.QToolButton()
+        self.advanced_toggle_btn.setText("Advanced ▸")
+        self.advanced_toggle_btn.setCheckable(True)
+        self.advanced_toggle_btn.setChecked(False)
+        self.advanced_toggle_btn.toggled.connect(self._toggle_advanced_visible)
+
+        toolbar.addWidget(QtWidgets.QLabel("Name:"))
+        toolbar.addWidget(self.name_edit, 2)
+        toolbar.addWidget(QtWidgets.QLabel("Air (Å):"))
+        toolbar.addWidget(self.air_spin)
+        toolbar.addWidget(QtWidgets.QLabel("Vac (Å):"))
+        toolbar.addWidget(self.vac_spin)
+        toolbar.addWidget(QtWidgets.QLabel("Category:"))
+        toolbar.addWidget(self.category_combo, 1)
+        toolbar.addStretch()
+        toolbar.addWidget(self.advanced_toggle_btn)
+        toolbar.addWidget(self.apply_btn)
+
+        preview_vbox.addWidget(self.editor_container)
+
+        # Advanced editor rows (collapsed by default)
+        self.advanced_editor = QtWidgets.QWidget()
+        adv_form = QtWidgets.QFormLayout(self.advanced_editor)
+        self.layout_manager.setup_form_layout(adv_form)
+        self.origin_combo = QtWidgets.QComboBox()
+        self.origin_combo.addItems(["sn", "galaxy", "stellar", "alias"]) 
+        self.sn_types_edit = QtWidgets.QLineEdit()
+        self.note_edit = QtWidgets.QLineEdit()
+        adv_form.addRow("Origin:", self.origin_combo)
+        adv_form.addRow("SN Types (comma):", self.sn_types_edit)
+        adv_form.addRow("Note:", self.note_edit)
+        self.advanced_editor.setVisible(False)
+        preview_vbox.addWidget(self.advanced_editor)
         if PYQTGRAPH_AVAILABLE:
-            self.plot_widget = pg.PlotWidget()
+            # Prefer enhanced plot widget if available for consistent UX
+            self.plot_widget = (
+                EnhancedPlotWidget() if EnhancedPlotWidget is not None else pg.PlotWidget()
+            )
             self.plot_widget.setBackground('w')
             self.plot_item = self.plot_widget.getPlotItem()
             self._spectrum_curve = self.plot_item.plot(pen=pg.mkPen('#444444', width=1))
@@ -249,9 +354,29 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         range_row.addStretch()
         preview_vbox.addLayout(range_row)
 
-        vlayout.addWidget(preview_group)
+        return preview_group
 
-        return panel
+    def _toggle_editor_visible(self) -> None:
+        try:
+            is_checked = self.editor_toggle_btn.isChecked()
+            # Update arrow glyph
+            self.editor_toggle_btn.setText("Line Editor ▾" if is_checked else "Line Editor ▸")
+            if hasattr(self, 'editor_container') and self.editor_container is not None:
+                self.editor_container.setVisible(is_checked)
+            if hasattr(self, 'advanced_editor') and self.advanced_editor is not None:
+                # Hide advanced section when header is collapsed
+                self.advanced_editor.setVisible(is_checked and self.advanced_toggle_btn.isChecked())
+        except Exception:
+            pass
+
+    def _toggle_advanced_visible(self, checked: bool) -> None:
+        try:
+            # Update chevron
+            self.advanced_toggle_btn.setText("Advanced ▾" if checked else "Advanced ▸")
+            if hasattr(self, 'advanced_editor') and self.advanced_editor is not None:
+                self.advanced_editor.setVisible(bool(checked))
+        except Exception:
+            pass
 
     def _on_table_selection(self) -> None:
         sel = self.line_table.currentRow()
@@ -334,7 +459,7 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             self,
             "Select Spectrum File",
             "",
-            "All Supported (*.txt *.dat *.ascii *.asci *.lnw *.fits *.flm);;Text Files (*.txt *.dat *.ascii *.asci *.flm);;SNID Files (*.lnw);;FITS Files (*.fits);;FLM Files (*.flm);;All Files (*.*)"
+            "All Supported (*.txt *.dat *.ascii *.asci *.fits *.flm);;Text Files (*.txt *.dat *.ascii *.asci *.flm);;FITS Files (*.fits);;FLM Files (*.flm);;All Files (*.*)"
         )
         if file_path:
             self.file_path_edit.setText(file_path)
@@ -370,11 +495,9 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             if dialog.exec() == QtWidgets.QDialog.Accepted:
                 # Normalize dialog result into a structure _extract_wave_flux understands
                 res = dialog.result or {}
-                proc_wave = res.get('processed_wave')
-                # Prefer flux_view if available, else processed_flux, else display_flux
-                proc_flux = res.get('flux_view') or res.get('processed_flux') or res.get('display_flux')
-                if proc_wave is not None and proc_flux is not None:
-                    self.current_spectrum = {'wave': np.asarray(proc_wave), 'flux': np.asarray(proc_flux)}
+                wave_arr, flux_arr = self._select_wave_flux_from_result(res)
+                if wave_arr is not None and flux_arr is not None:
+                    self.current_spectrum = {'wave': wave_arr, 'flux': flux_arr}
                 else:
                     # Fallback: keep previous spectrum
                     self.current_spectrum = {'wave': np.asarray(wave), 'flux': np.asarray(flux)}
@@ -428,8 +551,7 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
     def _load_spectrum(self, file_path: str) -> Tuple[np.ndarray, np.ndarray]:
         if file_path.lower().endswith('.fits'):
             return self._load_fits_spectrum(file_path)
-        if file_path.lower().endswith('.lnw'):
-            return self._load_lnw_spectrum(file_path)
+        # LNW support removed
         if file_path.lower().endswith('.flm'):
             return self._load_ascii_spectrum(file_path)  # FLM files are text-based
         return self._load_ascii_spectrum(file_path)
@@ -451,22 +573,70 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         raise ValueError("FITS spectrum not found in file")
 
     def _load_lnw_spectrum(self, file_path: str) -> Tuple[np.ndarray, np.ndarray]:
-        try:
-            from snid_sage.snid.io import read_template
-            template = read_template(file_path)
-            return template['wave'], template['flux']
-        except Exception:
-            return self._load_ascii_spectrum(file_path)
+        # LNW loading removed
+        return self._load_ascii_spectrum(file_path)
 
     def _load_ascii_spectrum(self, file_path: str) -> Tuple[np.ndarray, np.ndarray]:
-        data = np.loadtxt(file_path)
-        if data.ndim == 1:
-            flux = data
-            wave = np.arange(len(flux)) + 1
+        """
+        Robust ASCII/CSV spectrum loader.
+        - Supports whitespace-separated and comma-separated files
+        - Skips header rows automatically
+        - Uses first two numeric columns as (wave, flux)
+        - Ignores additional columns (e.g., flux_err)
+        """
+        # Try fast path: whitespace-separated numeric table
+        try:
+            data = np.loadtxt(file_path)
+            if data.ndim == 1:
+                flux = data
+                wave = np.arange(len(flux)) + 1
+                return wave, flux
+            wave = data[:, 0]
+            flux = data[:, 1]
             return wave, flux
-        wave = data[:, 0]
-        flux = data[:, 1]
-        return wave, flux
+        except Exception:
+            pass
+
+        # Try CSV with header: use genfromtxt to handle names and header
+        try:
+            arr = np.genfromtxt(file_path, delimiter=",", names=True, dtype=float)
+            if getattr(arr, 'dtype', None) is not None and arr.dtype.names:
+                names = list(arr.dtype.names)
+                # Pick first two columns by order
+                first, second = names[0], names[1]
+                wave = np.asarray(arr[first], dtype=float)
+                flux = np.asarray(arr[second], dtype=float)
+                return wave, flux
+            # If names parsing failed, try without names
+            arr2 = np.genfromtxt(file_path, delimiter=",", dtype=float)
+            if arr2 is not None and arr2.ndim >= 2 and arr2.shape[1] >= 2:
+                return arr2[:, 0], arr2[:, 1]
+        except Exception:
+            pass
+
+        # Fallback: manual line parsing tolerant to delimiters and headers
+        waves: List[float] = []
+        fluxes: List[float] = []
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
+            for line in fh:
+                s = line.strip()
+                if not s or s.startswith('#') or s.startswith(';'):
+                    continue
+                # Normalize delimiters to whitespace
+                s = s.replace(',', ' ').replace('\t', ' ')
+                parts = [p for p in s.split(' ') if p]
+                # Require at least two numeric tokens
+                try:
+                    vals = [float(parts[0]), float(parts[1])] if len(parts) >= 2 else None
+                except Exception:
+                    vals = None
+                if vals is None:
+                    continue
+                waves.append(vals[0])
+                fluxes.append(vals[1])
+        if len(waves) == 0:
+            raise ValueError("No numeric wave/flux data could be parsed from file")
+        return np.asarray(waves, dtype=float), np.asarray(fluxes, dtype=float)
 
     def _table_row_to_entry(self, row: int) -> Dict[str, Any]:
         return {
@@ -655,23 +825,19 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             wave = spectrum['input_spectrum'].get('wave')
             flux = spectrum['input_spectrum'].get('flux')
         else:
-            # Accept several variants from preprocessing and loaders
-            wave = (
-                spectrum.get('wave')
-                or spectrum.get('wavelength')
-                or spectrum.get('processed_wave')
-                or spectrum.get('log_wave')
-            )
-            flux = (
-                spectrum.get('flux')
-                or spectrum.get('flux_view')
-                or spectrum.get('display_flux')
-                or spectrum.get('processed_flux')
-                or spectrum.get('flat')
-                or spectrum.get('flat_view')
-                or spectrum.get('display_flat')
-                or spectrum.get('fluxed')
-                or spectrum.get('log_flux')
+            # Accept several variants from preprocessing and loaders without boolean evaluation of arrays
+            def _first_present(d: Dict[str, Any], keys: List[str]) -> Any:
+                for k in keys:
+                    if k in d:
+                        v = d.get(k)
+                        if v is not None:
+                            return v
+                return None
+
+            wave = _first_present(spectrum, ['wave', 'wavelength', 'processed_wave', 'log_wave'])
+            flux = _first_present(
+                spectrum,
+                ['flux', 'flux_view', 'display_flux', 'processed_flux', 'flat', 'flat_view', 'display_flat', 'fluxed', 'log_flux']
             )
         try:
             wave_arr = np.asarray(wave) if wave is not None else None

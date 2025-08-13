@@ -118,6 +118,25 @@ def _apply_no_title_styling_if_available(fig, ax, xlabel="Wavelength (Å)", ylab
     return False
 
 
+def _apply_faint_grid(ax, theme_manager=None):
+    """Apply a faint, publication-friendly grid to the given axes.
+
+    Matches GUI styling (very light dashed grid) and is theme-aware if a
+    theme_manager is provided.
+    """
+    grid_color = '#cccccc'
+    try:
+        if theme_manager and hasattr(theme_manager, 'get_current_colors'):
+            colors = theme_manager.get_current_colors()
+            grid_color = colors.get('plot_grid', grid_color)
+    except Exception:
+        pass
+
+    # Make grid clearly visible in saved PNGs while keeping it subtle
+    ax.grid(True, which='major', color=grid_color, alpha=0.50, linestyle='-', linewidth=0.8)
+    ax.set_axisbelow(True)
+
+
 def _create_themed_bbox_if_available(theme_manager=None, annotation_type='info', **kwargs):
     """
     Create a theme-aware bounding box for annotations
@@ -965,7 +984,9 @@ def plot_correlation_function(result: Any, figsize: Tuple[int, int] = (8, 6),
     # Always use standardized font sizes, regardless of GUI styling
     ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
     ax.set_ylabel('Correlation', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: correlation
-    ax.grid(True, alpha=0.3)
+    _apply_faint_grid(ax, theme_manager)
+    # Ensure faint grid regardless of styling path
+    _apply_faint_grid(ax, theme_manager)
     
     # Apply no-title styling if available, but ensure font sizes are preserved
     if _apply_no_title_styling_if_available(fig, ax, "Redshift", "Correlation", theme_manager):
@@ -1186,7 +1207,7 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
     ax.set_xlabel('Redshift', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # X-axis: redshift
     ax.set_ylabel('Age (days)', fontsize=PLOT_AXIS_LABEL_FONTSIZE)  # Y-axis: age
     ax.set_title('Redshift vs Age Distribution (by Subtype)', fontsize=PLOT_TITLE_FONTSIZE)
-    ax.grid(True, alpha=0.3)
+    _apply_faint_grid(ax, theme_manager)
     
     # Apply no-title styling if available, but ensure font sizes are preserved
     if _apply_no_title_styling_if_available(fig, ax, "Redshift", "Age (days)", theme_manager):
@@ -1463,7 +1484,10 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
         # Fallback styling if unified systems not available
         ax.set_xlabel('Wavelength (Å)')
         ax.set_ylabel('Flux')
-        ax.grid(True, alpha=0.3)
+        _apply_faint_grid(ax, theme_manager)
+    
+    # Ensure faint grid is applied regardless of styling path
+    _apply_faint_grid(ax, theme_manager)
     # Match GUI: no legend (info box replaces it)
 
     # Match GUI stable range setting with margins
@@ -1671,7 +1695,10 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
         # Fallback styling if unified systems not available
         ax.set_xlabel('Wavelength (Å)')
         ax.set_ylabel('Flattened Flux')
-        ax.grid(True, alpha=0.3)
+        _apply_faint_grid(ax, theme_manager)
+    
+    # Ensure faint grid is applied regardless of styling path
+    _apply_faint_grid(ax, theme_manager)
     # Match GUI: no legend (info box replaces it)
 
     # Match GUI stable range setting with margins

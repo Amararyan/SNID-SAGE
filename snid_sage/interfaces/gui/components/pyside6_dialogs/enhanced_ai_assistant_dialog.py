@@ -336,7 +336,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         
         # Simple status indicator
         if self.current_snid_results:
-            results_text = "✅ SNID results ready for AI analysis"
+            results_text = "SNID results ready for AI analysis"
             results_color = self.colors['btn_success']
         else:
             results_text = "⚠️ Run SNID analysis first for best results"
@@ -785,7 +785,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     @QtCore.Slot()
     def _on_connection_success(self):
         """Handle successful connection test"""
-        self.connection_status_label.setText("✅ Connected successfully")
+        self.connection_status_label.setText("Connected successfully")
         self.connection_status_label.setStyleSheet(f"color: {self.colors['btn_success']};")
         self.test_connection_btn.setEnabled(True)
         
@@ -807,7 +807,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     @QtCore.Slot(str)
     def _on_connection_error(self, error):
         """Handle connection test error"""
-        self.connection_status_label.setText(f"❌ Error: {error}")
+        self.connection_status_label.setText(f"Error: {error}")
         self.connection_status_label.setStyleSheet(f"color: {self.colors['btn_danger']};")
         self.test_connection_btn.setEnabled(True)
     
@@ -985,11 +985,11 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
                 from snid_sage.interfaces.llm.openrouter.openrouter_llm import get_model_test_status
                 is_tested = get_model_test_status(model_id)
                 if model_id == current_model_id and is_tested:
-                    status_text = "✅ Active"
+                    status_text = "Active"
                     status_item = QtWidgets.QTableWidgetItem(status_text)
                     status_item.setBackground(QtGui.QColor(144, 238, 144))  # Light green
                 elif is_tested:
-                    status_text = "✅ Tested"
+                    status_text = "Tested"
                     status_item = QtWidgets.QTableWidgetItem(status_text)
                     status_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green
                 else:
@@ -1091,7 +1091,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             if item and item.data(QtCore.Qt.UserRole) == model_id:
                 status_item = self.model_table.item(row, 5)  # Status column
                 if status_item:
-                    status_item.setText("✅ Tested")
+                    status_item.setText("Tested")
                     status_item.setBackground(QtGui.QColor(200, 255, 200))  # Light green
                 break
         
@@ -1114,7 +1114,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             if item and item.data(QtCore.Qt.UserRole) == model_id:
                 status_item = self.model_table.item(row, 5)  # Status column
                 if status_item:
-                    status_item.setText("❌ Failed")
+                    status_item.setText("Failed")
                     status_item.setBackground(QtGui.QColor(255, 200, 200))  # Light red
                 break
         

@@ -603,8 +603,8 @@ class EmissionDialogUIBuilder:
         if hasattr(self.dialog, 'step2_analysis') and self.dialog.step2_analysis:
             # Get reference to the dropdown from step2_analysis
             self.dialog.step2_line_dropdown = QtWidgets.QComboBox()
-            self.dialog.step2_line_dropdown.setMinimumWidth(200)
-            self.dialog.step2_line_dropdown.setMaximumWidth(250)
+            self.dialog.step2_line_dropdown.setMinimumWidth(120)
+            self.dialog.step2_line_dropdown.setMaximumWidth(160)
             info_layout.addWidget(self.dialog.step2_line_dropdown)
         
         # Navigation buttons

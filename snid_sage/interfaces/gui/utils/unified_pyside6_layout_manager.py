@@ -569,6 +569,17 @@ class UnifiedPySide6LayoutManager:
         def preprocessing_context_menu(event):
             if event.button() == QtCore.Qt.RightButton:
                 try:
+                    # Simulate quick visual press feedback on right-click
+                    try:
+                        gui_instance.preprocessing_btn.setDown(True)
+                        # Flush UI so the pressed state is visible immediately
+                        app = QtCore.QCoreApplication.instance()
+                        if app and not app.closingDown():
+                            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+                        QtCore.QTimer.singleShot(120, lambda: gui_instance.preprocessing_btn.setDown(False))
+                    except Exception:
+                        pass
+
                     appc = getattr(gui_instance, 'app_controller', None)
                     preprocessed_present = bool(getattr(appc, 'processed_spectrum', None)) if appc else False
                     analysis_present = bool(getattr(appc, 'snid_results', None)) if appc else False
@@ -682,6 +693,17 @@ class UnifiedPySide6LayoutManager:
                 # Preserve quick analysis behavior on right-click
                 # but still ensure the re-run confirmation if analysis already exists
                 try:
+                    # Simulate quick visual press feedback on right-click
+                    try:
+                        gui_instance.analysis_btn.setDown(True)
+                        # Flush UI so the pressed state is visible immediately
+                        app = QtCore.QCoreApplication.instance()
+                        if app and not app.closingDown():
+                            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+                        QtCore.QTimer.singleShot(120, lambda: gui_instance.analysis_btn.setDown(False))
+                    except Exception:
+                        pass
+
                     appc = getattr(gui_instance, 'app_controller', None)
                     has_results = bool(getattr(appc, 'snid_results', None)) if appc else False
                     if has_results and hasattr(gui_instance, 'event_handlers'):

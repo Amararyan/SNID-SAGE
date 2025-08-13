@@ -69,6 +69,10 @@ dev = [
     "black>=21.0.0",
     "flake8>=3.8.0",
     "mypy>=0.800",
+    # Documentation (MkDocs) - dev-only
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.0",
+    # (Optional) If Sphinx is used elsewhere, keep these; otherwise safe to remove
     "sphinx>=4.0.0",
     "sphinx-rtd-theme>=1.0.0",
     "twine>=4.0.0",

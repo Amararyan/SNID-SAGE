@@ -100,7 +100,7 @@ class LineDetectionController:
             if hasattr(self, 'nist_search_results'):
                 self.nist_search_results = None
             
-            _LOGGER.debug("✅ Line detection controller state reset")
+            _LOGGER.debug("Line detection controller state reset")
             
         except Exception as e:
             print(f"❌ Error resetting line detection controller: {e}")
@@ -165,22 +165,22 @@ class LineDetectionController:
                                 'mode': 'forced',
                                 'forced_redshift': forced_redshift
                             })
-                            _LOGGER.info(f"✅ Manual redshift applied with FORCED mode: z = {forced_redshift:.6f}")
+                            _LOGGER.info(f"Manual redshift applied with FORCED mode: z = {forced_redshift:.6f}")
                         else:
                             self.gui.analysis_controller.redshift_config.update({
                                 'mode': 'automatic',
                                 'forced_redshift': None,
                                 'search_range': search_range
                             })
-                            _LOGGER.info(f"✅ Manual redshift applied with SEARCH mode: z = {redshift_value:.6f} ±{search_range:.6f}")
+                            _LOGGER.info(f"Manual redshift applied with SEARCH mode: z = {redshift_value:.6f} ±{search_range:.6f}")
 
                     self._apply_manual_redshift(redshift_value, result_redshift)
                 else:
                     # Old format - just a float redshift value (backward compatibility)
                     self._apply_manual_redshift(result_redshift)
-                    _LOGGER.info(f"✅ Manual redshift applied: z = {result_redshift:.6f}")
+                    _LOGGER.info(f"Manual redshift applied: z = {result_redshift:.6f}")
             else:
-                _LOGGER.info("❌ Redshift selection cancelled")
+                _LOGGER.info("Redshift selection cancelled")
 
 
 
@@ -220,7 +220,7 @@ class LineDetectionController:
                     tapered_flux = processed['flat_flux']
                     spectrum_source = "flat_flux (flattened)"
                 else:
-                    _LOGGER.error("❌ No flattened spectrum data available for correlation")
+                    _LOGGER.error("No flattened spectrum data available for correlation")
                     if progress_callback:
                         progress_callback("Error: No flattened spectrum data available")
                     return {'success': False, 'error': 'No flattened spectrum data available for correlation'}
@@ -228,7 +228,7 @@ class LineDetectionController:
                 log_wave = processed.get('log_wave')
                 
                 if log_wave is None or tapered_flux is None:
-                    _LOGGER.error("❌ Missing wavelength or flux data in preprocessed spectrum")
+                    _LOGGER.error("Missing wavelength or flux data in preprocessed spectrum")
                     if progress_callback:
                         progress_callback("Error: Missing wavelength or flux data")
                     return {'success': False, 'error': 'Missing wavelength or flux data in preprocessed spectrum'}
@@ -307,14 +307,14 @@ class LineDetectionController:
                                                      'Medium' if match.get('rlap', 0.0) >= 5.0 else 'Low'
                                     }
                                     galaxy_matches.append(galaxy_match)
-                                    _LOGGER.debug(f"✅ Added galaxy match: {galaxy_match['template_name']} (RLAP: {galaxy_match['rlap']:.2f})")
+                                    _LOGGER.debug(f"Added galaxy match: {galaxy_match['template_name']} (RLAP: {galaxy_match['rlap']:.2f})")
                                     
                             except Exception as match_error:
                                 _LOGGER.error(f"❌ Error processing match {i}: {match_error}")
                                 _LOGGER.error(f"   Match data: {match}")
                                 continue
                         
-                        _LOGGER.info(f"✅ Found {len(galaxy_matches)} galaxy template matches")
+                        _LOGGER.info(f"Found {len(galaxy_matches)} galaxy template matches")
                         
                         if galaxy_matches:
                             try:
@@ -325,7 +325,7 @@ class LineDetectionController:
                                     galaxy_matches.sort(key=lambda x: get_best_metric_value(x) if isinstance(x, dict) else 0, reverse=True)
                                 except ImportError:
                                     galaxy_matches.sort(key=lambda x: x.get('rlap_ccc', x.get('rlap', 0)) if isinstance(x, dict) else 0, reverse=True)
-                                _LOGGER.debug("✅ Successfully sorted galaxy matches")
+                                _LOGGER.debug("Successfully sorted galaxy matches")
                                 
                                 # Get the best match for the dialog
                                 best_match = galaxy_matches[0]
@@ -341,7 +341,7 @@ class LineDetectionController:
                                 }
                                 
                             except Exception as sort_error:
-                                _LOGGER.error(f"❌ Error sorting galaxy matches: {sort_error}")
+                                _LOGGER.error(f"Error sorting galaxy matches: {sort_error}")
                                 _LOGGER.error(f"   Galaxy matches: {galaxy_matches}")
                                 # Return the best unsorted match if sorting fails
                                 if galaxy_matches:
@@ -364,21 +364,21 @@ class LineDetectionController:
                         return {'success': False, 'error': 'No template matches found in SNID results'}
                         
                 except Exception as e:
-                    _LOGGER.error(f"❌ SNID analysis failed: {e}")
+                    _LOGGER.error(f"SNID analysis failed: {e}")
                     if progress_callback:
                         progress_callback(f"Analysis failed: {str(e)}")
                     return {'success': False, 'error': f'SNID analysis failed: {str(e)}'}
             
             # Fallback: No preprocessed spectrum available
             else:
-                _LOGGER.error("❌ No preprocessed spectrum available for automatic redshift search")
-                _LOGGER.error("❌ Please run preprocessing first before using automatic redshift search")
+                _LOGGER.error("No preprocessed spectrum available for automatic redshift search")
+                _LOGGER.error("Please run preprocessing first before using automatic redshift search")
                 if progress_callback:
                     progress_callback("Error: No preprocessed spectrum available. Run preprocessing first.")
                 return {'success': False, 'error': 'No preprocessed spectrum available. Run preprocessing first.'}
                 
         except Exception as e:
-            _LOGGER.error(f"❌ Automatic redshift search failed: {e}")
+            _LOGGER.error(f"Automatic redshift search failed: {e}")
             _LOGGER.error(f"   Exception details: {traceback.format_exc()}")
             if progress_callback:
                 progress_callback(f"Search failed: {str(e)}")
@@ -403,7 +403,7 @@ class LineDetectionController:
                         flat_flux = processed['flat_flux']
                         spectrum_type = 'flat_flux (continuum-removed)'
                     else:
-                        _LOGGER.error("❌ No flattened spectrum data available in processed_spectrum")
+                        _LOGGER.error("No flattened spectrum data available in processed_spectrum")
                         return None
                     
                     # Apply zero-region filtering like the main GUI
@@ -437,11 +437,11 @@ class LineDetectionController:
                     }
             
             # PRIORITY 3: No spectrum data available
-            _LOGGER.error("❌ No spectrum data available for redshift dialog")
+            _LOGGER.error("No spectrum data available for redshift dialog")
             return None
             
         except Exception as e:
-            _LOGGER.error(f"❌ Error getting spectrum data: {e}")
+            _LOGGER.error(f"Error getting spectrum data: {e}")
             _LOGGER.error(f"   Exception details: {traceback.format_exc()}")
             return None
     
@@ -489,7 +489,7 @@ class LineDetectionController:
                 forced_z = ac_cfg.get('forced_redshift', redshift) if is_forced else None
 
             if is_forced:
-                status_text = f"✅ z = {forced_z:.6f} (forced)"
+                status_text = f"z = {forced_z:.6f} (forced)"
             else:
                 # If range information is available from mode_result, include it
                 if mode_result and isinstance(mode_result, dict):
@@ -500,7 +500,7 @@ class LineDetectionController:
                     if ac_obj:
                         search_range = ac_obj.redshift_config.get('search_range', 0.01)
 
-                status_text = f"✅ z = {redshift:.6f} ±{search_range:.6f}" if search_range is not None else f"✅ z = {redshift:.6f}"
+                status_text = f"z = {redshift:.6f} ±{search_range:.6f}" if search_range is not None else f"z = {redshift:.6f}"
 
             # Update status label without accessing theme manager - use simple fixed colors
             if hasattr(self.gui, 'redshift_status_label'):
@@ -518,7 +518,7 @@ class LineDetectionController:
                 self.gui.update_button_states()
             
             # Log the redshift application without disrupting themes
-            _LOGGER.info(f"✅ Manual redshift applied: z = {redshift:.6f}")
+            _LOGGER.info(f"Manual redshift applied: z = {redshift:.6f}")
             
             
             

@@ -23,16 +23,13 @@ from PySide6 import QtWidgets, QtCore
 from typing import Dict, Any, Optional, Tuple
 import json
 
-# Import main GUI layout manager for consistency
+# Import shared UI core layout adapter to avoid coupling
 try:
-    from snid_sage.interfaces.gui.utils.unified_pyside6_layout_manager import (
-        LayoutSettings as MainLayoutSettings,
-        get_unified_layout_manager as get_main_layout_manager
-    )
+    from snid_sage.interfaces.ui_core import get_layout_manager as get_core_layout
     MAIN_LAYOUT_AVAILABLE = True
-except ImportError:
+except Exception:
     MAIN_LAYOUT_AVAILABLE = False
-    MainLayoutSettings = None
+    get_core_layout = None  # type: ignore
 
 # Import Twemoji manager
 try:
@@ -109,11 +106,11 @@ class TemplateManagerLayoutManager:
         self.settings = TemplateLayoutSettings()
         self._main_layout_manager = None
         
-        if MAIN_LAYOUT_AVAILABLE:
+        if MAIN_LAYOUT_AVAILABLE and get_core_layout is not None:
             try:
-                self._main_layout_manager = get_main_layout_manager()
+                self._main_layout_manager = get_core_layout()
             except Exception as e:
-                _LOGGER.warning(f"Could not initialize main layout manager: {e}")
+                _LOGGER.warning(f"Could not initialize core layout manager: {e}")
         
         self.twemoji_manager = None
         if TWEMOJI_AVAILABLE:
@@ -202,13 +199,11 @@ class TemplateManagerLayoutManager:
     def _apply_tab_icons(self, tab_widget: QtWidgets.QTabWidget) -> None:
         """Apply Twemoji icons to tabs"""
         try:
-            # Define tab icons
+            # Define tab icons (only existing tabs)
             tab_icons = {
                 0: "📊",  # Template Viewer
                 1: "✨",  # Create Template
                 2: "🔧",  # Manage Templates
-                3: "⚖️",  # Compare Templates
-                4: "📈"   # Statistics & Analysis
             }
             
             for index, emoji in tab_icons.items():
@@ -221,6 +216,11 @@ class TemplateManagerLayoutManager:
                         tab_widget.setTabIcon(index, icon)
         except Exception as e:
             _LOGGER.warning(f"Could not apply tab icons: {e}")
+
+    def apply_tab_icons(self, tab_widget: QtWidgets.QTabWidget) -> None:
+        """Public wrapper to apply Twemoji icons to existing tabs."""
+        if self.twemoji_manager:
+            self._apply_tab_icons(tab_widget)
     
     def setup_form_layout(self, form_layout: QtWidgets.QFormLayout) -> None:
         """Setup form layout with consistent spacing"""
@@ -243,20 +243,17 @@ class TemplateManagerLayoutManager:
         )
     
     def create_action_button(self, text: str, emoji: str = None) -> QtWidgets.QPushButton:
-        """Create a consistently styled action button"""
+        """Create a consistently styled action button (text-only; icon via Twemoji)."""
         button = QtWidgets.QPushButton()
         
-        # Set text with emoji if available
-        if emoji:
-            button.setText(f"{emoji} {text}")
-            if self.twemoji_manager:
-                try:
-                    # Use packaged Twemoji icon if available
-                    self.twemoji_manager.set_button_icon(button, emoji, keep_text=True)
-                except Exception:
-                    pass
-        else:
-            button.setText(text)
+        # Always keep plain text. If an emoji is provided, set it as an icon only.
+        button.setText(text)
+        if emoji and self.twemoji_manager:
+            try:
+                # Use packaged Twemoji icon if available; do not keep emoji in text
+                self.twemoji_manager.set_button_icon(button, emoji, keep_text=True)
+            except Exception:
+                pass
         
         # Set button dimensions
         button.setMinimumHeight(self.settings.action_button_height)
@@ -264,12 +261,12 @@ class TemplateManagerLayoutManager:
         
         return button
     
-    def create_create_button(self, text: str = "✨ Create Template") -> QtWidgets.QPushButton:
-        """Create the main 'Create Template' button with special styling"""
+    def create_create_button(self, text: str = "Create Template") -> QtWidgets.QPushButton:
+        """Create the main 'Create Template' button with special styling (icon via Twemoji)."""
         button = QtWidgets.QPushButton(text)
         button.setMinimumHeight(self.settings.create_button_height)
         button.setObjectName("create_btn")  # For CSS styling
-        if text.startswith("✨") and self.twemoji_manager:
+        if self.twemoji_manager:
             try:
                 self.twemoji_manager.set_button_icon(button, "✨", keep_text=True)
             except Exception:
@@ -277,12 +274,12 @@ class TemplateManagerLayoutManager:
         
         return button
     
-    def create_compare_button(self, text: str = "🔍 Compare Selected") -> QtWidgets.QPushButton:
-        """Create the 'Compare' button with special styling"""
+    def create_compare_button(self, text: str = "Compare Selected") -> QtWidgets.QPushButton:
+        """Create the 'Compare' button with special styling (icon via Twemoji)."""
         button = QtWidgets.QPushButton(text)
         button.setMinimumHeight(self.settings.action_button_height)
         button.setObjectName("compare_btn")  # For CSS styling
-        if text.startswith("🔍") and self.twemoji_manager:
+        if self.twemoji_manager:
             try:
                 self.twemoji_manager.set_button_icon(button, "🔍", keep_text=True)
             except Exception:

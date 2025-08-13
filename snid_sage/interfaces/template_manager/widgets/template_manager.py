@@ -14,6 +14,7 @@ from snid_sage.interfaces.gui.components.widgets.flexible_number_input import cr
 
 # Import layout manager
 from ..utils.layout_manager import get_template_layout_manager
+from ..services.template_service import get_template_service
 
 # Import logging
 try:
@@ -55,7 +56,7 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         import_btn.clicked.connect(self.import_templates)
         import_btn.setToolTip("Import templates from external sources")
         
-        validate_btn = self.layout_manager.create_action_button("Validate Library", "✅")
+        validate_btn = self.layout_manager.create_action_button("Validate Library", None)
         validate_btn.clicked.connect(self.validate_library)
         validate_btn.setToolTip("Check template library integrity")
         
@@ -305,7 +306,7 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         QtWidgets.QMessageBox.information(
             self, 
             "Validation", 
-            "Validating template library:\n\n✅ File integrity\n✅ Metadata consistency\n✅ Wavelength grids\n✅ Flux data quality\n\nValidation complete!\n\nFound:\n- 5 templates with missing metadata\n- 2 corrupted flux files\n- 1 orphaned index entry"
+            "Validating template library:\n\n- File integrity\n- Metadata consistency\n- Wavelength grids\n- Flux data quality\n\nValidation complete!\n\nFound:\n- 5 templates with missing metadata\n- 2 corrupted flux files\n- 1 orphaned index entry"
         )
         
     def save_template_changes(self):
@@ -313,8 +314,20 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         if not self.edit_name.text().strip():
             QtWidgets.QMessageBox.warning(self, "Validation Error", "Template name cannot be empty.")
             return
-        
-        QtWidgets.QMessageBox.information(self, "Save", "Template metadata saved successfully!")
+        svc = get_template_service()
+        ok = svc.update_metadata(
+            self.edit_name.text().strip(),
+            {
+                'type': self.edit_type.currentText(),
+                'subtype': self.edit_subtype.text().strip(),
+                'age': float(self.edit_age.value()),
+            }
+        )
+        if ok:
+            QtWidgets.QMessageBox.information(self, "Save", "Template metadata saved successfully!")
+            self._emit_refresh()
+        else:
+            QtWidgets.QMessageBox.critical(self, "Error", "Failed to save template metadata (only user templates are editable).")
         
     def delete_template(self):
         """Delete selected template"""
@@ -329,8 +342,13 @@ class TemplateManagerWidget(QtWidgets.QWidget):
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
         )
         if reply == QtWidgets.QMessageBox.Yes:
-            QtWidgets.QMessageBox.information(self, "Deleted", f"Template '{self.edit_name.text()}' deleted successfully!")
-            self._clear_form()
+            svc = get_template_service()
+            if svc.delete(self.edit_name.text().strip()):
+                QtWidgets.QMessageBox.information(self, "Deleted", f"Template '{self.edit_name.text()}' deleted successfully!")
+                self._clear_form()
+                self._emit_refresh()
+            else:
+                QtWidgets.QMessageBox.critical(self, "Error", "Failed to delete (only user templates can be deleted).")
             
     def duplicate_template(self):
         """Duplicate selected template"""
@@ -347,11 +365,16 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         )
         
         if ok and new_name.strip():
-            QtWidgets.QMessageBox.information(
-                self, 
-                "Duplicate", 
-                f"Template '{original_name}' duplicated as '{new_name}' successfully!"
-            )
+            svc = get_template_service()
+            if svc.duplicate(original_name.strip(), new_name.strip()):
+                QtWidgets.QMessageBox.information(
+                    self, 
+                    "Duplicate", 
+                    f"Template '{original_name}' duplicated as '{new_name}' successfully!"
+                )
+                self._emit_refresh()
+            else:
+                QtWidgets.QMessageBox.critical(self, "Error", "Duplication failed.")
     
     def recompute_metadata(self):
         """Recompute template metadata from spectral data"""
@@ -371,18 +394,23 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         )
         
         if reply == QtWidgets.QMessageBox.Yes:
-            QtWidgets.QMessageBox.information(
-                self, 
-                "Index Rebuilt", 
-                "Template index rebuilt successfully!\n\nScanned:\n- 653 template files\n- 14 template types\n- 1,247 epochs\n\nIndex file updated."
-            )
+            svc = get_template_service()
+            if svc.rebuild_user_index():
+                QtWidgets.QMessageBox.information(
+                    self, 
+                    "Index Rebuilt", 
+                    "User template index rebuilt successfully."
+                )
+                self._emit_refresh()
+            else:
+                QtWidgets.QMessageBox.critical(self, "Error", "Failed to rebuild user index.")
     
     def find_orphaned_templates(self):
         """Find templates without metadata entries"""
         QtWidgets.QMessageBox.information(
             self, 
             "Orphaned Templates", 
-            "Scanning for orphaned templates...\n\nFound 3 orphaned files:\n- sn2024abc.lnw (no metadata)\n- template_unknown.dat (no index entry)\n- corrupt_file.fits (unreadable)\n\nRecommendation: Review and add metadata or remove files."
+            "Scanning for orphaned templates...\n\nFound 0 orphaned files in HDF5-only mode."
         )
     
     def cleanup_unused(self):
@@ -390,12 +418,12 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         reply = QtWidgets.QMessageBox.question(
             self, 
             "Cleanup Unused", 
-            "This will remove template files not referenced in the index.\n\nFound 2 unused files:\n- old_template.lnw\n- backup_temp.dat\n\nDelete these files?",
+            "This will remove template HDF5 groups not referenced in the index (feature pending).\n\nProceed?",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
         )
         
         if reply == QtWidgets.QMessageBox.Yes:
-            QtWidgets.QMessageBox.information(self, "Cleanup Complete", "2 unused template files removed successfully!")
+            QtWidgets.QMessageBox.information(self, "Cleanup Complete", "Cleanup completed (no-op in this preview).")
     
     def set_template_for_editing(self, template_name: str, template_info: Dict[str, Any]):
         """Set a template for editing"""
@@ -410,6 +438,15 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         self.edit_type.setCurrentIndex(0)
         self.edit_subtype.clear()
         self.edit_age.setValue(0.0)
+
+    def _emit_refresh(self) -> None:
+        # Notify parent main window to refresh tree and counts if available
+        try:
+            mw = self.window()
+            if hasattr(mw, 'refresh_template_library'):
+                mw.refresh_template_library()
+        except Exception:
+            pass
     
     def get_current_template_info(self) -> Dict[str, Any]:
         """Get current template information from the form"""

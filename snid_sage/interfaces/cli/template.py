@@ -27,12 +27,10 @@ def list_templates_func(args):
         print(f"Error: Template library not found: {library_path}", file=sys.stderr)
         return 1
     
-    # Check if it's a directory with HDF5 files or individual .lnw files
+    # Check if it's a directory with HDF5 template files
     if os.path.isdir(library_path):
         # Look for HDF5 template files
         hdf5_files = glob.glob(os.path.join(library_path, "templates_*.hdf5"))
-        lnw_files = glob.glob(os.path.join(library_path, "*.lnw"))
-        
         if hdf5_files:
             print(f"\nTemplate Library: {os.path.basename(library_path)}")
             print(f"Path: {library_path}")
@@ -59,29 +57,9 @@ def list_templates_func(args):
                     except Exception as e:
                         print(f"    (Error reading file: {e})")
                         
-        elif lnw_files:
-            # Original .lnw file handling
-            print(f"\nTemplate Library: {os.path.basename(library_path)}")
-            print(f"Path: {library_path}")
-            print(f"Format: Individual .lnw files")
-            print(f"Total templates: {len(lnw_files)}")
-            
-            if args.verbose and lnw_files:
-                print("\nTemplates:")
-                for template_file in sorted(lnw_files):
-                    try:
-                        template = read_template(template_file)
-                        name = template.get('name', os.path.basename(template_file))
-                        t_type = template.get('type', 'Unknown')
-                        subtype = template.get('subtype', 'Unknown')
-                        age = template.get('age', None)
-                        age_str = f", Age: {age:.1f}" if age is not None else ""
-                        print(f"  {name} ({t_type}/{subtype}{age_str})")
-                    except Exception as e:
-                        print(f"  {os.path.basename(template_file)} (Error reading: {e})")
         else:
             print(f"No template files found in {library_path}")
-            print("Expected: templates_*.hdf5 files or *.lnw files")
+            print("Expected: templates_*.hdf5 files")
             return 1
     else:
         print(f"Error: {library_path} is not a directory", file=sys.stderr)
@@ -287,48 +265,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         default='.'
     )
     
-    # Add templates command
-    add_parser = subparsers.add_parser(
-        'add', 
-        help='Add templates to a library'
-    )
-    add_parser.add_argument(
-        'library', 
-        help='Path to template library'
-    )
-    add_parser.add_argument(
-        'files', 
-        nargs='+', 
-        help='Files to add as templates (supports wildcards)'
-    )
-    add_parser.add_argument(
-        '-t', '--type', 
-        help='SN type for the templates'
-    )
-    add_parser.add_argument(
-        '-s', '--subtype', 
-        help='SN subtype for the templates'
-    )
-    add_parser.add_argument(
-        '-a', '--age', 
-        type=float, 
-        help='SN age in days'
-    )
-    add_parser.add_argument(
-        '--no-flatten', 
-        action='store_true', 
-        help='Do not flatten the spectra'
-    )
-    add_parser.add_argument(
-        '--force-rebin', 
-        action='store_true', 
-        help='Force rebinning even for .lnw files'
-    )
-    add_parser.add_argument(
-        '--create', 
-        action='store_true', 
-        help='Create library if it does not exist'
-    )
+    # Add/Remove/Merge commands removed in HDF5-only mode (handled by GUI/service)
     
     # Remove templates command
     remove_parser = subparsers.add_parser(
@@ -439,12 +376,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return list_templates_func(args)
         elif args.template_command == "create":
             return create_library_func(args)
-        elif args.template_command == "add":
-            return add_templates_func(args)
-        elif args.template_command == "remove":
-            return remove_templates_func(args)
-        elif args.template_command == "merge":
-            return merge_libraries_func(args)
+        # add/remove/merge disabled in HDF5-only mode
         elif args.template_command == "visualize":
             return visualize_templates_func(args)
         elif args.template_command == "convert":

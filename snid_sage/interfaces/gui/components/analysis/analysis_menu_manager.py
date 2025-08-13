@@ -219,7 +219,38 @@ class AnalysisMenuManager:
                     return
             except Exception:
                 pass
-
+            
+            # If analysis exists already, confirm re-running analysis and clear previous results
+            try:
+                analysis_present = bool(getattr(self.app_controller, 'snid_results', None))
+            except Exception:
+                analysis_present = False
+            if analysis_present:
+                reply = QtWidgets.QMessageBox.question(
+                    self.main_window,
+                    "Re-run Analysis?",
+                    (
+                        "You have already run an analysis.\n\n"
+                        "Re-running analysis will clear previous analysis results and overlays.\n"
+                        "Preprocessing will be kept so you can re-run with new settings.\n\n"
+                        "Do you want to continue?"
+                    ),
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No
+                )
+                if reply != QtWidgets.QMessageBox.Yes:
+                    return
+                # Clear only analysis state, keep preprocessing
+                if hasattr(self.app_controller, 'reset_analysis_state'):
+                    self.app_controller.reset_analysis_state()
+                # Update UI: remove overlays, keep current view; refresh plot
+                try:
+                    from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PlotMode
+                    if self.main_window.plot_manager.current_plot_mode != PlotMode.SPECTRUM:
+                        self.main_window.plot_manager.switch_to_plot_mode(PlotMode.SPECTRUM)
+                    self.main_window.plot_manager.plot_spectrum(self.main_window.current_view)
+                except Exception:
+                    pass
             # Show comprehensive progress dialog
             try:
                 from snid_sage.interfaces.gui.components.pyside6_dialogs.analysis_progress_dialog import show_analysis_progress_dialog
@@ -320,7 +351,38 @@ class AnalysisMenuManager:
                     return
             except Exception:
                 pass
-
+            
+            # If analysis exists already, confirm re-running analysis and clear previous results
+            try:
+                analysis_present = bool(getattr(self.app_controller, 'snid_results', None))
+            except Exception:
+                analysis_present = False
+            if analysis_present:
+                reply = QtWidgets.QMessageBox.question(
+                    self.main_window,
+                    "Re-run Analysis?",
+                    (
+                        "You have already run an analysis.\n\n"
+                        "Re-running analysis will clear previous analysis results and overlays.\n"
+                        "Preprocessing will be kept so you can re-run with new settings.\n\n"
+                        "Do you want to continue?"
+                    ),
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No
+                )
+                if reply != QtWidgets.QMessageBox.Yes:
+                    return
+                # Clear only analysis state, keep preprocessing
+                if hasattr(self.app_controller, 'reset_analysis_state'):
+                    self.app_controller.reset_analysis_state()
+                # Update UI: remove overlays, keep current view; refresh plot
+                try:
+                    from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PlotMode
+                    if self.main_window.plot_manager.current_plot_mode != PlotMode.SPECTRUM:
+                        self.main_window.plot_manager.switch_to_plot_mode(PlotMode.SPECTRUM)
+                    self.main_window.plot_manager.plot_spectrum(self.main_window.current_view)
+                except Exception:
+                    pass
             # Directly open configuration dialog
             try:
                 from snid_sage.interfaces.gui.components.pyside6_dialogs.configuration_dialog import show_configuration_dialog

@@ -180,11 +180,11 @@ class NoTitlePlotManager:
             if self.theme_manager:
                 self._apply_theme_colors(single_ax)
             else:
-                # Ensure a faint grid even without theme manager
-                single_ax.grid(True, color='#cccccc', alpha=0.08, linestyle='--', linewidth=0.5)
+                # Ensure a faint grid even without theme manager (slightly higher alpha for saved PNG visibility)
+                single_ax.grid(True, color='#cccccc', alpha=0.50, linestyle='-', linewidth=0.8)
             
             # Ensure grid is on with faint styling
-            single_ax.grid(True, alpha=0.08, linestyle='--', linewidth=0.5)
+            single_ax.grid(True, alpha=0.50, linestyle='-', linewidth=0.8)
             single_ax.set_axisbelow(True)
         
         # Optimize figure layout to reclaim title space
@@ -212,7 +212,7 @@ class NoTitlePlotManager:
             
             # Grid color
             grid_color = colors.get('plot_grid', '#cccccc')
-            ax.grid(color=grid_color, alpha=0.08, linestyle='--', linewidth=0.5)
+            ax.grid(color=grid_color, alpha=0.50, linestyle='-', linewidth=0.8)
             
             # Spine colors
             for spine in ax.spines.values():

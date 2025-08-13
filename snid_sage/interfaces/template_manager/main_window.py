@@ -16,8 +16,6 @@ from .components.template_tree import TemplateTreeWidget
 from .components.template_visualization import TemplateVisualizationWidget
 from .widgets.template_creator import TemplateCreatorWidget
 from .widgets.template_manager import TemplateManagerWidget
-from .widgets.template_comparison import TemplateComparisonWidget
-from .widgets.template_statistics import TemplateStatisticsWidget
 
 # Import utilities
 from .utils.theme_manager import get_template_theme_manager
@@ -47,15 +45,15 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         """Setup main window properties"""
         self.setWindowTitle("SNID Template Manager")
         
-        # Try to use main GUI icon if available
+        # Try to use centralized logo manager icon if available
         try:
-            from snid_sage.interfaces.gui.utils.logo_manager import get_logo_manager
-            logo_manager = get_logo_manager()
-            icon_path = logo_manager.get_icon_path()
+            from snid_sage.interfaces.ui_core.logo import get_logo_manager
+            icon_path = get_logo_manager().get_icon_path()
             if icon_path:
                 self.setWindowIcon(QtGui.QIcon(str(icon_path)))
-        except ImportError:
-            # Use default icon
+            else:
+                self.setWindowIcon(QtGui.QIcon())
+        except Exception:
             self.setWindowIcon(QtGui.QIcon())
         
         # Setup window with layout manager
@@ -100,7 +98,7 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         self.layout_manager.apply_panel_layout(panel, layout)
         
         # Header
-        header = QtWidgets.QLabel("📚 Template Library")
+        header = QtWidgets.QLabel("Template Library")
         header.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
         layout.addWidget(header)
         
@@ -109,7 +107,7 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         search_layout = QtWidgets.QVBoxLayout(search_frame)
         
         self.search_edit = QtWidgets.QLineEdit()
-        self.search_edit.setPlaceholderText("🔍 Search templates...")
+        self.search_edit.setPlaceholderText("Search templates...")
         self.search_edit.textChanged.connect(self._filter_templates)
         search_layout.addWidget(self.search_edit)
         
@@ -146,23 +144,21 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         
         # Template Viewer tab
         self.viewer_widget = TemplateVisualizationWidget()
-        self.tab_widget.addTab(self.viewer_widget, "📊 Template Viewer")
+        self.tab_widget.addTab(self.viewer_widget, "Template Viewer")
         
         # Template Creator tab
         self.creator_widget = TemplateCreatorWidget()
-        self.tab_widget.addTab(self.creator_widget, "✨ Create Template")
+        self.tab_widget.addTab(self.creator_widget, "Create Template")
         
         # Template Manager tab
         self.manager_widget = TemplateManagerWidget()
-        self.tab_widget.addTab(self.manager_widget, "🔧 Manage Templates")
-        
-        # Template Comparison tab
-        self.comparison_widget = TemplateComparisonWidget()
-        self.tab_widget.addTab(self.comparison_widget, "⚖️ Compare Templates")
-        
-        # Template Statistics tab
-        self.statistics_widget = TemplateStatisticsWidget()
-        self.tab_widget.addTab(self.statistics_widget, "📈 Statistics & Analysis")
+        self.tab_widget.addTab(self.manager_widget, "Manage Templates")
+
+        # Apply Twemoji tab icons now that tabs are ready
+        try:
+            self.layout_manager.apply_tab_icons(self.tab_widget)
+        except Exception:
+            pass
         
         return self.tab_widget
         
@@ -226,9 +222,7 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
             "Features:\n"
             "• Browse and visualize templates\n"
             "• Create new templates\n"
-            "• Manage template metadata\n"
-            "• Compare templates\n"
-            "• Statistical analysis\n\n"
+            "• Manage template metadata\n\n"
             "Developed by Fiorenzo Stoppa for SNID SAGE"
         )
     

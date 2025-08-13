@@ -111,15 +111,13 @@ class PySide6RedshiftAgeDialog(QtWidgets.QDialog):
         self.setModal(True)
         self.resize(1000, 700)
         
-        # Set window icon if available
+        # Set window icon using centralized logo manager (works in dev and installed package)
         try:
-            icon_path = QtCore.QStandardPaths.locate(
-                QtCore.QStandardPaths.AppDataLocation, 
-                "icon.png"
-            )
+            from snid_sage.interfaces.ui_core.logo import get_logo_manager
+            icon_path = get_logo_manager().get_icon_path()
             if icon_path:
-                self.setWindowIcon(QtGui.QIcon(icon_path))
-        except:
+                self.setWindowIcon(QtGui.QIcon(str(icon_path)))
+        except Exception:
             pass
     
     def _create_interface(self):
@@ -343,7 +341,7 @@ class PySide6RedshiftAgeDialog(QtWidgets.QDialog):
         """Populate the summary text"""
         if not self.analysis_results or not self.analysis_results.success:
             error_text = """
-❌ Redshift vs Age Analysis Failed
+Redshift vs Age Analysis Failed
 
 Analysis results are not available or the analysis was not successful.
 Please run a successful SNID analysis first.
@@ -631,7 +629,7 @@ Please check your analysis results and try again.
     def _show_error(self, error_msg):
         """Show error message in info text"""
         error_text = f"""
-❌ Error Loading Redshift vs Age Data
+Error Loading Redshift vs Age Data
 
 {error_msg}
 

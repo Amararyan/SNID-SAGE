@@ -18,17 +18,10 @@ This guide provides comprehensive instructions for installing SNID SAGE on your 
 
 ## Quick Installation (v0.3.0)
 
-Install the latest stable release from PyPI (pick one):
+Install the latest stable release from PyPI:
 
 ```bash
-# CLI-only
 pip install snid-sage
-
-# Full GUI (PySide6 + pyqtgraph)
-pip install "snid-sage[gui]"
-
-# Everything (GUI + all optional features)
-pip install "snid-sage[all]"
 ```
 
  
@@ -45,12 +38,8 @@ python -m venv snid_env
 # Activate environment
 snid_env\Scripts\activate
 
-# Install SNID SAGE (choose one)
+# Install SNID SAGE
 pip install snid-sage
-# or
-pip install "snid-sage[gui]"
-# or
-pip install "snid-sage[all]"
  
 
 # Verify installation
@@ -68,12 +57,8 @@ python3 -m venv snid_env
 # Activate environment
 source snid_env/bin/activate
 
-# Install SNID SAGE (choose one)
+# Install SNID SAGE
 pip install snid-sage
-# or
-pip install "snid-sage[gui]"
-# or
-pip install "snid-sage[all]"
  
 
 # Verify installation
@@ -111,16 +96,8 @@ If you need the latest development version or want to contribute:
 git clone https://github.com/FiorenSt/SNID-SAGE.git
 cd SNID_SAGE
 
-# Install in development mode
-
-# For CLI-only
+# Install in development mode (includes CLI and GUI)
 pip install -e .
-
-# For the full GUI
-pip install -e .[gui]
-
-# For everything (GUI + optional features)
-pip install -e .[all]
 
  
 ```

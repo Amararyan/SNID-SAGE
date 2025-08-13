@@ -67,7 +67,7 @@ class ConfigController:
                     'widget_type': 'path',
                     'path_type': 'directory',
                     'validation_rule': self.config_manager._validation_rules['paths']['templates_dir'],
-                    'tooltip': 'Directory containing SNID template spectra files (.lnw format)'
+                    'tooltip': 'Directory containing SNID template libraries (HDF5 with template_index.json)'
                 },
                 'output_dir': {
                     'label': 'Output Directory',

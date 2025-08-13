@@ -275,7 +275,7 @@ class ConfigurationManager:
                 # SNID-specific parameters
                 'rlapmin': 5.0,
                 'lapmin': 0.3,
-                'rlap_ccc_threshold': 1.0,  # NEW: RLAP-CCC threshold for clustering
+                'rlap_ccc_threshold': 1.5,  # NEW: RLAP-CCC threshold for clustering
 
                 'wmin': None,  # Optional wavelength limits
                 'wmax': None,

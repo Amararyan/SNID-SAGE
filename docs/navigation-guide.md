@@ -76,7 +76,7 @@ SNID SAGE Documentation
 **Documentation Flow:**
 1. [Installation](installation/installation.md) → [Quick Start](quickstart/first-analysis.md)
 2. [GUI Overview](gui/interface-overview.md) → [Basic Tutorial](tutorials/basic-analysis.md)
-3. [Understanding Results](tutorials/basic-analysis.md#understanding-results)
+3. [Understanding Results](tutorials/basic-analysis.md)
 4. [Plotting Guide](tutorials/plotting-visualization.md)
 5. [Export Options](tutorials/basic-analysis.md#saving-results)
 
@@ -86,7 +86,7 @@ SNID SAGE Documentation
 1. [Advanced Analysis](tutorials/advanced-analysis.md)
 2. [Data Preparation](data/data-preparation.md)
 3. [Template Management](tutorials/template-management.md)
-4. [Configuration Guide](tutorials/configuration-guide.md)
+4. [Configuration Guide](reference/configuration-guide.md)
 5. [AI Features](ai/overview.md) → [Analysis Types](ai/analysis-types.md)
 6. [Publication Plots](tutorials/publication-ready-plots.md)
 
@@ -94,7 +94,7 @@ SNID SAGE Documentation
 
 **Documentation Flow:**
 1. [CLI Reference](cli/command-reference.md)
-2. [Batch Processing](cli/batch-processing.md) → [Optimization](cli/batch-optimization.md)
+2. [Batch Processing](cli/batch-processing.md)
 3. [API Reference (Programming)](reference/api-reference.md)
 4. [Advanced Workflows](tutorials/advanced-workflows.md)
 5. [Custom Templates](data/custom-templates.md)
@@ -105,36 +105,36 @@ SNID SAGE Documentation
 ### Data Management
 - **Input**: [Supported Formats](data/supported-formats.md) → [Data Preparation](data/data-preparation.md)
 - **Templates**: [Template Library](data/template-library.md) → [Custom Templates](data/custom-templates.md)
-- **Output**: [Results Format](reference/api-reference.md#results) → [Export Options](cli/command-reference.md#output-files)
+- **Output**: [API Reference](reference/api-reference.md) → [CLI Output Files](cli/command-reference.md)
 
 ### Analysis Techniques
 - **Basic**: [First Analysis](quickstart/first-analysis.md) → [Basic Tutorial](tutorials/basic-analysis.md)
-- **Advanced**: [Advanced Analysis](tutorials/advanced-analysis.md) → [Performance Optimization](reference/performance-tuning.md)
-- **Specialized**: [Wind Velocity](gui/interface-overview.md#wind-velocity) → [FWHM Analysis](gui/interface-overview.md#fwhm)
+- **Advanced**: [Advanced Analysis](tutorials/advanced-analysis.md) → [Performance Optimization](tutorials/performance-optimization.md)
+- **Specialized**: [FWHM and Wind Analysis](tutorials/advanced-analysis.md)
 
 ### AI Integration
 - **Setup**: [AI Overview](ai/overview.md) → [OpenRouter Setup](ai/openrouter-setup.md)
 - **Usage**: [AI Tutorial](tutorials/ai-assisted-analysis.md) → [Analysis Types](ai/analysis-types.md)
-- **Advanced**: [Custom Prompts](ai/overview.md#custom-prompts) → [API Integration](ai/overview.md#api-integration)
+- **Advanced**: [AI Overview](ai/overview.md)
 
 ### Visualization
 - **Basics**: [Plotting Tutorial](tutorials/plotting-visualization.md)
-- **Interactive**: [GUI Plot Tools](gui/interface-overview.md#interactive-features)
+- **Interactive**: [GUI Plot Tools](gui/interface-overview.md)
 - **Publication**: [Publication Plots](tutorials/publication-ready-plots.md)
-- **Customization**: [Plot Themes](gui/interface-overview.md#theme-system)
+- **Customization**: [Plot Themes](gui/interface-overview.md)
 
 ### Configuration
-- **GUI**: [Settings Dialog](gui/interface-overview.md#configuration-dialogs)
-- **CLI**: [Config Command](cli/command-reference.md#config)
-- **Files**: [Configuration Guide](tutorials/configuration-guide.md)
-- **Advanced**: [Performance Tuning](reference/performance-tuning.md)
+- **GUI**: [Settings](gui/interface-overview.md)
+- **CLI**: [Config Command](cli/command-reference.md)
+- **Files**: [Configuration Guide](reference/configuration-guide.md)
+- **Advanced**: [Performance Optimization](tutorials/performance-optimization.md)
 
 ## Deep Dive Topics
 
 ### Understanding SNID Algorithm
-1. **Theory**: [SNID Overview](index.md) → [Cross-Correlation](tutorials/advanced-analysis.md#correlation)
+1. **Theory**: [SNID Overview](index.md) → [Advanced Analysis](tutorials/advanced-analysis.md)
 2. **Implementation**: [API Reference (Programming)](reference/api-reference.md) → [Source Code](dev/contributing.md)
-3. **Optimization**: [Performance Guide](reference/performance-tuning.md)
+3. **Optimization**: [Performance Guide](tutorials/performance-optimization.md)
 
 ### Supernova Classification
 1. **Types**: [Classification Guide](tutorials/classification.md)
@@ -150,43 +150,43 @@ SNID SAGE Documentation
 ## Reference Quick Links
 
 ### Commands & Functions
-- **CLI Commands**: [identify](cli/command-reference.md#identify) | [batch](cli/command-reference.md#batch) | [template](cli/command-reference.md#template) | [config](cli/command-reference.md#config)
-- **Core Functions**: [run_snid](reference/api-reference.md#run_snid) | [preprocess_spectrum](reference/api-reference.md#preprocess) | [run_snid_analysis](reference/api-reference.md#analysis)
-- **I/O Functions**: [read_spectrum](reference/api-reference.md#io) | [load_templates](reference/api-reference.md#templates) | [write_result](reference/api-reference.md#output)
+- **CLI Commands**: [Command Reference](cli/command-reference.md)
+- **Core Functions**: [API Reference](reference/api-reference.md)
+- **I/O Functions**: [API Reference](reference/api-reference.md)
 
 ### Configuration Options
-- **Analysis**: [Parameters](tutorials/configuration-guide.md#analysis) | [Templates](tutorials/configuration-guide.md#templates)
-- **Preprocessing**: [Options](tutorials/configuration-guide.md#preprocessing) | [Filters](data/data-preparation.md#preprocessing)
-- **Output**: [Formats](cli/command-reference.md#output-files) | [Plots](tutorials/plotting-visualization.md)
+- **Analysis**: [Parameters](reference/parameters.md)
+- **Preprocessing**: [Preprocessing Guide](gui/preprocessing.md)
+- **Output**: [CLI Output Files](cli/command-reference.md) | [Plots](tutorials/plotting-visualization.md)
 
 ### Troubleshooting
 - **Common Issues**: [FAQ](reference/faq.md) | [Troubleshooting](reference/troubleshooting.md)
-- **Error Messages**: [Error Codes](reference/troubleshooting.md#error-messages)
-- **Performance**: [Optimization](reference/performance-tuning.md)
+- **Troubleshooting**: [Common Issues](reference/troubleshooting.md)
+- **Performance**: [Optimization](tutorials/performance-optimization.md)
 
 ## Task-Based Navigation
 
 ### "I want to..."
 
 #### Analyze a spectrum
-- Single spectrum: [Quick Start](quickstart/first-analysis.md) or [CLI identify](cli/command-reference.md#identify)
+- Single spectrum: [Quick Start](quickstart/first-analysis.md) or [CLI identify](cli/command-reference.md)
 - Multiple spectra: [Batch Processing](cli/batch-processing.md)
-- With known redshift: [Forced Redshift](tutorials/advanced-analysis.md#forced-redshift)
+- With known redshift: [Advanced Analysis](tutorials/advanced-analysis.md)
 
 #### Improve results
 - Better preprocessing: [Data Preparation](data/data-preparation.md)
 - Filter templates: [Template Selection](tutorials/template-management.md)
-- Tune parameters: [Configuration Guide](tutorials/configuration-guide.md)
+- Tune parameters: [Configuration Guide](reference/configuration-guide.md)
 
 #### Create visualizations
 - Basic plots: [Plotting Tutorial](tutorials/plotting-visualization.md)
 - Publication figures: [Publication Plots](tutorials/publication-ready-plots.md)
-- Custom themes: [Plot Customization](gui/interface-overview.md#theme-system)
+- Custom themes: [Plot Customization](gui/interface-overview.md)
 
 #### Use AI features
 - Setup AI: [AI Overview](ai/overview.md) → [OpenRouter Setup](ai/openrouter-setup.md)
 - Get insights: [AI Analysis](tutorials/ai-assisted-analysis.md)
-- Interactive chat: [Chat Interface](ai/overview.md#interactive-chat-interface)
+- Interactive chat: [AI Overview](ai/overview.md)
 
 #### Automate workflows
 - Batch analysis: [Batch Processing](cli/batch-processing.md)
@@ -208,7 +208,7 @@ SNID SAGE Documentation
 ### User Guides (Learn Features)
 4. **[GUI Manual](gui/interface-overview.md)** - Graphical interface
 5. **[CLI Reference](cli/command-reference.md)** - Command line
-6. **[Tutorials](tutorials/)** - Step-by-step guides
+6. **[Tutorials](tutorials/basic-analysis.md)** - Step-by-step guides
 
 ### Technical Reference (Deep Details)
 7. **[API Documentation](reference/api-reference.md)** - Programming
@@ -217,7 +217,7 @@ SNID SAGE Documentation
 
 ### Advanced Topics (Expert Users)
 10. **[AI Integration](ai/overview.md)** - AI features
-11. **[Performance](reference/performance-tuning.md)** - Optimization
+11. **[Performance](tutorials/performance-optimization.md)** - Optimization
 12. **[Development](dev/contributing.md)** - Contributing
 
 ## Cross-References

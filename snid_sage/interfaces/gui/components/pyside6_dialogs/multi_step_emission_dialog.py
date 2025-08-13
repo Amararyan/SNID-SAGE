@@ -613,13 +613,44 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     #         _LOGGER.error(f"Error updating line tracker: {e}")
     
     def _update_all_lines(self):
-        """Update all line positions when redshift changes"""
-        # This method would update line positions based on redshift changes
-        # Implementation depends on how the line wavelengths are stored
-        
-        # OPTIMIZATION: Invalidate cache when redshift changes
-        self._invalidate_overlay_cache()
-        pass
+        """Update all line positions when redshift or velocity changes."""
+        try:
+            sn_redshift = self._get_effective_sn_redshift()
+            gal_redshift = self.host_redshift
+
+            def compute_new_obs(line_name, stored_obs, metadata, use_sn):
+                try:
+                    rest_wl = 0.0
+                    if isinstance(metadata, dict):
+                        rest_wl = float(metadata.get('rest_wavelength', 0.0) or 0.0)
+                    if rest_wl <= 0.0:
+                        rest_wl = self._get_rest_wavelength_for_line(line_name)
+                    if rest_wl > 0.0:
+                        z = sn_redshift if use_sn else gal_redshift
+                        return rest_wl * (1.0 + z)
+                except Exception:
+                    pass
+                return stored_obs
+
+            # Recompute SN lines (affected by ejecta velocity)
+            if self.sn_lines:
+                for name in list(self.sn_lines.keys()):
+                    obs_wl, meta = self.sn_lines[name]
+                    new_obs = compute_new_obs(name, obs_wl, meta, use_sn=True)
+                    self.sn_lines[name] = (new_obs, meta)
+
+            # Recompute Galaxy lines (host redshift only)
+            if self.galaxy_lines:
+                for name in list(self.galaxy_lines.keys()):
+                    obs_wl, meta = self.galaxy_lines[name]
+                    new_obs = compute_new_obs(name, obs_wl, meta, use_sn=False)
+                    self.galaxy_lines[name] = (new_obs, meta)
+
+            # Invalidate overlay cache and refresh plot
+            self._invalidate_overlay_cache()
+            self._update_plot()
+        except Exception as e:
+            _LOGGER.error(f"Error updating line positions after redshift/velocity change: {e}")
     
     def _invalidate_overlay_cache(self):
         """Invalidate the overlay cache when redshift parameters change"""
@@ -1126,6 +1157,15 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 line_name, rest_wavelength, line_data = closest_line
                 obs_wavelength = rest_wavelength * (1 + search_redshift)
                 
+                # Persist rest wavelength so we can recompute positions when redshift/velocity changes
+                try:
+                    if isinstance(line_data, dict):
+                        meta_copy = dict(line_data)
+                        meta_copy['rest_wavelength'] = rest_wavelength
+                        line_data = meta_copy
+                except Exception:
+                    pass
+                
                 # Add line to appropriate collection
                 if self.current_mode == 'sn':
                     self.sn_lines[line_name] = (obs_wavelength, line_data)
@@ -1142,6 +1182,22 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 
         except Exception as e:
             _LOGGER.error(f"Error finding nearby line: {e}")
+
+    def _get_rest_wavelength_for_line(self, line_name: str) -> float:
+        """Best-effort lookup of a line's rest wavelength from the database."""
+        try:
+            from snid_sage.shared.constants.physical import LINE_DB
+            target = (line_name or '').strip()
+            for entry in LINE_DB:
+                rest = entry.get('wavelength_air', 0.0)
+                if rest <= 0:
+                    continue
+                key = entry.get('key', '')
+                if key.replace(' (gal)', '').strip() == target:
+                    return float(rest)
+        except Exception as lookup_error:
+            _LOGGER.debug(f"Rest wavelength lookup failed for '{line_name}': {lookup_error}")
+        return 0.0
     
     def _find_closest_line_in_database(self, obs_wavelength, redshift, tolerance):
         """Find the closest line in the line database"""
@@ -1186,7 +1242,8 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                     line_data = {
                         'strength': line_entry.get('strength', 'medium'),
                         'type': line_entry.get('line_type', 'unknown'),
-                        'origin': line_entry.get('origin', 'unknown')
+                        'origin': line_entry.get('origin', 'unknown'),
+                        'rest_wavelength': line_rest_wavelength,
                     }
                     
                     closest_line = (line_name_clean, line_rest_wavelength, line_data)

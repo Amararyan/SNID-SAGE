@@ -44,9 +44,10 @@ recursive-exclude venv *
 recursive-exclude build *
 recursive-exclude dist *
 
-# Exclude large data directories for TestPyPI
+# Exclude large data directories for PyPI/TestPyPI
 recursive-exclude results *
 recursive-exclude site *
+recursive-exclude docs *
 
 # Exclude individual template files (too many for TestPyPI)
 recursive-exclude snid_sage/templates/Individual_templates *

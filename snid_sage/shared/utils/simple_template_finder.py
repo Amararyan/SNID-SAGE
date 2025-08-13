@@ -178,7 +178,7 @@ def _validate_templates_directory(templates_dir: Path) -> bool:
     """
     Validate that a directory contains valid SNID templates.
     
-    OPTIMIZED: Only checks for template_index.json instead of scanning all HDF5/LNW files
+    OPTIMIZED: Only checks for template_index.json instead of scanning all HDF5 files
     to avoid startup delays. Full validation happens during analysis when needed.
     
     Args:
@@ -202,11 +202,6 @@ def _validate_templates_directory(templates_dir: Path) -> bool:
         has_hdf5 = any(templates_dir.glob('templates_*.hdf5'))
         if has_hdf5:
             logger.debug(f"Found HDF5 template files in {templates_dir}")
-            return True
-        
-        has_lnw = any(templates_dir.glob('*.lnw'))
-        if has_lnw:
-            logger.debug(f"Found LNW template files in {templates_dir}")
             return True
         
         logger.debug(f"No template files found in {templates_dir}")
@@ -357,7 +352,6 @@ if __name__ == "__main__":
         
         # Show what's in the directory
         hdf5_files = list(templates_dir.glob('templates_*.hdf5'))
-        lnw_files = list(templates_dir.glob('*.lnw'))
         
         if hdf5_files:
             logger.info(f"   📁 HDF5 template files: {len(hdf5_files)}")
@@ -365,8 +359,6 @@ if __name__ == "__main__":
                 logger.info(f"      - {hdf5_file.name}")
             if len(hdf5_files) > 5:
                 logger.info(f"      ... and {len(hdf5_files) - 5} more")
-        if lnw_files:
-            logger.info(f"   📁 LNW template files: {len(lnw_files)}")
     else:
         logger.error("❌ No templates directory found")
         logger.error("Ensure you have cloned the full SNID-SAGE repository from GitHub")

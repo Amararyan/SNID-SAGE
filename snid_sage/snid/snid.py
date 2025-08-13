@@ -1153,7 +1153,7 @@ def run_snid_analysis(
     peak_window_size: int = 10,
     lapmin: float = 0.3,
     rlapmin: float = 5,
-    rlap_ccc_threshold: float = 1.0,  # NEW: RLAP-CCC threshold for clustering
+    rlap_ccc_threshold: float = 1.5,  # NEW: RLAP-CCC threshold for clustering
     # NEW: Forced redshift parameter
     forced_redshift: Optional[float] = None,
     # Output options
@@ -1388,10 +1388,13 @@ def run_snid_analysis(
         # _LOG.warning(f"Low redshift {zmin} requires {lz1-mid} bins, but minimum is {-mid}")
         lz1 = 0
 
-    if _LOG.isEnabledFor(logging.DEBUG):
-        z_lz1 = np.exp((lz1-mid)*DWLOG_grid)-1
-        z_lz2 = np.exp((lz2-mid)*DWLOG_grid)-1
-    _LOG.debug(f"Step 8: Redshift bin range: {lz1-mid} to {lz2-mid} (z = {z_lz1:.6f} to {z_lz2:.6f})")
+    # Compute redshift values for logging. Always compute to avoid referencing
+    # undefined variables when formatting the debug string.
+    z_lz1 = np.exp((lz1 - mid) * DWLOG_grid) - 1
+    z_lz2 = np.exp((lz2 - mid) * DWLOG_grid) - 1
+    _LOG.debug(
+        f"Step 8: Redshift bin range: {lz1 - mid} to {lz2 - mid} (z = {z_lz1:.6f} to {z_lz2:.6f})"
+    )
 
     # ============================================================================
     # STEP 9: PREPARE SPECTRUM FFT FOR CORRELATION
@@ -1779,7 +1782,7 @@ def run_snid_analysis(
             from .cosmological_clustering import perform_direct_gmm_clustering
             
             report_progress("Performing cosmological GMM clustering analysis with best metric")
-            _LOG.info("Using direct GMM clustering on redshift values with best available metric (RLAP-CCC > RLAP)")
+            _LOG.info("Using direct GMM clustering on redshift values with best available metric RLAP-CCC (fallback to RLAP when absent)")
             
             clustering_results = perform_direct_gmm_clustering(
                 matches, 

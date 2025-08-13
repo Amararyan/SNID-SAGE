@@ -3,6 +3,12 @@
 Welcome to the **SNID SAGE** documentation – a complete guide to Supernova spectral identification and analysis.
 
 ## Quick Links
+ 
+!!! tip "New to SNID SAGE? Start here"
+    1) [Installation](installation/installation.md) → 2) [Quick Start](quickstart/first-analysis.md) → 3) [GUI Overview](gui/interface-overview.md)
+ 
+!!! info "Power users"
+    Prefer scripting and automation? Jump to the [CLI Command Reference](cli/command-reference.md) and [Batch Processing](cli/batch-processing.md).
 
 <div class="grid cards" markdown>
 
@@ -11,28 +17,36 @@ Welcome to the **SNID SAGE** documentation – a complete guide to Supernova spe
   ---
   New to SNID SAGE? Install the package and run your first analysis.
   
-  [➜ Quick Start](quickstart/first-analysis.md)
+  [Quick Start](quickstart/first-analysis.md)
 
 - **Installation**
 
   ---
   Platform-specific installation instructions.
   
-  [➜ Install Guide](installation/installation.md)
+  [Install Guide](installation/installation.md)
+
 
 - **User Interfaces**
 
   ---
   Work with the graphical user interface (GUI) or the command-line interface (CLI).
   
-  [➜ GUI Guide](gui/interface-overview.md) · [➜ CLI Reference](cli/command-reference.md)
+  [GUI Guide](gui/interface-overview.md) · [CLI Reference](cli/command-reference.md)
+
+- **Task Hub**
+
+  ---
+  One-liners and deep links for common tasks.
+
+  [Task Hub](task-hub.md)
 
 - **AI Features**
 
   ---
   Configure and use the optional AI-assisted analysis utilities.
   
-  [➜ AI Integration](ai/overview.md)
+  [AI Integration](ai/overview.md)
 
 </div>
 

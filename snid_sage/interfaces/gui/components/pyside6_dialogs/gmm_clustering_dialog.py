@@ -442,7 +442,7 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
                     top_percentage=0.10,
                     verbose=True,
                     use_rlap_cos=True,  # Use RLAP-Cos for better discrimination
-                    rlap_ccc_threshold=1.0  # Default RLAP-CCC threshold
+                    rlap_ccc_threshold=1.5  # Default RLAP-CCC threshold
                 )
                 
                 _LOGGER.info(f"GMM clustering completed successfully")

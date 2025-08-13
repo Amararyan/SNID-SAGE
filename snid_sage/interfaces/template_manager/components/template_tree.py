@@ -37,14 +37,19 @@ class TemplateTreeWidget(QtWidgets.QTreeWidget):
     def load_templates(self):
         """Load templates from the template index"""
         try:
-            template_index_path = self._find_template_index()
-            if not template_index_path:
-                _LOGGER.warning("Template index not found")
-                self._create_sample_templates()
-                return
-                
-            with open(template_index_path, 'r') as f:
-                index_data = json.load(f)
+            # Use merged index (built-in + user)
+            try:
+                from snid_sage.interfaces.template_manager.services.template_service import get_template_service
+                index_data = get_template_service().get_merged_index()
+            except Exception as e:
+                _LOGGER.warning(f"Falling back to legacy index loading: {e}")
+                template_index_path = self._find_template_index()
+                if not template_index_path:
+                    _LOGGER.warning("Template index not found")
+                    self._create_sample_templates()
+                    return
+                with open(template_index_path, 'r') as f:
+                    index_data = json.load(f)
                 
             self.clear()
             

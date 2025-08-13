@@ -451,9 +451,32 @@ class PySide6AppController(QtCore.QObject):
                     self.main_window.progress_dialog.add_progress_line("Initializing SNID analysis...", "info")
                     _LOGGER.info("Progress dialog created for analysis")
                 elif self.main_window and self.main_window.progress_dialog:
-                    # Update existing progress dialog
-                    self.main_window.progress_dialog.add_progress_line("Initializing SNID analysis...", "info")
-                    _LOGGER.info("Using existing progress dialog for analysis")
+                    # Reuse existing progress dialog, ensuring it is visible
+                    dlg = self.main_window.progress_dialog
+                    try:
+                        # If the dialog was previously hidden/closed, bring it back
+                        if hasattr(dlg, 'isVisible') and not dlg.isVisible():
+                            if hasattr(dlg, 'show_dialog'):
+                                dlg.show_dialog()
+                            else:
+                                dlg.show()
+                        else:
+                            # Ensure it comes to the front
+                            try:
+                                dlg.raise_()
+                                dlg.activateWindow()
+                            except Exception:
+                                pass
+                        dlg.add_progress_line("Initializing SNID analysis...", "info")
+                        _LOGGER.info("Using existing progress dialog for analysis")
+                    except Exception:
+                        # If reusing fails for any reason, create a fresh dialog
+                        self.main_window.progress_dialog = show_analysis_progress_dialog(
+                            self.main_window,
+                            "SNID-SAGE Analysis Progress"
+                        )
+                        self.main_window.progress_dialog.add_progress_line("Initializing SNID analysis...", "info")
+                        _LOGGER.info("Progress dialog recreated for analysis")
                 else:
                     _LOGGER.warning("Main window not available for progress dialog")
 
@@ -1156,7 +1179,7 @@ class PySide6AppController(QtCore.QObject):
                     QtCore.Qt.QueuedConnection
                 )
                 
-                _LOGGER.info(f"✅ Analysis complete: {getattr(result, 'consensus_type', 'Unknown')} at z={getattr(result, 'redshift', 0.0):.6f}")
+                _LOGGER.info(f"Analysis complete: {getattr(result, 'consensus_type', 'Unknown')} at z={getattr(result, 'redshift', 0.0):.6f}")
             
         except Exception as e:
             _LOGGER.error(f"Error completing analysis workflow: {e}")
@@ -1193,11 +1216,11 @@ class PySide6AppController(QtCore.QObject):
                 elif result.clustering_results.get('best_cluster'):
                     cluster_info = " [Auto Selected]"
             
-            status_msg = f"✅ Best: {getattr(result, 'template_name', 'Unknown')} ({getattr(result, 'consensus_type', 'Unknown')}){cluster_info}"
+            status_msg = f"Best: {getattr(result, 'template_name', 'Unknown')} ({getattr(result, 'consensus_type', 'Unknown')}){cluster_info}"
             if gui_instance and hasattr(gui_instance, 'update_header_status'):
                 gui_instance.update_header_status(status_msg)
             
-            _LOGGER.debug("✅ GUI updates completed from main thread")
+            _LOGGER.debug("GUI updates completed from main thread")
             
         except Exception as e:
             _LOGGER.error(f"Error handling GUI updates from main thread: {e}")

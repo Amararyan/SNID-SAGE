@@ -128,10 +128,18 @@ class TemplateFFTStorage:
         if not (self.index_file.exists() and self._index is not None):
             return False
         
-        # Check that all expected type files exist
+        # Check that all expected type files exist, preferring storage_file from index
         expected_types = set(self._index.get('by_type', {}).keys())
         for sn_type in expected_types:
-            storage_file = self._get_storage_file_for_type(sn_type)
+            type_info = (self._index.get('by_type') or {}).get(sn_type) or {}
+            storage_path = type_info.get('storage_file')
+            if storage_path:
+                # Resolve relative to template_dir if needed
+                storage_file = Path(storage_path)
+                if not storage_file.is_absolute():
+                    storage_file = self.template_dir / storage_path
+            else:
+                storage_file = self._get_storage_file_for_type(sn_type)
             if not storage_file.exists():
                 return False
         
@@ -289,24 +297,150 @@ class TemplateFFTStorage:
         return stats
     
     def _load_index(self):
-        """Load the template index file."""
+        """Load the template index file with optional user override support.
+
+        Behavior:
+        - Load the base index from `template_index.json` (required for built-in templates)
+        - If a user index exists at `User_templates/template_index.user.json`, merge it
+          with the following rule:
+            • For any type that has a user HDF5 storage file present (templates_<Type>.user.hdf5),
+              perform a type-level override: only user templates for that type are used and the
+              storage_file points to the user HDF5 file. All built-in templates for that type are
+              excluded.
+            • For types without a user storage file, keep the built-in index entries as-is.
+        This enables per-type user customization while keeping other types from the base library.
+        """
+        base_index: Optional[Dict[str, Any]] = None
+        user_index: Optional[Dict[str, Any]] = None
+
+        # 1) Load base index
         if self.index_file.exists():
             try:
-                with open(self.index_file, 'r') as f:
-                    self._index = json.load(f)
+                with open(self.index_file, 'r', encoding='utf-8') as f:
+                    base_index = json.load(f)
             except Exception as e:
                 _LOG.warning(f"Failed to load index file: {e}")
-                self._index = None
-        else:
+                base_index = None
+
+        # 2) Load user index if present
+        user_dir = self.template_dir / 'User_templates'
+        user_index_path = user_dir / 'template_index.user.json'
+        if user_index_path.exists():
+            try:
+                with open(user_index_path, 'r', encoding='utf-8') as f:
+                    user_index = json.load(f)
+            except Exception as e:
+                _LOG.warning(f"Failed to load user index file: {e}")
+                user_index = None
+
+        # If no base index and no user index, nothing to do
+        if base_index is None and user_index is None:
             self._index = None
+            return
+
+        # Helper to build safe type filename suffix
+        def _safe_type_name(type_name: str) -> str:
+            return (
+                type_name.replace('/', '_').replace('-', '_').replace(' ', '_')
+                if isinstance(type_name, str) else 'Unknown'
+            )
+
+        # Start from base index (or an empty structure if missing)
+        merged = base_index or {
+            'version': '2.0',
+            'created_date': None,
+            'template_count': 0,
+            'grid_rebinned': True,
+            'grid_params': {},
+            'templates': {},
+            'by_type': {}
+        }
+
+        # Nothing to merge if no user index
+        if not user_index:
+            self._index = merged
+            return
+
+        # Determine which types have a user storage file present; these types will be overridden
+        overridden_types = set()
+        for ttype, bucket in (user_index.get('by_type') or {}).items():
+            safe = _safe_type_name(ttype)
+            user_storage = user_dir / f"templates_{safe}.user.hdf5"
+            if user_storage.exists():
+                overridden_types.add(ttype)
+
+        if not overridden_types:
+            # No user storage present; keep base index and simply add any user templates
+            # that reference a user storage file path (best-effort enrich)
+            user_templates = user_index.get('templates', {})
+            merged_templates = merged.setdefault('templates', {})
+            for name, meta in user_templates.items():
+                merged_templates[name] = meta
+            # Recompute by_type counts conservatively (prefer existing by_type storage_file)
+            by_type: Dict[str, Any] = {}
+            for name, meta in merged_templates.items():
+                ttype = meta.get('type', 'Unknown')
+                bucket = by_type.setdefault(ttype, {"count": 0, "storage_file": meta.get("storage_file", ""), "template_names": []})
+                bucket['count'] += 1
+                bucket['template_names'].append(name)
+                if not bucket.get('storage_file') and meta.get('storage_file'):
+                    bucket['storage_file'] = meta['storage_file']
+            merged['by_type'] = by_type
+            merged['template_count'] = len(merged_templates)
+            self._index = merged
+            return
+
+        # Perform type-level override for types with user storage files
+        base_templates = merged.get('templates', {})
+        user_templates = user_index.get('templates', {})
+
+        # Remove base templates for overridden types
+        names_to_remove = [
+            name for name, meta in base_templates.items()
+            if meta.get('type') in overridden_types
+        ]
+        for name in names_to_remove:
+            base_templates.pop(name, None)
+
+        # Add user templates for overridden types
+        for name, meta in user_templates.items():
+            if meta.get('type') in overridden_types:
+                # Ensure storage_file points to user path (normalize to forward slashes)
+                ttype = meta.get('type', 'Unknown')
+                safe = _safe_type_name(ttype)
+                meta = dict(meta)
+                meta['storage_file'] = str(Path('User_templates') / f"templates_{safe}.user.hdf5").replace('\\', '/')
+                base_templates[name] = meta
+
+        # Rebuild by_type with storage_file pointing to user file for overridden types
+        new_by_type: Dict[str, Any] = {}
+        for name, meta in base_templates.items():
+            ttype = meta.get('type', 'Unknown')
+            bucket = new_by_type.setdefault(ttype, {"count": 0, "storage_file": meta.get("storage_file", ""), "template_names": []})
+            bucket['count'] += 1
+            bucket['template_names'].append(name)
+            # For overridden types, force storage_file to the user file
+            if ttype in overridden_types:
+                safe = _safe_type_name(ttype)
+                bucket['storage_file'] = str(Path('User_templates') / f"templates_{safe}.user.hdf5").replace('\\', '/')
+            else:
+                # Otherwise, keep any existing storage_file (first non-empty wins)
+                if not bucket.get('storage_file') and meta.get('storage_file'):
+                    bucket['storage_file'] = meta['storage_file']
+
+        merged['templates'] = base_templates
+        merged['by_type'] = new_by_type
+        merged['template_count'] = len(base_templates)
+        self._index = merged
     
     def _load_all_templates_with_rebinning(self) -> List[TemplateEntry]:
         """Load all templates from the template directory and rebin them to standard grid."""
-        from snid_sage.snid.io import read_template  # Import here to avoid circular imports
+        # Legacy import removed: we no longer build storage from .lnw files
         from snid_sage.snid.preprocessing import log_rebin, init_wavelength_grid
         
         templates = []
-        template_files = list(self.template_dir.glob('*.lnw'))
+        # LNW files are no longer supported as a source. Keep empty list.
+        template_files = []
         
         _LOG.info(f"Loading and rebinning {len(template_files)} template files...")
         
@@ -319,7 +453,8 @@ class TemplateFFTStorage:
             
             try:
                 # Load template data
-                template_data = read_template(str(template_file))
+                # No LNW source: skip
+                continue
                 
                 # Extract metadata
                 name = template_file.stem

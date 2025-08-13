@@ -44,20 +44,20 @@ snid-sage
 ### Step 5: Choose Your Cluster (If Available)
 If SNID SAGE finds multiple viable clusters, a **Cluster Selection Dialog** will appear:
 
-**🎯 What You'll See:**
+What you'll see:
 - **3D Interactive Plot**: Shows all clusters in redshift vs type vs correlation space
 - **Cluster Dropdown**: Click "▼ Select Cluster" in top-left to see all options
 - **Top Matches Panel**: Right side shows spectrum overlays for the selected cluster
 - **Automatic Selection**: Best cluster is pre-selected (marked with ⭐ BEST)
 
-**🔍 How to Choose:**
+How to choose:
 - **Hover** over clusters to highlight them
 - **Click** on any cluster to select it
 - **Use dropdown** to see all clusters with their types and redshifts
 - **Review matches** in the right panel to see template quality
 - **Click "Confirm Selection"** when satisfied
 
-**💡 Pro Tips:**
+Tips:
 - **Best cluster is usually correct** - the automatic selection is reliable
 - **Check the matches panel** - better template overlays indicate better classification
 - **Close dialog** to use automatic selection if unsure
@@ -67,16 +67,16 @@ If SNID SAGE finds multiple viable clusters, a **Cluster Selection Dialog** will
 
 The analysis provides a clear classification:
 
-**🎯 FINAL CLASSIFICATION:**
+Final classification:
 - **Type**: Main supernova type (e.g., II, Ia, Ib, Ic)
 - **Quality**: High/Medium/Low confidence level
 - **Subtype**: Detailed classification (e.g., IIn, IIP, norm)
 
-**📏 MEASUREMENTS:**
+Measurements:
 - **Redshift**: Determined redshift with uncertainty
 - **Age**: Days from maximum light with uncertainty
 
-**🏆 TEMPLATE MATCHES:**
+Template matches:
 A ranked list of best matching templates showing:
 - Template name and type
 - RLAP-Cos score (correlation quality)
@@ -120,16 +120,16 @@ The CLI command performs the **exact same steps** as the GUI:
 ### CLI Output
 The command produces the same comprehensive results:
 
-**🎯 FINAL CLASSIFICATION:**
+Final classification:
 - **Type**: Main supernova type (e.g., II, Ia, Ib, Ic)
 - **Quality**: High/Medium/Low confidence level
 - **Subtype**: Detailed classification (e.g., IIn, IIP, norm)
 
-**📏 MEASUREMENTS:**
+Measurements:
 - **Redshift**: Determined redshift with uncertainty
 - **Age**: Days from maximum light with uncertainty
 
-**🏆 TEMPLATE MATCHES:**
+Template matches:
 - Ranked list of best matching templates
 - RLAP-Cos scores and individual estimates
 
@@ -208,4 +208,4 @@ You've successfully completed your first SNID SAGE analysis! You can now:
 - Use the GUI interface effectively
 - Generate basic visualizations
 
-Ready for more? Check out our [tutorials](../tutorials/) for advanced features and techniques. 
+Ready for more? Check out our [tutorials](../tutorials/index.md) for advanced features and techniques.

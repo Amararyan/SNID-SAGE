@@ -27,6 +27,8 @@ from snid_sage.shared.utils.math_utils import (
     apply_exponential_weighting,
     get_best_metric_value
 )
+from snid_sage.shared.utils.logging import set_verbosity as set_global_verbosity
+from snid_sage.shared.utils.logging import VerbosityLevel
 
 # Import and apply centralized font configuration for consistent plotting
 try:
@@ -47,15 +49,15 @@ class BatchTemplateManager:
     """
     
     def __init__(self, templates_dir: Optional[str], verbose: bool = False):
+        # Initialize logging early so helper methods can use it
+        self._log = logging.getLogger('snid_sage.snid.batch.template_manager')
+
         # Validate and auto-correct templates directory
         self.templates_dir = self._validate_and_fix_templates_dir(templates_dir)
         self.verbose = verbose
         self._templates = None
         self._templates_metadata = None
         self._load_time = None
-        
-        # Initialize logging
-        self._log = logging.getLogger('snid_sage.snid.batch.template_manager')
     
     def _validate_and_fix_templates_dir(self, templates_dir: Optional[str]) -> str:
         """
@@ -75,7 +77,7 @@ class BatchTemplateManager:
             try:
                 from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
                 auto_found_dir = find_templates_directory_or_raise()
-                print(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
+                self._log.info(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
                 return str(auto_found_dir)
             except (ImportError, FileNotFoundError):
                 raise FileNotFoundError(
@@ -90,8 +92,8 @@ class BatchTemplateManager:
         try:
             from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
             auto_found_dir = find_templates_directory_or_raise()
-            print(f"⚠️  Templates directory '{templates_dir}' not found.")
-            print(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
+            self._log.warning(f"Templates directory '{templates_dir}' not found.")
+            self._log.info(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
             return str(auto_found_dir)
         except (ImportError, FileNotFoundError):
             # Fallback failed
@@ -119,7 +121,7 @@ class BatchTemplateManager:
                 self._templates_metadata = {}
                 self._log.info(f"✅ Loaded {len(self._templates)} templates using UNIFIED STORAGE")
             except ImportError:
-                # Fallback to standard loading (for .lnw files)
+                # Fallback to standard loading (legacy path removed)
                 from snid_sage.snid.io import load_templates
                 self._templates, self._templates_metadata = load_templates(self.templates_dir, flatten=True)
                 self._log.info(f"✅ Loaded {len(self._templates)} templates using STANDARD method")
@@ -128,7 +130,7 @@ class BatchTemplateManager:
             
             if not self._templates:
                 self._log.error("❌ No templates loaded")
-                self._log.error("   Check that templates directory exists and contains .hdf5 or .lnw files")
+                self._log.error("   Check that templates directory exists and contains HDF5 files and template_index.json")
                 self._log.error(f"   Templates directory: {self.templates_dir}")
                 return False
                 
@@ -415,6 +417,24 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
         'cluster_size': len(cluster_matches) if cluster_matches else 0,
     }
     
+    # If we have any matches (from cluster or fallback), override the "best_*" fields
+    # to reflect the true top match according to RLAP-CCC (final metric),
+    # and also expose RLAP-CCC on the summary for downstream reporting.
+    if cluster_matches:
+        top_match = cluster_matches[0]
+        top_tpl = top_match.get('template', {}) if isinstance(top_match.get('template'), dict) else {}
+        summary['best_template'] = top_tpl.get('name', top_match.get('name', summary['best_template']))
+        summary['best_template_type'] = top_tpl.get('type', summary['best_template_type'])
+        summary['best_template_subtype'] = top_tpl.get('subtype', summary['best_template_subtype'])
+        # Use the top match's redshift/error for "Best Match Redshift"
+        summary['redshift'] = top_match.get('redshift', summary['redshift'])
+        summary['redshift_error'] = top_match.get('redshift_error', summary['redshift_error'])
+        # Always expose RLAP-CCC; if missing, fall back to RLAP but keep the key present
+        summary['rlap_ccc'] = top_match.get('rlap_ccc', top_match.get('rlap', summary.get('rlap', 0.0)))
+        # Propagate age for top match if available (used as fallback when no cluster age)
+        if isinstance(top_tpl, dict):
+            summary['age'] = top_tpl.get('age', summary.get('age', None))
+
     # Add cluster statistics if available
     if winning_cluster:
         summary['cluster_type'] = winning_cluster.get('type', 'Unknown')
@@ -812,10 +832,23 @@ Examples:
     # Display options
     display_group = parser.add_argument_group("Display Options")
     display_group.add_argument(
+        "--brief",
+        action="store_true",
+        help="Minimal console output: terse per-spectrum status and final summary"
+    )
+    display_group.add_argument(
+        "--full",
+        action="store_true",
+        help="Detailed console output (disables brief mode)"
+    )
+    display_group.add_argument(
         "--no-progress",
         action="store_true",
         help="Disable progress output (auto-disabled when stdout is not a TTY)"
     )
+
+    # Default to brief output unless explicitly overridden
+    parser.set_defaults(brief=True)
     
     # Processing options
     # Parallelism removed to avoid unsafe shared state; always sequential
@@ -888,11 +921,14 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         report.append("Results are sorted by analysis quality (RLAP-CCC) - highest quality first.")
         report.append("")
         
-        # Header
-        header = f"{'Spectrum':<25} {'Type':<8} {'Subtype':<10} {'Template':<18} {'z':<8} {'RLAP-CCC':<8} {'C':<1}"
+        # Header (include redshift error and age)
+        header = (
+            f"{'Spectrum':<16} {'Type':<7} {'Subtype':<9} {'Template':<18} "
+            f"{'z':<8} {'±Error':<10} {'Age':<6} {'RLAP-CCC':<10} {'Status':<1}"
+        )
         report.append(header)
         report.append("-" * len(header))
-        report.append("Legend: * = Cluster-based analysis, z = redshift")
+        # Legend removed per request
         
         # Sort results by RLAP-CCC descending (highest quality first)
         from snid_sage.shared.utils.math_utils import get_best_metric_value
@@ -901,24 +937,59 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         
         # Results
         for _, _, _, summary in successful_results_sorted:
-            spectrum = summary['spectrum'][:24]
-            cons_type = summary.get('consensus_type', 'Unknown')[:7]
-            cons_subtype = summary.get('consensus_subtype', 'Unknown')[:9]
+            spectrum = summary['spectrum'][:15]
+            cons_type = summary.get('consensus_type', 'Unknown')[:6]
+            cons_subtype = summary.get('consensus_subtype', 'Unknown')[:8]
             template = summary.get('best_template', 'Unknown')[:17]
             
             # Use cluster-weighted redshift if available, otherwise regular redshift
-            if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
-                redshift = f"{summary['cluster_redshift_weighted']:.6f}"
+            use_cluster = summary.get('has_clustering') and ('cluster_redshift_weighted' in summary)
+            if use_cluster:
+                redshift = f"{summary.get('cluster_redshift_weighted', float('nan')):.6f}"
+                redshift_err_val = summary.get('cluster_redshift_weighted_uncertainty', None)
             else:
                 redshift = f"{summary.get('redshift', 0):.6f}"
+                redshift_err_val = summary.get('redshift_error', None)
+
+            if isinstance(redshift_err_val, (int, float)) and (redshift_err_val or redshift_err_val == 0):
+                redshift_err = f"{redshift_err_val:.6f}"
+            else:
+                redshift_err = "N/A"
+
+            # Age: prefer cluster-weighted age if available; otherwise top-match age if provided
+            age_val = summary.get('cluster_age_weighted', None)
+            if age_val is None or (isinstance(age_val, float) and (np.isnan(age_val))):
+                age_val = summary.get('age', None)
+            age_str = f"{age_val:.1f}" if isinstance(age_val, (int, float)) else "N/A"
             
             # Use best available metric (RLAP-CCC if available, otherwise RLAP)
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             rlap_cos = f"{get_best_metric_value(summary):.1f}"
-            cluster_marker = "*" if summary.get('has_clustering', False) else " "
+            status_marker = "✓"
             
-            row = f"{spectrum:<25} {cons_type:<8} {cons_subtype:<10} {template:<18} {redshift:<10} {rlap_cos:<8} {cluster_marker}"
+            row = (
+                f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
+                f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {status_marker}"
+            )
             report.append(row)
+
+        # Append failed analyses to the same table with 'x' status
+        if failed_results:
+            for name, success, message, _ in failed_results:
+                spectrum = name[:15]
+                cons_type = 'N/A'
+                cons_subtype = 'N/A'
+                template = 'N/A'
+                redshift = 'N/A'
+                redshift_err = 'N/A'
+                age_str = 'N/A'
+                rlap_cos = 'N/A'
+                status_marker = 'x'
+                row = (
+                    f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
+                    f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {status_marker}"
+                )
+                report.append(row)
         
         report.append("")
         
@@ -1086,6 +1157,22 @@ def main(args: argparse.Namespace) -> int:
     try:
         # Logging already configured at top-level; proceed
         is_quiet = bool(getattr(args, 'quiet', False) or getattr(args, 'silent', False))
+        # Determine brief mode default: on by default, turned off by --full or verbosity flags
+        brief_mode = bool(getattr(args, 'brief', True)) and not bool(getattr(args, 'full', False))
+        if getattr(args, 'verbose', False) or getattr(args, 'debug', False):
+            brief_mode = False
+
+        # If brief mode, quiet down global logging to suppress INFO spam
+        if brief_mode and not is_quiet:
+            try:
+                set_global_verbosity(VerbosityLevel.QUIET)
+            except Exception:
+                pass
+            # Hard-disable INFO and DEBUG from all loggers to keep console minimal
+            try:
+                logging.disable(logging.INFO)
+            except Exception:
+                pass
         
         # Additional suppression for CLI mode - silence specific noisy loggers
         if not args.verbose:
@@ -1127,7 +1214,7 @@ def main(args: argparse.Namespace) -> int:
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Simple startup message (after resolving output_dir)
-        if not is_quiet:
+        if not is_quiet and not brief_mode:
             print("SNID Batch Analysis - Cluster-aware & optimized")
             print(f"   Files: {len(input_files)} spectra")
             print(f"   Mode: {mode}")
@@ -1143,7 +1230,7 @@ def main(args: argparse.Namespace) -> int:
         # ============================================================================
         # OPTIMIZATION: Load templates ONCE for the entire batch
         # ============================================================================
-        if not is_quiet:
+        if not is_quiet and not brief_mode:
             print("Loading templates once for entire batch...")
         template_manager = BatchTemplateManager(args.templates_dir, verbose=args.verbose)
         
@@ -1151,7 +1238,7 @@ def main(args: argparse.Namespace) -> int:
             print("[ERROR] Failed to load templates", file=sys.stderr)
             return 1
         
-        if not is_quiet:
+        if not is_quiet and not brief_mode:
             print(f"[SUCCESS] Templates loaded in {template_manager.load_time:.2f}s")
             print(f"Ready to process {len(input_files)} spectra with {template_manager.template_count} templates")
             print("")
@@ -1161,17 +1248,17 @@ def main(args: argparse.Namespace) -> int:
         failed_count = 0
         
         # Always sequential processing with optimized template loading
-        if not is_quiet:
+        if not is_quiet and not brief_mode:
             print("[INFO] Starting optimized sequential processing...")
 
         for i, spectrum_path in enumerate(input_files, 1):
             is_tty = sys.stdout.isatty()
             show_progress = (not args.verbose) and (not is_quiet) and (not getattr(args, 'no_progress', False)) and is_tty
-            if args.verbose:
+            if args.verbose and not brief_mode:
                 print(f"[{i:3d}/{len(input_files):3d}] {Path(spectrum_path).name}")
             else:
                 # Lightweight progress
-                if show_progress and (i % 10 == 0 or i == len(input_files)):
+                if show_progress and (i % 10 == 0 or i == len(input_files)) and not brief_mode:
                     print(f"   Progress: {i}/{len(input_files)} ({i/len(input_files)*100:.0f}%)")
 
             name, success, message, summary = process_single_spectrum_optimized(
@@ -1182,16 +1269,24 @@ def main(args: argparse.Namespace) -> int:
 
             if not success:
                 failed_count += 1
-                if "No good matches" in message or "No templates after filtering" in message:
-                    # Normal outcome - no match found
-                    if not is_quiet:
-                        print(f"      {name}: No good matches found")
+                if brief_mode and not is_quiet:
+                    # Distinguish normal no-match vs actual error
+                    if ("No good matches" in message) or ("No templates after filtering" in message):
+                        status = "no-match"
+                    else:
+                        status = "error"
+                    print(f"[{i}/{len(input_files)}] {name}: {status}")
                 else:
-                    # Actual error
-                    if not is_quiet:
-                        print(f"      [ERROR] {name}: {message}")
+                    if "No good matches" in message or "No templates after filtering" in message:
+                        # Normal outcome - no match found
+                        if not is_quiet:
+                            print(f"      {name}: No good matches found")
+                    else:
+                        # Actual error
+                        if not is_quiet:
+                            print(f"      [ERROR] {name}: {message}")
                 if args.stop_on_error:
-                    if not is_quiet:
+                    if not is_quiet and not brief_mode:
                         print("Stopping due to error.")
                     break
             else:
@@ -1208,7 +1303,7 @@ def main(args: argparse.Namespace) -> int:
                         redshift = summary.get('redshift', 0)
                         z_marker = ""
 
-                    # Use best available metric (RLAP-CCC > RLAP-Cos > RLAP)
+                    # Use best available metric (prefer RLAP-CCC; RLAP only if RLAP-CCC absent)
                     from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
                     best_metric_value = get_best_metric_value(summary)
                     best_metric_name = get_best_metric_name(summary)
@@ -1216,9 +1311,20 @@ def main(args: argparse.Namespace) -> int:
                     # Format subtype display
                     type_display = f"{consensus_type} {consensus_subtype}".strip()
 
-                    print(f"      {name}: {type_display} z={redshift:.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
+                    if brief_mode:
+                        # Brief enriched line with key info similar to the summary file
+                        best_template = str(summary.get('best_template', 'Unknown'))
+                        best_template_short = best_template[:18]
+                        type_display = f"{consensus_type} {consensus_subtype}".strip()
+                        metric_str = f"{best_metric_name}={best_metric_value:.1f}"
+                        z_value = redshift
+                        print(
+                            f"[{i}/{len(input_files)}] {name}: {type_display} z={z_value:.6f} {metric_str} tpl={best_template_short}"
+                        )
+                    else:
+                        print(f"      {name}: {type_display} z={redshift:.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
                 else:
-                    if not is_quiet:
+                    if not is_quiet and not brief_mode:
                         print(f"      {name}: success")
         
         # Results summary
@@ -1226,26 +1332,29 @@ def main(args: argparse.Namespace) -> int:
         success_rate = successful_count / len(results) * 100 if results else 0
         
         if not is_quiet:
-            print(f"\nCompleted: {success_rate:.1f}% success ({successful_count}/{len(results)})")
-        
+            if brief_mode:
+                print(f"Done {successful_count}/{len(results)}; success rate {success_rate:.1f}%")
+            else:
+                print(f"\nCompleted: {success_rate:.1f}% success ({successful_count}/{len(results)})")
+
         # Generate summary report
-            summary_path = output_dir / "batch_analysis_report.txt"
-        if not is_quiet:
-                print(f"Generating summary report...")
-        
+        summary_path = output_dir / "batch_analysis_report.txt"
+        if not is_quiet and not brief_mode:
+            print("Generating summary report...")
+
         summary_report = generate_summary_report(results, args)
         with open(summary_path, 'w', encoding='utf-8') as f:
             f.write(summary_report)
-        
-        if not is_quiet:
+
+        if not is_quiet and not brief_mode:
             print(f"[SUCCESS] Summary report: {summary_path}")
-        
-                # Show what was created
-        if not is_quiet and not args.minimal and successful_count > 0:
+
+        # Show what was created
+        if not is_quiet and not brief_mode and not args.minimal and successful_count > 0:
             print(f"Individual results in: {output_dir}/")
             if args.complete:
-                print(f"   3D Plots: Static PNG files with optimized viewing angle")
-                print(f"   Top 5 templates: Sorted by RLAP-CCC (highest quality first)")
+                print("   3D Plots: Static PNG files with optimized viewing angle")
+                print("   Top 5 templates: Sorted by RLAP-CCC (highest quality first)")
             
         return 0 if failed_count == 0 else 1
         

@@ -28,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # Note: find_winning_cluster_exact_match has been replaced by find_winning_cluster_top5_method
-# The new method uses top-5 best metric values (RLAP-CCC > RLAP) with penalties for small clusters
+# The new method uses top-5 best metric values (prefer RLAP-CCC; fallback to RLAP) with penalties for small clusters
 
 
 
@@ -168,7 +168,7 @@ def perform_direct_gmm_clustering(
     top_percentage: float = 0.10,
     verbose: bool = False,
     use_rlap_cos: bool = True,  # DEPRECATED: Now uses get_best_metric_value() automatically
-    rlap_ccc_threshold: float = 1.0  # NEW: RLAP-CCC threshold for clustering
+    rlap_ccc_threshold: float = 1.5  # NEW: RLAP-CCC threshold for clustering
 ) -> Dict[str, Any]:
     """
     Direct GMM clustering on redshift values with automatic best metric selection.
@@ -177,7 +177,7 @@ def perform_direct_gmm_clustering(
     matching the approach in transformation_comparison_test.py exactly.
     
     NEW: Now automatically uses the best available similarity metric via 
-    get_best_metric_value(): RLAP-CCC > RLAP for improved template discrimination.
+    get_best_metric_value(): prefers RLAP-CCC (final metric); falls back to RLAP when needed.
     
     Parameters
     ----------
@@ -207,7 +207,9 @@ def perform_direct_gmm_clustering(
     
     # Determine which metric to use - now using get_best_metric_value()
     # This automatically prioritizes RLAP-CCC > RLAP
-    metric_name = "Best Available (RLAP-CCC > RLAP)"
+    # Standardize metric naming; do not imply comparison phrasing.
+    # We always prefer the final RLAP-CCC metric when available.
+    metric_name = "RLAP-CCC"
     metric_key = "best_metric"  # Not actually used anymore, see get_best_metric_value() calls
     
     _LOGGER.info(f"🔄 Starting direct GMM top-{top_percentage*100:.0f}% {metric_name} clustering")
@@ -956,7 +958,7 @@ def find_winning_cluster_top5_method(
     verbose: bool = False
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Find the winning cluster using the top-5 best metric method (RLAP-CCC > RLAP).
+    Find the winning cluster using the top-5 best metric method (prefer RLAP-CCC; fallback to RLAP).
     
     This method:
     1. Takes the top 5 best metric values from each cluster (using get_best_metric_value())
@@ -984,7 +986,9 @@ def find_winning_cluster_top5_method(
         return None, {'error': 'No cluster candidates available'}
     
     # DEPRECATED: Parameters not used anymore, see get_best_metric_value() calls
-    metric_name = 'Best Available (RLAP-CCC > RLAP)'
+    # Standardize metric naming; do not imply comparison phrasing.
+    # We always prefer the final RLAP-CCC metric when available.
+    metric_name = 'RLAP-CCC'
     
     # Calculate top-5 means for each cluster
     cluster_scores = []
@@ -997,7 +1001,7 @@ def find_winning_cluster_top5_method(
         # Extract metric values and sort in descending order
         metric_values = []
         for match in matches:
-            # Use get_best_metric_value to automatically prioritize RLAP-CCC > RLAP
+            # Use get_best_metric_value to automatically prioritize RLAP-CCC
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             value = get_best_metric_value(match)
             metric_values.append(value)

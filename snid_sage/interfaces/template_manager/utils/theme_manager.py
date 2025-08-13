@@ -25,13 +25,13 @@ except ImportError:
     import logging
     _LOGGER = logging.getLogger('template_manager.theme')
 
-# Import main GUI theme manager for consistency
+# Import shared UI core theme manager for base stylesheet consistency
 try:
-    from snid_sage.interfaces.gui.utils.pyside6_theme_manager import PySide6ThemeManager as MainThemeManager
+    from snid_sage.interfaces.ui_core import get_theme_manager as _get_base_theme
     MAIN_THEME_AVAILABLE = True
-except ImportError:
+except Exception:
     MAIN_THEME_AVAILABLE = False
-    MainThemeManager = None
+    _get_base_theme = None  # type: ignore
 
 
 class TemplateManagerThemeManager:
@@ -45,11 +45,12 @@ class TemplateManagerThemeManager:
     def __init__(self):
         """Initialize the Template Manager theme manager"""
         self._main_theme = None
-        if MAIN_THEME_AVAILABLE:
+        if MAIN_THEME_AVAILABLE and _get_base_theme is not None:
             try:
-                self._main_theme = MainThemeManager()
+                # Use the shared theme manager instance for base styles
+                self._main_theme = _get_base_theme()
             except Exception as e:
-                _LOGGER.warning(f"Could not initialize main theme manager: {e}")
+                _LOGGER.warning(f"Could not initialize base theme manager: {e}")
         
         # Template Manager specific colors
         self._template_colors = {
@@ -57,17 +58,12 @@ class TemplateManagerThemeManager:
             'template_selected': '#3498db',
             'template_creator': '#10B981',
             'template_manager': '#8B5CF6',
-            'template_comparison': '#F59E0B',
-            'template_statistics': '#EF4444',
             'template_viewer': '#06B6D4'
         }
         
     def get_base_colors(self) -> Dict[str, str]:
         """Get base color palette, delegating to main theme if available"""
-        if self._main_theme:
-            return self._main_theme.get_base_colors()
-        
-        # Fallback colors matching main GUI
+        # Local base palette (kept stable to avoid depending on base theme internals)
         return {
             'primary': '#2c3e50',
             'secondary': '#34495e',
@@ -88,10 +84,7 @@ class TemplateManagerThemeManager:
     
     def get_workflow_colors(self) -> Dict[str, str]:
         """Get workflow button colors, delegating to main theme if available"""
-        if self._main_theme:
-            return self._main_theme.get_workflow_colors()
-        
-        # Fallback workflow colors
+        # Local workflow palette
         return {
             'preprocessing': '#3498db',
             'identification': '#e74c3c', 
@@ -158,17 +151,7 @@ class TemplateManagerThemeManager:
             background-color: {colors['template_manager']};
         }}
         
-        /* Template Comparison Styles */
-        TemplateComparisonWidget QPushButton[objectName="compare_btn"] {{
-            background-color: {colors['template_comparison']};
-            color: white;
-            font-weight: bold;
-        }}
-        
-        /* Template Statistics Styles */
-        TemplateStatisticsWidget {{
-            background-color: {colors['template_statistics']};
-        }}
+        /* Comparison and Statistics tabs removed */
         """
     
     def _generate_fallback_stylesheet(self) -> str:

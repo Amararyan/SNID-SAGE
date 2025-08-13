@@ -336,13 +336,13 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
             
             # Format message with color based on level
             if level == "success":
-                formatted_line = f'<span style="color: #059669; font-weight: bold;">[{timestamp}] ✅ {message}</span>'
+                formatted_line = f'<span style="color: #059669; font-weight: bold;">[{timestamp}] {message}</span>'
             elif level == "warning":
-                formatted_line = f'<span style="color: #d97706; font-weight: bold;">[{timestamp}] ⚠️ {message}</span>'
+                formatted_line = f'<span style="color: #d97706; font-weight: bold;">[{timestamp}] {message}</span>'
             elif level == "error":
-                formatted_line = f'<span style="color: #dc2626; font-weight: bold;">[{timestamp}] ❌ {message}</span>'
+                formatted_line = f'<span style="color: #dc2626; font-weight: bold;">[{timestamp}] {message}</span>'
             else:  # info
-                formatted_line = f'<span style="color: #475569;">[{timestamp}] ℹ️ {message}</span>'
+                formatted_line = f'<span style="color: #475569;">[{timestamp}] {message}</span>'
             
             # Add to text area
             cursor = self.progress_text.textCursor()
@@ -423,7 +423,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         try:
             if success:
                 self.set_stage("Analysis Complete", 100)
-                self.add_progress_line("🎉 SNID analysis completed successfully!", "success")
+                self.add_progress_line("SNID analysis completed successfully!", "success")
                 if message:
                     self.add_progress_line(message, "success")
                 
@@ -437,7 +437,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
                 
             else:
                 self.set_stage("Analysis Failed", self.progress_bar.value())
-                self.add_progress_line("❌ SNID analysis failed", "error")
+                self.add_progress_line("SNID analysis failed", "error")
                 if message:
                     self.add_progress_line(f"Error: {message}", "error")
                 
@@ -509,7 +509,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
             _LOGGER.info("Space Debris Cleanup game started from analysis progress dialog")
         except Exception as e:
             _LOGGER.error(f"Error starting Space Debris game: {e}")
-            self.add_progress_line(f"❌ Failed to start game: {str(e)}", "error")
+            self.add_progress_line(f"Failed to start game: {str(e)}", "error")
 
 
 class AnalysisProgressManager(QtCore.QObject):

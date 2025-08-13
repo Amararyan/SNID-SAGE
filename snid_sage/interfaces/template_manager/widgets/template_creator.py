@@ -17,6 +17,7 @@ from snid_sage.interfaces.gui.components.widgets.flexible_number_input import cr
 
 # Import layout manager
 from ..utils.layout_manager import get_template_layout_manager
+from ..services.template_service import get_template_service
 
 # Import main GUI preprocessing dialog if available
 try:
@@ -123,7 +124,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             self, 
             "Select Spectrum File",
             "",
-            "All Supported (*.txt *.dat *.ascii *.asci *.lnw *.fits *.flm);;Text Files (*.txt *.dat *.ascii *.asci *.flm);;SNID Files (*.lnw);;FITS Files (*.fits);;FLM Files (*.flm);;All Files (*.*)"
+            "All Supported (*.txt *.dat *.ascii *.asci *.fits *.flm);;Text Files (*.txt *.dat *.ascii *.asci *.flm);;FITS Files (*.fits);;FLM Files (*.flm);;All Files (*.*)"
         )
         
         if file_path:
@@ -213,8 +214,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
                 
                 if SNID_AVAILABLE:
                     processed_spectrum, trace = preprocess_spectrum(
-                        wave=wave,
-                        flux=flux,
+                        input_spectrum=(wave, flux),
                         verbose=False
                     )
                     spectrum_data = processed_spectrum
@@ -227,8 +227,35 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
                         'flat': flux / np.median(flux)
                     }
             
-            # Save template
-            success = self._save_template(template_info, spectrum_data)
+            # Extract wave/flux arrays
+            wave = spectrum_data.get('processed_wave') or spectrum_data.get('wave') or spectrum_data.get('wavelength')
+            flux = spectrum_data.get('flat') or spectrum_data.get('processed_flux') or spectrum_data.get('flux')
+            if wave is None or flux is None:
+                raise ValueError("No valid wave/flux in spectrum data")
+
+            wave = np.asarray(wave, dtype=float)
+            flux = np.asarray(flux, dtype=float)
+
+            # De-redshift to rest-frame if needed
+            try:
+                z_input = float(template_info.get('redshift', 0.0) or 0.0)
+            except Exception:
+                z_input = 0.0
+            if z_input != 0.0 and wave.size > 0:
+                wave = wave / (1.0 + z_input)
+
+            # Persist via HDF5-only service
+            svc = get_template_service()
+            success = svc.add_template_from_arrays(
+                name=template_info['name'],
+                ttype=template_info['type'],
+                subtype=template_info['subtype'],
+                age=float(template_info['age']),
+                redshift=float(template_info['redshift']),
+                phase=template_info['phase'],
+                wave=wave,
+                flux=flux,
+            )
             
             if success:
                 QtWidgets.QMessageBox.information(
@@ -250,42 +277,9 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             _LOGGER.error(f"Template creation error: {e}")
             
     def _save_template(self, template_info: Dict[str, Any], spectrum_data: Dict[str, np.ndarray]) -> bool:
-        """Save template to the template library"""
-        try:
-            # For now, save to a simple directory structure
-            # In a full implementation, this would integrate with the HDF5 template storage
-            
-            templates_dir = Path("snid_sage/templates/Custom_templates")
-            templates_dir.mkdir(exist_ok=True)
-            
-            # Save as simple LNW format for now
-            template_file = templates_dir / f"{template_info['name']}.lnw"
-            
-            # Create simple LNW-style format
-            wave = spectrum_data.get('wave', spectrum_data.get('wavelength', []))
-            flux = spectrum_data.get('flat', spectrum_data.get('flux', []))
-            
-            if len(wave) == 0 or len(flux) == 0:
-                raise ValueError("No valid spectrum data to save")
-            
-            # Write template file
-            with open(template_file, 'w') as f:
-                f.write(f"# Template: {template_info['name']}\n")
-                f.write(f"# Type: {template_info['type']}\n")
-                f.write(f"# Subtype: {template_info['subtype']}\n")
-                f.write(f"# Age: {template_info['age']}\n")
-                f.write(f"# Redshift: {template_info['redshift']}\n")
-                f.write(f"# Created by SNID Template Manager\n")
-                
-                for w, f_val in zip(wave, flux):
-                    f.write(f"{w:.6f} {f_val:.6e}\n")
-            
-            _LOGGER.info(f"Template saved to: {template_file}")
-            return True
-            
-        except Exception as e:
-            _LOGGER.error(f"Error saving template: {e}")
-            return False
+        """Deprecated: LNW saving removed. Use TemplateService instead."""
+        _LOGGER.error("_save_template legacy path invoked; this method is deprecated in HDF5-only mode.")
+        return False
             
     def _clear_form(self):
         """Clear the template creation form"""
@@ -299,11 +293,9 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
     def _load_spectrum(self, file_path: str) -> Tuple[np.ndarray, np.ndarray]:
         """Load spectrum from file"""
         try:
-            # Try different file formats
+            # Try different file formats (LNW removed)
             if file_path.endswith('.fits'):
                 return self._load_fits_spectrum(file_path)
-            elif file_path.endswith('.lnw'):
-                return self._load_lnw_spectrum(file_path)
             elif file_path.endswith('.flm'):
                 return self._load_ascii_spectrum(file_path)  # FLM files are text-based
             else:
@@ -337,18 +329,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         except ImportError:
             raise ImportError("astropy required for FITS files: pip install astropy")
             
-    def _load_lnw_spectrum(self, file_path: str) -> Tuple[np.ndarray, np.ndarray]:
-        """Load spectrum from LNW file"""
-        if SNID_AVAILABLE:
-            try:
-                from snid_sage.snid.io import read_template
-                template = read_template(file_path)
-                return template['wave'], template['flux']
-            except Exception as e:
-                _LOGGER.warning(f"Could not load LNW file with SNID reader: {e}")
-        
-        # Fallback to ASCII loading
-        return self._load_ascii_spectrum(file_path)
+    # LNW loading removed
         
     def _load_ascii_spectrum(self, file_path: str) -> Tuple[np.ndarray, np.ndarray]:
         """Load spectrum from ASCII file"""
