@@ -239,7 +239,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+            font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;
@@ -345,7 +345,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
                 font-size: {font_size};
                 padding: {padding};
                 min-height: {height};
-                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+                font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
             }}
             QPushButton:hover {{
                 background-color: {hover_color};
@@ -620,7 +620,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+            font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;
@@ -661,7 +661,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+            font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;
@@ -699,7 +699,7 @@ class EnhancedDialogButtonManager(QtCore.QObject):
             font-size: {font_size};
             padding: {padding};
             min-height: {height};
-            font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+            font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
         }}
         QPushButton:focus {{
             outline: none;

@@ -50,7 +50,7 @@ except ImportError:
 def _get_ui_font_family() -> str:
     """Return a UI font family that exists on the current platform."""
     if sys.platform == 'darwin':
-        return 'Helvetica Neue'
+        return 'Arial'
     if sys.platform == 'win32':
         return 'Segoe UI'
     # Linux and others: pick commonly available sans

@@ -764,7 +764,7 @@ class PySide6ThemeManager:
         QPushButton[objectName="unified_prev_btn"], 
         QPushButton[objectName="unified_next_btn"] {
             padding: 2px 4px !important;
-            font-size: 10pt !important;
+            font-size: 14pt !important;
             font-weight: bold !important;
             min-height: 24px !important;
             background-color: #f3f4f6;

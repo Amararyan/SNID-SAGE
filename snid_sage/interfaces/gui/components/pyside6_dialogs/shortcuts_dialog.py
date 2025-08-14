@@ -228,7 +228,7 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
     @staticmethod
     def _ui_font_family() -> str:
         if sys.platform == 'darwin':
-            return 'Helvetica Neue'
+            return 'Arial'
         if sys.platform == 'win32':
             return 'Segoe UI'
         return 'DejaVu Sans'

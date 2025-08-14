@@ -891,14 +891,37 @@ def main(args: argparse.Namespace) -> int:
             if result and result.success:
                 progress_indicator.finish("Analysis complete")
             else:
-                progress_indicator.finish("Analysis failed")
+                progress_indicator.finish("Analysis complete")
             print()
-        
-        if not result or not result.success:
+
+        # Friendly handling for no-match outcomes vs hard failures
+        if not result:
             print(f"\nSNID analysis failed for {spectrum_name}")
-            if hasattr(result, 'error_message'):
-                print(f"   Error: {result.error_message}")
             return 1
+        if not result.success:
+            # Determine if this is a no-match outcome
+            num_best = 0
+            try:
+                if hasattr(result, 'best_matches') and result.best_matches:
+                    num_best = len(result.best_matches)
+            except Exception:
+                num_best = 0
+
+            if num_best == 0:
+                print(f"\n{spectrum_name}: No good matches found")
+                # Provide concise guidance for CLI users
+                if not is_quiet:
+                    print("\nSuggestions:")
+                    print("  • Try Advanced Preprocessing (smoothing, wavelength masks, continuum)")
+                    print("  • Adjust the redshift search range or try a manual redshift estimate")
+                    print("  • Mask strong sky/telluric features; increase S/N if possible")
+                    print("  • Ensure the correct template sets are enabled")
+                return 2
+            else:
+                print(f"\nSNID analysis failed for {spectrum_name}")
+                if hasattr(result, 'error_message'):
+                    print(f"   Error: {result.error_message}")
+                return 1
         
 
         
@@ -996,7 +1019,7 @@ def main(args: argparse.Namespace) -> int:
             return 0
         else:
             print(f"\n{spectrum_name}: No good matches found")
-            return 1
+            return 2
             
     except FileNotFoundError as e:
         print(f"[ERROR] File not found - {e}", file=sys.stderr)

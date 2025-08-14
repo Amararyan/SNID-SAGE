@@ -294,15 +294,16 @@ class TwemojiManager:
         
         icon = self.get_icon(emoji)
         if not icon:
-            # If we can't get an icon, still sanitize the text by removing the emoji
-            # from the beginning when there is additional label text.
+            # If we can't get an icon, only strip the emoji when there is additional label text.
+            # Preserve pure-symbol buttons like "◀"/"▶" so their Unicode glyphs remain visible.
             try:
                 if keep_text:
                     current_text = button.text() or ""
                     if current_text.startswith(emoji):
-                        new_text = current_text[len(emoji):].strip()
-                        button.setText(new_text)
-                _LOGGER.debug(f"No Twemoji icon for '{emoji}'. Emoji removed from button text if present.")
+                        new_text = (current_text[len(emoji):]).strip()
+                        if new_text:
+                            button.setText(new_text)
+                _LOGGER.debug(f"No Twemoji icon for '{emoji}'. Kept original text when it contained only the symbol.")
             except Exception:
                 pass
             return False
@@ -347,6 +348,18 @@ class TwemojiManager:
         for button in buttons:
             text = button.text()
             if not text:
+                continue
+
+            # Skip specific navigation buttons and pure triangle/arrow-only labels
+            try:
+                object_name = button.objectName() if hasattr(button, 'objectName') else ""
+            except Exception:
+                object_name = ""
+            if object_name in {"unified_prev_btn", "unified_next_btn"}:
+                _LOGGER.debug(f"Skipping Twemoji conversion for navigation button: {object_name}")
+                continue
+            if text in {"◀", "▶", "◀◀", "▶▶"}:
+                _LOGGER.debug("Skipping Twemoji conversion for pure arrow/triangle label button")
                 continue
 
             handled = False

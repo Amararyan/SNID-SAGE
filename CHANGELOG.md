@@ -18,6 +18,19 @@ All notable changes to SNID SAGE will be documented in this file.
 
 ---
 
+## [0.4.1] - 2025-08-14
+
+### Added
+- Automatic version checking on startup (GUI and CLI). The check is non-blocking and only notifies when an update is available.
+
+### Fixed
+- Cross‑platform keyboard shortcuts: corrected Ctrl (Windows/Linux) vs Cmd (macOS) handling across GUI menus and dialogs.
+
+### Notes
+- Version numbering managed by setuptools_scm; publish by tagging `v0.4.1`.
+
+---
+
 ## [0.4.0] - 2025-08-14
 
 ### Changed

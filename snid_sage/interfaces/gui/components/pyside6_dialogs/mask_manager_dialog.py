@@ -74,7 +74,7 @@ class PySide6MaskManagerDialog(QtWidgets.QDialog):
             QDialog {{
                 background: {self.colors['bg_primary']};
                 color: {self.colors['text_primary']};
-                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+                font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
             }}
             
             QGroupBox {{

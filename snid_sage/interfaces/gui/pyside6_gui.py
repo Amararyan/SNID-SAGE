@@ -1037,7 +1037,31 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                             self.progress_dialog.analysis_completed(True, msg)
                             QtCore.QTimer.singleShot(2000, self.progress_dialog.accept)  # Auto-close after 2 seconds
                     else:
-                        self.progress_dialog.analysis_completed(False, "Analysis failed - see logs for details")
+                        # Distinguish between a true failure and an inconclusive/no-match outcome
+                        results = getattr(self.app_controller, 'snid_results', None)
+                        # Build an indicative message if we can detect the inconclusive path
+                        inconclusive_msg = None
+                        try:
+                            if results is None or not getattr(results, 'success', False):
+                                # Check analysis trace or controller log state for no-match conditions
+                                # Prefer explicit flags when present
+                                if hasattr(self.app_controller, '_has_good_cluster') and not self.app_controller._has_good_cluster(results):
+                                    # If engine ran but we have zero matches, treat as inconclusive
+                                    num_best = 0
+                                    try:
+                                        if results and hasattr(results, 'best_matches') and results.best_matches:
+                                            num_best = len(results.best_matches)
+                                    except Exception:
+                                        num_best = 0
+                                    if num_best == 0:
+                                        inconclusive_msg = "Analysis inconclusive: no good matches found"
+                        except Exception:
+                            inconclusive_msg = None
+
+                        if inconclusive_msg:
+                            self.progress_dialog.analysis_completed(False, inconclusive_msg)
+                        else:
+                            self.progress_dialog.analysis_completed(False, "Analysis failed - see logs for details")
                 except Exception as e:
                     _LOGGER.warning(f"Error updating progress dialog: {e}")
             
@@ -1105,39 +1129,77 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 
                 _LOGGER.info("🎉 GUI updated after successful analysis completion")
             else:
-                self.status_label.setText("SNID analysis failed")
-                self.config_status_label.setText("Analysis Failed")
-                self.config_status_label.setStyleSheet("font-style: italic; color: #ef4444;")
-                
-                # Enhanced error messaging based on analysis type
-                error_info = getattr(self.app_controller, 'last_analysis_error', None)
-                
-                if error_info and error_info.get('type') == 'forced_redshift':
-                    # Specific messaging for forced redshift failures
-                    context = error_info.get('context', 'forced redshift analysis')
-                    error_msg = error_info.get('error', 'Unknown error')
-                    
-                    QtWidgets.QMessageBox.critical(
+                # Determine if this is an inconclusive outcome (no good matches) vs a hard failure
+                results = getattr(self.app_controller, 'snid_results', None)
+                has_good_cluster = False
+                try:
+                    if hasattr(self.app_controller, '_has_good_cluster'):
+                        has_good_cluster = self.app_controller._has_good_cluster(results)
+                except Exception:
+                    has_good_cluster = False
+
+                num_best = 0
+                try:
+                    if results and hasattr(results, 'best_matches') and results.best_matches:
+                        num_best = len(results.best_matches)
+                except Exception:
+                    num_best = 0
+
+                is_inconclusive = bool((results is not None) and (not has_good_cluster or num_best == 0))
+
+                if is_inconclusive:
+                    # Inconclusive: no good matches found – guide the user
+                    self.status_label.setText("Analysis inconclusive – no good matches found")
+                    self.config_status_label.setText("Inconclusive")
+                    self.config_status_label.setStyleSheet("font-style: italic; color: #d97706;")
+
+                    QtWidgets.QMessageBox.information(
                         self,
-                        "Forced Redshift Analysis Failed",
-                        f"The {context} failed to complete.\n\n"
-                        f"Error: {error_msg}\n\n"
-                        "Common solutions:\n"
-                        "• Check that the forced redshift value is reasonable (0 < z < 2)\n"
-                        "• Verify your spectrum preprocessing settings\n"
-                        "• Try using automatic redshift search instead\n"
-                        "• Check that templates are properly loaded\n\n"
-                        "Please check the analysis logs for detailed error information."
+                        "No Good Matches Found",
+                        (
+                            "The analysis completed, but no reliable matches were found.\n\n"
+                            "Try the following to improve results:\n"
+                            "• Use Advanced Preprocessing (smoothing, wavelength masks, continuum).\n"
+                            "• Adjust the redshift search range or try a manual redshift estimate.\n"
+                            "• Mask strong sky/telluric features; increase S/N if possible.\n"
+                            "• Ensure the correct template sets are enabled."
+                        )
                     )
                 else:
-                    # Standard error messaging for normal analysis
-                    QtWidgets.QMessageBox.critical(
-                        self,
-                        "Analysis Failed",
-                        "SNID analysis failed to complete.\n\n"
-                        "Please check the analysis logs for detailed error information.\n"
-                        "You may need to verify your spectrum preprocessing or template configuration."
-                    )
+                    # Hard failure
+                    self.status_label.setText("SNID analysis failed")
+                    self.config_status_label.setText("Analysis Failed")
+                    self.config_status_label.setStyleSheet("font-style: italic; color: #ef4444;")
+
+                    # Enhanced error messaging based on analysis type
+                    error_info = getattr(self.app_controller, 'last_analysis_error', None)
+
+                    if error_info and error_info.get('type') == 'forced_redshift':
+                        # Specific messaging for forced redshift failures
+                        context = error_info.get('context', 'forced redshift analysis')
+                        error_msg = error_info.get('error', 'Unknown error')
+
+                        QtWidgets.QMessageBox.critical(
+                            self,
+                            "Forced Redshift Analysis Failed",
+                            f"The {context} failed to complete.\n\n"
+                            f"Error: {error_msg}\n\n"
+                            "Common solutions:\n"
+                            "• Check that the forced redshift value is reasonable (0 < z < 2)\n"
+                            "• Verify your spectrum preprocessing settings\n"
+                            "• Try using automatic redshift search instead\n"
+                            "• Check that templates are properly loaded\n\n"
+                            "Please check the analysis logs for detailed error information."
+                        )
+                    else:
+                        # Standard error messaging for normal analysis
+                        QtWidgets.QMessageBox.critical(
+                            self,
+                            "Analysis Failed",
+                            "SNID analysis failed to complete.\n\n"
+                            "Please check the analysis logs for detailed error information.\n"
+                            "You may need to verify your spectrum preprocessing or template configuration."
+                        )
         except Exception as e:
             _LOGGER.error(f"Error handling analysis completion: {e}")
     
@@ -2146,38 +2208,51 @@ def main(verbosity_args=None):
         if logger:
             logger.info("PySide6 GUI created successfully and is visible!")
 
-        # Non-blocking PyPI update check; only notify if update available
+        # Non-blocking PyPI update check; show dialog only if an update is available
         try:
             from snid_sage.shared.utils.version_checker import VersionChecker
 
             def _notify_if_update_available(info: dict) -> None:
                 try:
-                    if info and info.get('update_available'):
-                        current = info.get('current_version', 'unknown')
-                        latest = info.get('latest_version', 'unknown')
+                    # Show a modal info dialog only when an update is available
+                    def _show_dialog_if_needed():
+                        try:
+                            if info and info.get('update_available'):
+                                try:
+                                    from snid_sage.interfaces.gui.utils.pyside6_message_utils import showinfo
+                                    current = info.get('current_version', 'unknown')
+                                    latest = info.get('latest_version', 'unknown')
+                                    showinfo(
+                                        "Update Available",
+                                        f"SNID SAGE {current} → {latest}\nUpdate with: pip install --upgrade snid-sage",
+                                        parent=window,
+                                    )
+                                except Exception:
+                                    if logger:
+                                        logger.debug("Failed to show update-available dialog", exc_info=True)
+                                    pass
+                        except Exception:
+                            if logger:
+                                logger.debug("Failed while handling update notification", exc_info=True)
+                            pass
 
-                        def _show_dialog():
-                            try:
-                                from snid_sage.interfaces.gui.utils.pyside6_message_utils import showinfo
-                                showinfo(
-                                    "Update Available",
-                                    f"SNID SAGE {current} → {latest}\nUpdate with: pip install --upgrade snid-sage",
-                                    parent=window,
-                                )
-                            except Exception:
-                                pass
-
-                        # Ensure dialog shows on the main Qt thread
-                        QtCore.QTimer.singleShot(0, _show_dialog)
+                    # Ensure UI interactions happen on the main Qt thread
+                    QtCore.QTimer.singleShot(0, _show_dialog_if_needed)
                 except Exception:
+                    if logger:
+                        logger.debug("Update check callback failed", exc_info=True)
                     pass
 
             try:
                 VersionChecker(timeout=3.0).check_for_updates_async(_notify_if_update_available)
             except Exception:
+                if logger:
+                    logger.debug("Failed to start asynchronous update check", exc_info=True)
                 pass
         except Exception:
             # Silently ignore if version checker or GUI utils are unavailable
+            if logger:
+                logger.debug("Version checker not available; skipping update check")
             pass
         
         # Start event loop

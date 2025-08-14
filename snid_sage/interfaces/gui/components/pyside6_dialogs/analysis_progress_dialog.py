@@ -79,7 +79,7 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
             QDialog {
                 background: #f8fafc;
                 color: #1e293b;
-                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+                font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
             }
             
             QLabel {
@@ -438,16 +438,38 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
                 self.hide_btn.setText("View Results")
                 
             else:
-                self.set_stage("Analysis Failed", self.progress_bar.value())
-                self.add_progress_line("SNID analysis failed", "error")
-                if message:
-                    self.add_progress_line(f"Error: {message}", "error")
-                
-                # Change title and button
-                self.title_label.setText("SNID Analysis Failed")
-                self.cancel_btn.setText("Close")
-                self.cancel_btn.clicked.disconnect()
-                self.cancel_btn.clicked.connect(self.reject)
+                # Treat specific cases (no matches / inconclusive) as a non-error outcome
+                normalized_msg = (message or "").lower()
+                is_inconclusive = any(k in normalized_msg for k in [
+                    "inconclusive",
+                    "no good matches",
+                    "no template matches",
+                    "no reliable cluster",
+                    "no matches found"
+                ])
+
+                if is_inconclusive:
+                    self.set_stage("Analysis Inconclusive", self.progress_bar.value())
+                    # Provide a clear, user-friendly line without an error tone
+                    display_msg = message or "No good matches found"
+                    self.add_progress_line(display_msg, "warning")
+                    
+                    # Update dialog visuals to reflect an inconclusive (not error) state
+                    self.title_label.setText("SNID Analysis Inconclusive")
+                    self.cancel_btn.setText("Close")
+                    self.cancel_btn.clicked.disconnect()
+                    self.cancel_btn.clicked.connect(self.reject)
+                else:
+                    self.set_stage("Analysis Failed", self.progress_bar.value())
+                    self.add_progress_line("SNID analysis failed", "error")
+                    if message:
+                        self.add_progress_line(f"Error: {message}", "error")
+                    
+                    # Change title and button
+                    self.title_label.setText("SNID Analysis Failed")
+                    self.cancel_btn.setText("Close")
+                    self.cancel_btn.clicked.disconnect()
+                    self.cancel_btn.clicked.connect(self.reject)
                 
             # Re-apply styles after changing object names
             self.setStyleSheet(self.styleSheet())

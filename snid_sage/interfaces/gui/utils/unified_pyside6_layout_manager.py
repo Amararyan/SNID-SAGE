@@ -306,7 +306,7 @@ class UnifiedPySide6LayoutManager:
                 border-radius: 4px;
                 padding: 2px 4px;
                 font-weight: bold;
-                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+                font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
                 font-size: 14px;
                 color: white;
             }

@@ -76,7 +76,7 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         if platform.system() == "Windows":
             preferred_fonts = ["Segoe UI", "Calibri", "Arial", "Verdana", "Tahoma"]
         elif platform.system() == "Darwin":  # macOS
-            preferred_fonts = ["SF Pro Display", "Helvetica Neue", "Arial", "Verdana"]
+            preferred_fonts = ["Arial", "Helvetica Neue", "Verdana"]
         else:  # Linux
             preferred_fonts = ["Ubuntu", "DejaVu Sans", "Liberation Sans", "Arial", "Verdana"]
         

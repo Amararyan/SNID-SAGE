@@ -57,7 +57,8 @@ def showerror(title: str, message: str, parent: Optional[Any] = None) -> None:
             print(f"ERROR [{title}]: {message}")
             return
         
-        msg = QtWidgets.QMessageBox(qt_parent)
+        parent_widget = parent if isinstance(parent, QtWidgets.QWidget) else qt_parent
+        msg = QtWidgets.QMessageBox(parent_widget)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Critical)
         msg.setWindowTitle(title)
         msg.setText(message)
@@ -81,7 +82,8 @@ def showwarning(title: str, message: str, parent: Optional[Any] = None) -> None:
             print(f"WARNING [{title}]: {message}")
             return
         
-        msg = QtWidgets.QMessageBox(qt_parent)
+        parent_widget = parent if isinstance(parent, QtWidgets.QWidget) else qt_parent
+        msg = QtWidgets.QMessageBox(parent_widget)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         msg.setWindowTitle(title)
         msg.setText(message)
@@ -105,7 +107,8 @@ def showinfo(title: str, message: str, parent: Optional[Any] = None) -> None:
             print(f"INFO [{title}]: {message}")
             return
         
-        msg = QtWidgets.QMessageBox(qt_parent)
+        parent_widget = parent if isinstance(parent, QtWidgets.QWidget) else qt_parent
+        msg = QtWidgets.QMessageBox(parent_widget)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
         msg.setWindowTitle(title)
         msg.setText(message)
@@ -130,7 +133,8 @@ def askyesno(title: str, message: str, parent: Optional[Any] = None) -> bool:
             print(f"QUESTION [{title}]: {message}")
             return False
         
-        msg = QtWidgets.QMessageBox(qt_parent)
+        parent_widget = parent if isinstance(parent, QtWidgets.QWidget) else qt_parent
+        msg = QtWidgets.QMessageBox(parent_widget)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
         msg.setWindowTitle(title)
         msg.setText(message)
@@ -161,7 +165,8 @@ def askokcancel(title: str, message: str, parent: Optional[Any] = None) -> bool:
             print(f"QUESTION [{title}]: {message}")
             return False
         
-        msg = QtWidgets.QMessageBox(qt_parent)
+        parent_widget = parent if isinstance(parent, QtWidgets.QWidget) else qt_parent
+        msg = QtWidgets.QMessageBox(parent_widget)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
         msg.setWindowTitle(title)
         msg.setText(message)

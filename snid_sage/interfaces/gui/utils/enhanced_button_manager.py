@@ -222,7 +222,7 @@ class EnhancedButtonManager(QtCore.QObject):
         if self._is_small_button(object_name):
             # Small buttons (navigation, analysis, utility) - use smaller dimensions
             if "unified_prev_btn" in object_name or "unified_next_btn" in object_name:
-                font_size = "10pt"  # Navigation arrows
+                font_size = "14pt"  # Navigation arrows
             elif "unified_reset_btn" in object_name or "unified_settings_btn" in object_name:
                 font_size = "9pt"   # Utility buttons
             elif "unified_info_btn" in object_name:
@@ -281,7 +281,7 @@ class EnhancedButtonManager(QtCore.QObject):
             if self._is_small_button(object_name):
                 # Small buttons (navigation, analysis, utility) - use smaller dimensions
                 if "unified_prev_btn" in object_name or "unified_next_btn" in object_name:
-                    font_size = "10pt"  # Navigation arrows
+                    font_size = "14pt"  # Navigation arrows
                 elif "unified_reset_btn" in object_name or "unified_settings_btn" in object_name:
                     font_size = "9pt"   # Utility buttons
                 elif "unified_gmm_btn" in object_name or "unified_redshift_age_btn" in object_name or "unified_subtype_proportions_btn" in object_name:
@@ -318,7 +318,7 @@ class EnhancedButtonManager(QtCore.QObject):
             # Determine button size
             if self._is_small_button(object_name):
                 if "unified_prev_btn" in object_name or "unified_next_btn" in object_name:
-                    font_size = "10pt"  # Navigation arrows
+                    font_size = "14pt"  # Navigation arrows
                 elif "unified_reset_btn" in object_name or "unified_settings_btn" in object_name:
                     font_size = "9pt"   # Utility buttons
                 elif "unified_gmm_btn" in object_name or "unified_redshift_age_btn" in object_name or "unified_subtype_proportions_btn" in object_name:
@@ -378,7 +378,7 @@ class EnhancedButtonManager(QtCore.QObject):
         if self._is_small_button(object_name):
             # Small buttons (navigation, analysis, utility) - use smaller dimensions
             if "unified_prev_btn" in object_name or "unified_next_btn" in object_name:
-                font_size = "10pt"  # Navigation arrows
+                font_size = "14pt"  # Navigation arrows
             elif "unified_reset_btn" in object_name or "unified_settings_btn" in object_name:
                 font_size = "9pt"   # Utility buttons
             elif "unified_info_btn" in object_name:

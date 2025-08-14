@@ -78,15 +78,26 @@ class CrossPlatformWindowManager:
         return QtGui.QKeySequence(combo_qt)
 
     @staticmethod
-    def create_shortcut(parent, combo: str, callback) -> Optional["QtGui.QShortcut"]:  # type: ignore[name-defined]
+    def create_shortcut(parent, combo: str, callback, context: Optional["QtCore.Qt.ShortcutContext"] = None) -> Optional["QtGui.QShortcut"]:  # type: ignore[name-defined]
         """Create and return a QShortcut using a platform-aware combo.
+
+        The combo should be provided using 'Ctrl' as the logical modifier. On macOS,
+        it will be automatically converted to use the Command key. Optionally, a
+        Qt shortcut context can be provided (e.g., QtCore.Qt.ApplicationShortcut).
 
         Returns None if Qt is not available.
         """
         if QtGui is None:
             return None
         sequence = CrossPlatformWindowManager.make_sequence(combo)
-        return QtGui.QShortcut(sequence, parent, callback)
+        shortcut = QtGui.QShortcut(sequence, parent, callback)
+        try:
+            if context is not None and QtCore is not None:
+                shortcut.setContext(context)
+        except Exception:
+            # Context setting is best-effort; ignore if not available
+            pass
+        return shortcut
 
     @staticmethod
     def standard_shortcut(parent, standard_key: "QtGui.QKeySequence.StandardKey", callback) -> Optional["QtGui.QShortcut"]:  # type: ignore[name-defined]

@@ -74,12 +74,13 @@ class PySide6EventHandlers(QtCore.QObject):
             CPW.create_shortcut(self.main_window, "Ctrl+Shift+O", self.on_open_configuration_dialog)
 
             # Quick workflow (combined preprocessing + analysis)
-            CPW.create_shortcut(self.main_window, "Ctrl+Return", self.on_run_quick_workflow)
-            CPW.create_shortcut(self.main_window, "Ctrl+Enter", self.on_run_quick_workflow)
+            CPW.create_shortcut(self.main_window, "Ctrl+Return", self.on_run_quick_workflow, context=QtCore.Qt.ApplicationShortcut)
+            CPW.create_shortcut(self.main_window, "Ctrl+Enter", self.on_run_quick_workflow, context=QtCore.Qt.ApplicationShortcut)
+            # Note: separate extended variants are registered below
 
             # Extended quick workflow (preprocessing + analysis + auto cluster selection)
-            CPW.create_shortcut(self.main_window, "Ctrl+Shift+Return", self.on_run_quick_workflow_with_auto_cluster)
-            CPW.create_shortcut(self.main_window, "Ctrl+Shift+Enter", self.on_run_quick_workflow_with_auto_cluster)
+            CPW.create_shortcut(self.main_window, "Ctrl+Shift+Return", self.on_run_quick_workflow_with_auto_cluster, context=QtCore.Qt.ApplicationShortcut)
+            CPW.create_shortcut(self.main_window, "Ctrl+Shift+Enter", self.on_run_quick_workflow_with_auto_cluster, context=QtCore.Qt.ApplicationShortcut)
 
             # Analysis operations
             QtGui.QShortcut("F5", self.main_window, self.on_run_analysis)
@@ -105,8 +106,13 @@ class PySide6EventHandlers(QtCore.QObject):
             QtGui.QShortcut("F1", self.main_window, self.on_show_shortcuts_dialog)
             CPW.create_shortcut(self.main_window, "Ctrl+/", self.on_show_shortcuts_dialog)
 
-            # Games (cross-platform Ctrl/Cmd+G)
-            CPW.create_shortcut(self.main_window, "Ctrl+G", self.on_start_games)
+            # Games (cross-platform Ctrl/Cmd+G) – make it application-wide so it works from anywhere
+            CPW.create_shortcut(
+                self.main_window,
+                "Ctrl+G",
+                self.on_start_games,
+                context=QtCore.Qt.ApplicationShortcut,
+            )
 
             # Quit application (cross-platform Ctrl/Cmd+Q)
             CPW.standard_shortcut(self.main_window, QtGui.QKeySequence.StandardKey.Quit, self.on_quit_application)

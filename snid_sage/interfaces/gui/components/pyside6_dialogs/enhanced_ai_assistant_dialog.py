@@ -88,7 +88,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             QDialog {{
                 background: {self.colors['bg_primary']};
                 color: {self.colors['text_primary']};
-                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+                font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
                 font-size: 10pt;
             }}
             
@@ -456,9 +456,16 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
                 CrossPlatformWindowManager as CPW,
             )
             for combo in ("Ctrl+Return", "Ctrl+Enter"):
-                sc = CPW.create_shortcut(self.chat_input, combo, self._send_chat_message)
+                sc = CPW.create_shortcut(self.chat_input, combo, self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
                 # Avoid linter complaining about unused variable in some environments
                 _ = sc
+            # Be explicit on macOS with Meta token as some Qt builds differ
+            try:
+                if CPW.is_macos():
+                    _ = CPW.create_shortcut(self.chat_input, "Meta+Return", self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
+                    _ = CPW.create_shortcut(self.chat_input, "Meta+Enter", self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
+            except Exception:
+                pass
         except Exception:
             pass
         

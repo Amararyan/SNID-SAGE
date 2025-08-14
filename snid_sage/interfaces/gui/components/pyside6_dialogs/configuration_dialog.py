@@ -150,7 +150,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             QDialog {
                 background: #f8fafc;
                 color: #1e293b;
-                font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+                font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
             }
             
             QGroupBox {
