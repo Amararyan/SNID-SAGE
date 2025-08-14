@@ -1,6 +1,6 @@
 ## Settings (GUI)
 
-Centralized settings used by GUI and CLI. Saved in the user config.
+Centralized settings used by GUI and CLI. Saved in the user config. For the full list of keys and details, see the [Configuration Guide](../reference/configuration-guide.md).
 
 ### Paths
 - Templates Directory (`paths.templates_dir`)
@@ -23,12 +23,5 @@ Centralized settings used by GUI and CLI. Saved in the user config.
 ### Profiles
 - Save, load, and delete named profiles
 
-### CLI parity
-Use `snid config` to show/set/get the same settings:
-
-```powershell
-snid config show
-snid config set paths.templates_dir C:\data\snid_templates
-snid config get analysis.rlapmin
-```
+ 
 

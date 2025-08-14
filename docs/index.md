@@ -75,7 +75,6 @@ Hands-on walkthroughs covering basic to advanced use-cases.
 
 ## Need Help?
 
-- **[FAQ](reference/faq.md)** – Common questions
 - **[Troubleshooting](reference/troubleshooting.md)** – Diagnosing issues
 - **GitHub Issues** – Report bugs or request features
 

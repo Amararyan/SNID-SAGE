@@ -157,39 +157,9 @@ sudo dnf install python3.10 python3-pip  # Fedora
 pip3 install snid-sage
 ```
 
-## Launching SNID SAGE
+## Next Steps
 
-After installation, you can launch SNID SAGE using the following commands:
-
-### GUI Interface
-```bash
-snid-sage
-```
-
- 
-
-### Command Line Interface
-```bash
-snid --help
-```
-
-### Quick Analysis Example
-```bash
-# Analyze a spectrum (default saves summary + plots)
-snid spectrum.dat -o results
-
-# Or with explicit templates directory
-snid identify spectrum.dat templates/ -o results
-
-# Minimal mode (summary only, no plots)
-snid identify spectrum.dat -o results --minimal
-
-# Complete mode (summary, plots, and all additional files)
-snid identify spectrum.dat -o results --complete
-
-# Disable plots explicitly
-snid identify spectrum.dat -o results --no-plots
-```
+After installation, proceed to the [Quick Start Guide](../quickstart/first-analysis.md) for a minimal end-to-end analysis, and the [CLI Command Reference](../cli/command-reference.md) for command-line usage.
 
 ## Installation Verification
 

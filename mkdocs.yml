@@ -77,7 +77,6 @@ nav:
 
   - Start:
     - Installation: installation/installation.md
-    - Icon Setup: installation/icon-setup.md
     - Quick Start: quickstart/first-analysis.md
     - Task Hub: task-hub.md
     - Navigation Guide: navigation-guide.md
@@ -119,7 +118,6 @@ nav:
     - Configuration Guide: reference/configuration-guide.md
     - API Reference: reference/api-reference.md
     - Troubleshooting: reference/troubleshooting.md
-    - FAQ: reference/faq.md
     - Changelog: reference/changelog.md
 
   - Development:

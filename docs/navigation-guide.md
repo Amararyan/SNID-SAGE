@@ -26,6 +26,5 @@ Use these short paths. No deep trees, no duplicate links.
 - What it can analyze: `ai/analysis-types.md`
 
 ## Help
-- FAQ: `reference/faq.md`
 - Troubleshooting: `reference/troubleshooting.md`
 - Config: `reference/configuration-guide.md`

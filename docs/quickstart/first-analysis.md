@@ -198,7 +198,7 @@ Now that you've completed your first analysis, explore:
 
 - **Buttons disabled?** Follow the workflow: Load → Preprocess → Analyze
 - **Poor results?** Check signal-to-noise and wavelength coverage
-- **More help**: See [FAQ](../reference/faq.md) or [Troubleshooting](../reference/troubleshooting.md)
+- **More help**: See [Troubleshooting](../reference/troubleshooting.md)
 
 ## Congratulations!
 
