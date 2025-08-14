@@ -16,7 +16,7 @@ This guide provides comprehensive instructions for installing SNID SAGE on your 
 - **Storage**: 5GB+ for templates and results
 - **GPU**: CUDA-compatible for local LLM support (optional)
 
-## Quick Installation (v0.3.0)
+## Quick Installation (v0.4.0)
 
 Install the latest stable release from PyPI:
 

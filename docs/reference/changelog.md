@@ -10,7 +10,15 @@ This changelog documents all notable changes, improvements, and bug fixes in SNI
 
 ---
 
-## Version 0.3.0 - *Current Release*
+## Version 0.4.0 - *Current Release*
+
+### Changes
+- Documentation and site updated to 0.4.0
+- Internal version file indicates 0.4.0.dev1; promoting to stable by tagging `v0.4.0`
+
+---
+
+## Version 0.3.0
 
 ### New Features
 - **PySide6/Qt GUI**: Modern Qt-based interface replacing tkinter

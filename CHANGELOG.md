@@ -18,6 +18,20 @@ All notable changes to SNID SAGE will be documented in this file.
 
 ---
 
+## [0.4.0] - 2025-08-14
+
+### Changed
+- Prepare documentation for 0.4.0 release
+- Mark 0.4.0 as current release across docs
+
+### Fixed
+- Minor documentation inconsistencies referencing 0.3.0
+
+### Notes
+- Version numbering managed by setuptools_scm; publish by tagging `v0.4.0`
+
+---
+
 ## [0.3.0] - 2025-08-07
 
 ### Added
