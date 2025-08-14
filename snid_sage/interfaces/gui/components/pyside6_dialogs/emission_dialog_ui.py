@@ -11,6 +11,10 @@ from typing import Dict, Any
 
 # Import flexible number input widget
 from snid_sage.interfaces.gui.components.widgets.flexible_number_input import create_flexible_double_input
+from snid_sage.shared.utils.line_detection.line_db_loader import (
+    get_phase_labels_for_type,
+    get_anchors,
+)
 
 # Import logging
 try:
@@ -154,13 +158,7 @@ class EmissionDialogUIBuilder:
         # SN Phase dropdown
         sn_presets_layout.addWidget(QtWidgets.QLabel("Phase:"))
         self.dialog.sn_phase_dropdown = QtWidgets.QComboBox()
-        self.dialog.sn_phase_dropdown.addItems([
-            "Select Phase...",
-            "Early Phase",
-            "Maximum Light",
-            "Late Phase", 
-            "Nebular Phase"
-        ])
+        self.dialog.sn_phase_dropdown.addItems(["Select Phase..."])
         self.dialog.sn_phase_dropdown.currentTextChanged.connect(self.dialog.event_handlers.on_sn_phase_preset_selected)
         sn_presets_layout.addWidget(self.dialog.sn_phase_dropdown)
         
@@ -408,7 +406,9 @@ class EmissionDialogUIBuilder:
             "Type IIn",
             "Type IIb"
         ])
-        self.dialog.sn_type_dropdown.setMaximumWidth(120)
+        self.dialog.sn_type_dropdown.setMaximumWidth(160)
+        # When Type changes, update Phase options using JSON DB anchors/labels
+        self.dialog.sn_type_dropdown.currentTextChanged.connect(self._on_compact_sn_type_changed)
         # Remove automatic connection - will apply on button click
         presets_layout.addWidget(self.dialog.sn_type_dropdown)
         
@@ -421,14 +421,8 @@ class EmissionDialogUIBuilder:
         
         # SN Phase dropdown (compact) - no label, placeholder text
         self.dialog.sn_phase_dropdown = QtWidgets.QComboBox()
-        self.dialog.sn_phase_dropdown.addItems([
-            "Choose Phase...",
-            "Early Phase",
-            "Maximum Light",
-            "Late Phase", 
-            "Nebular Phase"
-        ])
-        self.dialog.sn_phase_dropdown.setMaximumWidth(120)
+        self.dialog.sn_phase_dropdown.addItems(["Choose Phase..."])
+        self.dialog.sn_phase_dropdown.setMaximumWidth(160)
         # Remove automatic connection - will apply on button click
         presets_layout.addWidget(self.dialog.sn_phase_dropdown)
         
@@ -454,7 +448,7 @@ class EmissionDialogUIBuilder:
             "Fe II",
             "Fe III"
         ])
-        self.dialog.element_dropdown.setMaximumWidth(120)
+        self.dialog.element_dropdown.setMaximumWidth(150)
         # Remove automatic connection - will apply on button click
         presets_layout.addWidget(self.dialog.element_dropdown)
         
@@ -514,6 +508,71 @@ class EmissionDialogUIBuilder:
         toolbar_layout.addLayout(presets_layout)
         
         return toolbar_frame
+
+    def _on_compact_sn_type_changed(self, text: str):
+        """When Type changes in the compact toolbar, refresh Phase choices and select anchor."""
+        try:
+            if not text or text.startswith("Choose"):
+                return
+            # Map UI Type to internal keys used in DB
+            type_mapping = {
+                "Type Ia": ["Ia"],
+                "Type II": ["II"],
+                "Type Ib/c": ["Ib", "Ic"],
+                "Type IIn": ["IIn"],
+                "Type IIb": ["IIb"],
+            }
+            keys = type_mapping.get(text, [])
+            if not keys:
+                return
+            # Gather phase labels for selected type(s)
+            labels_set = set()
+            for k in keys:
+                for lab in get_phase_labels_for_type(k):
+                    if lab:
+                        labels_set.add(lab)
+            labels = sorted(labels_set)
+            # Pretty names mapping
+            pretty_map = {
+                "very_early": "Very Early",
+                "early": "Early Phase",
+                "maximum": "Maximum Light",
+                "postmax": "Post-maximum",
+                "late": "Late Phase",
+                "nebular": "Nebular Phase",
+                "interaction": "Interaction",
+                "plateau": "Plateau",
+                "transition": "Transition",
+                "peak": "Maximum Light",
+            }
+            # Determine anchor phase from DB anchors
+            anchors = get_anchors()
+            anchor_label = None
+            for k in keys:
+                if k in anchors and anchors[k]:
+                    anchor_label = anchors[k]
+                    break
+            # Fall back to first available label if anchor not found
+            selected_pretty = None
+            if anchor_label and anchor_label in labels:
+                selected_pretty = pretty_map.get(anchor_label, anchor_label)
+            elif labels:
+                selected_pretty = pretty_map.get(labels[0], labels[0])
+            # Rebuild Phase dropdown
+            combo = self.dialog.sn_phase_dropdown
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("Choose Phase...")
+            for lab in labels:
+                combo.addItem(pretty_map.get(lab, lab))
+            # Select anchor/default if available
+            if selected_pretty:
+                idx = combo.findText(selected_pretty)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
+        except Exception as e:
+            _LOGGER.error(f"Error updating Phase options for Type '{text}': {e}")
     
     def _apply_preset_selection(self):
         """Apply the selected preset combinations when Apply button is clicked with smart filtering"""
@@ -637,8 +696,7 @@ class EmissionDialogUIBuilder:
         info_layout.addWidget(sep1)
 
         
-        # Analyze button
-        # Clear points button (to the left of Analyze)
+        # Clear points stays on the left side
         clear_points_btn = QtWidgets.QPushButton("Clear Points")
         clear_points_btn.setStyleSheet("""
             QPushButton {
@@ -655,6 +713,9 @@ class EmissionDialogUIBuilder:
         """)
         info_layout.addWidget(clear_points_btn)
 
+        # Push Analyze/Finish to the top-right
+        info_layout.addStretch()
+
         analyze_btn = QtWidgets.QPushButton("Analyze")
         analyze_btn.setStyleSheet("""
             QPushButton {
@@ -670,14 +731,33 @@ class EmissionDialogUIBuilder:
             }
         """)
         info_layout.addWidget(analyze_btn)
+
+        # Finish button (red, same styling family as Cancel)
+        finish_btn = QtWidgets.QPushButton("Finish")
+        finish_btn.setToolTip("Finish and close the analysis")
+        finish_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ef4444;
+                border: 1px solid #dc2626;
+                border-radius: 3px;
+                color: white;
+                font-weight: bold;
+                padding: 4px 12px;
+            }
+            QPushButton:hover {
+                background-color: #dc2626;
+            }
+        """)
+        finish_btn.clicked.connect(self.dialog.accept)
+        info_layout.addWidget(finish_btn)
         
-        info_layout.addStretch()
         toolbar_layout.addLayout(info_layout)
         
         # Store references for connection later (simplified)
         self.dialog.step2_toolbar_refs = {
             'analyze_btn': analyze_btn,
-            'clear_points_btn': clear_points_btn
+            'clear_points_btn': clear_points_btn,
+            'finish_btn': finish_btn
         }
         
         return toolbar_frame 

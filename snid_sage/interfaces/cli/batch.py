@@ -27,6 +27,7 @@ from snid_sage.shared.utils.math_utils import (
     apply_exponential_weighting,
     get_best_metric_value
 )
+from snid_sage.shared.utils.results_formatter import clean_template_name
 from snid_sage.shared.utils.logging import set_verbosity as set_global_verbosity
 from snid_sage.shared.utils.logging import VerbosityLevel
 
@@ -924,7 +925,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         # Header (include redshift error and age)
         header = (
             f"{'Spectrum':<16} {'Type':<7} {'Subtype':<9} {'Template':<18} "
-            f"{'z':<8} {'±Error':<10} {'Age':<6} {'RLAP-CCC':<10} {'Status':<1}"
+            f"{'z':<8} {'±Error':<10} {'Age':<6} {'RLAP-CCC':<10} {'Quality':<8} {'Status':<1}"
         )
         report.append(header)
         report.append("-" * len(header))
@@ -940,7 +941,12 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             spectrum = summary['spectrum'][:15]
             cons_type = summary.get('consensus_type', 'Unknown')[:6]
             cons_subtype = summary.get('consensus_subtype', 'Unknown')[:8]
-            template = summary.get('best_template', 'Unknown')[:17]
+            template = clean_template_name(summary.get('best_template', 'Unknown'))[:17]
+            # Cluster quality (if available)
+            if summary.get('has_clustering'):
+                quality = summary.get('cluster_quality_category', '') or 'N/A'
+            else:
+                quality = 'N/A'
             
             # Use cluster-weighted redshift if available, otherwise regular redshift
             use_cluster = summary.get('has_clustering') and ('cluster_redshift_weighted' in summary)
@@ -969,7 +975,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             
             row = (
                 f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
-                f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {status_marker}"
+                f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {status_marker}"
             )
             report.append(row)
 
@@ -980,6 +986,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
                 cons_type = 'N/A'
                 cons_subtype = 'N/A'
                 template = 'N/A'
+                quality = 'N/A'
                 redshift = 'N/A'
                 redshift_err = 'N/A'
                 age_str = 'N/A'
@@ -987,7 +994,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
                 status_marker = 'x'
                 row = (
                     f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
-                    f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {status_marker}"
+                    f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {status_marker}"
                 )
                 report.append(row)
         
@@ -1000,7 +1007,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         
         for _, _, _, summary in successful_results_sorted:
             report.append(f"\n📄 {summary['spectrum']}")
-            report.append(f"   Best Template: {summary.get('best_template', 'Unknown')}")
+            report.append(f"   Best Template: {clean_template_name(summary.get('best_template', 'Unknown'))}")
             report.append(f"   Classification: {summary.get('consensus_type', 'Unknown')} {summary.get('consensus_subtype', '')}")
             
             # Show cluster information if available
@@ -1212,6 +1219,10 @@ def main(args: argparse.Namespace) -> int:
                 args.output_dir = str(Path.cwd() / 'results')
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Always show a single concise startup line (respects quiet/silent)
+        if not is_quiet:
+            print(f"Starting batch analysis for {len(input_files)} spectra")
         
         # Simple startup message (after resolving output_dir)
         if not is_quiet and not brief_mode:

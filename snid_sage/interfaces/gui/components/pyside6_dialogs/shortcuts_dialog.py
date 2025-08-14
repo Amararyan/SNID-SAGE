@@ -116,8 +116,8 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
                 "category": "🚀 QUICK WORKFLOW",
                 "shortcuts": [
                     {"action": "Open Spectrum", "shortcut": f"{mod_key}+O", "description": "Load spectrum file"},
-                                         {"action": "Quick Analysis", "shortcut": f"{mod_key}+Enter", "description": "preprocessing + analysis"},
-                     {"action": "Extended Quick Analysis", "shortcut": f"{mod_key}+Shift+Enter", "description": "preprocessing + analysis + auto-cluster"},
+                    {"action": "Quick Analysis", "shortcut": f"{mod_key}+Enter", "description": "Preprocessing + Analysis"},
+                     {"action": "Extended Quick Analysis", "shortcut": f"{mod_key}+Shift+Enter", "description": "Preprocessing + Analysis + Auto Cluster"},
                     {"action": "Reset Application", "shortcut": f"{mod_key}+Shift+R", "description": "Reset all analysis and plots"}
                 ]
             },
@@ -126,7 +126,7 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
                 "shortcuts": [
                     {"action": "SNID Configuration", "shortcut": f"{mod_key}+Shift+O", "description": "Configure SNID parameters"},
                     {"action": "Run Analysis", "shortcut": "F5", "description": "Run SNID analysis"},
-                    {"action": "Preprocessing", "shortcut": "F6", "description": "Open preprocessing dialog"},
+                    {"action": "Preprocessing", "shortcut": "F6", "description": "Open Preprocessing dialog"},
                     {"action": "Settings", "shortcut": f"{mod_key}+,", "description": "Open application settings"}
                 ]
             },
@@ -141,24 +141,14 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
             {
                 "category": "👁️ VIEW CONTROLS",
                 "shortcuts": [
-                    {"action": "Flux View", "shortcut": "F", "description": "Switch to flux view"},
-                    {"action": "Flat View", "shortcut": "T", "description": "Switch to flat view"},
+                    {"action": "Flux View", "shortcut": "F", "description": "Switch to Flux view"},
+                    {"action": "Flat View", "shortcut": "T", "description": "Switch to Flat view"},
                     {"action": "Toggle View Mode", "shortcut": "Spacebar", "description": "Cycle between view modes"}
-                ]
-            },
-            {
-                "category": "🎭 MASKING & EDITING",
-                "shortcuts": [
-                    {"action": "Toggle Masking", "shortcut": "M", "description": "Enable/disable masking mode"},
-                    {"action": "Disable Masking", "shortcut": "Escape", "description": "Exit masking mode"},
-                    {"action": "Clear All Masks", "shortcut": f"{mod_key}+Shift+C", "description": "Remove all mask regions"},
-                    {"action": "Mask Manager", "shortcut": f"{mod_key}+M", "description": "Open mask management dialog"}
                 ]
             },
             {
                 "category": "🔬 ADVANCED FEATURES",
                 "shortcuts": [
-                    {"action": "Emission Lines", "shortcut": f"{mod_key}+E", "description": "Open emission line analysis"},
                     {"action": "Games", "shortcut": f"{mod_key}+G", "description": "Start entertainment games"}
                 ]
             },
@@ -166,7 +156,7 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
                 "category": "❓ HELP & APPLICATION",
                 "shortcuts": [
                     {"action": "Show Shortcuts", "shortcut": "F1", "description": "Show this help dialog"},
-                    {"action": "Show Shortcuts", "shortcut": f"{mod_key}+?", "description": "Alternative shortcut help"},
+                    {"action": "Show Shortcuts", "shortcut": f"{mod_key}+/", "description": "Alternative shortcut help"},
                     {"action": "Quit Application", "shortcut": f"{mod_key}+Q", "description": "Exit SNID SAGE"}
                 ]
             }

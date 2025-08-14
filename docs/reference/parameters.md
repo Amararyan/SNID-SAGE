@@ -41,14 +41,14 @@ Unified reference of configurable parameters across GUI and CLI.
 - templates_dir, output_dir, data_dir, config_dir
 
 ### CLI mappings (identify)
-```powershell
-snid identify spectrum.dat --output-dir results/ `
-  --zmin 0.0 --zmax 0.1 `
-  --rlapmin 5.0 --lapmin 0.3 `
-  --age-min -5 --age-max 30 `
-  --savgol-window 11 --savgol-order 3 `
-  --aband-remove --skyclip `
-  --wavelength-masks 6550:6600 7600:7700 `
+```bash
+snid identify spectrum.dat --output-dir results/ \
+  --zmin 0.0 --zmax 0.1 \
+  --rlapmin 5.0 --lapmin 0.3 \
+  --age-min -5 --age-max 30 \
+  --savgol-window 11 --savgol-order 3 \
+  --aband-remove --skyclip \
+  --wavelength-masks 6550:6600 7600:7700 \
   --type-filter Ia Ib Ic
 ```
 

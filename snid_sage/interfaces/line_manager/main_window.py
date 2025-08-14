@@ -63,6 +63,9 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         self.current_spectrum: Dict[str, Any] | None = None
         self._user_presets: Dict[str, Any] = load_user_presets().get("presets", {})
         self._user_lines: List[Dict[str, Any]] = load_user_lines()
+        # Redshift configuration
+        self.host_redshift: float = 0.0  # Galaxy/host redshift
+        self.velocity_shift: float = 0.0  # Ejecta velocity in km/s (affects SN lines)
         self._build_ui()
         self._refresh_tables()
 
@@ -318,6 +321,35 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
 
         preview_vbox.addWidget(self.editor_container)
 
+        # Redshift and ejecta velocity controls
+        redshift_group = QtWidgets.QGroupBox("Redshift Configuration")
+        self.layout_manager.setup_group_box(redshift_group)
+        redshift_layout = QtWidgets.QGridLayout(redshift_group)
+        # Host redshift
+        redshift_layout.addWidget(QtWidgets.QLabel("Host z:"), 0, 0)
+        self.host_z_spin = QtWidgets.QDoubleSpinBox()
+        self.host_z_spin.setDecimals(5)
+        self.host_z_spin.setRange(-0.1, 5.0)
+        self.host_z_spin.setSingleStep(0.0005)
+        self.host_z_spin.setValue(self.host_redshift)
+        self.host_z_spin.valueChanged.connect(self._on_host_redshift_changed)
+        redshift_layout.addWidget(self.host_z_spin, 0, 1)
+        # Ejecta velocity
+        redshift_layout.addWidget(QtWidgets.QLabel("Ejecta velocity (km/s):"), 1, 0)
+        self.velocity_spin = QtWidgets.QDoubleSpinBox()
+        self.velocity_spin.setDecimals(0)
+        self.velocity_spin.setRange(-50000, 50000)
+        self.velocity_spin.setSingleStep(100)
+        self.velocity_spin.setSuffix(" km/s")
+        self.velocity_spin.setValue(self.velocity_shift)
+        self.velocity_spin.valueChanged.connect(self._on_velocity_changed)
+        redshift_layout.addWidget(self.velocity_spin, 1, 1)
+        # Info label
+        info = QtWidgets.QLabel("Galaxy/stellar lines use Host z. SN lines use Host z + ejecta velocity.")
+        info.setStyleSheet("color: #64748b; font-style: italic;")
+        redshift_layout.addWidget(info, 2, 0, 1, 2)
+        preview_vbox.addWidget(redshift_group)
+
         # Advanced editor rows (collapsed by default)
         self.advanced_editor = QtWidgets.QWidget()
         adv_form = QtWidgets.QFormLayout(self.advanced_editor)
@@ -493,14 +525,14 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             wave, flux = self._load_spectrum(spectrum_file)
             dialog = PySide6PreprocessingDialog(self, (wave, flux))
             if dialog.exec() == QtWidgets.QDialog.Accepted:
-                # Normalize dialog result into a structure _extract_wave_flux understands
+                # Store the full processed result so we can display exactly like the main GUI
                 res = dialog.result or {}
-                wave_arr, flux_arr = self._select_wave_flux_from_result(res)
-                if wave_arr is not None and flux_arr is not None:
-                    self.current_spectrum = {'wave': wave_arr, 'flux': flux_arr}
+                # Prefer to keep the entire processed dictionary (contains log_wave, left/right edges, etc.)
+                # Fallback to raw arrays only if result is empty
+                if isinstance(res, dict) and res:
+                    self.current_spectrum = res
                 else:
-                    # Fallback: keep previous spectrum
-                    self.current_spectrum = {'wave': np.asarray(wave), 'flux': np.asarray(flux)}
+                    self.current_spectrum = {'input_spectrum': {'wave': np.asarray(wave), 'flux': np.asarray(flux)}}
                 QtWidgets.QMessageBox.information(self, "Success", "Preprocessing completed and stored.")
                 self._update_plot()
         except Exception as e:
@@ -820,31 +852,95 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
     def _extract_wave_flux(self, spectrum: Optional[Dict[str, Any]]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         if not spectrum:
             return None, None
-        # Prefer original input if present, else common keys
-        if 'input_spectrum' in spectrum and isinstance(spectrum['input_spectrum'], dict):
-            wave = spectrum['input_spectrum'].get('wave')
-            flux = spectrum['input_spectrum'].get('flux')
-        else:
-            # Accept several variants from preprocessing and loaders without boolean evaluation of arrays
-            def _first_present(d: Dict[str, Any], keys: List[str]) -> Any:
-                for k in keys:
-                    if k in d:
-                        v = d.get(k)
-                        if v is not None:
-                            return v
-                return None
 
-            wave = _first_present(spectrum, ['wave', 'wavelength', 'processed_wave', 'log_wave'])
-            flux = _first_present(
-                spectrum,
-                ['flux', 'flux_view', 'display_flux', 'processed_flux', 'flat', 'flat_view', 'display_flat', 'fluxed', 'log_flux']
-            )
+        # If processed output present, mirror main GUI logic for the Flux view
+        # 1) Use log_wave for x when available
+        # 2) For y, reconstruct from tapered_flat + extended continuum if possible,
+        #    else use flux_view/display_flux, else fall back to log_flux
+        # 3) Trim to valid [left_edge, right_edge] if available
         try:
+            if isinstance(spectrum, dict) and ('log_wave' in spectrum or 'log_flux' in spectrum):
+                log_wave = spectrum.get('log_wave')
+
+                # Build flux for "flux" view similar to main controller
+                def _reconstruct_flux_for_view(proc: Dict[str, Any]) -> Optional[np.ndarray]:
+                    try:
+                        if (
+                            proc.get('has_continuum') is True
+                            and 'tapered_flux' in proc
+                            and 'continuum' in proc
+                        ):
+                            tapered_flat = np.asarray(proc['tapered_flux'])
+                            continuum = np.asarray(proc['continuum'])
+                            recon_continuum = continuum.copy()
+                            try:
+                                nz = (recon_continuum > 0).nonzero()[0]
+                                if nz.size:
+                                    c0, c1 = int(nz[0]), int(nz[-1])
+                                    if c0 > 0:
+                                        recon_continuum[:c0] = recon_continuum[c0]
+                                    if c1 < recon_continuum.size - 1:
+                                        recon_continuum[c1+1:] = recon_continuum[c1]
+                            except Exception:
+                                pass
+                            return (tapered_flat + 1.0) * recon_continuum
+                        if 'flux_view' in proc:
+                            return np.asarray(proc['flux_view'])
+                        if 'display_flux' in proc:
+                            return np.asarray(proc['display_flux'])
+                        return np.asarray(proc.get('log_flux')) if 'log_flux' in proc else None
+                    except Exception:
+                        return None
+
+                flux_for_view = _reconstruct_flux_for_view(spectrum)
+                wave_arr = np.asarray(log_wave) if log_wave is not None else None
+                flux_arr = np.asarray(flux_for_view) if flux_for_view is not None else None
+
+                # Apply zero-padding filter using preprocessing edges
+                if wave_arr is not None and flux_arr is not None:
+                    wave_arr, flux_arr = self._apply_zero_padding_filter(wave_arr, flux_arr, spectrum)
+                return wave_arr, flux_arr
+
+            # Fallbacks: prefer original input spectrum if present
+            if 'input_spectrum' in spectrum and isinstance(spectrum['input_spectrum'], dict):
+                wave = spectrum['input_spectrum'].get('wave')
+                flux = spectrum['input_spectrum'].get('flux')
+            else:
+                # Accept several variants from preprocessing and loaders without boolean evaluation of arrays
+                def _first_present(d: Dict[str, Any], keys: List[str]) -> Any:
+                    for k in keys:
+                        if k in d:
+                            v = d.get(k)
+                            if v is not None:
+                                return v
+                    return None
+
+                wave = _first_present(spectrum, ['wave', 'wavelength', 'processed_wave', 'log_wave'])
+                flux = _first_present(
+                    spectrum,
+                    ['flux', 'flux_view', 'display_flux', 'processed_flux', 'flat', 'flat_view', 'display_flat', 'fluxed', 'log_flux']
+                )
+
             wave_arr = np.asarray(wave) if wave is not None else None
             flux_arr = np.asarray(flux) if flux is not None else None
             return wave_arr, flux_arr
         except Exception:
             return None, None
+
+    def _apply_zero_padding_filter(self, wave: np.ndarray, flux: np.ndarray, processed_spectrum: Optional[Dict[str, Any]] = None) -> Tuple[np.ndarray, np.ndarray]:
+        try:
+            if processed_spectrum and 'left_edge' in processed_spectrum and 'right_edge' in processed_spectrum:
+                left_edge = int(processed_spectrum['left_edge'])
+                right_edge = int(processed_spectrum['right_edge'])
+                return wave[left_edge:right_edge+1], flux[left_edge:right_edge+1]
+            valid_mask = (flux != 0) & np.isfinite(flux)
+            if np.any(valid_mask):
+                left_edge = int(np.argmax(valid_mask))
+                right_edge = int(len(flux) - 1 - np.argmax(valid_mask[::-1]))
+                return wave[left_edge:right_edge+1], flux[left_edge:right_edge+1]
+            return wave, flux
+        except Exception:
+            return wave, flux
 
     def _get_wave_range(self) -> Tuple[Optional[float], Optional[float]]:
         wave, _ = self._extract_wave_flux(self.current_spectrum)
@@ -873,13 +969,25 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         for idx in self.line_table.selectionModel().selectedRows():
             selected_keys.add(self.line_table.item(idx.row(), 0).text())
 
+        host_z = float(getattr(self, 'host_redshift', 0.0) or 0.0)
+        sn_z = float(self._get_effective_sn_redshift())
+
+        # Axis is always wavelength in Å (even when data is on a log-spaced grid)
+        def to_axis_units(w_angstrom: float) -> float:
+            return float(w_angstrom)
+
         for entry in get_effective_line_db():
             name = entry.get('key', '')
             air = float(entry.get('wavelength_air', 0.0) or 0.0)
             if air <= 0:
                 continue
+            origin = (entry.get('origin', '') or '').lower()
+            z_apply = sn_z if origin == 'sn' else host_z
+            z_apply = max(0.0, z_apply)
+            obs_angstrom = air * (1.0 + z_apply)
+            obs_pos = to_axis_units(obs_angstrom)
             if in_range_only and (min_w is not None and max_w is not None):
-                if not (min_w <= air <= max_w):
+                if not (min_w <= obs_pos <= max_w):
                     continue
             color = CATEGORY_COLORS.get(entry.get('category', ''), '#888888')
             width = 1.0
@@ -890,7 +998,7 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
                 width = 2.5
                 alpha = 200
             pen = pg.mkPen(QtGui.QColor(QtGui.QColor(color).red(), QtGui.QColor(color).green(), QtGui.QColor(color).blue(), alpha), width=width)
-            inf_line = pg.InfiniteLine(pos=air, angle=90, pen=pen)
+            inf_line = pg.InfiniteLine(pos=obs_pos, angle=90, pen=pen)
             self.plot_item.addItem(inf_line)
             self._overlay_lines_items.append(inf_line)
         # Update status
@@ -904,6 +1012,28 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             self.count_label.setText(
                 f"User lines: {len(self._user_lines)}  |  Total effective: {len(get_effective_line_db())}  |  Range: {min_w:.0f}–{max_w:.0f} Å"
             )
+
+    def _on_host_redshift_changed(self, val: float) -> None:
+        try:
+            self.host_redshift = float(val)
+            self._draw_line_overlays()
+        except Exception:
+            pass
+
+    def _on_velocity_changed(self, val: float) -> None:
+        try:
+            self.velocity_shift = float(val)
+            self._draw_line_overlays()
+        except Exception:
+            pass
+
+    def _get_effective_sn_redshift(self) -> float:
+        """Galaxy host redshift plus ejecta velocity translated to redshift units."""
+        try:
+            c_km_s = 299792.458
+            return max(0.0, float(self.host_redshift) + float(self.velocity_shift) / c_km_s)
+        except Exception:
+            return max(0.0, float(getattr(self, 'host_redshift', 0.0) or 0.0))
 
 
 def _split_csv(text: str) -> List[str]:

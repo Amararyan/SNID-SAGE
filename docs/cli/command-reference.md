@@ -20,7 +20,7 @@ snid identify --help
 
 !!! note "Windows PowerShell users"
     - Do not use `&&` to chain commands; use `;` between commands.
-    - For multi-line commands, use the PowerShell backtick (`) as a line continuation.
+    - Prefer single-line commands; chain multiple commands with `;`.
 
 ```powershell
 # Basic analysis (PowerShell)
@@ -29,17 +29,15 @@ snid spectrum.dat --output-dir results/
 # Command-specific help
 snid identify --help
 
-# Multi-line example (use backticks)
-snid identify data\sn2003jo.dat --output-dir results\ `
-  --complete `
-  --savgol-window 11 --savgol-order 3
+# Complete analysis with options
+snid identify data\sn2003jo.dat --output-dir results\ --complete --savgol-window 11 --savgol-order 3
 ```
 
 ## Command Structure
 
 !!! tip "PowerShell basics"
     - Use `;` to chain commands (instead of `&&`).
-    - Use the backtick (`` ` ``) for line continuation.
+    - Prefer one-liners for commands; avoid line continuations.
 
 ```bash
 snid [GLOBAL_OPTIONS] COMMAND [COMMAND_OPTIONS] [ARGUMENTS]
@@ -245,14 +243,6 @@ The `--complete` mode generates GUI-style plots:
 - `snid_clustering_statistics.png` - Detailed clustering statistics
 - `snid_redshift_age.png` - Redshift vs age distribution
 
-
-
-## template - Template Management
-
-Manage the template library and create custom templates.
-
-For detailed template management documentation, see **[Template Management](template-management.md)**.
-
 ## config - Configuration Management
 
 Manage SNID SAGE configuration settings.
@@ -392,9 +382,7 @@ snid batch "data/*.dat" templates/ --output-dir batch_results/
 Get-ChildItem -Path data -Filter *.dat | ForEach-Object {
   $s = $_.FullName;
   Write-Host "Processing $s";
-  snid identify $s `
-    --output-dir ("results/" + [System.IO.Path]::GetFileNameWithoutExtension($s) + "/") `
-    --complete
+  snid identify $s --output-dir ("results/" + [System.IO.Path]::GetFileNameWithoutExtension($s) + "/") --complete
 }
 
 # Summary

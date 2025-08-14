@@ -277,11 +277,11 @@ snid identify data/tns_2024ggi.dat --output-dir results_2024ggi/
 - Potential host galaxy contamination
 
 **Troubleshooting:**
-```powershell
+```bash
 # Apply additional preprocessing
-snid identify data/tns_2024ggi.dat --output-dir results_2024ggi/ `
-    --savgol-window 15 --savgol-order 3 `
-    --wavelength-masks 5550:5600 7550:7700
+snid identify data/tns_2024ggi.dat --output-dir results_2024ggi/ \
+  --savgol-window 15 --savgol-order 3 \
+  --wavelength-masks 5550:5600 7550:7700
 ```
 
 ### Analysis 3: High-Quality Spectrum

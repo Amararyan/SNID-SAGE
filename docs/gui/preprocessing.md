@@ -34,11 +34,11 @@ How to prepare spectra before analysis.
 ### CLI parity
 GUI options map to `snid identify` flags:
 
-```powershell
-snid identify spectrum.dat --output-dir results/ `
-  --savgol-window 11 --savgol-order 3 `
-  --aband-remove --skyclip `
-  --emclip-z 0.02 --emwidth 40 `
+```bash
+snid identify spectrum.dat --output-dir results/ \
+  --savgol-window 11 --savgol-order 3 \
+  --aband-remove --skyclip \
+  --emclip-z 0.02 --emwidth 40 \
   --wavelength-masks 6550:6600 7600:7700
 ```
 

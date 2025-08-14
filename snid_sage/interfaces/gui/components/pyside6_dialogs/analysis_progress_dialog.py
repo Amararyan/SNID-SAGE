@@ -423,9 +423,11 @@ class AnalysisProgressDialog(QtWidgets.QDialog):
         try:
             if success:
                 self.set_stage("Analysis Complete", 100)
-                self.add_progress_line("SNID analysis completed successfully!", "success")
+                # Prefer the provided message; fallback to a neutral completion message
                 if message:
                     self.add_progress_line(message, "success")
+                else:
+                    self.add_progress_line("Analysis completed.", "success")
                 
                 # Change title and button
                 self.title_label.setText("SNID Analysis Complete")

@@ -84,6 +84,52 @@ class EmissionDialogEventHandlers:
             # Update current selection
             self.current_type = text
             
+            # Update phase dropdown options based on selected type using JSON DB
+            try:
+                from snid_sage.shared.utils.line_detection.line_db_loader import get_phase_labels_for_type
+                combo = self.dialog.sn_phase_dropdown
+                current = combo.currentText() if combo.count() > 0 else None
+                combo.blockSignals(True)
+                combo.clear()
+                combo.addItem("Select Phase..." if not text.startswith("Choose") else "Choose Phase...")
+                # Map UI text to internal type keys used in DB
+                type_mapping = {
+                    "Type Ia": "Ia",
+                    "Type II": "II",
+                    "Type Ib/c": None,  # combined; we'll union labels from Ib and Ic
+                    "Type IIn": "IIn",
+                    "Type IIb": "IIb",
+                }
+                key = type_mapping.get(text)
+                labels = []
+                if key is None and text == "Type Ib/c":
+                    labels = sorted(set(get_phase_labels_for_type("Ib") + get_phase_labels_for_type("Ic")))
+                elif key:
+                    labels = get_phase_labels_for_type(key)
+                # Pretty names
+                pretty_map = {
+                    "very_early": "Very Early",
+                    "early": "Early Phase",
+                    "maximum": "Maximum Light",
+                    "postmax": "Post-maximum",
+                    "late": "Late Phase",
+                    "nebular": "Nebular Phase",
+                    "interaction": "Interaction",
+                    "plateau": "Plateau",
+                    "transition": "Transition",
+                    "peak": "Maximum Light",
+                }
+                # Append pretty labels
+                seen = set()
+                for lab in labels:
+                    pretty = pretty_map.get(lab, lab)
+                    if pretty not in seen:
+                        combo.addItem(pretty)
+                        seen.add(pretty)
+                combo.blockSignals(False)
+            except Exception:
+                pass
+
             # Apply smart filtering if we have phase and/or element selections
             lines = self._get_smart_filtered_lines()
             if lines is not None:
@@ -307,7 +353,7 @@ class EmissionDialogEventHandlers:
             return None
             
         try:
-            from snid_sage.shared.constants.physical import SUPERNOVA_EMISSION_LINES
+            from snid_sage.shared.utils.line_detection.line_db_loader import filter_lines
             
             spectrum_data = self._get_normalized_spectrum_data()
             lines_to_add = {}
@@ -346,19 +392,53 @@ class EmissionDialogEventHandlers:
             target_category = element_mapping.get(self.current_element) if self.current_element else None
             
             # Filter lines based on all active criteria
-            for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
+            for line in filter_lines():
+                line_name = line.get('key', '')
+                if not line_name:
+                    continue
+                # Rehydrate minimal structure used downstream
+                line_data = {
+                    'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+                    'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+                    'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+                    'sn_types': list(line.get('sn_types', []) or []),
+                    'category': line.get('category'),
+                    'origin': line.get('origin'),
+                    'phase_profiles': line.get('phase_profiles') or {},
+                }
                 line_matches = True
                 
                 # Check SN type match
                 if target_sn_types:
-                    line_sn_types = line_data.get('sn_types', [])
-                    if not any(sn_type in line_sn_types for sn_type in target_sn_types):
+                    line_sn_types = set(line_data.get('sn_types', []) or [])
+                    profiles = line_data.get('phase_profiles') or {}
+                    # match if type in sn_types or phase_profiles keys
+                    if not any((t in line_sn_types) or (t in profiles) for t in target_sn_types):
                         line_matches = False
                 
                 # Check phase match (allow 'all' phase to match any selection)
                 if target_phases and line_matches:
-                    line_phase = line_data.get('phase', '')
-                    if line_phase not in target_phases and line_phase != 'all':
+                    # If any of the selected types is active, restrict by that type's phase labels
+                    profiles = line_data.get('phase_profiles') or {}
+                    ok_phase = False
+                    if target_sn_types:
+                        for t in target_sn_types:
+                            for prof in profiles.get(t, []) or []:
+                                if prof.get('phase_label') in target_phases:
+                                    ok_phase = True
+                                    break
+                            if ok_phase:
+                                break
+                    else:
+                        # No type selected: any matching phase across any type counts
+                        for t, arr in profiles.items():
+                            for prof in arr or []:
+                                if prof.get('phase_label') in target_phases:
+                                    ok_phase = True
+                                    break
+                            if ok_phase:
+                                break
+                    if not ok_phase:
                         line_matches = False
                 
                 # Check element category match

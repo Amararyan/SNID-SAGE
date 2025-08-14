@@ -18,7 +18,6 @@ from typing import Optional, List
 # Import the core SNID functionality
 from snid_sage.snid.snid import run_snid
 import snid_sage.interfaces.cli.identify as identify_module
-import snid_sage.interfaces.cli.template as template_module
 import snid_sage.interfaces.cli.batch as batch_module
 import snid_sage.interfaces.cli.config as config_module
 from snid_sage.shared.utils.logging import add_logging_arguments, configure_from_args
@@ -28,6 +27,39 @@ try:
     from snid_sage import __version__
 except ImportError:
     __version__ = "unknown"
+
+
+def _start_update_check_nonblocking() -> None:
+    """Kick off a background check for a newer PyPI release and notify if found.
+
+    Runs quickly in a background thread and is safe if offline.
+    Only prints a short notice when an update is available.
+    """
+    try:
+        # Local import to avoid any startup import cost/errors if dependencies change
+        from snid_sage.shared.utils.version_checker import VersionChecker
+    except Exception:
+        return
+
+    def _notify_if_update_available(info: dict) -> None:
+        try:
+            if info and info.get("update_available"):
+                current = info.get("current_version", "unknown")
+                latest = info.get("latest_version", "unknown")
+                print(
+                    f"Update available: {current} -> {latest}. "
+                    f"Update with: pip install --upgrade snid-sage",
+                    file=sys.stderr,
+                )
+        except Exception:
+            # Never let update notifications interfere with CLI
+            pass
+
+    try:
+        VersionChecker(timeout=3.0).check_for_updates_async(_notify_if_update_available)
+    except Exception:
+        # Silently ignore any issues with starting the check
+        pass
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -62,14 +94,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     identify_module.add_arguments(identify_parser)
     
-    # Template management commands
-    template_parser = subparsers.add_parser(
-        "template", 
-        help="Manage template libraries",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    template_module.add_arguments(template_parser)
-    
     # Batch processing commands
     batch_parser = subparsers.add_parser(
         "batch", 
@@ -101,10 +125,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.print_help()
         return 0
     
-    # Special case: if first argument looks like a spectrum file, 
-    # assume it's the legacy "identify" command
-    if len(argv) >= 1 and not argv[0].startswith('-') and argv[0] not in ['identify', 'template', 'batch', 'config']:
-        # Legacy mode: snid spectrum.dat templates/
+    # Special case: if first argument looks like a spectrum file,
+    # treat it as the default "identify" command for convenience
+    if len(argv) >= 1 and not argv[0].startswith('-') and argv[0] not in ['identify', 'batch', 'config']:
+        # Implicit identify mode: snid <spectrum> [templates/]
+        # Show a brief interactive tip once, without changing default behavior
+        try:
+            if sys.stderr.isatty() and not any(f in argv for f in ['-q', '--quiet', '--silent']):
+                print(
+                    "Tip: 'snid <file>' runs 'snid identify <file>'. Use 'snid identify' for clarity.",
+                    file=sys.stderr
+                )
+        except Exception:
+            # Never let optional tips interfere with CLI behavior
+            pass
         argv = ['identify'] + argv
     
     args = parser.parse_args(argv)
@@ -115,11 +149,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception:
         pass
 
+    # Fire-and-forget update check (non-blocking). Only warns when update is available.
+    _start_update_check_nonblocking()
+
     try:
         if args.command == "identify":
             return identify_module.main(args)
-        elif args.command == "template":
-            return template_module.main(args)
         elif args.command == "batch":
             return batch_module.main(args)
         elif args.command == "config":

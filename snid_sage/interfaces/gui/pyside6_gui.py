@@ -1025,8 +1025,16 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                             self.progress_dialog.analysis_completed(True, "Analysis completed - selecting cluster...")
                             QtCore.QTimer.singleShot(100, self.progress_dialog.accept)  # Close quickly for cluster selection
                         else:
-                            # No clustering - show completion and keep open briefly
-                            self.progress_dialog.analysis_completed(True, "Analysis completed successfully!")
+                            # No clustering - tailor message based on match quality and keep open briefly
+                            results = getattr(self.app_controller, 'snid_results', None)
+                            type_conf = getattr(results, 'type_confidence', 0.0) if results else 0.0
+                            is_weak = (type_conf < 0.30)
+                            msg = (
+                                "Only a weak match was found – try Advanced Preprocessing (smoothing, masking, continuum) to improve results."
+                                if is_weak else
+                                "Analysis completed."
+                            )
+                            self.progress_dialog.analysis_completed(True, msg)
                             QtCore.QTimer.singleShot(2000, self.progress_dialog.accept)  # Auto-close after 2 seconds
                     else:
                         self.progress_dialog.analysis_completed(False, "Analysis failed - see logs for details")
@@ -1040,7 +1048,13 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 # Update workflow state
                 from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
                 self.app_controller.update_workflow_state(WorkflowState.ANALYSIS_COMPLETE)
-                self.status_label.setText("SNID analysis completed successfully")
+                # Update status label based on result quality
+                results = getattr(self.app_controller, 'snid_results', None)
+                type_conf = getattr(results, 'type_confidence', 0.0) if results else 0.0
+                if not has_good_cluster and type_conf < 0.30:
+                    self.status_label.setText("Analysis finished with weak match – consider Advanced Preprocessing")
+                else:
+                    self.status_label.setText("SNID analysis completed")
                 
                 # Enable analysis plot buttons
                 for btn in self.analysis_plot_buttons:
@@ -1066,19 +1080,28 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     # Good cluster available - cluster selection dialog will automatically show results after selection
                     _LOGGER.info("🎯 Analysis completed with valid cluster - cluster selection will handle results display")
                 else:
-                    # No clustering - show the traditional message dialog to ask user if they want to view results
-                    reply = QtWidgets.QMessageBox.question(
-                        self,
-                        "Analysis Complete! 🎉",
-                        "SNID analysis completed successfully!\n\n"
-                        "Would you like to view the classification results now?",
-                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                        QtWidgets.QMessageBox.Yes
-                    )
-                    
-                    if reply == QtWidgets.QMessageBox.Yes:
-                        # Open results dialog automatically
-                        QtCore.QTimer.singleShot(100, self.show_analysis_results)  # Small delay to ensure UI is ready
+                    # No clustering - provide quality-aware guidance instead of success prompt
+                    results = getattr(self.app_controller, 'snid_results', None)
+                    type_conf = getattr(results, 'type_confidence', 0.0) if results else 0.0
+                    if type_conf < 0.30:
+                        QtWidgets.QMessageBox.information(
+                            self,
+                            "Weak Match Found",
+                            (
+                                "Only a weak match was found for this spectrum.\n\n"
+                                "Try Advanced Preprocessing (smoothing, wavelength masks, continuum adjustments) to improve the results."
+                            )
+                        )
+                    else:
+                        reply = QtWidgets.QMessageBox.question(
+                            self,
+                            "Analysis Complete",
+                            "Analysis completed. View classification results now?",
+                            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                            QtWidgets.QMessageBox.Yes
+                        )
+                        if reply == QtWidgets.QMessageBox.Yes:
+                            QtCore.QTimer.singleShot(100, self.show_analysis_results)
                 
                 _LOGGER.info("🎉 GUI updated after successful analysis completion")
             else:
@@ -2122,6 +2145,40 @@ def main(verbosity_args=None):
         
         if logger:
             logger.info("PySide6 GUI created successfully and is visible!")
+
+        # Non-blocking PyPI update check; only notify if update available
+        try:
+            from snid_sage.shared.utils.version_checker import VersionChecker
+
+            def _notify_if_update_available(info: dict) -> None:
+                try:
+                    if info and info.get('update_available'):
+                        current = info.get('current_version', 'unknown')
+                        latest = info.get('latest_version', 'unknown')
+
+                        def _show_dialog():
+                            try:
+                                from snid_sage.interfaces.gui.utils.pyside6_message_utils import showinfo
+                                showinfo(
+                                    "Update Available",
+                                    f"SNID SAGE {current} → {latest}\nUpdate with: pip install --upgrade snid-sage",
+                                    parent=window,
+                                )
+                            except Exception:
+                                pass
+
+                        # Ensure dialog shows on the main Qt thread
+                        QtCore.QTimer.singleShot(0, _show_dialog)
+                except Exception:
+                    pass
+
+            try:
+                VersionChecker(timeout=3.0).check_for_updates_async(_notify_if_update_available)
+            except Exception:
+                pass
+        except Exception:
+            # Silently ignore if version checker or GUI utils are unavailable
+            pass
         
         # Start event loop
         return app.exec()

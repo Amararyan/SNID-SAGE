@@ -3,8 +3,8 @@ User Line Store
 ===============
 
 Load/save user-defined spectral lines and presets, and expose merged
-line databases for the GUI so custom lines appear in the SN Emission
-Lines dialog alongside built-in ones.
+line databases for the GUI so custom lines appear in the Spectral Lines
+dialog alongside built-in ones.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ except Exception:
 
 # Built-in physical constants and helpers
 from snid_sage.shared.constants import physical as _phys
+from snid_sage.shared.utils.line_detection.line_db_loader import get_all_lines, reload_database
 
 
 def _get_lines_dir() -> Path:
@@ -38,6 +39,11 @@ def _get_store_paths() -> Tuple[Path, Path]:
     """Return (lines.json, presets.json) paths under the config lines dir."""
     lines_dir = _get_lines_dir()
     return lines_dir / "user_lines.json", lines_dir / "user_line_presets.json"
+
+
+def _get_user_db_path() -> Path:
+    """Return full path to the merged user database file used by the loader."""
+    return _get_lines_dir() / "line_database_user.json"
 
 
 def load_user_lines() -> List[Dict[str, Any]]:
@@ -60,6 +66,50 @@ def save_user_lines(lines: List[Dict[str, Any]]) -> bool:
         payload = {"lines": lines}
         with open(lines_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
+        # Also write/refresh the merged _user database so the app auto-picks it up
+        try:
+            base_lines = list(get_all_lines())
+        except Exception:
+            base_lines = []
+        # Merge base with user entries by key, with user entries overriding
+        by_key: Dict[str, Dict[str, Any]] = {d.get("key"): dict(d) for d in base_lines if d.get("key")}
+        for entry in lines:
+            key = entry.get("key")
+            if not key:
+                continue
+            by_key[key] = dict(entry)
+
+        merged_payload: Dict[str, Any] = {
+            "lines": list(by_key.values())
+        }
+        # If the base database contains additional top-level fields (e.g., phase_system), preserve them
+        try:
+            # Read packaged default DB to preserve top-level fields (e.g., phase_system)
+            packaged_default = Path(__file__).resolve().parents[3] / "lines" / "line_database.json"
+            if packaged_default.exists():
+                with packaged_default.open("r", encoding="utf-8") as rf:
+                    base_db = json.load(rf)
+                for k, v in base_db.items():
+                    if k != "lines" and k not in merged_payload:
+                        merged_payload[k] = v
+            else:
+                # Legacy fallback for editable installs during transition
+                repo_default = Path("config") / "lines" / "line_database.json"
+                if repo_default.exists():
+                    with repo_default.open("r", encoding="utf-8") as rf:
+                        base_db = json.load(rf)
+                    for k, v in base_db.items():
+                        if k != "lines" and k not in merged_payload:
+                            merged_payload[k] = v
+        except Exception:
+            pass
+
+        user_db_path = _get_user_db_path()
+        with user_db_path.open("w", encoding="utf-8") as uf:
+            json.dump(merged_payload, uf, indent=2, ensure_ascii=False)
+
+        # Invalidate and reload loader cache so new file is picked up
+        reload_database()
         return True
     except Exception:
         return False
@@ -98,10 +148,25 @@ def save_user_presets(presets: Dict[str, Any]) -> bool:
 
 
 def get_effective_line_db() -> List[Dict[str, Any]]:
-    """Return LINE_DB merged with user-defined lines, keyed by 'key'.
+    """Return JSON DB merged with user-defined lines, keyed by 'key'.
     User entries override built-ins on key collisions.
     """
-    merged: Dict[str, Dict[str, Any]] = {d["key"]: dict(d) for d in _phys.LINE_DB}
+    merged: Dict[str, Dict[str, Any]] = {}
+    # Base from JSON database
+    for d in get_all_lines():
+        key = d.get("key")
+        if not key:
+            continue
+        merged[key] = {
+            "key": key,
+            "wavelength_vacuum": float(d.get("wavelength_vacuum", 0.0) or 0.0),
+            "wavelength_air": float(d.get("wavelength_air", 0.0) or 0.0),
+            "sn_types": list(d.get("sn_types", []) or []),
+            "category": d.get("category", ""),
+            "origin": d.get("origin", "sn"),
+            "note": d.get("note", ""),
+        }
+    # Overlay user entries
     for entry in load_user_lines():
         key = entry.get("key")
         if not key:

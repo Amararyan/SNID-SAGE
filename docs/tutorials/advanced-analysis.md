@@ -6,9 +6,9 @@ Practical ways to go beyond a basic run while staying within supported features.
 
 - Filter by type and age to focus and speed up matching
 - Example (CLI):
-```powershell
-snid identify spectrum.dat --output-dir results/ `
-  --type-filter Ia Ib `
+```bash
+snid identify spectrum.dat --output-dir results/ \
+  --type-filter Ia Ib \
   --age-min -5 --age-max 30
 ```
 
@@ -26,10 +26,10 @@ snid identify spectrum.dat --output-dir results/ --zmin 0.0 --zmax 0.1
 ## Preprocessing tuning
 
 - Apply modest smoothing on noisy data; prefer specific wavelength masks over broad ranges
-```powershell
-snid identify spectrum.dat --output-dir results/ `
-  --savgol-window 11 --savgol-order 3 `
-  --aband-remove --skyclip `
+```bash
+snid identify spectrum.dat --output-dir results/ \
+  --savgol-window 11 --savgol-order 3 \
+  --aband-remove --skyclip \
   --wavelength-masks 6550:6600 7600:7700
 ```
 

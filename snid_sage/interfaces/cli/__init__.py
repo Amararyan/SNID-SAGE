@@ -6,7 +6,6 @@ Command-line interface for SNID SAGE spectrum analysis.
 
 This module provides command-line tools for:
 - Spectrum identification
-- Template management
 - Batch processing
 - Configuration management
 """
@@ -26,11 +25,6 @@ except ImportError:
     identify = None
 
 try:
-    from . import template
-except ImportError:
-    template = None
-
-try:
     from . import batch
 except ImportError:
     batch = None
@@ -40,4 +34,4 @@ try:
 except ImportError:
     config = None
 
-__all__ = ['main', 'identify', 'template', 'batch', 'config'] 
+__all__ = ['main', 'identify', 'batch', 'config']

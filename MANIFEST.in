@@ -22,6 +22,7 @@ recursive-include snid_sage/images *.png *.ico *.svg
 recursive-include snid_sage/images/twemoji *.svg
 include snid_sage/images/twemoji/ATTRIBUTION.txt
 recursive-include snid_sage/custom_templates *.md
+recursive-include snid_sage/lines *.json
 
 # Include scripts
 recursive-include scripts *.py

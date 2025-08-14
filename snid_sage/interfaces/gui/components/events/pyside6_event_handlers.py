@@ -105,10 +105,45 @@ class PySide6EventHandlers(QtCore.QObject):
             QtGui.QShortcut("F1", self.main_window, self.on_show_shortcuts_dialog)
             CPW.create_shortcut(self.main_window, "Ctrl+/", self.on_show_shortcuts_dialog)
 
+            # Games (cross-platform Ctrl/Cmd+G)
+            CPW.create_shortcut(self.main_window, "Ctrl+G", self.on_start_games)
+
+            # Quit application (cross-platform Ctrl/Cmd+Q)
+            CPW.standard_shortcut(self.main_window, QtGui.QKeySequence.StandardKey.Quit, self.on_quit_application)
+
             _LOGGER.debug("Keyboard shortcuts setup completed")
 
         except Exception as e:
             _LOGGER.error(f"Error setting up keyboard shortcuts: {e}")
+
+    def on_start_games(self):
+        """Start the Space Debris game immediately (no dialog)."""
+        try:
+            if hasattr(self.main_window, '_start_space_debris_game'):
+                self.main_window._start_space_debris_game()
+            elif hasattr(self.main_window, 'start_games'):
+                # Fallback to legacy start which may show a menu
+                self.main_window.start_games()
+            else:
+                QtWidgets.QMessageBox.information(
+                    self.main_window,
+                    "Games",
+                    "Games feature is not available in this build."
+                )
+        except Exception as e:
+            _LOGGER.error(f"Error starting games: {e}")
+
+    def on_quit_application(self):
+        """Quit the application in a cross-platform friendly way."""
+        try:
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.quit()
+            else:
+                # Fallback
+                self.main_window.close()
+        except Exception as e:
+            _LOGGER.error(f"Error quitting application: {e}")
     
     def on_view_change(self, view_type):
         """Handle view toggle changes"""

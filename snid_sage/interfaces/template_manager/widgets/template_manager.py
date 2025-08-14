@@ -114,7 +114,7 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         # Advanced operations
         advanced_group = QtWidgets.QGroupBox("Advanced Operations")
         self.layout_manager.setup_group_box(advanced_group)
-        advanced_layout = QtWidgets.QVBoxLayout(advanced_group)
+        advanced_layout = QtWidgets.QHBoxLayout(advanced_group)
         
         # Metadata tools
         metadata_tools_frame = QtWidgets.QFrame()

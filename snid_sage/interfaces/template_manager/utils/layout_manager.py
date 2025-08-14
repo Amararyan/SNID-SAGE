@@ -243,14 +243,19 @@ class TemplateManagerLayoutManager:
         )
     
     def create_action_button(self, text: str, emoji: str = None) -> QtWidgets.QPushButton:
-        """Create a consistently styled action button (text-only; icon via Twemoji)."""
+        """Create a consistently styled action button.
+
+        Per user preference, do NOT add emoji icons to buttons that already have
+        textual labels. Only attach an emoji icon when the label is empty (icon-only).
+        """
         button = QtWidgets.QPushButton()
-        
-        # Always keep plain text. If an emoji is provided, set it as an icon only.
+
+        # Always set the provided text label
         button.setText(text)
-        if emoji and self.twemoji_manager:
+
+        # Only attach an emoji icon if there is no text label (icon-only button)
+        if (emoji and not (text and text.strip()) and self.twemoji_manager):
             try:
-                # Use packaged Twemoji icon if available; do not keep emoji in text
                 self.twemoji_manager.set_button_icon(button, emoji, keep_text=True)
             except Exception:
                 pass
@@ -262,28 +267,24 @@ class TemplateManagerLayoutManager:
         return button
     
     def create_create_button(self, text: str = "Create Template") -> QtWidgets.QPushButton:
-        """Create the main 'Create Template' button with special styling (icon via Twemoji)."""
+        """Create the main 'Create Template' button with special styling.
+
+        Do not add emoji icons to labeled buttons.
+        """
         button = QtWidgets.QPushButton(text)
         button.setMinimumHeight(self.settings.create_button_height)
         button.setObjectName("create_btn")  # For CSS styling
-        if self.twemoji_manager:
-            try:
-                self.twemoji_manager.set_button_icon(button, "✨", keep_text=True)
-            except Exception:
-                pass
         
         return button
     
     def create_compare_button(self, text: str = "Compare Selected") -> QtWidgets.QPushButton:
-        """Create the 'Compare' button with special styling (icon via Twemoji)."""
+        """Create the 'Compare' button with special styling.
+
+        Do not add emoji icons to labeled buttons.
+        """
         button = QtWidgets.QPushButton(text)
         button.setMinimumHeight(self.settings.action_button_height)
         button.setObjectName("compare_btn")  # For CSS styling
-        if self.twemoji_manager:
-            try:
-                self.twemoji_manager.set_button_icon(button, "🔍", keep_text=True)
-            except Exception:
-                pass
         
         return button
     

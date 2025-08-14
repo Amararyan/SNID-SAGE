@@ -62,7 +62,7 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         control_layout = QtWidgets.QHBoxLayout(control_panel)
         
         self.view_mode_combo = QtWidgets.QComboBox()
-        self.view_mode_combo.addItems(["All Epochs", "Individual Epoch", "Normalized"])
+        self.view_mode_combo.addItems(["All Epochs", "Individual Epoch"])
         self.view_mode_combo.currentTextChanged.connect(self.update_plot)
         
         self.epoch_selector = create_flexible_int_input(min_val=1, max_val=999, default=1)
@@ -266,8 +266,7 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 self._plot_all_epochs_pg()
             elif view_mode == "Individual Epoch":
                 self._plot_individual_epoch_pg()
-            elif view_mode == "Normalized":
-                self._plot_normalized_pg()
+            
         else:
             # Create a sample plot if no real data available
             self._create_sample_plot_pg()
@@ -374,54 +373,7 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         else:
             _LOGGER.warning(f"Epoch index {epoch_idx} out of range (available: {len(self.template_data.epochs)})")
                 
-    def _plot_normalized_pg(self):
-        """Plot normalized spectra using PyQtGraph"""
-        if not self.template_data or not self.template_data.epochs:
-            return
-            
-        # Validate data
-        if self.template_data.wave_data is None:
-            _LOGGER.warning("No wavelength data available for plotting")
-            return
-            
-        # Generate colors  
-        colors = [pg.intColor(i, len(self.template_data.epochs), hues=9, values=1, maxValue=255, minValue=150, maxHue=300, minHue=0) 
-                  for i in range(len(self.template_data.epochs))]
-        
-        legend_items = []
-        
-        for i, epoch in enumerate(self.template_data.epochs):
-            if (epoch['flux'] is not None and 
-                len(epoch['flux']) == len(self.template_data.wave_data)):
-                # Normalize flux
-                flux = epoch['flux']
-                median_flux = np.median(flux)
-                if median_flux > 0:
-                    flux_normalized = flux / median_flux
-                else:
-                    _LOGGER.warning(f"Skipping epoch {i}: zero or negative median flux")
-                    continue
-                age = epoch['age']
-                
-                # Plot normalized flux
-                curve = self.plot_item.plot(
-                    self.template_data.wave_data, flux_normalized,
-                    pen=pg.mkPen(color=colors[i], width=1.5, style=QtCore.Qt.SolidLine),
-                    name=f"Age: {age:.1f} days"
-                )
-                legend_items.append((curve, f"Age: {age:.1f} days"))
-            else:
-                _LOGGER.warning(f"Skipping epoch {i}: flux data mismatch with wavelength grid")
-                
-        # Update Y label for normalized plot
-        self.plot_item.setLabel('left', 'Flattened Flux')
-        
-        # Add legend - ensure no duplicates
-        if legend_items:
-            # Remove any existing legend first (already handled in _plot_template_spectrum)
-            legend = self.plot_item.addLegend(offset=(10, 10))
-            for curve, label in legend_items:
-                legend.addItem(curve, label)
+    
         
     def _create_sample_plot_pg(self):
         """Create a sample plot when no real data is available using PyQtGraph"""

@@ -741,7 +741,7 @@ class UnifiedPySide6LayoutManager:
         _LOGGER.info("🔬 Creating emission line section...")
         
         # Create emission line overlay button (matching original interface)
-        gui_instance.emission_line_overlay_btn = QtWidgets.QPushButton("SN Emission Lines")
+        gui_instance.emission_line_overlay_btn = QtWidgets.QPushButton("Spectral Lines")
         gui_instance.emission_line_overlay_btn.setObjectName("unified_emission_line_overlay_btn")
 
         _LOGGER.info("🔧 Checking available emission line dialog methods...")
@@ -756,7 +756,7 @@ class UnifiedPySide6LayoutManager:
             gui_instance.emission_line_overlay_btn.clicked.connect(lambda: _LOGGER.info("Emission lines dialog not available"))
         
         gui_instance.emission_line_overlay_btn.setEnabled(False)  # Initially disabled
-        gui_instance.emission_line_overlay_btn.setToolTip("Interactive SN emission line analysis\nIdentify and analyze supernova and galaxy emission lines\nRedshift verification and P-Cygni profile analysis\n(Available after loading spectrum)")
+        gui_instance.emission_line_overlay_btn.setToolTip("Interactive spectral line analysis\nIdentify and analyze supernova and galaxy lines\nRedshift verification and P-Cygni profile analysis\n(Available after loading spectrum)")
         layout.addWidget(gui_instance.emission_line_overlay_btn)
         _LOGGER.info("✅ Emission line button created and connected")
         

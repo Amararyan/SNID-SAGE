@@ -234,7 +234,7 @@ class TwemojiManager:
             QIcon object or None if unavailable
         """
         if not PYSIDE6_AVAILABLE:
-            _LOGGER.warning("PySide6 not available, cannot create QIcon")
+            _LOGGER.debug("PySide6 not available, cannot create QIcon")
             return None
         
         # Check cache first
@@ -244,13 +244,13 @@ class TwemojiManager:
         # Get Unicode codepoint
         codepoint = self._get_unicode_codepoint(emoji)
         if not codepoint:
-            _LOGGER.warning(f"No codepoint mapping found for emoji: {emoji}")
+            _LOGGER.debug(f"No codepoint mapping found for emoji: {emoji}")
             return None
         
         # Get SVG path (packaged preferred, then cache, then download)
         svg_path = self._ensure_cached_or_packaged_icon(emoji, codepoint)
         if not svg_path or not svg_path.exists():
-            _LOGGER.warning(f"Failed to get SVG file for emoji: {emoji}")
+            _LOGGER.debug(f"Failed to get SVG file for emoji: {emoji}")
             return None
         
         try:
@@ -294,7 +294,17 @@ class TwemojiManager:
         
         icon = self.get_icon(emoji)
         if not icon:
-            _LOGGER.warning(f"Could not get icon for emoji '{emoji}', keeping text")
+            # If we can't get an icon, still sanitize the text by removing the emoji
+            # from the beginning when there is additional label text.
+            try:
+                if keep_text:
+                    current_text = button.text() or ""
+                    if current_text.startswith(emoji):
+                        new_text = current_text[len(emoji):].strip()
+                        button.setText(new_text)
+                _LOGGER.debug(f"No Twemoji icon for '{emoji}'. Emoji removed from button text if present.")
+            except Exception:
+                pass
             return False
         
         try:
@@ -338,13 +348,22 @@ class TwemojiManager:
             text = button.text()
             if not text:
                 continue
-            
-            # Check if button text starts with any known emoji
+
+            handled = False
+            # First, try known/packaged emojis for best icon fidelity
             for emoji in self.EMOJI_MAPPING.keys():
                 if text.startswith(emoji):
                     if self.set_button_icon(button, emoji, keep_text=True):
                         converted += 1
+                    handled = True
                     break
+
+            # If not handled by known mapping, attempt a generic leading-emoji parse
+            if not handled:
+                stripped, generic_emoji = self._strip_leading_emoji(text)
+                if generic_emoji:
+                    if self.set_button_icon(button, generic_emoji, keep_text=True):
+                        converted += 1
         
         _LOGGER.info(f"Converted {converted} buttons to use Twemoji icons")
         return converted

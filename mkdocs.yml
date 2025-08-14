@@ -15,7 +15,11 @@ edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2024 SNID SAGE Development Team
 
 # Configuration
-theme: readthedocs
+theme:
+  name: readthedocs
+  navigation_depth: 2
+  collapse_navigation: true
+  sticky_navigation: true
 
 # Plugins (simplified for initial setup)
 plugins:
@@ -71,37 +75,33 @@ markdown_extensions:
 nav:
   - Home: index.md
 
-  - Getting Started:
+  - Start:
     - Installation: installation/installation.md
     - Icon Setup: installation/icon-setup.md
     - Quick Start: quickstart/first-analysis.md
     - Task Hub: task-hub.md
     - Navigation Guide: navigation-guide.md
 
-  - User Guides:
-    - GUI:
-      - Overview: gui/interface-overview.md
-      - Preprocessing: gui/preprocessing.md
-      - Redshift & Age: gui/redshift-age.md
-      - Results & Plots: gui/results-and-plots.md
-      - AI Assistant: gui/ai-assistant.md
-      - Settings & Configuration: gui/settings-configuration.md
-    - Mini-GUIs:
-      - Templates Manager: gui/templates-manager.md
-      - Lines Manager: gui/lines-manager.md
-    - Data:
-      - Supported Formats: data/supported-formats.md
-      - Data Preparation: data/data-preparation.md
-      - Template Library: data/template-library.md
-      - Custom Templates: data/custom-templates.md
-    - CLI:
-      - Command Reference: cli/command-reference.md
-      - Batch Processing: cli/batch-processing.md
-      - Template Management: cli/template-management.md
-    - AI Integration:
-      - Overview: ai/overview.md
-      - Analysis Types: ai/analysis-types.md
-      - OpenRouter Setup: ai/openrouter-setup.md
+  - Using SNID SAGE:
+    - GUI Overview: gui/interface-overview.md
+    - Preprocessing: gui/preprocessing.md
+    - Redshift & Age: gui/redshift-age.md
+    - Results & Plots: gui/results-and-plots.md
+    - Settings & Config: gui/settings-configuration.md
+    - Templates Manager: gui/templates-manager.md
+    - Lines Manager: gui/lines-manager.md
+    - AI Assistant (GUI): gui/ai-assistant.md
+    - CLI Reference: cli/command-reference.md
+    - Batch Processing: cli/batch-processing.md
+    - AI Features: ai/overview.md
+    - OpenRouter Setup: ai/openrouter-setup.md
+    - AI Analysis Types: ai/analysis-types.md
+
+  - Data & Templates:
+    - Supported Formats: data/supported-formats.md
+    - Data Preparation: data/data-preparation.md
+    - Template Library: data/template-library.md
+    - Custom Templates: data/custom-templates.md
 
   - Tutorials:
     - Basic Analysis: tutorials/basic-analysis.md
@@ -113,18 +113,17 @@ nav:
     - Publication-Ready Plots: tutorials/publication-ready-plots.md
     - Performance Optimization: tutorials/performance-optimization.md
     - Advanced Workflows: tutorials/advanced-workflows.md
-    - Tutorials Index: tutorials/index.md
 
   - Reference:
-    - API Reference: reference/api-reference.md
+    - Parameters: reference/parameters.md
     - Configuration Guide: reference/configuration-guide.md
-    - Parameters Reference: reference/parameters.md
+    - API Reference: reference/api-reference.md
     - Troubleshooting: reference/troubleshooting.md
     - FAQ: reference/faq.md
     - Changelog: reference/changelog.md
 
   - Development:
-    - Contributing: dev/contributing.md 
+    - Contributing: dev/contributing.md
     - Plot Swapping System: dev/plot-swapping-system.md
 
 # Custom styling for Read the Docs theme

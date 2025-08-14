@@ -484,7 +484,8 @@ class AnalysisMenuManager:
             # Update workflow state
             from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
             self.app_controller.update_workflow_state(WorkflowState.ANALYSIS_COMPLETE)
-            self.main_window.status_label.setText("SNID analysis completed successfully")
+            # Defer success wording to the main window handler that inspects match quality
+            self.main_window.status_label.setText("SNID analysis completed")
             
             # Enable analysis plot buttons
             for btn in self.main_window.analysis_plot_buttons:

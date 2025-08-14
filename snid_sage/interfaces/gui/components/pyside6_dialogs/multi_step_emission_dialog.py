@@ -1,8 +1,8 @@
 """
-PySide6 Multi-Step SN Emission Line Analysis Dialog for SNID SAGE GUI (Refactored)
-==================================================================================
+PySide6 Multi-Step Spectral Line Analysis Dialog for SNID SAGE GUI (Refactored)
+==============================================================================
 
-A modern, step-by-step workflow for supernova emission line analysis.
+A modern, step-by-step workflow for spectral line analysis.
 This is the refactored version that uses separate modules for organization.
 """
 
@@ -113,6 +113,37 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         except Exception as e:
             _LOGGER.error(f"Error initializing refactored emission line dialog: {e}")
             raise
+
+    def showEvent(self, event):
+        """Ensure the spectrum view is well centered when the dialog appears."""
+        super().showEvent(event)
+        try:
+            if getattr(self, '_did_initial_center', False):
+                return
+            if not PYQTGRAPH_AVAILABLE or not self.plot_item:
+                return
+            wave = self.spectrum_data.get('wave', None)
+            flux = self.spectrum_data.get('flux', None)
+            if wave is None or flux is None:
+                return
+            if len(wave) == 0 or len(flux) == 0:
+                return
+            # Compute ranges with margins
+            wmin = float(np.min(wave)); wmax = float(np.max(wave))
+            fmin = float(np.min(flux)); fmax = float(np.max(flux))
+            xpad = (wmax - wmin) * 0.05 if wmax > wmin else 10.0
+            ypad = (fmax - fmin) * 0.10 if fmax > fmin else abs(fmax) * 0.10 + 1.0
+            # Apply ranges and keep auto-range disabled
+            try:
+                self.plot_item.disableAutoRange()
+            except Exception:
+                self.plot_widget.enableAutoRange(axis='x', enable=False)
+                self.plot_widget.enableAutoRange(axis='y', enable=False)
+            self.plot_item.setXRange(wmin - xpad, wmax + xpad, padding=0)
+            self.plot_item.setYRange(fmin - ypad, fmax + ypad, padding=0)
+            self._did_initial_center = True
+        except Exception:
+            pass
     
     def _get_theme_colors(self):
         """Get color scheme from theme manager or use defaults"""
@@ -139,7 +170,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     
     def _setup_dialog(self):
         """Setup basic dialog properties"""
-        self.setWindowTitle("Emission Line Analysis - Step by Step")
+        self.setWindowTitle("Spectral Line Analysis - Step by Step")
         self.setModal(True)
         self.resize(1000, 600)  # Made narrower (was 1200) and less tall (was 800)
         self.setMinimumSize(900, 500)  # Also adjusted minimum size
@@ -263,6 +294,13 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 self.plot_item.setContentsMargins(6, 10, 6, 6)
                 # Give the ViewBox some default padding for autoRange
                 self.plot_item.getViewBox().setDefaultPadding(0.08)
+                # Disable auto-ranging to prevent rescale on overlay additions
+                try:
+                    self.plot_item.disableAutoRange()
+                except Exception:
+                    # Fallback per-axis
+                    self.plot_widget.enableAutoRange(axis='x', enable=False)
+                    self.plot_widget.enableAutoRange(axis='y', enable=False)
             except Exception:
                 pass
             
@@ -463,11 +501,25 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 # Ensure some headroom so the curve isn't cut at the top
                 try:
                     flux = self.spectrum_data['flux']
+                    wave = self.spectrum_data['wave']
                     if len(flux) > 0:
                         fmin = float(np.min(flux))
                         fmax = float(np.max(flux))
                         pad = (fmax - fmin) * 0.1 if fmax > fmin else abs(fmax) * 0.1 + 1.0
                         self.plot_widget.setYRange(fmin - pad, fmax + pad)
+                        # Also set X range with a small margin since auto-range is disabled
+                        try:
+                            wmin = float(np.min(wave))
+                            wmax = float(np.max(wave))
+                            xpad = (wmax - wmin) * 0.05 if wmax > wmin else 10.0
+                            self.plot_item.setXRange(wmin - xpad, wmax + xpad, padding=0)
+                        except Exception:
+                            pass
+                        # Keep auto-range disabled so later overlays don't rescale
+                        try:
+                            self.plot_item.disableAutoRange()
+                        except Exception:
+                            self.plot_widget.enableAutoRange(axis='y', enable=False)
                 except Exception:
                     pass
             
@@ -506,8 +558,8 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             
             # Get plot range for positioning (use relative position within current y-range)
             y_min, y_max = self.plot_item.viewRange()[1]
-            # Position at 75% of the current visible range height
-            y_pos = y_min + (y_max - y_min) * 0.75
+            # Position at 95% of the current visible range height
+            y_pos = y_min + (y_max - y_min) * 0.95
             
             # Set position and rotation - slightly offset from the line for better readability
             text.setPos(wavelength + 2, y_pos)  # Small horizontal offset for readability
@@ -945,7 +997,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self._initialize_step2_interface()
             
             # Update window title
-            self.setWindowTitle("Emission Line Analysis - Step 2: Analysis")
+            self.setWindowTitle("Spectral Line Analysis - Step 2: Analysis")
             
             _LOGGER.info("Step 2 interface created successfully")
             
@@ -1123,7 +1175,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.current_step = 1
             
             # Update window title
-            self.setWindowTitle("Emission Line Analysis - Step by Step")
+            self.setWindowTitle("Spectral Line Analysis - Step by Step")
             
             # Refresh plot to show step 1 view
             self._update_plot()
@@ -1348,6 +1400,14 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             return
         
         try:
+            # Lock current view ranges to avoid any auto-rescaling during overlay
+            x_range_before, y_range_before = self.plot_item.viewRange()
+            try:
+                self.plot_item.disableAutoRange()
+            except Exception:
+                self.plot_widget.enableAutoRange(axis='x', enable=False)
+                self.plot_widget.enableAutoRange(axis='y', enable=False)
+
             # Get spectrum wavelength range
             wave = self.spectrum_data.get('wave', np.array([]))
             if len(wave) == 0:
@@ -1376,6 +1436,12 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self._create_overlay_plot_items_batch(overlay_lines)
             
             _LOGGER.debug(f"Displayed {len(overlay_lines)} overlay lines")
+            # Restore the original view ranges explicitly to prevent any rescale
+            try:
+                self.plot_item.setXRange(x_range_before[0], x_range_before[1], padding=0)
+                self.plot_item.setYRange(y_range_before[0], y_range_before[1], padding=0)
+            except Exception:
+                pass
             
         except Exception as e:
             _LOGGER.error(f"Error showing line overlay: {e}")
@@ -1443,17 +1509,13 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
                 rest_wavelengths = np.array(rest_wavelengths)
                 obs_wavelengths = rest_wavelengths * (1 + redshift)
                 
-                # Vectorized range filtering
-                in_range_mask = (obs_wavelengths >= wave_min) & (obs_wavelengths <= wave_max)
-                
-                # Build result list with pre-calculated colors
-                for i, in_range in enumerate(in_range_mask):
-                    if in_range:
-                        clean_name = line_names[i].replace(" (gal)", "")
-                        # Skip lines that are already added
-                        if clean_name not in self.sn_lines and clean_name not in self.galaxy_lines:
-                            line_color = self._get_line_color(clean_name, self.current_mode)
-                            overlay_lines.append((clean_name, obs_wavelengths[i], line_color))
+                # Build result list with pre-calculated colors (no range filtering; rely on fixed view)
+                for i in range(len(obs_wavelengths)):
+                    clean_name = line_names[i].replace(" (gal)", "")
+                    # Skip lines that are already added
+                    if clean_name not in self.sn_lines and clean_name not in self.galaxy_lines:
+                        line_color = self._get_line_color(clean_name, self.current_mode)
+                        overlay_lines.append((clean_name, obs_wavelengths[i], line_color))
             
             # Cache the result
             redshift_key = f"{redshift:.8f}_{wave_min:.1f}_{wave_max:.1f}"
@@ -1485,7 +1547,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             
             # Get current plot view range once
             y_min, y_max = self.plot_item.viewRange()[1]
-            text_y_pos = y_min + (y_max - y_min) * 0.6
+            text_y_pos = y_min + (y_max - y_min) * 0.95
             
             # OPTIMIZATION 4: Batch add items to reduce plot update overhead
             items_to_add = []

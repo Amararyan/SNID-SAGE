@@ -6,7 +6,7 @@ These functions support the dropdown menu system in the multi-step emission anal
 """
 
 from typing import Dict, List, Tuple, Any
-from snid_sage.shared.constants.physical import SUPERNOVA_EMISSION_LINES
+from snid_sage.shared.utils.line_detection.line_db_loader import filter_lines
 
 def get_type_ia_lines(current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
     """Add Type Ia supernova lines"""
@@ -161,115 +161,198 @@ def get_interaction_lines(current_redshift: float, spectrum_data: Dict) -> Dict[
 # ========================================
 
 def _add_lines_by_type(sn_types: List[str], current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines matching specific SN types"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        line_sn_types = line_data.get('sn_types', [])
-        if any(sn_type in line_sn_types for sn_type in sn_types):
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
+    """Add lines matching specific SN types (from JSON DB)."""
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(sn_types=sn_types):
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_category(category: str, current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines by element category"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        if line_data.get('category') == category:
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
+    """Add lines by element category (from JSON DB)."""
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(category=category):
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_origin(origin: str, current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines by origin (sn/galaxy)"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        if line_data.get('origin') == origin:
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
+    """Add lines by origin (sn/galaxy) from JSON DB."""
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(origin=origin):
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_strength(strengths: List[str], current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines by strength"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        if line_data.get('strength') in strengths:
+    """Placeholder: strength not encoded in JSON DB; fallback to common categories."""
+    # Keep behavior by mapping to category groups commonly considered strong
+    categories = ['silicon', 'hydrogen', 'calcium', 'iron'] if strengths else []
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for cat in categories:
+        for line in filter_lines(category=cat):
+            line_name = line.get('key')
+            if not line_name:
+                continue
+            line_data = {
+                'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+                'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+                'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+                'sn_types': list(line.get('sn_types', []) or []),
+                'category': line.get('category'),
+                'origin': line.get('origin'),
+            }
             if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
                 obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
                 lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_type_and_phase(sn_types: List[str], phases: List[str], current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines matching specific SN types and phases"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        line_sn_types = line_data.get('sn_types', [])
-        line_phase = line_data.get('phase', '')
-        
-        type_match = any(sn_type in line_sn_types for sn_type in sn_types)
-        phase_match = line_phase in phases
-        
-        if type_match and (phase_match or not phases):
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
+    """Add lines matching specific SN types and string phase labels from JSON DB."""
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(sn_types=sn_types, phase_labels=phases):
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_phase(phases: List[str], current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines by phase"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        line_phase = line_data.get('phase', '')
-        if line_phase in phases:
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
+    """Add lines by phase labels across any SN type from JSON DB."""
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(phase_labels=phases):
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_name_pattern(patterns: List[str], current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines matching name patterns"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        for pattern in patterns:
-            if pattern in line_name:
-                if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                    obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                    lines_to_add[line_name] = (obs_wavelength, line_data)
-                break
+    """Add lines matching name patterns from JSON DB."""
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(name_patterns=patterns):
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_category_and_strength(category: str, strengths: List[str], current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines by category and strength"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        if (line_data.get('category') == category and 
-            line_data.get('strength') in strengths):
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
-    return lines_to_add
+    """Placeholder mapping for strength filters using JSON DB categories."""
+    return _add_lines_by_category(category, current_redshift, spectrum_data)
 
 def _add_lines_by_category_and_phase(category: str, phases: List[str], current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines by category and phase"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        if (line_data.get('category') == category and 
-            line_data.get('phase') in phases):
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
+    """Add lines by category and phase (from JSON DB labels)."""
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(phase_labels=phases, category=category):
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _add_lines_by_line_type(line_type: str, current_redshift: float, spectrum_data: Dict) -> Dict[str, Tuple[float, Dict]]:
-    """Add lines by emission/absorption type"""
-    lines_to_add = {}
-    for line_name, line_data in SUPERNOVA_EMISSION_LINES.items():
-        if line_data.get('type') == line_type:
-            if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
-                obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
-                lines_to_add[line_name] = (obs_wavelength, line_data)
+    """Approximate emission/absorption with category heuristics using JSON DB."""
+    # Absorption-dominant categories (approx)
+    if line_type == 'absorption':
+        cats = ['silicon', 'stellar_absorption']
+    else:
+        cats = None
+    lines_to_add: Dict[str, Tuple[float, Dict]] = {}
+    for line in filter_lines(category=None if cats is None else None):
+        # If cats specified, skip non-matching categories
+        if cats is not None and line.get('category') not in cats:
+            continue
+        line_name = line.get('key')
+        if not line_name:
+            continue
+        line_data = {
+            'wavelength': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_air': float(line.get('wavelength_air', 0.0) or 0.0),
+            'wavelength_vacuum': float(line.get('wavelength_vacuum', 0.0) or 0.0),
+            'sn_types': list(line.get('sn_types', []) or []),
+            'category': line.get('category'),
+            'origin': line.get('origin'),
+        }
+        if _is_line_in_spectrum_range(line_data, current_redshift, spectrum_data):
+            obs_wavelength = line_data['wavelength'] * (1 + current_redshift)
+            lines_to_add[line_name] = (obs_wavelength, line_data)
     return lines_to_add
 
 def _is_line_in_spectrum_range(line_data: Dict, current_redshift: float, spectrum_data: Dict) -> bool:

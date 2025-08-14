@@ -125,10 +125,10 @@ class DialogManager:
         try:
             _LOGGER.info("🔬 Starting emission line dialog opening process...")
             
-            # Check if spectrum is loaded - use flat spectrum for SN emission line analysis
+            # Check if spectrum is loaded - use flat spectrum for SN line analysis
             _LOGGER.info("📊 Checking if spectrum is loaded...")
-            spectrum_view = 'flat'  # Always use flat spectrum for SN emission lines
-            _LOGGER.info(f"📊 Using {spectrum_view} spectrum for SN emission line analysis")
+            spectrum_view = 'flat'  # Always use flat spectrum for SN lines
+            _LOGGER.info(f"📊 Using {spectrum_view} spectrum for SN line analysis")
             
             wave, flux = self.app_controller.get_spectrum_for_view(spectrum_view)
             _LOGGER.info(f"📊 Retrieved spectrum data - wave: {wave is not None}, flux: {flux is not None}")

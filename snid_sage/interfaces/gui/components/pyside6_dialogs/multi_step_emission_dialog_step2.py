@@ -1,8 +1,8 @@
 """
-PySide6 Multi-Step SN Emission Line Analysis Dialog - Step 2 (Peak Analysis)
-===========================================================================
+PySide6 Multi-Step Spectral Line Analysis Dialog - Step 2 (Peak Analysis)
+========================================================================
 
-This module contains all the Step 2 analysis functionality for the emission line dialog.
+This module contains all the Step 2 analysis functionality for the spectral lines dialog.
 Separated from the main dialog to keep the code organized and manageable.
 
 Step 2 Features:
@@ -75,7 +75,7 @@ class EmissionLineStep2Analysis:
         """Create Step 2 peak analysis interface (simplified - only Manual Points method)"""
         # Description
         desc = QtWidgets.QLabel(
-            "Manual point selection for emission line analysis. "
+            "Manual point selection for spectral line analysis. "
             "Use the toolbar above to navigate lines and adjust zoom level."
         )
         desc.setWordWrap(True)
@@ -91,7 +91,8 @@ class EmissionLineStep2Analysis:
             "Manual Selection Instructions:\n"
             "• Left Click: Add point snapped to nearest bin\n"
             "• Ctrl/Cmd+Click: Add free-floating point anywhere\n"
-            f"• {right_click_text}: Remove closest point"
+            f"• {right_click_text}: Remove closest point\n"
+            "• FWHM preview appears after selecting at least 5 points"
         )
         self.manual_instructions.setWordWrap(True)
         self.manual_instructions.setStyleSheet(f"color: {self.colors.get('text_secondary', '#666')}; padding: 5px;")
@@ -425,23 +426,38 @@ class EmissionLineStep2Analysis:
         Returns tuple (fwhm, left_lambda, right_lambda, half_level) or None if not derivable.
         """
         try:
-            if len(wavelengths) < 3:
+            # Require a minimum number of points for stability
+            if len(wavelengths) < 5:
                 return None
             # Ensure strictly increasing by sorting (callers already sort, but keep safe)
             pts = sorted(zip(wavelengths, fluxes), key=lambda p: p[0])
             w = [p[0] for p in pts]
             f = [p[1] for p in pts]
-            peak_idx = int(np.argmax(f))
-            peak_flux = f[peak_idx]
-            if peak_flux <= 0:
-                return None
-            half = peak_flux / 2.0
+            # Estimate baseline (continuum) from edges
+            if len(f) >= 4:
+                edge_vals = [f[0], f[1], f[-2], f[-1]]
+            else:
+                edge_vals = [f[0], f[-1]]
+            baseline = float(np.median(edge_vals))
+
+            # Determine if feature is emission (peak above baseline) or absorption (trough below)
+            max_flux = float(np.max(f))
+            min_flux = float(np.min(f))
+            is_emission = (max_flux - baseline) >= (baseline - min_flux)
+
+            # Choose central index and compute half level
+            center_idx = int(np.argmax(f)) if is_emission else int(np.argmin(f))
+            center_flux = f[center_idx]
+            if is_emission:
+                half = baseline + 0.5 * (center_flux - baseline)
+            else:
+                half = baseline - 0.5 * (baseline - center_flux)
 
             # Left crossing
-            li = peak_idx
-            while li > 0 and f[li] > half:
+            li = center_idx
+            while li > 0 and ((f[li] > half) if is_emission else (f[li] < half)):
                 li -= 1
-            if li == peak_idx:
+            if li == center_idx:
                 return None
             left_lambda = w[li]
             if f[li] != f[li + 1]:
@@ -451,10 +467,10 @@ class EmissionLineStep2Analysis:
                 left_lambda = x0 + (half - y0) * (x1 - x0) / (y1 - y0)
 
             # Right crossing
-            ri = peak_idx
-            while ri < len(f) - 1 and f[ri] > half:
+            ri = center_idx
+            while ri < len(f) - 1 and ((f[ri] > half) if is_emission else (f[ri] < half)):
                 ri += 1
-            if ri == peak_idx:
+            if ri == center_idx:
                 return None
             right_lambda = w[ri]
             if f[ri] != f[ri - 1]:
@@ -585,8 +601,10 @@ class EmissionLineStep2Analysis:
                 )
                 self.parent.plot_item.addItem(scatter)
 
-                # Compute FWHM from points for immediate visual feedback
-                fwhm_tuple = self._compute_fwhm_from_points(point_waves, point_fluxes)
+                # Compute FWHM from points for immediate visual feedback (require >=5 points)
+                fwhm_tuple = None
+                if len(point_waves) >= 5:
+                    fwhm_tuple = self._compute_fwhm_from_points(point_waves, point_fluxes)
                 if fwhm_tuple is not None:
                     fwhm, left_lambda, right_lambda, half_level = fwhm_tuple
                     # Draw horizontal FWHM line segment at half-max between left and right

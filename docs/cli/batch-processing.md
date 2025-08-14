@@ -52,5 +52,5 @@ With `--complete`, additional plots are generated (comparison, clustering, redsh
 ## See also
 
 - [Command Reference](command-reference.md)
-- [Templates (CLI)](template-management.md)
+- [Template Management](../tutorials/template-management.md)
 

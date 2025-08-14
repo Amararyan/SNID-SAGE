@@ -79,7 +79,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         # Allow full-screen and maximizing; no artificial max size
         self.setSizeGripEnabled(True)
         self.setMinimumSize(700, 500)
-        self.resize(1200, 800)
+        self.resize(1000, 650)
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowMaximizeButtonHint)
         
         # Apply dialog styling (do not override checkbox/radio indicators)
@@ -350,7 +350,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         metadata_layout = QtWidgets.QHBoxLayout()
         
         self.observer_name_input = QtWidgets.QLineEdit()
-        self.observer_name_input.setPlaceholderText("Observer name (optional)")
+        self.observer_name_input.setPlaceholderText("Reporting group/name (optional)")
         metadata_layout.addWidget(self.observer_name_input)
         
         self.telescope_input = QtWidgets.QLineEdit()
@@ -368,28 +368,8 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.specific_request_input.setPlaceholderText("Enter any specific requests or questions about the analysis (optional)")
         self.specific_request_input.setMaximumHeight(80)
         layout.addWidget(self.specific_request_input)
-        
-        # Simplified options in a single row
-        options_layout = QtWidgets.QHBoxLayout()
-        
-        self.include_classification_cb = QtWidgets.QCheckBox("Classification")
-        self.include_classification_cb.setChecked(True)
-        options_layout.addWidget(self.include_classification_cb)
-        
-        self.include_redshift_cb = QtWidgets.QCheckBox("Redshift")
-        self.include_redshift_cb.setChecked(True)
-        options_layout.addWidget(self.include_redshift_cb)
-        
-        self.include_templates_cb = QtWidgets.QCheckBox("Templates")
-        self.include_templates_cb.setChecked(True)
-        options_layout.addWidget(self.include_templates_cb)
-        
-        self.include_recommendations_cb = QtWidgets.QCheckBox("Recommendations")
-        self.include_recommendations_cb.setChecked(True)
-        options_layout.addWidget(self.include_recommendations_cb)
-        
-        options_layout.addStretch()
-        layout.addLayout(options_layout)
+
+        # (Prompt preview UI removed per request)
         
         # Generate summary controls - simplified
         generate_layout = QtWidgets.QHBoxLayout()
@@ -436,6 +416,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         
         layout.addStretch()
         self.tab_widget.addTab(summary_widget, "📊 Summary")
+        # (Prompt preview initialization removed)
     
     def _create_chat_tab(self):
         """Create interactive chat tab"""
@@ -449,7 +430,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         self.chat_history.setReadOnly(True)
         self.chat_history.setMinimumHeight(350)
         self.chat_history.setPlainText(
-            "AI Assistant: Hello! Ask me questions about your SNID analysis.\n\n"
+            "AI Assistant: Hello! Ask me questions about your SNID-SAGE analysis.\n\n"
             "Examples:\n"
             "• What type of supernova is this?\n"
             "• How confident is this classification?\n"
@@ -459,7 +440,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         )
         # Initialize conversation history with assistant greeting
         self.conversation = [
-            {"role": "assistant", "content": "Hello! Ask me questions about your SNID analysis."}
+            {"role": "assistant", "content": "Hello! Ask me questions about your SNID-SAGE analysis."}
         ]
         layout.addWidget(self.chat_history)
         
@@ -1222,18 +1203,17 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
                     )
                 
                 summary = f"""
-SNID AI ANALYSIS SUMMARY
-========================
-
-Observer: {user_metadata.get('observer_name', 'Not specified')}
-Telescope: {user_metadata.get('telescope', 'Not specified')}  
-Observation Date: {user_metadata.get('observation_date', 'Not specified')}
-Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-AI Model: {ai_settings['model_id']}
-
-CLASSIFICATION ANALYSIS:
-{summary_text}
-"""
+ SNID AI ANALYSIS SUMMARY
+ ========================
+ 
+ Reporting Group/Name: {user_metadata.get('reporting_group') or user_metadata.get('observer_name', 'Not specified')}
+ Telescope: {user_metadata.get('telescope', 'Not specified')}  
+ Observation Date: {user_metadata.get('observation_date', 'Not specified')}
+ Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+ 
+ CLASSIFICATION ANALYSIS:
+ {summary_text}
+ """
                 
                 # Update UI from main thread  
                 QtCore.QMetaObject.invokeMethod(
@@ -1373,7 +1353,7 @@ CLASSIFICATION ANALYSIS:
     def _clear_chat(self):
         """Clear chat history"""
         self.chat_history.setPlainText(
-            "AI Assistant: Hello! Ask me questions about your SNID analysis.\n\n"
+            "AI Assistant: Hello! Ask me questions about your SNID-SAGE analysis.\n\n"
             "Examples:\n"
             "• What type of supernova is this?\n"
             "• How confident is this classification?\n"
@@ -1382,7 +1362,7 @@ CLASSIFICATION ANALYSIS:
             "What would you like to know?"
         )
         self.conversation = [
-            {"role": "assistant", "content": "Hello! Ask me questions about your SNID analysis."}
+            {"role": "assistant", "content": "Hello! Ask me questions about your SNID-SAGE analysis."}
         ]
 
         # Update AI availability state

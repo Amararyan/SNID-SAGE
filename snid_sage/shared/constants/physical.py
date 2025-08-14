@@ -2,10 +2,12 @@
 SNID-SAGE – Physical & Astronomical Constants
 =============================================
 
-Air and vacuum wavelengths for every emission/absorption line used in the SNID-SAGE
-analysis suite (super-novae, stellar, host-galaxy).
+Air and vacuum wavelengths for every emission/absorption line used in the
+SNID-SAGE analysis suite (super-novae, stellar, host-galaxy).
 
-Data imported from comprehensive CSV line lists with both vacuum and air wavelengths.
+The canonical line list is now packaged as JSON at `snid_sage/lines/line_database.json`
+and loaded at runtime. Helpers and color/category mappings remain here for
+compatibility with existing code.
 """
 
 # ---------------------------------------------------------------------------
@@ -32,18 +34,15 @@ CALCIUM_II_H            = 3968.47
 CALCIUM_II_K            = 3933.67
 
 # ---------------------------------------------------------------------------
-# Full spectral-line catalogue
+# Full spectral-line catalogue (loaded from packaged JSON)
 # ---------------------------------------------------------------------------
 # A single table drives every downstream tool.
-# ────────────────────────────────────────────────────────────────────────────
-#  key                 → printable / display name
-#  wavelength_vacuum   → vacuum wavelength (Å)
-#  wavelength_air      → air wavelength (Å)
-#  sn_types            → list[str]  (empty list = not intrinsic to SN ejecta)
-#  category            → one of SN_LINE_CATEGORIES below
-#  origin              → "sn", "stellar", "galaxy", or "alias"
-#  note                → optional string
-# ---------------------------------------------------------------------------
+# Each entry fields: key, wavelength_vacuum, wavelength_air, sn_types, category, origin, note
+
+from snid_sage.shared.utils.line_detection.line_db_loader import (
+    get_all_lines as _load_all_lines,
+    get_categories as _load_categories,
+)
 
 LINE_DB = [
     {"key":"H-alpha", "wavelength_vacuum":6564.61, "wavelength_air":6562.80, "sn_types":["II", "IIn", "IIb"], "category":"hydrogen", "origin":"sn"},
@@ -201,54 +200,16 @@ LINE_DB = [
     {"key":"Sr II 4215", "wavelength_vacuum":4216.00, "wavelength_air":4215.52, "sn_types":["II"], "category":"strontium", "origin":"sn"},
 ]
 
-# Add group aliases
-LINE_DB.extend([
-    {"key":"[O II]",  "wavelength_vacuum":0.0, "wavelength_air":0.0, "sn_types":[], "category":"galaxy","origin":"alias","note":"3726+3727+3728"},
-    {"key":"[O III]", "wavelength_vacuum":0.0, "wavelength_air":0.0, "sn_types":[], "category":"galaxy","origin":"alias","note":"4363+4959+5007"},
-    {"key":"[N II]",  "wavelength_vacuum":0.0, "wavelength_air":0.0, "sn_types":[], "category":"galaxy","origin":"alias","note":"6548+6583"},
-    {"key":"[S II]",  "wavelength_vacuum":0.0, "wavelength_air":0.0, "sn_types":[], "category":"galaxy","origin":"alias","note":"6716+6731"},
-    {"key":"[Ca II]", "wavelength_vacuum":0.0, "wavelength_air":0.0, "sn_types":[], "category":"galaxy","origin":"alias","note":"7291+7324"},
-])
+ # Legacy alias group definitions removed; aliases are defined in JSON
+
+# Override with the packaged JSON line database to make this module a thin shim.
+LINE_DB = list(_load_all_lines())
 
 # ---------------------------------------------------------------------------
 # Category descriptions
 # ---------------------------------------------------------------------------
-SN_LINE_CATEGORIES = {
-    "hydrogen"          : "Hydrogen – Type II signatures",
-    "hydrogen_nir"      : "Hydrogen – NIR Paschen / Brackett",
-    "helium"            : "Helium – Type Ib signatures",
-    "helium_nir"        : "Helium – NIR lines",
-    "oxygen"            : "Oxygen – CC-SN features / SLSN O II",
-    "carbon"            : "Carbon – Type Ic or Ia early-C",
-    "nitrogen"          : "Nitrogen – interaction signatures",
-    "sodium"            : "Sodium – interstellar absorption",
-    "magnesium"         : "Magnesium",
-    "silicon"           : "Silicon – Type Ia diagnostics",
-    "sulfur"            : "Sulfur – IME",
-    "calcium"           : "Calcium – H&K, IR triplet, nebular",
-    "iron"              : "Iron – Fe-peak lines",
-    "iron_nir"          : "Iron – NIR multiplets",
-    "titanium"          : "Titanium – 91bg-like",
-    "chromium"          : "Chromium – Ia blue trough",
-    "cobalt"            : "Cobalt – decay products",
-    "nickel"            : "Nickel – stable / decay",
-    "argon"             : "Argon – nebular",
-    "barium"            : "Barium – Type II absorption",
-    "scandium"          : "Scandium – Type II minor metals",
-    "strontium"         : "Strontium – Type II s-process",
-    "flash_ion"         : "High-ionisation flash lines (early CSM)",
-    "interstellar"      : "Interstellar / circum-stellar",
-    "stellar_absorption": "Host-galaxy stellar absorption",
-    "galaxy"            : "Host-galaxy emission",
-    "alias"             : "Group alias (no unique λ)",
-}
-
-# ---------------------------------------------------------------------------
-# Quick-lookup dictionaries
-# ---------------------------------------------------------------------------
-LINE_BY_NAME          = {d["key"]: d for d in LINE_DB}
-VACUUM_WAVELENGTHS_Å  = {d["key"]: d["wavelength_vacuum"] for d in LINE_DB if d["wavelength_vacuum"] > 0}
-AIR_WAVELENGTHS_Å     = {d["key"]: d["wavelength_air"] for d in LINE_DB if d["wavelength_air"] > 0}
+_CATS = _load_categories()
+SN_LINE_CATEGORIES = {k: v.get("description", k) for k, v in _CATS.items()} if _CATS else {}
 
 # ---------------------------------------------------------------------------
 # Compatibility layer for existing GUI code
@@ -257,41 +218,13 @@ AIR_WAVELENGTHS_Å     = {d["key"]: d["wavelength_air"] for d in LINE_DB if d["w
 SUPERNOVA_EMISSION_LINES = {}
 
 # Define colors for each category (consistent with existing GUI expectations)
-CATEGORY_COLORS = {
-    "hydrogen": "#ff4444",
-    "hydrogen_nir": "#ff2222", 
-    "helium": "#44ff44",
-    "helium_nir": "#22ff22",
-    "oxygen": "#44aaff",
-    "carbon": "#ffaa44",
-    "nitrogen": "#ff6644",
-    "sodium": "#ffaa88",
-    "magnesium": "#44ffaa",
-    "silicon": "#4444ff",
-    "sulfur": "#ffdd44",
-    "calcium": "#ff8844",
-    "iron": "#aa44aa",
-    "iron_nir": "#aa22aa",
-    "titanium": "#88aaff",
-    "chromium": "#66aa88",
-    "cobalt": "#cc6699",
-    "nickel": "#aa9966",
-    "argon": "#99cc66",
-    "barium": "#cc9966",
-    "scandium": "#99aa77",
-    "strontium": "#cc8866",
-    "flash_ion": "#ff44dd",
-    "interstellar": "#888888",
-    "stellar_absorption": "#aaaaaa",
-    "galaxy": "#4444ff",
-    "alias": "#666666"
-}
+CATEGORY_COLORS = {k: v.get("color", "#888888") for k, v in _CATS.items()} if _CATS else {}
 
 # Define helper functions for GUI compatibility
 def _get_line_strength(line_data):
     """Determine line strength based on SN types and category"""
     line_name = line_data["key"]
-    sn_types = line_data["sn_types"]
+    sn_types = line_data.get("sn_types", [])
     category = line_data["category"]
     note = line_data.get("note", "")
     
@@ -360,7 +293,7 @@ def _get_line_type(line_data):
         return "emission"
     
     # Most SN lines are emission
-    if line_data["sn_types"]:
+    if line_data.get("sn_types"):
         return "emission"
     
     return "emission"
@@ -375,7 +308,7 @@ for line_entry in LINE_DB:
             "wavelength_vacuum": line_entry["wavelength_vacuum"],
             "wavelength_air": line_entry["wavelength_air"],
             "type": _get_line_type(line_entry),
-            "sn_types": line_entry["sn_types"],
+            "sn_types": line_entry.get("sn_types", []),
             "strength": _get_line_strength(line_entry),
             "color": CATEGORY_COLORS.get(line_entry["category"], "#888888"),
             "category": line_entry["category"],
