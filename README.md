@@ -6,12 +6,7 @@
 
 **SNID SAGE** (SuperNova IDentification – Spectral Analysis and Guided Exploration) is your go-to tool for analyzing supernova spectra. It combines an intuitive PySide6/Qt graphical interface with the original SNID (Blondin & Tonry 2007) cross-correlation techniques, enhanced with modern clustering for classification choice, high-performance plotting via `pyqtgraph`, and LLM-powered analysis summaries and interactive chat assistance.
 
----
 
-![SNID SAGE GUI](snid_sage/images/Screenshot.png)
-*SNID SAGE main GUI: intuitive workflow, interactive plotting, and advanced analysis tools.*
-
----
 
 ## Quick Installation
 
@@ -61,21 +56,8 @@ snid-sage
 # Single spectrum analysis (templates auto-discovered). Saves summary (.output) and plots by default
 snid data/sn2003jo.dat -o results/
 
-# Single spectrum with explicit templates
-your_templates_dir=snid_sage/templates
-snid data/sn2003jo.dat -o results/
-
 # Batch processing (default saves per-object summary and plots)
-snid batch "data/*.dat" %your_templates_dir% -o results/
-
-# Minimal outputs (summary only, no plots)
-snid data/sn2003jo.dat -o results/ --minimal
-
-# Complete outputs (summary, plots, and all additional data files)
-snid data/sn2003jo.dat -o results/ --complete
-
-# Disable plots explicitly (default is to generate plots)
-snid data/sn2003jo.dat -o results/ --no-plots
+snid batch "data/*.dat" -o results/
 ```
 
 ## Documentation & Support
