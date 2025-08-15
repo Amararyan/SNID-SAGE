@@ -94,7 +94,6 @@ nav:
     - Batch Processing: cli/batch-processing.md
     - AI Features: ai/overview.md
     - OpenRouter Setup: ai/openrouter-setup.md
-    - AI Analysis Types: ai/analysis-types.md
 
   - Data & Templates:
     - Supported Formats: data/supported-formats.md
@@ -122,7 +121,6 @@ nav:
 
   - Development:
     - Contributing: dev/contributing.md
-    - Plot Swapping System: dev/plot-swapping-system.md
 
 # Custom styling for Read the Docs theme
 extra_css:

@@ -39,7 +39,7 @@ git clone https://github.com/yourusername/SNID_SAGE.git
 cd SNID_SAGE
 
 # Add upstream remote
-git remote add upstream https://github.com/originaluser/SNID_SAGE.git
+git remote add upstream https://github.com/FiorenSt/SNID-SAGE.git
 ```
 
 #### **2. Set Up Development Environment**
@@ -537,4 +537,4 @@ New contributors can request mentorship for:
 
 ---
 
-**Ready to contribute?** Check out our [good first issues](https://github.com/yourusername/SNID_SAGE/labels/good%20first%20issue) or reach out on [GitHub Discussions](https://github.com/yourusername/SNID_SAGE/discussions)! 
+**Ready to contribute?** Check out our [good first issues](https://github.com/FiorenSt/SNID-SAGE/labels/good%20first%20issue) or reach out on [GitHub Discussions](https://github.com/FiorenSt/SNID-SAGE/discussions)! 
