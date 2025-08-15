@@ -63,19 +63,19 @@ snid data/sn2003jo.dat -o results/
 
 # Single spectrum with explicit templates
 your_templates_dir=snid_sage/templates
-snid identify data/sn2003jo.dat %your_templates_dir% -o results/
+snid data/sn2003jo.dat -o results/
 
 # Batch processing (default saves per-object summary and plots)
 snid batch "data/*.dat" %your_templates_dir% -o results/
 
 # Minimal outputs (summary only, no plots)
-snid identify data/sn2003jo.dat -o results/ --minimal
+snid data/sn2003jo.dat -o results/ --minimal
 
 # Complete outputs (summary, plots, and all additional data files)
-snid identify data/sn2003jo.dat -o results/ --complete
+snid data/sn2003jo.dat -o results/ --complete
 
 # Disable plots explicitly (default is to generate plots)
-snid identify data/sn2003jo.dat -o results/ --no-plots
+snid data/sn2003jo.dat -o results/ --no-plots
 ```
 
 ## Documentation & Support

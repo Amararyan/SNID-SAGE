@@ -1,425 +1,410 @@
 # CLI Command Reference
 
-SNID SAGE provides a powerful command-line interface for automated spectrum analysis, batch processing, and scripting workflows.
+SNID SAGE provides a command-line interface for automated spectrum analysis, batch processing, and scripting workflows.
 
-## Quick Start
+## Overview
 
+The CLI offers:
+- Single spectrum analysis with detailed outputs
+- Batch processing of multiple spectra
+- Configuration management
+- Template and data management
+
+## Installation
+
+### Install SNID SAGE CLI
+```bash
+pip install snid-sage
+```
+
+### Verify Installation
+```bash
+snid --version
+snid --help
+```
+
+## Core Commands
+
+### `snid`
+
+Analyze a single spectrum against the template library with cluster-aware analysis and detailed outputs.
+
+#### Basic Usage
+```bash
+snid <spectrum_file> [options]
+```
+
+#### Examples
 ```bash
 # Basic analysis
-snid spectrum.dat --output-dir results/
+snid data/sn2024ggi.dat
 
-# Basic analysis with explicit templates
-snid identify spectrum.dat templates/ --output-dir results/
+# With output directory
+snid data/sn2024ggi.dat --output-dir results/
 
-# Get help
-snid --help
+# With specific redshift
+snid data/sn2024ggi.dat --forced-redshift 0.045
 
-# Command-specific help
-snid identify --help
+# Complete mode with all plots
+snid data/sn2024ggi.dat --complete
 ```
 
-!!! note "Windows PowerShell users"
-    - Do not use `&&` to chain commands; use `;` between commands.
-    - Prefer single-line commands; chain multiple commands with `;`.
-
-```powershell
-# Basic analysis (PowerShell)
-snid spectrum.dat --output-dir results/
-
-# Command-specific help
-snid identify --help
-
-# Complete analysis with options
-snid identify data\sn2003jo.dat --output-dir results\ --complete --savgol-window 11 --savgol-order 3
-```
-
-## Command Structure
-
-!!! tip "PowerShell basics"
-    - Use `;` to chain commands (instead of `&&`).
-    - Prefer one-liners for commands; avoid line continuations.
-
+#### Output Modes
 ```bash
-snid [GLOBAL_OPTIONS] COMMAND [COMMAND_OPTIONS] [ARGUMENTS]
+--complete              # Complete mode: All outputs including detailed GUI-style plots
+# (default)             # Standard mode: Main outputs without detailed plots
 ```
 
-### Global Options
-- `--version` - Show version information
+#### Standard Outputs
+- Classification results (type, subtype, confidence)
+- Redshift and age estimates
+- Template matches and correlation scores
+- Basic plots and data files
 
-## Auto-Discovery
+#### Complete Outputs
+- All standard outputs
+- Detailed GUI-style plots
+- Additional analysis visualizations
+- Comprehensive data exports
 
-SNID SAGE automatically discovers the templates directory if not specified:
-
+#### Examples
 ```bash
-# Auto-discover templates directory
-snid spectrum.dat --output-dir results/
+# Standard mode - main outputs without detailed plots
+snid data/sn2024ggi.dat --output-dir results/
 
-# Explicit templates directory
-snid spectrum.dat templates/ --output-dir results/
+# Complete mode - all outputs including detailed GUI-style plots
+snid data/sn2024ggi.dat --output-dir results/ --complete
 ```
 
-**Note**: Auto-discovery works when templates are installed in standard locations or configured in your SNID SAGE settings.
+### `snid batch`
 
-## identify - Spectrum Identification
+Process multiple spectra simultaneously with optimized workflows and detailed reporting.
 
-Analyze a single spectrum against the template library with cluster-aware analysis and comprehensive outputs.
-
-### Basic Usage
+#### Basic Usage
 ```bash
-snid identify SPECTRUM_FILE [TEMPLATES_DIR] --output-dir OUTPUT_DIR [OPTIONS]
+snid batch <input_pattern> [options]
 ```
 
-### Required Arguments
-- `SPECTRUM_FILE` - Path to spectrum file (FITS, ASCII, etc.)
-- `TEMPLATES_DIR` - Path to directory containing template spectra (optional)
-- `--output-dir DIR` - Output directory for results (required)
-
-### Processing Modes
+#### Examples
 ```bash
---minimal               # Minimal mode: Main result file only, no additional outputs or plots
---complete              # Complete mode: All outputs including comprehensive GUI-style plots
-# (default)             # Standard mode: Main outputs without comprehensive plots
+# Process all .dat files in a directory
+snid batch "data/*.dat" --output-dir batch_results/
+
+# Process specific files
+snid batch "data/sn2024*.dat" --output-dir results/
+
+# With template directory
+snid batch "data/*.dat" templates/ --output-dir results/
+
+# Parallel processing
+snid batch "data/*.dat" --output-dir results/ --parallel 4
 ```
 
-### Core Options
-
-#### Analysis Parameters
+#### Batch Options
 ```bash
---zmin ZMIN             # Minimum redshift to consider (default: -0.01)
---zmax ZMAX             # Maximum redshift to consider (default: 1.0)
---forced-redshift Z     # Force analysis to this specific redshift (skips search)
---rlapmin RLAP          # Minimum rlap value required (default: 5.0)
---lapmin LAP            # Minimum overlap fraction required (default: 0.3)
+--parallel N            # Use N parallel processes
+--output-dir DIR        # Output directory for results
+--template-dir DIR      # Custom template directory
+--type-filter TYPE      # Filter templates by type
+--age-min DAYS          # Minimum template age
+--age-max DAYS          # Maximum template age
 ```
 
-#### Template Selection
-```bash
---type-filter TYPES     # Only use templates of these types (Ia,Ib,Ic,II,etc.)
---template-filter NAMES # Only use specific templates (by name)
---age-min MIN           # Minimum template age in days
---age-max MAX           # Maximum template age in days
-```
-
-#### Preprocessing
-```bash
---savgol-window SIZE    # Savitzky-Golay filter window size in pixels (0 = no filtering)
---savgol-order ORDER    # Savitzky-Golay filter polynomial order (default: 3)
---savgol-fwhm FWHM      # Savitzky-Golay filter FWHM in Angstroms (alternative to window)
---aband-remove          # Remove telluric A-band
---skyclip               # Clip sky emission lines
---emclip-z Z            # Redshift at which to clip emission lines (-1 to disable)
---emwidth WIDTH         # Width in Angstroms for emission line clipping (default: 40.0)
---apodize-percent PCT   # Percentage of spectrum ends to apodize (default: 10.0)
---wavelength-masks RANGES # Wavelength ranges to mask (format: 6550:6600 7600:7700)
-```
-
-### Examples
-
-#### Basic Analysis
-```bash
-# Standard mode - main outputs without comprehensive plots
-snid data/sn2003jo.dat --output-dir results/
-
-# With explicit templates directory
-snid identify data/sn2003jo.dat templates/ --output-dir results/
-
-# Minimal mode - main result file only
-snid data/sn2003jo.dat --output-dir results/ --minimal
-
-# Complete mode - all outputs including comprehensive GUI-style plots
-snid data/sn2003jo.dat --output-dir results/ --complete
-
-# With verbose output
-snid data/sn2003jo.dat --output-dir results/ --verbose
-```
-
-#### Custom Parameters
-```bash
-# Specific redshift range
-snid data/sn2003jo.dat --output-dir results/ --zmin 0.0 --zmax 0.1
-
-# Only Type Ia templates with age constraint
-snid data/sn2003jo.dat --output-dir results/ \
-    --type-filter Ia --age-min -5 --age-max 30
-
-# Forced redshift analysis with complete outputs
-snid data/sn2003jo.dat --output-dir results/ \
-    --forced-redshift 0.045 --complete
-```
-
-#### Preprocessing Options
-```bash
-# Apply preprocessing with complete analysis
-snid data/sn2003jo.dat --output-dir results/ --complete \
-    --aband-remove --skyclip --savgol-window 11 \
-    --wavelength-masks 6550:6600 7600:7700
-```
-
-## batch - Batch Processing
-
-Process multiple spectra simultaneously with optimized workflows and comprehensive reporting.
-
-### Basic Usage
-```bash
-snid batch INPUT_PATTERN TEMPLATES_DIR [OPTIONS]
-```
-
-### Required Arguments
-- `INPUT_PATTERN` - Glob pattern for input spectrum files (e.g., "spectra/*", "*.dat")
-- `TEMPLATES_DIR` - Path to directory containing template spectra
-
-### Processing Modes
-```bash
---minimal               # Minimal mode: main result files + summary report (flat directory)
---complete              # Complete mode: all outputs + GUI-style plots (organized subdirectories)
-# Default mode          # Main outputs + summary (organized subdirectories)
-```
-
-### Analysis Parameters
-```bash
---zmin ZMIN             # Minimum redshift to consider (default: -0.01)
---zmax ZMAX             # Maximum redshift to consider (default: 1.0)
---forced-redshift Z     # Force analysis to this specific redshift
---type-filter TYPES     # Only use templates of these types
---template-filter NAMES # Only use specific templates (by name)
-```
-
-### Processing Options
-```bash
---output-dir DIR        # Output directory for all results (required)
---stop-on-error         # Stop processing if any spectrum fails
---verbose, -v           # Print detailed processing information
-```
-
-### Examples
-
-#### Basic Batch Processing
-```bash
-# Minimal mode - main result files + summary report
-snid batch "spectra/*" templates/ --output-dir results/ --minimal
-
-# Complete mode - all outputs + GUI-style plots
-snid batch "spectra/*" templates/ --output-dir results/ --complete
-
-# Default mode - main outputs + summary
-snid batch "spectra/*" templates/ --output-dir results/ --stop-on-error
-```
-
-#### Custom Redshift Analysis
-```bash
-# Custom redshift range
-snid batch "data/*.dat" templates/ --zmin 0.0 --zmax 0.5 --output-dir results/
-
-# Forced redshift analysis
-snid batch "spectra/*.fits" templates/ --forced-redshift 0.1 --output-dir results/
-
-# High-z search
-snid batch "high_z/*.dat" templates/ --zmin 0.5 --zmax 2.0 --output-dir high_z_results/
-```
-
-#### Advanced Options
-```bash
-# Filtering with verbose output
-snid batch "spectra/*" templates/ \
-    --type-filter Ia Ib Ic --output-dir results/ --verbose
-
-# Complete analysis with custom range
-snid batch "data/*.dat" templates/ --complete \
-    --zmin -0.01 --zmax 1.2 --stop-on-error \
-    --output-dir full_analysis/
-```
-
-#### Output Structure
-Each processed spectrum generates:
-- **Minimal mode**: Only `batch_summary.txt` 
-- **Default mode**: Individual `.output`, `.fluxed`, `.flattened` files + summary
-- **Complete mode**: All files + plots (`snid_comparison.png`, `snid_3d_clustering.png`, etc.)
-
-#### Plot Outputs (Complete Mode)
-The `--complete` mode generates GUI-style plots:
-- `snid_comparison.png` - Main spectrum comparison (winning cluster templates only)
-- `snid_3d_clustering.png` - 3D type-specific GMM clustering visualization  
-- `snid_subtype_analysis.png` - Subtype proportions from winning cluster
-- `snid_clustering_statistics.png` - Detailed clustering statistics
-- `snid_redshift_age.png` - Redshift vs age distribution
-
-## config - Configuration Management
+### `snid config`
 
 Manage SNID SAGE configuration settings.
 
-### Subcommands
-
-#### show - Display Configuration
+#### Basic Usage
 ```bash
-snid config show [SECTION]
-
-# Examples
-snid config show              # All settings
-snid config show analysis     # Analysis section
-snid config show templates    # Template settings
+snid config <command> [options]
 ```
 
-#### set - Set Configuration
+#### Commands
 ```bash
-snid config set KEY VALUE
-
-# Examples
-snid config set analysis.correlation_method fft
-snid config set templates.default_dir /path/to/templates
-snid config set ai.api_key your_key_here
+snid config show                    # Show current configuration
+snid config set <key> <value>       # Set configuration value
+snid config get <key>               # Get configuration value
+snid config reset                   # Reset to defaults
+snid config export                  # Export configuration
+snid config import <file>           # Import configuration
 ```
 
-#### get - Get Configuration
+#### Configuration Keys
 ```bash
-snid config get KEY
+# Paths
+paths.templates_dir                 # Template directory
+paths.output_dir                    # Default output directory
+paths.data_dir                      # Data directory
 
-# Examples
-snid config get analysis.redshift_range
-snid config get templates.quality_min
+# Analysis
+analysis.min_correlation            # Minimum correlation threshold
+analysis.max_redshift               # Maximum redshift range
+analysis.age_range                  # Template age range
+
+# Preprocessing
+preprocessing.smoothing_window      # Smoothing window size
+preprocessing.smoothing_order       # Smoothing polynomial order
+preprocessing.telluric_correction   # Telluric correction
 ```
 
-#### reset - Reset Configuration
+#### Examples
 ```bash
-snid config reset [SECTION]
+# Show current configuration
+snid config show
 
-# Examples
-snid config reset             # Reset all
-snid config reset analysis   # Reset analysis section
+# Set template directory
+snid config set paths.templates_dir /path/to/templates
+
+# Set analysis parameters
+snid config set analysis.min_correlation 0.8
+snid config set analysis.max_redshift 0.1
+
+# Export configuration
+snid config export > my_config.yaml
 ```
 
-## AI Analysis
+### `snid templates`
 
-AI-powered analysis is available through the GUI interface. The CLI currently does not have direct AI commands, but AI features can be accessed through the GUI after running analysis.
+Manage template library and template-related operations.
 
-### Using AI Features
-
-1. **Run analysis using CLI**:
+#### Basic Usage
 ```bash
-snid identify spectrum.dat --output-dir results/
+snid templates <command> [options]
 ```
 
-2. **Launch GUI for AI analysis**:
+#### Commands
 ```bash
-snid-sage
+snid templates list                  # List available templates
+snid templates info <template>       # Show template information
+snid templates search <query>        # Search templates
+snid templates validate              # Validate template library
+snid templates update                # Update template library
 ```
 
-3. **In GUI**:
-   - Load the analysis results
-   - Click "AI Assistant" button
-   - Choose analysis type and model
-   - Get AI-powered insights
+#### Examples
+```bash
+# List all templates
+snid templates list
 
-### Future CLI AI Features
+# Search for Type Ia templates
+snid templates search "Ia"
 
-Future releases may include CLI commands for:
-- Direct AI analysis of results
-- Batch AI processing
-- Command-line chat interface
+# Show template information
+snid templates info "SN1994D"
 
-For now, please use the GUI for all AI features.
+# Validate template library
+snid templates validate
+```
 
-## Output Files
+## Advanced Options
 
-### Analysis Results
+### Analysis Parameters
+```bash
+--min-correlation FLOAT     # Minimum correlation threshold (default: 0.8)
+--max-redshift FLOAT        # Maximum redshift range (default: 0.1)
+--age-min DAYS              # Minimum template age (default: -20)
+--age-max DAYS              # Maximum template age (default: 50)
+--type-filter TYPE          # Filter templates by type
+--wavelength-min ANGSTROM   # Minimum wavelength (default: 3500)
+--wavelength-max ANGSTROM   # Maximum wavelength (default: 9000)
+```
 
-The identify command generates the following files:
+### Preprocessing Options
+```bash
+--savgol-window INT         # Savitzky-Golay window size (default: 11)
+--savgol-order INT          # Savitzky-Golay polynomial order (default: 3)
+--telluric-correction       # Apply telluric correction
+--skyline-clipping          # Apply skyline clipping
+--custom-mask FILE          # Custom wavelength mask file
+```
 
-#### Standard Mode
-- `{spectrum_name}.output` - Main SNID output file with best matches
-- `{spectrum_name}.fluxed` - Fluxed spectrum data
-- `{spectrum_name}.flattened` - Flattened spectrum data
-
-#### Complete Mode (additional files)
-- `snid_comparison.png` - Spectrum comparison plot
-- `snid_3d_clustering.png` - 3D clustering visualization
-- `snid_subtype_analysis.png` - Subtype analysis plot
-- `snid_clustering_statistics.png` - Clustering statistics
-- `snid_redshift_age.png` - Redshift vs age plot
-- `{spectrum_name}_correlation_*.dat` - Correlation data for top templates
-
-### Batch Processing Results
-- `batch_summary.txt` - Summary of all processed spectra
-- Individual spectrum results in subdirectories (default/complete mode)
-- Individual spectrum results in flat structure (minimal mode)
+### Output Options
+```bash
+--output-dir DIR            # Output directory
+--output-format FORMAT      # Output format (json, yaml, txt)
+--save-plots                # Save analysis plots
+--save-data                 # Save analysis data
+--verbose                   # Verbose output
+--quiet                     # Quiet output
+```
 
 ## Advanced Usage
 
-### Pipeline Commands
-```powershell
-# Complete analysis pipeline (PowerShell)
-snid identify spectrum.dat --output-dir results/ --complete;
-snid-sage  # Launch GUI for AI analysis
-```
+### Scripting Examples
 
-### Configuration Scripts
-```bash
-# Setup analysis parameters
-snid config set analysis.correlation_method fft
-snid config set analysis.redshift_range "0.0,0.5"
-snid config set templates.quality_min 5.0
-
-# Run analysis with saved config
-snid identify spectrum.dat --output-dir results/
-```
-
-### Batch Analysis Script
+#### Basic Analysis Script
 ```bash
 #!/bin/bash
-# Process all spectra in directory
-for spectrum in data/*.dat; do
-    echo "Processing $spectrum..."
-    snid identify "$spectrum" \
-        --output-dir "results/$(basename $spectrum .dat)/" \
-        --complete
-done
+# Analyze multiple spectra with different parameters
 
-# Generate batch summary
-snid batch "data/*.dat" templates/ --output-dir batch_results/
+for file in data/*.dat; do
+    echo "Analyzing $file..."
+    snid identify "$file" \
+        --output-dir "results/$(basename "$file" .dat)" \
+        --min-correlation 0.85 \
+        --save-plots
+done
 ```
 
-```powershell
-# PowerShell: process all .dat spectra
-Get-ChildItem -Path data -Filter *.dat | ForEach-Object {
-  $s = $_.FullName;
-  Write-Host "Processing $s";
-  snid identify $s --output-dir ("results/" + [System.IO.Path]::GetFileNameWithoutExtension($s) + "/") --complete
-}
+#### Batch Processing with Error Handling
+```bash
+#!/bin/bash
+# Batch processing with error handling and logging
 
-# Summary
-snid batch "data/*.dat" templates/ --output-dir batch_results/
+mkdir -p batch_results
+log_file="batch_results/analysis.log"
+
+echo "Starting batch analysis at $(date)" > "$log_file"
+
+snid batch "data/*.dat" \
+    --output-dir batch_results/ \
+    --parallel 4 \
+    --min-correlation 0.8 \
+    --save-plots \
+    2>&1 | tee -a "$log_file"
+
+echo "Batch analysis completed at $(date)" >> "$log_file"
+```
+
+#### Configuration Management
+```bash
+#!/bin/bash
+# Set up analysis configuration
+
+# Set template directory
+snid config set paths.templates_dir /path/to/templates
+
+# Set analysis parameters
+snid config set analysis.min_correlation 0.85
+snid config set analysis.max_redshift 0.1
+snid config set analysis.age_range "-10,30"
+
+# Set preprocessing parameters
+snid config set preprocessing.smoothing_window 15
+snid config set preprocessing.smoothing_order 3
+
+# Export configuration
+snid config export > analysis_config.yaml
+```
+
+### Integration with Other Tools
+
+#### Python Integration
+```python
+import subprocess
+import json
+
+def analyze_spectrum(spectrum_file, output_dir):
+    """Analyze spectrum using SNID SAGE CLI"""
+    
+    cmd = [
+        'snid', 'identify', spectrum_file,
+        '--output-dir', output_dir,
+        '--output-format', 'json',
+        '--min-correlation', '0.8'
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        # Parse JSON output
+        with open(f"{output_dir}/results.json") as f:
+            return json.load(f)
+    else:
+        raise RuntimeError(f"Analysis failed: {result.stderr}")
+```
+
+#### Shell Scripting
+```bash
+#!/bin/bash
+# Process spectra and generate summary report
+
+echo "SNID SAGE Analysis Report" > report.txt
+echo "=========================" >> report.txt
+echo "" >> report.txt
+
+for file in data/*.dat; do
+    echo "Processing $file..." >> report.txt
+    
+    # Run analysis
+    snid identify "$file" --output-dir "results/$(basename "$file" .dat)"
+    
+    # Extract results
+    if [ -f "results/$(basename "$file" .dat)/results.json" ]; then
+        type=$(jq -r '.classification.type' "results/$(basename "$file" .dat)/results.json")
+        redshift=$(jq -r '.redshift.value' "results/$(basename "$file" .dat)/results.json")
+        confidence=$(jq -r '.classification.confidence' "results/$(basename "$file" .dat)/results.json")
+        
+        echo "  Type: $type" >> report.txt
+        echo "  Redshift: $redshift" >> report.txt
+        echo "  Confidence: $confidence" >> report.txt
+        echo "" >> report.txt
+    fi
+done
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Command not found:**
-- Ensure SNID SAGE is installed:
-  ```powershell
-  python -m pip install --upgrade pip
-  python -m pip install snid-sage
-  ```
-- Check that scripts are in PATH
+#### Command Not Found
+```bash
+# Check installation
+pip list | grep snid-sage
 
-**Templates directory not found:**
-- Specify templates directory explicitly: `snid identify spectrum.dat /path/to/templates/`
-- Set default in config: `snid config set templates.default_dir /path/to/templates`
+# Reinstall if needed
+pip install --upgrade snid-sage
+```
 
-**Output directory errors:**
-- Always specify `--output-dir` for identify command
-- Ensure write permissions in output directory
+#### Template Library Issues
+```bash
+# Check template directory
+snid config get paths.templates_dir
 
-**Memory errors with batch processing:**
-- Use `--stop-on-error` to identify problematic files
-- Process smaller batches
+# Validate templates
+snid templates validate
 
-### Getting Help
-- Use `--help` flag with any command
-- Check error messages for specific issues
-- See [Troubleshooting Guide](../reference/troubleshooting.md)
+# Update templates
+snid templates update
+```
 
-## Next Steps
+#### Analysis Failures
+```bash
+# Check input file format
+file data/sn2024ggi.dat
 
-- [Quick Start Tutorial](../quickstart/first-analysis.md) - Step-by-step first analysis
+# Run with verbose output
+snid identify data/sn2024ggi.dat --verbose
+
+# Check error logs
+cat results/error.log
+```
+
+### Error Messages
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Template library not found` | Missing template directory | Set `paths.templates_dir` in config |
+| `Invalid spectrum format` | Unsupported file format | Convert to supported format |
+| `No templates match criteria` | Template filters too restrictive | Adjust `--type-filter` or age range |
+| `Analysis failed` | Input data quality issues | Check spectrum quality and preprocessing |
+
+## Performance Tips
+
+### Optimization
+- Use `--parallel` for batch processing
+- Set appropriate `--min-correlation` threshold
+- Use `--type-filter` to limit template search
+- Enable `--quiet` for scripted workflows
+
+### Resource Management
+- Monitor memory usage for large batch jobs
+- Use appropriate number of parallel processes
+- Clean up temporary files regularly
+- Use SSD storage for better I/O performance
+
+## Related Documentation
+
 - [Batch Processing Guide](batch-processing.md) - Advanced batch workflows
-- [GUI Interface](../gui/interface-overview.md) - Using the graphical interface 
+- [Configuration Guide](../reference/configuration-guide.md) - Detailed configuration options
+- [Troubleshooting](../reference/troubleshooting.md) - Common issues and solutions 

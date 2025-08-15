@@ -6,20 +6,14 @@ This guide helps you diagnose and fix common issues with SNID SAGE installation,
 
 ### GUI Won't Start
 ```bash
-# Verify installation
-pip show snid-sage
-
 # Try CLI instead
 snid --version
 ```
 
 ### Analysis Fails Immediately
 ```bash
-# Check templates are installed
-snid template list
-
 # Test with sample data
-snid identify data/sn2003jo.dat --output-dir test_results/
+snid data/sn2003jo.dat --output-dir test_results/
 ```
 
 ### No Results/Poor Classification
@@ -28,7 +22,7 @@ snid identify data/sn2003jo.dat --output-dir test_results/
 head -10 your_spectrum.dat
 
 # Try with preprocessing
-snid identify spectrum.dat --output-dir results/ --savgol-window 11
+snid spectrum.dat --output-dir results/ --savgol-window 11
 ```
 
 ---
@@ -48,8 +42,8 @@ ModuleNotFoundError: No module named 'matplotlib'
 
 **1. Verify Installation**
 ```bash
-pip show snid-sage
-# Should show package information
+# Check if package is installed
+python -c "import snid_sage; print('SNID SAGE OK')"
 ```
 
 **2. Reinstall Package**
@@ -96,7 +90,7 @@ echo $DISPLAY
 ssh -X username@hostname
 
 # Or use CLI interface instead
-snid identify spectrum.dat --output-dir results/
+snid spectrum.dat --output-dir results/
 ```
 
 **3. Windows Graphics Issues**
@@ -184,7 +178,7 @@ np.savetxt('spectrum_angstroms.dat', data)
 **3. Verify Rest Frame**
 ```bash
 # Specify known redshift
-snid identify spectrum.dat --output-dir results/ --forced-redshift 0.034
+snid spectrum.dat --output-dir results/ --forced-redshift 0.034
 ```
 
 ---
@@ -203,7 +197,7 @@ Analysis completed with low confidence
 #### Diagnosis:
 ```bash
 # Check spectrum quality
-snid identify spectrum.dat --output-dir results/ --verbose
+snid spectrum.dat --output-dir results/ --verbose
 ```
 
 #### Solutions:
@@ -211,24 +205,24 @@ snid identify spectrum.dat --output-dir results/ --verbose
 **1. Improve Data Quality**
 ```bash
 # Apply preprocessing
-snid identify spectrum.dat --output-dir results/ \
+snid spectrum.dat --output-dir results/ \
     --savgol-window 15 --savgol-order 3
 ```
 
 **2. Adjust Parameters**
 ```bash
 # Broader search
-snid identify spectrum.dat --output-dir results/ \
+snid spectrum.dat --output-dir results/ \
     --zmin 0.0 --zmax 0.1
 ```
 
 **3. Check Template Selection**
 ```bash
 # Use all templates
-snid identify spectrum.dat --output-dir results/
+snid spectrum.dat --output-dir results/
 
 # Try specific types
-snid identify spectrum.dat --output-dir results/ --type-filter Ia Ib Ic
+snid spectrum.dat --output-dir results/ --type-filter Ia Ib Ic
 ```
 
 ### Problem: Wrong classification
@@ -243,14 +237,14 @@ snid identify spectrum.dat --output-dir results/ --type-filter Ia Ib Ic
 **1. Visual Inspection**
 ```bash
 # Generate plots
-snid identify spectrum.dat --output-dir results/ --complete
+snid spectrum.dat --output-dir results/ --complete
 # Examine snid_comparison.png
 ```
 
 **2. Manual Redshift**
 ```bash
 # Try known redshift
-snid identify spectrum.dat --output-dir results/ --forced-redshift 0.0234
+snid spectrum.dat --output-dir results/ --forced-redshift 0.0234
 ```
 
 #### Common Causes & Solutions:
@@ -259,7 +253,7 @@ snid identify spectrum.dat --output-dir results/ --forced-redshift 0.0234
 ```bash
 # Strong emission lines can affect classification
 # Try masking emission regions
-snid identify spectrum.dat --output-dir results/ \
+snid spectrum.dat --output-dir results/ \
     --wavelength-masks 6550:6570 4850:4870
 ```
 
@@ -271,7 +265,7 @@ snid identify spectrum.dat --output-dir results/ \
 **Poor S/N Ratio:**
 ```bash
 # Increase smoothing
-snid identify spectrum.dat --output-dir results/ --savgol-window 21
+snid spectrum.dat --output-dir results/ --savgol-window 21
 ```
 
 ---
@@ -322,7 +316,7 @@ curl -I https://openrouter.ai
 **1. Template Optimization**
 ```bash
 # Limit templates
-snid identify spectrum.dat --output-dir results/ \
+snid spectrum.dat --output-dir results/ \
     --type-filter Ia \
     --age-min -10 --age-max 30
 ```
@@ -337,7 +331,7 @@ snid identify spectrum.dat --output-dir results/ \
 #### Solutions:
 ```bash
 # Use minimal mode
-snid identify spectrum.dat --output-dir results/ --minimal
+snid spectrum.dat --output-dir results/ --minimal
 
 # Use CLI for batch processing
 snid batch "data/*.dat" templates/ --output-dir results/
@@ -376,7 +370,7 @@ snid batch "data/*.dat" templates/ --output-dir results/
 ```bash
 # Templates should be included with installation
 # Verify installation:
-snid template list
+python -c "import snid_sage; print('SNID SAGE OK')"
 ```
 
 #### "Correlation failed"
@@ -387,7 +381,7 @@ snid template list
 #### "Memory allocation failed"
 ```bash
 # Reduce memory usage
-snid identify spectrum.dat --output-dir results/ --minimal
+snid spectrum.dat --output-dir results/ --minimal
 ```
 
 #### "OpenRouter authentication failed"
@@ -412,7 +406,7 @@ snid identify spectrum.dat --output-dir results/ --minimal
 ```bash
 # System info
 python --version
-pip show snid-sage
+python -c "import snid_sage; print('SNID SAGE version:', snid_sage.__version__)"
 
 # Error message (full traceback)
 # Steps to reproduce

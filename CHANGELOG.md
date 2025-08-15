@@ -2,36 +2,15 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
-## [Unreleased]
+## [0.4.0] - 2025-01-XX
 
-### Added
-- 
+### First Fully Stable Release
 
-### Changed
-- 
-
-### Fixed
-- 
-
-### Removed
-- 
-
----
-
-## [0.5.0] - 2025-08-15
-
-### 🎉 First Fully Stable Release
-
-This release marks SNID SAGE's transition to a fully stable, production-ready application.
-
-### Added
-- REST and observed wavelength axes support (GUI and CLI)
-
-### Fixed
-- Resolved all known bugs and edge cases
-
-### Notes
-- **This is the first release officially recommended for production use**
+- **GUI**: Complete PySide6/Qt interface with modern styling
+- **CLI**: Full command-line interface with batch processing
+- **AI Integration**: OpenRouter-powered analysis assistance
+- **Templates**: Comprehensive template library with 500+ spectra
+- **Documentation**: Complete user guides and tutorials
 
 
 ## [0.4.1] - 2025-08-14

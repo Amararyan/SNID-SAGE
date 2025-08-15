@@ -1,300 +1,114 @@
-# OpenRouter Setup Guide
+# OpenRouter Setup for SNID SAGE
 
-Complete guide to setting up OpenRouter for AI-powered spectrum analysis in SNID SAGE.
+SNID SAGE uses OpenRouter to provide AI-powered spectrum analysis. This guide covers the essential setup steps.
 
-## What is OpenRouter?
+## Setup Overview
 
-OpenRouter provides access to 15+ state-of-the-art AI models through a single API, including:
-- **GPT-4 Turbo** (OpenAI) - Most capable reasoning
-- **Claude 3 Opus** (Anthropic) - Excellent scientific analysis  
-- **Gemini Pro** (Google) - Strong multilingual support
-- **Llama 2** (Meta) - Open source alternative
-- **Command R+** (Cohere) - Strong summarization
+SNID SAGE integrates with OpenRouter to offer:
+- AI-powered spectrum interpretation
+- Interactive analysis assistance
+- Publication-ready descriptions
 
-## Quick Setup (5 minutes)
+## Quick Setup
 
-### Step 1: Get Your API Key
+### 1. Get OpenRouter API Key
 1. Visit [OpenRouter.ai](https://openrouter.ai/)
-2. Click **"Sign Up"** or **"Get Started"**
-3. Create account (email + password)
-4. Navigate to **"API Keys"** in dashboard
-5. Click **"Create Key"**
-6. Copy your key (starts with `sk-or-...`)
+2. Create an account
+3. Go to **API Keys** section
+4. Create a new key (starts with `sk-or-...`)
 
-### Step 2: Configure SNID SAGE
+### 2. Configure in SNID SAGE
+1. **Launch SNID SAGE GUI**
+2. **Load and analyze a spectrum** (AI Assistant button is enabled after analysis)
+3. **Click AI Assistant button** (deep blue button - now enabled)
+4. **Go to Settings tab** in the AI Assistant dialog
+5. **Enter your API key** in the "API Key" field
+6. **Test connection** using the "Test Connection" button
 
-#### Method A: Environment Variable (Recommended)
-```bash
-# Windows PowerShell
-$env:OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+## Model Selection
 
-# macOS/Linux Terminal
-export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+SNID SAGE works with these OpenRouter models:
 
-# Make permanent (Linux/macOS)
-echo 'export OPENROUTER_API_KEY="sk-or-v1-your-key-here"' >> ~/.bashrc
-source ~/.bashrc
-```
+### Recommended Models
+- **GPT-3.5 Turbo**: Fast, reliable for most analysis
+- **GPT-4 Turbo**: Best quality for complex cases
+- **Claude 3 Opus**: Excellent for scientific writing
+- **Gemini Pro**: Good multilingual support
 
-#### Method B: Configuration File
-```bash
-# Using SNID SAGE CLI
-python run_snid_cli.py config set ai.openrouter_api_key "sk-or-v1-your-key-here"
+### Model Configuration
+In the AI Assistant dialog:
+1. **Settings tab** → **Model Selection**
+2. **Fetch All Models** to see available options
+3. **Select your preferred model** from the table
+4. **Test the model** using "Test Selected" button
 
-# Or edit config file directly
-echo "openrouter_api_key: sk-or-v1-your-key-here" >> config/user_config.yaml
-```
+## Usage in SNID SAGE
 
-#### Method C: API Key File
-```bash
-# Create API key file in project root
-echo "sk-or-v1-your-key-here" > openrouter_api_key.txt
+### AI Analysis Workflow
+1. **Complete SNID Analysis**: Run normal spectrum analysis first
+2. **Open AI Assistant**: Click the AI Assistant button (now enabled)
+3. **Choose Analysis Type**:
+   - **Summary tab**: Generate comprehensive analysis
+   - **Chat tab**: Interactive questions about your results
 
-# SNID SAGE will automatically detect and use this file
-```
+### What the AI Receives
+The AI Assistant gets your SNID analysis results including:
+- Classification results (type, subtype, confidence)
+- Redshift and age estimates
+- Template matches and correlation scores
+- Spectral features and measurements
+- User metadata (observer name, telescope, date)
 
-### Step 3: Test Connection
-1. Launch SNID SAGE GUI
-2. Click **Settings** → **Configure AI**
-3. Enter your API key and test connection
-4. Select your preferred model from the dropdown
-
----
-
-## Model Selection Guide
-
-### **Top Models for Scientific Analysis**
-
-#### Best Overall: GPT-4 Turbo
-```yaml
-Model: "openai/gpt-4-turbo"
-Cost: $0.01-0.03 per request
-Speed: Fast
-Strengths: 
-  - Best reasoning capabilities
-  - Excellent scientific understanding
-  - Strong context handling
-  - Reliable performance
-```
-
-#### Scientific Specialist: Claude 3 Opus
-```yaml
-Model: "anthropic/claude-3-opus"
-Cost: $0.015-0.075 per request  
-Speed: Medium
-Strengths:
-  - Exceptional scientific analysis
-  - Strong literature knowledge
-  - Detailed explanations
-  - Publication-quality output
-```
-
-#### Fast & Efficient: GPT-3.5 Turbo
-```yaml
-Model: "openai/gpt-3.5-turbo"
-Cost: $0.0005-0.002 per request
-Speed: Very Fast
-Strengths:
-  - Cost-effective
-  - Quick responses
-  - Good general knowledge
-  - Reliable availability
-```
-
-#### Multilingual: Gemini Pro
-```yaml
-Model: "google/gemini-pro"
-Cost: $0.0005-0.002 per request
-Speed: Fast
-Strengths:
-  - Excellent multilingual support
-  - Strong code understanding
-  - Good scientific knowledge
-  - Cost-effective
-```
-
-### **Model Comparison Table**
-
-| Model | Cost/Request | Speed | Scientific Quality | Best For |
-|-------|-------------|-------|-------------------|----------|
-| GPT-4 Turbo | $0.01-0.03 | Fast | ⭐⭐⭐⭐⭐ | Complex analysis |
-| Claude 3 Opus | $0.015-0.075 | Medium | ⭐⭐⭐⭐⭐ | Publication work |
-| GPT-3.5 Turbo | $0.0005-0.002 | Very Fast | ⭐⭐⭐⭐ | Quick summaries |
-| Gemini Pro | $0.0005-0.002 | Fast | ⭐⭐⭐⭐ | Multilingual work |
-| Llama 2 70B | $0.0007-0.003 | Medium | ⭐⭐⭐⭐ | Open source option |
-
----
-
-## Advanced Configuration
-
-### GUI Configuration
-All AI settings are configured through the SNID SAGE GUI:
-
-1. **Launch GUI**: Run `snid-sage`
-2. **Open Settings**: Click the **Settings** button
-3. **Configure AI**: Select **Configure AI** option
-4. **Model Selection**: Choose your preferred model from the dropdown
-5. **Test Connection**: Verify your API key works
-
-### Configuration File
-Advanced users can edit the configuration file directly:
-```bash
-# Location: ~/.snidanalyzer/openrouter_config.json
-{
-  "api_key": "your-api-key-here",
-  "model_id": "openai/gpt-3.5-turbo"
-}
-```
-
----
+### Integration Features
+- **Context Awareness**: AI remembers your analysis results
+- **Interactive Chat**: Ask follow-up questions about your spectrum
+- **Export Options**: Save AI analysis with your results
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### API Key Not Working
-1. **Check Environment Variable**: Verify `$OPENROUTER_API_KEY` is set
-2. **Test in GUI**: Settings → Configure AI → Test Connection
-3. **Regenerate Key**: Go to OpenRouter dashboard → API Keys → Create New Key
+**API Key Not Working**
+- Check key format (should start with `sk-or-`)
+- Test connection in AI Assistant Settings tab
+- Verify key in OpenRouter dashboard
 
-#### Model Not Available
-1. **Check Model List**: Settings → Configure AI → Browse available models
-2. **Try Alternative**: Select a different model from the dropdown
-3. **Check OpenRouter Status**: Visit [status.openrouter.ai](https://status.openrouter.ai/)
+**Model Not Available**
+- Try alternative model from the model table
+- Check OpenRouter status page
+- Verify model access with your account
 
-#### Rate Limiting
-1. **Check Usage**: OpenRouter dashboard shows current usage
-2. **Wait and Retry**: Rate limits reset automatically
-3. **Upgrade Plan**: Consider upgrading for higher limits
+**Analysis Fails**
+- Ensure SNID analysis completed first
+- Check internet connection
+- Try simpler analysis type
 
 ### Error Messages
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `401 Unauthorized` | Invalid API key | Check key format and validity |
-| `429 Too Many Requests` | Rate limit exceeded | Wait or upgrade plan |
-| `503 Service Unavailable` | Model temporarily down | Try alternative model |
-| `400 Bad Request` | Invalid request format | Check input data |
+| Error | Solution |
+|-------|----------|
+| `401 Unauthorized` | Check API key format and validity |
+| `429 Too Many Requests` | Wait or upgrade OpenRouter plan |
+| `503 Service Unavailable` | Try different model or wait |
+| `No analysis results` | Complete SNID analysis first |
 
----
+## Privacy and Security
 
-## Cost Management
+### Data Handling
+- **Spectrum Data**: Never sent to AI models
+- **Analysis Results**: Only classification results sent to AI
+- **API Keys**: Stored locally, encrypted transmission
 
-### **Understanding Costs**
+### Best Practices
+- Use dedicated API key for SNID SAGE
+- Monitor usage through OpenRouter dashboard
+- Consider data sensitivity for cloud AI
 
-#### **Cost Calculation**
-```
-Cost = (Input Tokens + Output Tokens) × Token Price
-```
+## Next Steps
 
-#### **Typical Costs per Analysis**
-| Analysis Type | Input Tokens | Output Tokens | Cost Range |
-|---------------|-------------|---------------|------------|
-| Quick Summary | 500-1000 | 200-400 | $0.001-0.005 |
-| Detailed Analysis | 1000-2000 | 500-1000 | $0.005-0.02 |
-| Scientific Context | 1500-3000 | 800-1500 | $0.01-0.05 |
-| Publication Notes | 2000-4000 | 1000-2000 | $0.02-0.08 |
+1. **Test Setup**: Run AI analysis on a sample spectrum
+2. **Explore Features**: Try different analysis types
+3. **Customize**: Configure preferred models and settings
+4. **Integration**: Incorporate AI analysis into your workflow
 
-### **Cost Optimization Tips**
-
-#### **1. Choose Appropriate Models**
-- **Quick tasks**: Use GPT-3.5 Turbo (cheaper, ~$0.002 per analysis)
-- **Complex analysis**: Use GPT-4 Turbo (better quality, ~$0.03 per analysis)
-- **Scientific work**: Use Claude 3 Opus (excellent quality, ~$0.015 per analysis)
-
-#### **2. Monitor Usage**
-- **OpenRouter Dashboard**: Track usage and costs in real-time
-- **Set Budget Alerts**: Configure spending limits in OpenRouter dashboard
-- **Review Regularly**: Check usage patterns to optimize costs
-
-#### **3. Efficient Analysis**
-- **Run SNID First**: Complete spectrum analysis before using AI
-- **Use Specific Prompts**: Clear, focused questions reduce token usage
-- **Batch Similar Questions**: Combine related queries when possible
-
----
-
-## 🔒 **Security & Privacy**
-
-### **API Key Security**
-
-#### **Best Practices**
-```bash
-# Never commit keys to version control
-echo "openrouter_api_key.txt" >> .gitignore
-echo "*.key" >> .gitignore
-
-# Use environment variables
-export OPENROUTER_API_KEY="your-key-here"
-
-# Rotate keys regularly
-# OpenRouter dashboard → API Keys → Regenerate
-```
-
-#### **Data Privacy**
-- **No data retention**: OpenRouter doesn't store your data
-- **Encrypted transmission**: All API calls use HTTPS
-- **GDPR compliant**: Full data protection compliance
-- **Academic use**: Special pricing for research institutions
-
-### **Network Security**
-
-#### **Firewall Configuration**
-```bash
-# Allow OpenRouter API access
-# Required domains: api.openrouter.ai, openrouter.ai
-
-# Test connectivity
-curl -I https://api.openrouter.ai/health
-```
-
----
-
-## 📊 **Usage Examples**
-
-### **GUI-Based Analysis**
-1. **Run SNID Analysis**: Load spectrum and run analysis in GUI
-2. **Open AI Assistant**: Click the **AI Assistant** button (deep blue)
-3. **Choose Analysis Type**: Select from available options
-4. **Review Results**: AI provides comprehensive analysis
-
-### **Interactive Chat**
-1. **Complete Analysis**: Run SNID analysis first
-2. **Start Chat**: Click **AI Assistant** → **Interactive Chat**
-3. **Select Persona**: Choose Scientist, Educator, Reviewer, or Consultant
-4. **Ask Questions**: Chat naturally about your results
-
----
-
-## 🆘 **Support & Resources**
-
-### **OpenRouter Support**
-- **Documentation**: [docs.openrouter.ai](https://docs.openrouter.ai/)
-- **Status Page**: [status.openrouter.ai](https://status.openrouter.ai/)
-- **Discord**: [discord.gg/openrouter](https://discord.gg/openrouter)
-- **Email**: support@openrouter.ai
-
-### **SNID SAGE AI Support**
-- **GitHub Issues**: Report bugs and feature requests
-- **Documentation**: [AI Overview](overview.md)
-- **Community**: GitHub Discussions
-
-### **Academic Support**
-- **Research Discounts**: Contact OpenRouter for academic pricing
-- **Educational Resources**: Free tier available for students
-- **Collaboration**: Open to research partnerships
-
----
-
-## 📈 **Next Steps**
-
-1. **Test Your Setup**: Run a quick analysis to verify everything works
-2. **Explore Models**: Try different models for different use cases
-3. **Optimize Costs**: Configure caching and model selection
-4. **Advanced Features**: Learn about batch processing and custom prompts
-5. **Integration**: Set up automated workflows with your analysis pipeline
-
-For more advanced AI features, see:
-- **[AI Overview](overview.md)** - Complete AI capabilities guide
-- **[Analysis Types](analysis-types.md)** - Detailed analysis explanations
-- **[AI Tutorial](../tutorials/ai-assisted-analysis.md)** - Step-by-step AI workflow 
+For detailed AI analysis options, see [Analysis Types](analysis-types.md). 

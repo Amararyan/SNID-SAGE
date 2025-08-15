@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide provides comprehensive instructions for installing SNID SAGE on your system.
+This guide provides instructions for installing SNID SAGE on your system.
 
 ## System Requirements
 
@@ -24,8 +24,6 @@ Install the latest stable release from PyPI:
 pip install snid-sage
 ```
 
- 
-
 ### Virtual Environment Setup
 
 #### Using venv (Recommended)
@@ -40,7 +38,6 @@ snid_env\Scripts\activate
 
 # Install SNID SAGE
 pip install snid-sage
- 
 
 # Verify installation
 python -c "import snid_sage; print('SNID SAGE installed successfully!')"
@@ -59,7 +56,6 @@ source snid_env/bin/activate
 
 # Install SNID SAGE
 pip install snid-sage
- 
 
 # Verify installation
 python -c "import snid_sage; print('SNID SAGE installed successfully!')"
@@ -98,153 +94,99 @@ cd SNID_SAGE
 
 # Install in development mode (includes CLI and GUI)
 pip install -e .
-
- 
 ```
 
-## Platform-Specific Instructions
+## Verification
 
-### Windows
-
-1. **Install Python 3.8+** from [python.org](https://python.org/downloads/)
-2. **Ensure pip is in PATH** during Python installation
-3. **PowerShell Execution Policy** (if needed):
-   ```powershell
-   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-   ```
-4. **Install SNID SAGE**:
-   ```powershell
-   pip install snid-sage
-   ```
-
-### macOS
-
-1. **Install Python** (if not present):
-   ```bash
-   # Using Homebrew
-   brew install python@3.10
-   ```
-2. **Install Xcode Command Line Tools** (if needed):
-   ```bash
-   xcode-select --install
-   ```
-3. **Install SNID SAGE**:
-   ```bash
-   pip3 install snid-sage
-   ```
-
-### Linux
-
-**Ubuntu/Debian:**
+### Test Installation
 ```bash
-# Update package manager
-sudo apt update
-
-# Install Python and pip
-sudo apt install python3.10 python3-pip
-
-# Install SNID SAGE
-pip3 install snid-sage
-```
-
-**Fedora/CentOS/RHEL:**
-```bash
-# Install Python and pip
-sudo dnf install python3.10 python3-pip  # Fedora
-# sudo yum install python3 python3-pip   # CentOS/RHEL
-
-# Install SNID SAGE
-pip3 install snid-sage
-```
-
-## Next Steps
-
-After installation, proceed to the [Quick Start Guide](../quickstart/first-analysis.md) for a minimal end-to-end analysis, and the [CLI Command Reference](../cli/command-reference.md) for command-line usage.
-
-## Installation Verification
-
-### Test Basic Installation
-```bash
-# Test Python import
-python -c "import snid_sage; print('Core modules OK')"
-
 # Check version
 snid --version
 
-# Launch GUI (will open a window)
+# Test CLI
+snid --help
+
+# Test GUI launch
 snid-sage
 ```
 
-### Test with Sample Data
+### Check Dependencies
 ```bash
-# Download sample spectrum (if not included)
-# Run analysis
-snid data/sn2003jo.dat --output-dir test_results/
+# Verify key dependencies
+python -c "import numpy, matplotlib, scipy, astropy; print('Dependencies OK')"
+```
 
-# Or with explicit templates directory
-snid identify data/sn2003jo.dat templates/ --output-dir test_results/
+## Platform-Specific Notes
+
+### Windows
+- **Python**: Use Python 3.9+ from python.org
+- **Virtual Environment**: Recommended for dependency management
+- **GUI**: PySide6-based interface with native Windows styling
+
+### macOS
+- **Python**: Use Python 3.9+ from python.org or Homebrew
+- **Dependencies**: Some packages may require Xcode Command Line Tools
+- **GUI**: Native macOS integration with PySide6
+
+### Linux (Ubuntu/Debian)
+```bash
+# Install system dependencies
+sudo apt update
+sudo apt install python3-pip python3-venv
+
+# Install SNID SAGE
+pip3 install snid-sage
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-**"Module not found" errors:**
-- Ensure you're using the correct Python environment
-- Try reinstalling: `pip install snid-sage --force-reinstall`
-
-**GUI doesn't launch:**
-- On Linux desktops, ensure an X11/Wayland session is available
-
-**Permission errors:**
-- Use `--user` flag: `pip install --user snid-sage`
-- Or use a virtual environment (recommended)
-
-**SSL Certificate errors:**
-- Update certificates on macOS: `/Applications/Python\ 3.x/Install\ Certificates.command`
-- Check your internet connection and try again
-
-### Getting Help
-
-If you encounter issues:
-
-1. Check the [Troubleshooting Guide](../reference/troubleshooting.md)
-2. Search [GitHub Issues](https://github.com/FiorenSt/SNID-SAGE/issues)
-3. Create a new issue with:
-   - Operating system and version
-   - Python version (`python --version`)
-   - Complete error message
-   - Steps to reproduce
-
-## Updating SNID SAGE
-
-### From PyPI
+**Import Errors**
 ```bash
-pip install snid-sage --upgrade
+# Check Python version
+python --version
+
+# Reinstall with specific Python version
+python3.9 -m pip install snid-sage
 ```
 
-### From Source
+**GUI Not Launching**
 ```bash
-cd SNID_SAGE
-git pull origin main
-pip install -e . --upgrade
+# Check PySide6 installation
+python -c "import PySide6; print('PySide6 OK')"
+
+# Reinstall GUI dependencies
+pip install --upgrade PySide6
 ```
 
-## Uninstallation
-
+**Template Library Issues**
 ```bash
-# Uninstall package
-pip uninstall snid-sage
+# Check template installation
+snid templates list
 
-# Remove virtual environment (if used)
-rm -rf snid_env  # Unix/macOS
-# or
-rmdir /s snid_env  # Windows
-
-# Remove conda environment (if used)
-conda remove -n snid_sage --all
+# Reinstall templates
+pip install --upgrade snid-sage
 ```
+
+### Error Messages
+
+| Error | Solution |
+|-------|----------|
+| `ModuleNotFoundError` | Install missing dependencies with `pip install package_name` |
+| `ImportError: DLL load failed` | Update Visual C++ Redistributable (Windows) |
+| `No module named 'PySide6'` | Install PySide6: `pip install PySide6` |
+| `Permission denied` | Use virtual environment or `pip install --user` |
 
 ## Next Steps
 
-After installation, proceed to the [Quick Start Guide](../quickstart/first-analysis.md) to perform your first supernova spectrum analysis! 
+1. **Test Installation**: Run `snid-sage` to launch the GUI
+2. **Get Sample Data**: Download test spectra from TNS
+3. **Read Documentation**: Start with the [Quick Start Guide](../quickstart/first-analysis.md)
+4. **Configure AI**: Set up OpenRouter for AI features (optional)
+
+## Support
+
+- **Documentation**: [SNID SAGE Docs](https://snid-sage.readthedocs.io/)
+- **GitHub Issues**: Report bugs and request features
+- **Community**: Join discussions on GitHub 

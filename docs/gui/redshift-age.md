@@ -31,9 +31,9 @@ Map GUI choices to CLI flags:
 
 ```powershell
 # Force exact redshift
-snid identify spectrum.dat --output-dir results/ --forced-redshift 0.045
+snid spectrum.dat --output-dir results/ --forced-redshift 0.045
 
 # Search in range
-snid identify spectrum.dat --output-dir results/ --zmin 0.04 --zmax 0.05
+snid spectrum.dat --output-dir results/ --zmin 0.04 --zmax 0.05
 ```
 

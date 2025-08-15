@@ -48,7 +48,7 @@ What you'll see:
 - **3D Interactive Plot**: Shows all clusters in redshift vs type vs correlation space
 - **Cluster Dropdown**: Click "▼ Select Cluster" in top-left to see all options
 - **Top Matches Panel**: Right side shows spectrum overlays for the selected cluster
-- **Automatic Selection**: Best cluster is pre-selected (marked with ⭐ BEST)
+- **Automatic Selection**: Best cluster is pre-selected (marked with BEST)
 
 How to choose:
 - **Hover** over clusters to highlight them
@@ -105,9 +105,6 @@ You can also analyze the same spectrum using the command line interface, which p
 ```bash
 # Analyze the same spectrum using CLI
 snid data/tns_2024ggi.dat --output-dir results/
-
-# Or with explicit templates directory
-snid identify data/tns_2024ggi.dat templates/ --output-dir results/
 ```
 
 ### What This Does

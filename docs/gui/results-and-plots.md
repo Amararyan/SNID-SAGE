@@ -16,6 +16,6 @@ CLI outputs:
 - Complete adds plot files (`comparison`, `3d_gmm_clustering`, `redshift_age`, `cluster_subtypes`)
 
 ```powershell
-snid identify data\sn2003jo.dat --output-dir results\ --complete
+snid data\sn2003jo.dat --output-dir results\ --complete
 ```
 

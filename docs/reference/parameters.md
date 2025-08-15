@@ -42,7 +42,7 @@ Unified reference of configurable parameters across GUI and CLI.
 
 ### CLI mappings (identify)
 ```bash
-snid identify spectrum.dat --output-dir results/ \
+snid spectrum.dat --output-dir results/ \
   --zmin 0.0 --zmax 0.1 \
   --rlapmin 5.0 --lapmin 0.3 \
   --age-min -5 --age-max 30 \
