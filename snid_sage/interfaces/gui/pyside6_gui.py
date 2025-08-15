@@ -2221,6 +2221,11 @@ def main(verbosity_args=None):
                                 try:
                                     from snid_sage.interfaces.gui.utils.pyside6_message_utils import showinfo
                                     current = info.get('current_version', 'unknown')
+                                    # Suppress update dialog for development builds
+                                    if isinstance(current, str) and 'dev' in current.lower():
+                                        if logger:
+                                            logger.debug("Skipping update dialog for development version: %s", current)
+                                        return
                                     latest = info.get('latest_version', 'unknown')
                                     showinfo(
                                         "Update Available",
@@ -2236,8 +2241,9 @@ def main(verbosity_args=None):
                                 logger.debug("Failed while handling update notification", exc_info=True)
                             pass
 
-                    # Ensure UI interactions happen on the main Qt thread
-                    QtCore.QTimer.singleShot(0, _show_dialog_if_needed)
+                    # Ensure UI interactions happen on the main Qt thread by
+                    # binding the singleShot to a QObject that lives on the GUI thread
+                    QtCore.QTimer.singleShot(0, window, _show_dialog_if_needed)
                 except Exception:
                     if logger:
                         logger.debug("Update check callback failed", exc_info=True)

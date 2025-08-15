@@ -172,7 +172,6 @@ class PySide6AnalysisResultsDialog(QtWidgets.QDialog):
                 border: 2px solid {self.colors['border']};
                 border-radius: 6px;
                 background: {self.colors['panel_bg']};
-                alternate-background-color: #f1f5f9;
                 selection-background-color: {self.colors['accent']};
                 gridline-color: {self.colors['border']};
             }}

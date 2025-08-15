@@ -116,7 +116,7 @@ class UiCoreLayout:
         try:
             from PySide6 import QtWidgets
 
-            table.setAlternatingRowColors(True)
+            table.setAlternatingRowColors(False)
             table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
             table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
             vh = table.verticalHeader()

@@ -197,7 +197,7 @@ class PySide6RedshiftAgeDialog(QtWidgets.QDialog):
             "Type", "Count", "Avg Redshift", "Avg Age (days)"
         ])
         self.stats_table.horizontalHeader().setStretchLastSection(True)
-        self.stats_table.setAlternatingRowColors(True)
+        self.stats_table.setAlternatingRowColors(False)
         self.stats_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         info_layout.addWidget(self.stats_table)
         

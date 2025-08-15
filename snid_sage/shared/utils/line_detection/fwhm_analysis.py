@@ -132,8 +132,14 @@ class FWHMAnalyzer:
             fitted_flux = gaussian(wavelength, *popt)
             r_squared = 1 - (np.sum((flux - fitted_flux)**2) / np.sum((flux - np.mean(flux))**2))
             
+            # Derive velocity in km/s relative to fitted center wavelength
+            try:
+                velocity_kms = 299792.458 * (float(fwhm) / float(center))
+            except Exception:
+                velocity_kms = None
             return {
                 'fwhm': fwhm,
+                'fwhm_vel': velocity_kms,
                 'center': center,
                 'amplitude': amplitude,
                 'sigma': sigma,
@@ -183,8 +189,14 @@ class FWHMAnalyzer:
                 crossings = sorted(crossings)
                 fwhm = crossings[-1] - crossings[0]
                 
+                # Derive velocity in km/s relative to peak wavelength
+                try:
+                    velocity_kms = 299792.458 * (float(fwhm) / float(peak_wavelength))
+                except Exception:
+                    velocity_kms = None
                 return {
                     'fwhm': fwhm,
+                    'fwhm_vel': velocity_kms,
                     'center': peak_wavelength,
                     'peak_flux': peak_flux,
                     'half_max': half_max,

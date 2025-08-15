@@ -45,6 +45,14 @@ except Exception:
     FigureCanvas = None
     Figure = None
 
+# Rest wavelength axis for PyQtGraph top axis
+try:
+    from snid_sage.interfaces.gui.utils.pyqtgraph_rest_axis import RestWavelengthAxisItem
+    _REST_AXIS_AVAILABLE = True
+except Exception:
+    _REST_AXIS_AVAILABLE = False
+    RestWavelengthAxisItem = None  # type: ignore
+
 # Import logging
 try:
     from snid_sage.shared.utils.logging import get_logger
@@ -118,6 +126,9 @@ class PySide6PlotManager:
         
         # Analysis plotter (will be initialized after matplotlib)
         self.analysis_plotter = None
+
+        # Custom rest-wavelength top axis (PyQtGraph)
+        self._rest_axis = None
         
         # Initialize the dual plot system
         self.init_dual_plot_system()
@@ -192,6 +203,12 @@ class PySide6PlotManager:
             
             # Create enhanced plot widget with save functionality and disabled context menus
             self.plot_widget = EnhancedPlotWidget()
+            try:
+                # Hook drag-and-drop of files on the plot to main window handler
+                if hasattr(self.plot_widget, 'files_dropped'):
+                    self.plot_widget.files_dropped.connect(self._on_files_dropped)
+            except Exception:
+                pass
             
             # Force software rendering at widget level (WSL compatibility)
             try:
@@ -217,10 +234,29 @@ class PySide6PlotManager:
             # Set axis colors explicitly
             left_axis = self.plot_item.getAxis('left')
             bottom_axis = self.plot_item.getAxis('bottom')
+            right_axis = self.plot_item.getAxis('right')
             left_axis.setTextPen('black')
             bottom_axis.setTextPen('black')
+            if right_axis:
+                right_axis.setTextPen('black')
             left_axis.setPen('black')
             bottom_axis.setPen('black')
+            if right_axis:
+                right_axis.setPen('black')
+            # Show right axis (no label)
+            try:
+                self.plot_item.showAxis('right')
+                ra = self.plot_item.getAxis('right')
+                if ra:
+                    # Hide numbers on the right axis
+                    ra.setStyle(showValues=False)
+                    # Ensure the axis line area remains visible
+                    try:
+                        ra.setWidth(8)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             _LOGGER.debug("🔧 Axis colors set to black")
             
             # Initialize interactive masking
@@ -238,6 +274,69 @@ class PySide6PlotManager:
         except Exception as e:
             _LOGGER.error(f"Error initializing PyQtGraph plot: {e}")
             self.init_fallback_plot()
+
+    def _on_files_dropped(self, paths):
+        """Handle files dropped onto the PyQtGraph plot widget.
+        Accepts first supported spectrum file and forwards to the standard loader.
+        """
+        try:
+            if not paths:
+                return
+            # Prefer known spectrum extensions; otherwise take the first path
+            supported_exts = {'.dat', '.txt', '.ascii', '.asci', '.fits', '.flm'}
+            chosen = None
+            for p in paths:
+                try:
+                    ext_parts = str(p).lower().rsplit('.', 1)
+                    ext = f".{ext_parts[1]}" if len(ext_parts) == 2 else ''
+                except Exception:
+                    ext = ''
+                if ext in supported_exts:
+                    chosen = p
+                    break
+            if chosen is None:
+                chosen = paths[0]
+            # Delegate to main window's event handler if available
+            if hasattr(self.main_window, 'event_handlers') and hasattr(self.main_window.event_handlers, 'handle_open_spectrum_file'):
+                self.main_window.event_handlers.handle_open_spectrum_file(chosen)
+        except Exception as e:
+            _LOGGER.error(f"Error handling dropped files: {e}")
+
+    def _ensure_rest_axis(self):
+        """Create and attach the rest wavelength top axis if available."""
+        try:
+            if not PYQTGRAPH_AVAILABLE or not _REST_AXIS_AVAILABLE or not self.plot_item:
+                return
+            if self._rest_axis is not None:
+                # already attached
+                return
+            # Create custom top axis and link to the same ViewBox
+            self._rest_axis = RestWavelengthAxisItem('top')  # type: ignore
+            # Replace the existing top axis in the PlotItem layout
+            try:
+                # Remove existing top axis if present
+                top_axis = self.plot_item.getAxis('top')
+                if top_axis is not None:
+                    self.plot_item.layout.removeItem(top_axis)
+            except Exception:
+                pass
+            # Add our axis at the top
+            self.plot_item.layout.addItem(self._rest_axis, 1, 1)
+            # Link to main viewbox so ticks align and update on pan/zoom
+            self._rest_axis.linkToView(self.plot_item.vb)
+        except Exception as axis_error:
+            _LOGGER.debug(f"Could not attach rest axis: {axis_error}")
+
+    def _set_rest_axis_redshift(self, z: float):
+        """Update the rest-axis redshift (if axis is present)."""
+        try:
+            if self._rest_axis is None:
+                self._ensure_rest_axis()
+            if self._rest_axis is not None:
+                # type: ignore[attr-defined]
+                self._rest_axis.set_redshift(z)  # type: ignore
+        except Exception as e:
+            _LOGGER.debug(f"Could not set rest axis redshift: {e}")
     
     def init_fallback_plot(self):
         """Initialize fallback plot area when PyQtGraph is not available"""
@@ -349,7 +448,7 @@ class PySide6PlotManager:
             self.plot_item.showGrid(x=True, y=True, alpha=0.08)
             
             # Set labels
-            self.plot_item.setLabels(left='Flux', bottom='Wavelength (Å)')
+            self.plot_item.setLabels(left='Flux', bottom='Obs. Wavelength (Å)')
             
             # Configure plot item style
             self.plot_item.getViewBox().setBackgroundColor(colors.get('plot_bg', 'white'))
@@ -376,13 +475,32 @@ class PySide6PlotManager:
             if hasattr(self.plot_widget, 'hide_save_button'):
                 self.plot_widget.hide_save_button()
             
+            # Ensure axes are visible and styled: left, bottom, right (no values), top rest axis present
+            try:
+                # Right axis visible but without values
+                self.plot_item.showAxis('right')
+                ra = self.plot_item.getAxis('right')
+                if ra:
+                    ra.setTextPen('black')
+                    ra.setPen('black')
+                    ra.setStyle(showValues=False)
+            except Exception:
+                pass
+
+            # Attach an empty rest top axis as placeholder (z=0)
+            try:
+                self._ensure_rest_axis()
+                self._set_rest_axis_redshift(0.0)
+            except Exception:
+                pass
+
             # Add welcome text without fake spectrum
             text_item = pg.TextItem(
                 html='<div style="text-align: center; color: black; font-size: 14pt; font-weight: bold; '
                      'background-color: rgba(240,240,240,180); border: 1px solid gray; padding: 10px; border-radius: 5px;">'
                      'Welcome to SNID SAGE<br>'
                      '<span style="font-size: 12pt; font-weight: normal;">'
-                     'Load a spectrum file to begin analysis'
+                     'Click Load Spectrum or drag a spectrum here'
                      '</span></div>',
                 anchor=(0.5, 0.5)
             )
@@ -392,11 +510,31 @@ class PySide6PlotManager:
             self.plot_item.addItem(text_item)
             
             # Set labels for empty plot
-            self.plot_item.setLabels(left='Flux', bottom='Wavelength (Å)')
+            self.plot_item.setLabels(left='Flux', bottom='Obs. Wavelength (Å)')
             
             # Set reasonable default ranges for empty plot
             self.plot_item.setXRange(3000, 10000)
             self.plot_item.setYRange(-0.5, 1.5)
+            
+            # Ensure axis visibility policy for empty plot:
+            # - Left and bottom: values shown
+            # - Right and top: edge line only (no values)
+            try:
+                # Bottom/left already visible with values by default
+                # Right axis: show edge line, hide tick values
+                self.plot_item.showAxis('right')
+                ra = self.plot_item.getAxis('right')
+                if ra:
+                    ra.setStyle(showValues=False)
+                    try:
+                        ra.setWidth(8)
+                    except Exception:
+                        pass
+                # Top axis: ensure present; if rest axis available, use it at z=0
+                self._ensure_rest_axis()
+                self._set_rest_axis_redshift(0.0)
+            except Exception:
+                pass
             
         except Exception as e:
             _LOGGER.warning(f"Could not plot welcome message: {e}")
@@ -516,7 +654,23 @@ class PySide6PlotManager:
             _LOGGER.debug(f"Using view: {view_type}, y_label: {y_label}")
             
             # Set labels (no title per user requirement)
-            self.plot_item.setLabels(left=y_label, bottom='Wavelength (Å)')
+            self.plot_item.setLabels(left=y_label, bottom='Obs. Wavelength (Å)')
+
+            # Ensure rest-wavelength top axis and set redshift from controller (manual or host)
+            try:
+                appc = self.main_window.app_controller
+                z_val = None
+                # Prefer manual redshift if set
+                if hasattr(appc, 'manual_redshift') and appc.manual_redshift:
+                    z_val = float(appc.manual_redshift)
+                elif hasattr(appc, 'get_redshift'):
+                    z_val = appc.get_redshift() or 0.0
+                else:
+                    z_val = 0.0
+                self._ensure_rest_axis()
+                self._set_rest_axis_redshift(float(z_val or 0.0))
+            except Exception:
+                pass
             
             # Use same blue as Flux/Flat buttons for consistency
             pen = pg.mkPen(color='#3b82f6', width=2)  # Same blue as Flux/Flat buttons
@@ -625,7 +779,15 @@ class PySide6PlotManager:
                 return
             
             # Set plot labels
-            self.plot_item.setLabels(left=y_label, bottom='Wavelength (Å)')
+            self.plot_item.setLabels(left=y_label, bottom='Obs. Wavelength (Å)')
+
+            # Attach/update rest-wavelength top axis using current match redshift
+            try:
+                redshift = float(current_match.get('redshift', 0.0) or 0.0)
+                self._ensure_rest_axis()
+                self._set_rest_axis_redshift(redshift)
+            except Exception:
+                pass
             
             # Plot observed spectrum (same blue as Flux/Flat buttons)
             obs_pen = pg.mkPen(color='#3b82f6', width=2)  # Same blue as Flux/Flat buttons

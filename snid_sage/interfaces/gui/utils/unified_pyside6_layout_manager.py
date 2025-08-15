@@ -546,7 +546,10 @@ class UnifiedPySide6LayoutManager:
         gui_instance.load_spectrum_btn.setObjectName("unified_load_spectrum_btn")
 
         gui_instance.load_spectrum_btn.clicked.connect(gui_instance.browse_file)
-        gui_instance.load_spectrum_btn.setToolTip("Load a spectrum file for analysis\nSupported formats: .txt, .dat, .ascii, .asci, .fits")
+        gui_instance.load_spectrum_btn.setToolTip(
+            "Click Load Spectrum or drag a spectrum here\n"
+            "Supported formats: .txt, .dat, .ascii, .asci, .fits, .flm"
+        )
         layout.addWidget(gui_instance.load_spectrum_btn)
         
         # File status label - add with reduced spacing

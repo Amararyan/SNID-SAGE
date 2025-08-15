@@ -23,13 +23,53 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import json
 import threading
+from importlib import resources
 
 import numpy as np
 import h5py
 
 
-_BUILTIN_DIR = Path("snid_sage/templates").resolve()
-_USER_DIR = _BUILTIN_DIR / "User_templates"
+def _compute_builtin_dir() -> Path:
+    """Resolve the packaged templates directory robustly (installed or dev)."""
+    # Prefer importlib.resources traversal of the installed package
+    try:
+        with resources.as_file(resources.files('snid_sage') / 'templates') as tpl_dir:
+            if tpl_dir.exists():
+                return tpl_dir
+    except Exception:
+        pass
+    # Fallback: use the repo-relative path for editable installs
+    try:
+        return Path(__file__).resolve().parents[3] / "templates"
+    except Exception:
+        return Path("snid_sage/templates").resolve()
+
+
+_BUILTIN_DIR = _compute_builtin_dir()
+
+# Determine a writable user templates directory. Prefer app config dir.
+def _compute_user_dir() -> Path:
+    # Try configuration manager location
+    try:
+        from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
+        cfg = ConfigurationManager()
+        user_dir = Path(cfg.config_dir) / "templates" / "User_templates"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        return user_dir
+    except Exception:
+        pass
+    # Fallback to a subdir next to built-ins (may be read-only, so try/except)
+    fallback = _BUILTIN_DIR / "User_templates"
+    try:
+        fallback.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # As a last resort, use home directory
+        fallback = Path.home() / ".snid_sage" / "User_templates"
+        fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
+_USER_DIR = _compute_user_dir()
 _USER_INDEX = _USER_DIR / "template_index.user.json"
 _BUILTIN_INDEX = _BUILTIN_DIR / "template_index.json"
 

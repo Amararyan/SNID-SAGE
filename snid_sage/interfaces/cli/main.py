@@ -21,6 +21,7 @@ import snid_sage.interfaces.cli.identify as identify_module
 import snid_sage.interfaces.cli.batch as batch_module
 import snid_sage.interfaces.cli.config as config_module
 from snid_sage.shared.utils.logging import add_logging_arguments, configure_from_args
+from snid_sage.shared.utils.logging import VerbosityLevel
 
 # Import version
 try:
@@ -129,9 +130,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     # treat it as the default "identify" command for convenience
     if len(argv) >= 1 and not argv[0].startswith('-') and argv[0] not in ['identify', 'batch', 'config']:
         # Implicit identify mode: snid <spectrum> [templates/]
-        # Show a brief interactive tip once, without changing default behavior
+        # Show a brief interactive tip only in verbose/debug to avoid default noise
         try:
-            if sys.stderr.isatty() and not any(f in argv for f in ['-q', '--quiet', '--silent']):
+            wants_verbose = any(f in argv for f in ['-v', '--verbose', '-d', '--debug'])
+            if sys.stderr.isatty() and wants_verbose:
                 print(
                     "Tip: 'snid <file>' runs 'snid identify <file>'. Use 'snid identify' for clarity.",
                     file=sys.stderr
@@ -145,7 +147,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     
     # Configure logging once at the top-level based on global flags
     try:
-        configure_from_args(args, gui_mode=False)
+        # Default CLI verbosity set to QUIET to reduce noise unless user opts-in
+        configure_from_args(args, gui_mode=False, default_verbosity=VerbosityLevel.QUIET)
     except Exception:
         pass
 

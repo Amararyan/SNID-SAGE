@@ -290,7 +290,7 @@ class TemplateManagerLayoutManager:
     
     def setup_table_widget(self, table: QtWidgets.QTableWidget) -> None:
         """Setup table widget with consistent styling"""
-        table.setAlternatingRowColors(True)
+        table.setAlternatingRowColors(False)
         table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         

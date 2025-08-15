@@ -92,7 +92,7 @@ class EmissionLineStep2Analysis:
             "• Left Click: Add point snapped to nearest bin\n"
             "• Ctrl/Cmd+Click: Add free-floating point anywhere\n"
             f"• {right_click_text}: Remove closest point\n"
-            "• FWHM preview appears after selecting at least 5 points"
+            "• Velocity preview appears after selecting at least 5 points"
         )
         self.manual_instructions.setWordWrap(True)
         self.manual_instructions.setStyleSheet(f"color: {self.colors.get('text_secondary', '#666')}; padding: 5px;")
@@ -339,6 +339,34 @@ class EmissionLineStep2Analysis:
                 'fwhm_right': right_lambda,
                 'half_max_level': half_level
             })
+
+            # Derive velocity (km/s) using rest wavelength when available
+            c_km_s = 299792.458
+            rest_lambda = 0.0
+            try:
+                # Prefer metadata-stored rest wavelength if present
+                if line_name in self.parent.sn_lines:
+                    _, meta = self.parent.sn_lines.get(line_name, (None, {}))
+                    rest_lambda = float(meta.get('rest_wavelength', 0.0) or 0.0)
+                if rest_lambda <= 0.0 and line_name in self.parent.galaxy_lines:
+                    _, meta = self.parent.galaxy_lines.get(line_name, (None, {}))
+                    rest_lambda = float(meta.get('rest_wavelength', 0.0) or 0.0)
+            except Exception:
+                rest_lambda = 0.0
+            if rest_lambda <= 0.0:
+                try:
+                    rest_lambda = float(self.parent._get_rest_wavelength_for_line(line_name) or 0.0)
+                except Exception:
+                    rest_lambda = 0.0
+            # Fallback to peak wavelength, then observed wavelength
+            if rest_lambda <= 0.0:
+                rest_lambda = float(result.get('peak_wavelength') or 0.0) or float(result.get('observed_wavelength') or 0.0) or 0.0
+            if rest_lambda > 0.0 and fwhm is not None:
+                try:
+                    velocity_kms = c_km_s * (float(fwhm) / float(rest_lambda))
+                    result['velocity_kms'] = float(velocity_kms)
+                except Exception:
+                    pass
         
         return result
     
@@ -377,6 +405,7 @@ class EmissionLineStep2Analysis:
 
         observed_wavelength = result.get('observed_wavelength')
         fwhm_value = result.get('fwhm') or result.get('FWHM')
+        velocity_value = result.get('velocity_kms') or result.get('fwhm_vel')
         peak_wavelength = result.get('peak_wavelength')
         num_points = result.get('num_points')
 
@@ -387,7 +416,12 @@ class EmissionLineStep2Analysis:
             except Exception:
                 details_parts.append(f"λobs={observed_wavelength}")
 
-        if fwhm_value is not None:
+        if velocity_value is not None:
+            try:
+                details_parts.append(f"v={float(velocity_value):.0f} km/s")
+            except Exception:
+                details_parts.append(f"v={velocity_value} km/s")
+        elif fwhm_value is not None:
             try:
                 details_parts.append(f"FWHM={float(fwhm_value):.2f} Å")
             except Exception:
@@ -622,7 +656,26 @@ class EmissionLineStep2Analysis:
                             self.line_analysis_results[ln]['fwhm_left'] = left_lambda
                             self.line_analysis_results[ln]['fwhm_right'] = right_lambda
                             self.line_analysis_results[ln]['half_max_level'] = half_level
-                        # Refresh minimal summary to reflect FWHM quickly
+                            # Compute and store velocity (km/s) using rest wavelength when available
+                            try:
+                                c_km_s = 299792.458
+                                rest_lambda = 0.0
+                                # Prefer metadata-stored rest wavelength
+                                if lt == 'sn' and ln in self.parent.sn_lines:
+                                    _, meta = self.parent.sn_lines.get(ln, (None, {}))
+                                    rest_lambda = float(meta.get('rest_wavelength', 0.0) or 0.0)
+                                if rest_lambda <= 0.0 and lt == 'galaxy' and ln in self.parent.galaxy_lines:
+                                    _, meta = self.parent.galaxy_lines.get(ln, (None, {}))
+                                    rest_lambda = float(meta.get('rest_wavelength', 0.0) or 0.0)
+                                if rest_lambda <= 0.0:
+                                    rest_lambda = float(self.parent._get_rest_wavelength_for_line(ln) or 0.0)
+                                if rest_lambda <= 0.0:
+                                    rest_lambda = float(self.line_analysis_results[ln].get('peak_wavelength') or 0.0) or float(self.line_analysis_results[ln].get('observed_wavelength') or 0.0) or 0.0
+                                if rest_lambda > 0.0:
+                                    self.line_analysis_results[ln]['velocity_kms'] = float(c_km_s * (float(fwhm) / rest_lambda))
+                            except Exception:
+                                pass
+                        # Refresh minimal summary to reflect velocity quickly
                         self.refresh_summary()
             
         except Exception as e:

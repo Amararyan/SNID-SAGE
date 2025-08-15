@@ -45,6 +45,14 @@ try:
 except Exception:
     EnhancedPlotWidget = None  # type: ignore
 
+# Optional rest wavelength top axis support
+try:
+    from snid_sage.interfaces.gui.utils.pyqtgraph_rest_axis import RestWavelengthAxisItem
+    _REST_AXIS_AVAILABLE = True
+except Exception:
+    _REST_AXIS_AVAILABLE = False
+    RestWavelengthAxisItem = None  # type: ignore
+
 # Category colors
 from snid_sage.shared.constants.physical import CATEGORY_COLORS
 
@@ -370,9 +378,36 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             )
             self.plot_widget.setBackground('w')
             self.plot_item = self.plot_widget.getPlotItem()
+            # Show right axis (no label) and style
+            try:
+                self.plot_item.showAxis('right')
+                ra = self.plot_item.getAxis('right')
+                if ra:
+                    ra.setTextPen('black')
+                    ra.setPen('black')
+                    ra.setStyle(showValues=False)
+            except Exception:
+                pass
             self._spectrum_curve = self.plot_item.plot(pen=pg.mkPen('#444444', width=1))
             self._overlay_lines_items: List[Any] = []
             preview_vbox.addWidget(self.plot_widget)
+            # Attach rest wavelength top axis and link to view
+            try:
+                if _REST_AXIS_AVAILABLE:
+                    rest_axis = RestWavelengthAxisItem('top')  # type: ignore
+                    try:
+                        top_axis = self.plot_item.getAxis('top')
+                        if top_axis is not None:
+                            self.plot_item.layout.removeItem(top_axis)
+                    except Exception:
+                        pass
+                    self.plot_item.layout.addItem(rest_axis, 1, 1)
+                    rest_axis.linkToView(self.plot_item.vb)
+                    # Initialize with host redshift
+                    rest_axis.set_redshift(float(getattr(self, 'host_redshift', 0.0) or 0.0))
+                    self._rest_axis = rest_axis
+            except Exception:
+                self._rest_axis = None
         else:
             self.plot_widget = None
             preview_vbox.addWidget(QtWidgets.QLabel("pyqtgraph not available. Install pyqtgraph to enable preview."))
@@ -1017,6 +1052,11 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         try:
             self.host_redshift = float(val)
             self._draw_line_overlays()
+            try:
+                if hasattr(self, '_rest_axis') and self._rest_axis is not None:
+                    self._rest_axis.set_redshift(float(self.host_redshift or 0.0))
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -1024,6 +1064,12 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         try:
             self.velocity_shift = float(val)
             self._draw_line_overlays()
+            # Keep top axis tied to host redshift for rest labels
+            try:
+                if hasattr(self, '_rest_axis') and self._rest_axis is not None:
+                    self._rest_axis.set_redshift(float(self.host_redshift or 0.0))
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -1031,7 +1077,9 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
         """Galaxy host redshift plus ejecta velocity translated to redshift units."""
         try:
             c_km_s = 299792.458
-            return max(0.0, float(self.host_redshift) + float(self.velocity_shift) / c_km_s)
+            # Positive ejecta velocity (expansion toward observer) should BLUESHIFT lines
+            # hence decrease the effective redshift.
+            return max(0.0, float(self.host_redshift) - float(self.velocity_shift) / c_km_s)
         except Exception:
             return max(0.0, float(getattr(self, 'host_redshift', 0.0) or 0.0))
 

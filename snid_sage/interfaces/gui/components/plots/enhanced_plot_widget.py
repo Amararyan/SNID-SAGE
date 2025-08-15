@@ -172,6 +172,9 @@ class EnhancedPlotWidget(pg.PlotWidget):
     - Automatic positioning and theming support
     """
     
+    # Emit local file paths when files are dropped onto the widget
+    files_dropped = QtCore.Signal(list)
+
     def __init__(self, *args, **kwargs):
         """Initialize enhanced plot widget"""
         super().__init__(*args, **kwargs)
@@ -208,7 +211,17 @@ class EnhancedPlotWidget(pg.PlotWidget):
 
     # Drag-and-drop handlers to keep Qt from emitting dragLeave before dragEnter warnings
     def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:  # type: ignore[override]
-        event.acceptProposedAction()
+        try:
+            mime = event.mimeData()
+            if mime and mime.hasUrls():
+                # Accept only local file URLs
+                for url in mime.urls():
+                    if url.isLocalFile():
+                        event.acceptProposedAction()
+                        return
+        except Exception:
+            pass
+        event.ignore()
 
     def dragMoveEvent(self, event: QtGui.QDragMoveEvent) -> None:  # type: ignore[override]
         event.acceptProposedAction()
@@ -217,7 +230,21 @@ class EnhancedPlotWidget(pg.PlotWidget):
         event.accept()
 
     def dropEvent(self, event: QtGui.QDropEvent) -> None:  # type: ignore[override]
-        # We do not handle drops here; just ignore after a consistent accept sequence
+        try:
+            mime = event.mimeData()
+            if not mime or not mime.hasUrls():
+                event.ignore()
+                return
+            paths = []
+            for url in mime.urls():
+                if url.isLocalFile():
+                    paths.append(url.toLocalFile())
+            if paths:
+                self.files_dropped.emit(paths)
+                event.acceptProposedAction()
+                return
+        except Exception:
+            pass
         event.ignore()
     
     def _setup_save_functionality(self):

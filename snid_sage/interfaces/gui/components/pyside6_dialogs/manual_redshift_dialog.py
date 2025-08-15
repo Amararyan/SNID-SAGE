@@ -52,6 +52,14 @@ except ImportError:
     pg = None
     EnhancedPlotWidget = None
 
+# Optional rest wavelength top axis support
+try:
+    from snid_sage.interfaces.gui.utils.pyqtgraph_rest_axis import RestWavelengthAxisItem
+    _REST_AXIS_AVAILABLE = True
+except Exception:
+    _REST_AXIS_AVAILABLE = False
+    RestWavelengthAxisItem = None  # type: ignore
+
 # Import logging
 try:
     from snid_sage.shared.utils.logging import get_logger
@@ -174,6 +182,8 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
         
         # Setup UI
         self._setup_ui()
+        # Optional rest wavelength top axis handle
+        self._rest_axis = None
     
     def _setup_ui(self):
         """Setup the plot widget UI"""
@@ -186,11 +196,38 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
         
         self.plot_widget.setBackground('w')
         self.plot_widget.setLabel('left', 'Flux')
-        self.plot_widget.setLabel('bottom', 'Wavelength (Å)')
+        self.plot_widget.setLabel('bottom', 'Obs. Wavelength (Å)')
         self.plot_widget.setTitle(f"{self.title} (drag here)")
         
         # Get the plot item for adding data
         self.plot_item = self.plot_widget.getPlotItem()
+        # Ensure right axis is visible (no label) and styled
+        try:
+            self.plot_item.showAxis('right')
+            ra = self.plot_item.getAxis('right')
+            if ra:
+                ra.setTextPen('black')
+                ra.setPen('black')
+                ra.setStyle(showValues=False)
+        except Exception:
+            pass
+        # Attach rest wavelength top axis if available
+        try:
+            if PYQTGRAPH_AVAILABLE and _REST_AXIS_AVAILABLE:
+                rest_axis = RestWavelengthAxisItem('top')  # type: ignore
+                # Remove default top axis and insert ours
+                try:
+                    top_axis = self.plot_item.getAxis('top')
+                    if top_axis is not None:
+                        self.plot_item.layout.removeItem(top_axis)
+                except Exception:
+                    pass
+                self.plot_item.layout.addItem(rest_axis, 1, 1)
+                rest_axis.linkToView(self.plot_item.vb)
+                rest_axis.set_redshift(self.overlay_redshift)
+                self._rest_axis = rest_axis
+        except Exception:
+            self._rest_axis = None
         
         # Disable plot mouse interaction to prevent spectrum movement during drag
         self.plot_widget.setMouseEnabled(x=False, y=False)
@@ -262,6 +299,12 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
         self.overlay_active = active
         self.selected_line = selected_line
         self._update_overlay_lines()
+        # Keep top axis redshift in sync
+        try:
+            if self._rest_axis is not None:
+                self._rest_axis.set_redshift(self.overlay_redshift)
+        except Exception:
+            pass
     
     def _update_overlay_lines(self):
         """Update overlay lines display - lines MOVE to redshifted positions"""
@@ -369,6 +412,12 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
         # Update overlay lines to new redshifted positions
         if self.overlay_active:
             self._update_overlay_lines()
+        # Update the top axis in real time
+        try:
+            if self._rest_axis is not None:
+                self._rest_axis.set_redshift(self.overlay_redshift)
+        except Exception:
+            pass
         
         # Call callback if set
         if self.redshift_changed_callback:
@@ -377,6 +426,11 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
     def set_redshift(self, redshift):
         """Set the redshift value and update line positions accordingly"""
         self.overlay_redshift = max(0.0, min(1.0, redshift))
+        try:
+            if self._rest_axis is not None:
+                self._rest_axis.set_redshift(self.overlay_redshift)
+        except Exception:
+            pass
         
         # Keep spectrum at original wavelengths - DO NOT shift the spectrum
         # The lines will move instead when _update_overlay_lines() is called

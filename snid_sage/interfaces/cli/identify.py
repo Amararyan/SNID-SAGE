@@ -319,6 +319,11 @@ Examples:
         action="store_true",
         help="Disable progress bar/output (auto-disabled when stdout is not a TTY)"
     )
+    display_group.add_argument(
+        "--progress",
+        action="store_true",
+        help="Show progress bar during analysis (disabled by default)"
+    )
 
     # Plot control: default is to save plots; allow disabling
     output_group.add_argument(
@@ -728,7 +733,9 @@ def _validate_and_fix_templates_dir(templates_dir: Optional[str]) -> str:
         try:
             from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
             auto_found_dir = find_templates_directory_or_raise()
-            print(f"[SUCCESS] Auto-discovered templates at: {auto_found_dir}")
+            logging.getLogger('snid_sage.snid.identify').info(
+                f"Auto-discovered templates at: {auto_found_dir}"
+            )
             return str(auto_found_dir)
         except (ImportError, FileNotFoundError):
             raise FileNotFoundError(
@@ -743,8 +750,12 @@ def _validate_and_fix_templates_dir(templates_dir: Optional[str]) -> str:
     try:
         from snid_sage.shared.utils.simple_template_finder import find_templates_directory_or_raise
         auto_found_dir = find_templates_directory_or_raise()
-        print(f"⚠️  Templates directory '{templates_dir}' not found.")
-        print(f"✅ Auto-discovered templates at: {auto_found_dir}")
+        logging.getLogger('snid_sage.snid.identify').warning(
+            f"Templates directory '{templates_dir}' not found"
+        )
+        logging.getLogger('snid_sage.snid.identify').info(
+            f"Auto-discovered templates at: {auto_found_dir}"
+        )
         return str(auto_found_dir)
     except (ImportError, FileNotFoundError):
         # Fallback failed
@@ -814,14 +825,9 @@ def main(args: argparse.Namespace) -> int:
         if args.age_min is not None or args.age_max is not None:
             age_range = (args.age_min, args.age_max)
         
-        # Create progress indicator - show only when not verbose/quiet, not disabled and TTY
+        # Create progress indicator - show only when --progress given, not quiet, and TTY
         is_tty = sys.stdout.isatty()
-        if getattr(args, 'verbose', False) or is_quiet or getattr(args, 'no_progress', False) or not is_tty:
-            # Verbose mode: no progress bar (relies on detailed logging)
-            progress_callback = None
-        else:
-            # Default: show nice progress bar for all modes (minimal, normal, complete)
-            print("Starting SNID analysis...")
+        if getattr(args, 'progress', False) and (not is_quiet) and (not getattr(args, 'no_progress', False)) and is_tty:
             progress_indicator = CLIProgressIndicator(total_templates=0, show_bar=True)
             
             def progress_callback(message: str, template_count: Optional[int] = None):
@@ -853,6 +859,8 @@ def main(args: argparse.Namespace) -> int:
                         progress_indicator.update(message)
                 else:
                     progress_indicator.update(message)
+        else:
+            progress_callback = None
         
         # Determine output directory from CLI arg or unified config
         if not args.output_dir:
@@ -887,7 +895,7 @@ def main(args: argparse.Namespace) -> int:
         )
         
         # Finish progress indicator
-        if not args.verbose and not is_quiet:
+        if getattr(args, 'progress', False) and not args.verbose and not is_quiet:
             if result and result.success:
                 progress_indicator.finish("Analysis complete")
             else:
@@ -997,17 +1005,19 @@ def main(args: argparse.Namespace) -> int:
                 try:
                     from snid_sage.shared.utils.results_formatter import create_unified_formatter
                     formatter = create_unified_formatter(result, spectrum_name, args.spectrum_path)
-                    print("\n" + "="*80)
-                    print(formatter.get_display_summary())
-                    print("="*80)
+                    if args.verbose:
+                        print("\n" + "="*80)
+                        print(formatter.get_display_summary())
+                        print("="*80)
+                    else:
+                        print(formatter.get_cli_one_line_summary())
                 except ImportError:
-                    print(f"\n{spectrum_name}: {result.consensus_type} z={result.redshift:.6f} RLAP={result.rlap:.1f}")
-                    print("-"*80)
+                    print(f"{spectrum_name}: {result.consensus_type} z={result.redshift:.6f} RLAP={result.rlap:.1f}")
             
 
             
-            # Show what was created
-            if not is_quiet:
+            # Show what was created (only in verbose mode)
+            if not is_quiet and args.verbose:
                 if not args.minimal:
                     print(f"\nResults saved to: {args.output_dir}/")
                     if args.complete:

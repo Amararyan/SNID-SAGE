@@ -34,6 +34,52 @@ except Exception:
     ENHANCED_BUTTONS_AVAILABLE = False
 
 
+class _ChatInput(QtWidgets.QTextEdit):
+    """Text edit that captures Cmd/Ctrl+Enter to send chat messages.
+
+    This prevents application-wide shortcuts (e.g., quick workflow) from
+    intercepting the key combo while the user is typing in the chat box.
+    """
+
+    def __init__(self, send_callback, parent=None):
+        super().__init__(parent)
+        self._send_callback = send_callback
+        # Strong focus to ensure we receive key events while typing
+        try:
+            self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        except Exception:
+            pass
+
+    def event(self, event: QtCore.QEvent) -> bool:
+        """Intercept shortcut override so app-wide shortcuts don't fire."""
+        try:
+            if event.type() == QtCore.QEvent.ShortcutOverride:
+                key_event = event  # type: ignore[assignment]
+                if isinstance(key_event, QtGui.QKeyEvent):
+                    modifiers = key_event.modifiers()
+                    is_ctrl_or_cmd = bool(modifiers & QtCore.Qt.ControlModifier) or bool(modifiers & QtCore.Qt.MetaModifier)
+                    if is_ctrl_or_cmd and key_event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                        event.accept()
+                        return True
+        except Exception:
+            pass
+        return super().event(event)
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent):
+        try:
+            modifiers = event.modifiers()
+            is_ctrl_or_cmd = bool(modifiers & QtCore.Qt.ControlModifier) or bool(modifiers & QtCore.Qt.MetaModifier)
+            if is_ctrl_or_cmd and event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                # Trigger send and consume the event so global shortcuts do not fire
+                self._send_callback()
+                event.accept()
+                return
+        except Exception:
+            # Fall through to default handling on any error
+            pass
+        super().keyPressEvent(event)
+
+
 class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     """
     Enhanced AI Assistant Dialog with simplified interface.
@@ -421,6 +467,8 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
     def _create_chat_tab(self):
         """Create interactive chat tab"""
         chat_widget = QtWidgets.QWidget()
+        # Keep a reference for tab visibility checks
+        self._chat_tab_widget = chat_widget
         layout = QtWidgets.QVBoxLayout(chat_widget)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
@@ -445,7 +493,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         layout.addWidget(self.chat_history)
         
         # Input area - simplified, no group box
-        self.chat_input = QtWidgets.QTextEdit()
+        self.chat_input = _ChatInput(self._send_chat_message)
         self.chat_input.setMaximumHeight(70)
         self.chat_input.setPlaceholderText("Type your question here...")
         layout.addWidget(self.chat_input)
@@ -455,15 +503,36 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             from snid_sage.interfaces.gui.utils.cross_platform_window import (
                 CrossPlatformWindowManager as CPW,
             )
+            # Keep Python references to avoid shortcut objects being garbage collected
+            self._chat_shortcuts = []
             for combo in ("Ctrl+Return", "Ctrl+Enter"):
                 sc = CPW.create_shortcut(self.chat_input, combo, self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
-                # Avoid linter complaining about unused variable in some environments
-                _ = sc
+                if sc is not None:
+                    self._chat_shortcuts.append(sc)
             # Be explicit on macOS with Meta token as some Qt builds differ
             try:
                 if CPW.is_macos():
-                    _ = CPW.create_shortcut(self.chat_input, "Meta+Return", self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
-                    _ = CPW.create_shortcut(self.chat_input, "Meta+Enter", self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
+                    sc1 = CPW.create_shortcut(self.chat_input, "Meta+Return", self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
+                    sc2 = CPW.create_shortcut(self.chat_input, "Meta+Enter", self._send_chat_message, context=QtCore.Qt.WidgetWithChildrenShortcut)
+                    for _sc in (sc1, sc2):
+                        if _sc is not None:
+                            self._chat_shortcuts.append(_sc)
+            except Exception:
+                pass
+
+            # Additional safety: register application-level shortcuts that only fire when chat input has focus
+            self._chat_app_shortcuts = []
+            for combo in ("Ctrl+Return", "Ctrl+Enter"):
+                sca = CPW.create_shortcut(self, combo, self._on_chat_send_shortcut, context=QtCore.Qt.ApplicationShortcut)
+                if sca is not None:
+                    self._chat_app_shortcuts.append(sca)
+            try:
+                if CPW.is_macos():
+                    sca1 = CPW.create_shortcut(self, "Meta+Return", self._on_chat_send_shortcut, context=QtCore.Qt.ApplicationShortcut)
+                    sca2 = CPW.create_shortcut(self, "Meta+Enter", self._on_chat_send_shortcut, context=QtCore.Qt.ApplicationShortcut)
+                    for _sc in (sca1, sca2):
+                        if _sc is not None:
+                            self._chat_app_shortcuts.append(_sc)
             except Exception:
                 pass
         except Exception:
@@ -487,6 +556,17 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
         layout.addLayout(send_layout)
         
         self.tab_widget.addTab(chat_widget, "💬 Chat")
+
+    def _on_chat_send_shortcut(self):
+        """Application-level shortcut handler that only sends when chat has focus."""
+        try:
+            # Only allow when chat tab is active and input has focus
+            if getattr(self, 'tab_widget', None) is not None and self.tab_widget.currentWidget() is getattr(self, '_chat_tab_widget', None):
+                if self.chat_input.hasFocus():
+                    self._send_chat_message()
+        except Exception:
+            # Best-effort; ignore errors
+            pass
     
     def _create_settings_tab(self):
         """Create AI settings configuration tab"""
@@ -606,7 +686,7 @@ class PySide6EnhancedAIAssistantDialog(QtWidgets.QDialog):
             "Model Name", "Provider", "Context", "Price", "Status"
         ])
         self.model_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.model_table.setAlternatingRowColors(True)
+        self.model_table.setAlternatingRowColors(False)
         self.model_table.setSortingEnabled(True)
         # Let the table expand to fill vertical space
         self.model_table.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)

@@ -82,22 +82,47 @@ class CrossPlatformWindowManager:
         """Create and return a QShortcut using a platform-aware combo.
 
         The combo should be provided using 'Ctrl' as the logical modifier. On macOS,
-        it will be automatically converted to use the Command key. Optionally, a
-        Qt shortcut context can be provided (e.g., QtCore.Qt.ApplicationShortcut).
+        it will be automatically converted to use the Command key. To be robust
+        across different Qt builds and app attributes on macOS, we also register
+        a fallback shortcut variant. Optionally, a Qt shortcut context can be
+        provided (e.g., QtCore.Qt.ApplicationShortcut).
 
         Returns None if Qt is not available.
         """
         if QtGui is None:
             return None
+        # Primary (platform-aware) shortcut
         sequence = CrossPlatformWindowManager.make_sequence(combo)
-        shortcut = QtGui.QShortcut(sequence, parent, callback)
+        shortcut_primary = QtGui.QShortcut(sequence, parent, callback)
         try:
             if context is not None and QtCore is not None:
-                shortcut.setContext(context)
+                shortcut_primary.setContext(context)
         except Exception:
-            # Context setting is best-effort; ignore if not available
             pass
-        return shortcut
+
+        # On macOS, also register a fallback variant without token replacement.
+        # This covers environments where Qt does not swap Ctrl/Meta automatically
+        # (e.g., AA_MacDontSwapCtrlAndMeta in effect) or differs in parsing.
+        try:
+            if CrossPlatformWindowManager.is_macos():
+                fallback_seq_text = combo
+                fallback_seq = QtGui.QKeySequence(fallback_seq_text)
+                fallback_shortcut = QtGui.QShortcut(fallback_seq, parent, callback)
+                if context is not None and QtCore is not None:
+                    fallback_shortcut.setContext(context)
+                # Additionally, if the logical combo used 'Ctrl', explicitly try a
+                # 'Meta' textual variant to catch Qt builds that prefer explicit Meta.
+                if 'Ctrl' in combo:
+                    meta_text = CrossPlatformWindowManager._replace_ctrl_token(combo, 'Meta')
+                    meta_seq = QtGui.QKeySequence(meta_text)
+                    meta_shortcut = QtGui.QShortcut(meta_seq, parent, callback)
+                    if context is not None and QtCore is not None:
+                        meta_shortcut.setContext(context)
+        except Exception:
+            # Best-effort: if any variant fails, keep the primary
+            pass
+
+        return shortcut_primary
 
     @staticmethod
     def standard_shortcut(parent, standard_key: "QtGui.QKeySequence.StandardKey", callback) -> Optional["QtGui.QShortcut"]:  # type: ignore[name-defined]

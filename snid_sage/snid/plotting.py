@@ -331,7 +331,12 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
             # Create a secondary x-axis for rest wavelength
             ax_top_twin = ax_top.twiny()
             ax_top_twin.set_xlim([x/(1+z_template) for x in ax_top.get_xlim()])
-            ax_top_twin.set_xlabel('Rest Wavelength (Å)')
+            ax_top_twin.set_xlabel('Rest Wavelength (Å)', labelpad=6)
+            # Hide top tick labels for a cleaner edge-only look if desired
+            try:
+                ax_top_twin.tick_params(axis='x', labeltop=True)
+            except Exception:
+                pass
         else:
             # Fallback method if spectral data not available
             if ('wave' in original_template_data and 'flux' in original_template_data and 
@@ -354,16 +359,26 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
                     
                     ax_top_twin = ax_top.twiny()
                     ax_top_twin.set_xlim([x/(1+z_template) for x in ax_top.get_xlim()])
-                    ax_top_twin.set_xlabel('Rest Wavelength (Å)')
+                    ax_top_twin.set_xlabel('Rest Wavelength (Å)', labelpad=6)
+                    try:
+                        ax_top_twin.tick_params(axis='x', labeltop=True)
+                    except Exception:
+                        pass
                     
     except Exception as e:
         print(f"Warning: Template plotting failed: {e}")
     
-    ax_top.set_xlabel('Observed Wavelength (Å)')
+    ax_top.set_xlabel('Obs. Wavel.')
     ax_top.set_ylabel('Flux')
     ax_top.set_title('Original Spectra')
     ax_top.legend(loc='upper right')
     ax_top.grid(True, alpha=0.3)
+    # Show right spine edge-only (no ticks/labels)
+    try:
+        ax_top.spines['right'].set_visible(True)
+        ax_top.tick_params(axis='y', right=False, labelright=False)
+    except Exception:
+        pass
     
     # Bottom panel - Flattened spectra
     ax_bottom = axs[1, 0]
@@ -389,6 +404,12 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
     ax_bottom.set_title('Flattened Spectra')
     ax_bottom.legend()
     ax_bottom.grid(True, alpha=0.3)
+    # Right spine edge-only for consistency
+    try:
+        ax_bottom.spines['right'].set_visible(True)
+        ax_bottom.tick_params(axis='y', right=False, labelright=False)
+    except Exception:
+        pass
     
     # Cross-correlation function (top right) - Show both before and after trimming
     ax_corr = axs[0, 1]
@@ -423,6 +444,11 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
         ax_corr.set_title('Cross-correlation')
         ax_corr.grid(True, alpha=0.3)
         ax_corr.legend(fontsize=PLOT_LEGEND_FONTSIZE)
+        try:
+            ax_corr.spines['right'].set_visible(True)
+            ax_corr.tick_params(axis='y', right=False, labelright=False)
+        except Exception:
+            pass
         
     else:
         # Fallback message if no correlation data available
@@ -1452,7 +1478,31 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
                ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, transform=ax.transAxes,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8))
     
-    # Match GUI: no secondary x-axis in overlay plot
+    # Add rest-wavelength top axis using the match redshift
+    try:
+        if z_template is not None and np.isfinite(z_template) and (1.0 + z_template) != 0.0:
+            try:
+                # Prefer modern secondary axis API for correct tick mapping
+                secax = ax.secondary_xaxis(
+                    'top',
+                    functions=(
+                        lambda x: x / (1.0 + z_template),
+                        lambda r: r * (1.0 + z_template),
+                    ),
+                )
+                secax.set_xlabel('Rest Wavelength (Å)', labelpad=6)
+            except Exception:
+                # Fallback to twiny if secondary_xaxis is unavailable
+                ax_top = ax.twiny()
+                x0, x1 = ax.get_xlim()
+                ax_top.set_xlim(x0 / (1.0 + z_template), x1 / (1.0 + z_template))
+                ax_top.set_xlabel('Rest Wavelength (Å)', labelpad=6)
+                try:
+                    ax_top.tick_params(axis='x', labeltop=True)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     
     # Add template metadata annotation
     # Match GUI overlay info box (top-right, white background, black border)
@@ -1480,9 +1530,9 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
             bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor='black', alpha=0.8))
     
     # Format plot (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Wavelength (Å)", "Flux", theme_manager):
+    if not _apply_no_title_styling_if_available(fig, ax, "Obs. Wavelength (Å)", "Flux", theme_manager):
         # Fallback styling if unified systems not available
-        ax.set_xlabel('Wavelength (Å)')
+        ax.set_xlabel('Obs. Wavelength (Å)')
         ax.set_ylabel('Flux')
         _apply_faint_grid(ax, theme_manager)
     
@@ -1665,6 +1715,30 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
                ha='center', va='center', fontsize=PLOT_STATUS_FONTSIZE, transform=ax.transAxes,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8))
     
+    # Add rest-wavelength top axis using the match redshift
+    try:
+        if z_template is not None and np.isfinite(z_template) and (1.0 + z_template) != 0.0:
+            try:
+                secax = ax.secondary_xaxis(
+                    'top',
+                    functions=(
+                        lambda x: x / (1.0 + z_template),
+                        lambda r: r * (1.0 + z_template),
+                    ),
+                )
+                secax.set_xlabel('Rest Wavelength (Å)', labelpad=6)
+            except Exception:
+                ax_top = ax.twiny()
+                x0, x1 = ax.get_xlim()
+                ax_top.set_xlim(x0 / (1.0 + z_template), x1 / (1.0 + z_template))
+                ax_top.set_xlabel('Rest Wavelength (Å)', labelpad=6)
+                try:
+                    ax_top.tick_params(axis='x', labeltop=True)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     # Add template metadata annotation
     # Match GUI overlay info box (top-right, white background, black border)
     template_info_lines = []
@@ -1691,9 +1765,9 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
             bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor='black', alpha=0.8))
     
     # Format plot (no title per user requirement)
-    if not _apply_no_title_styling_if_available(fig, ax, "Wavelength (Å)", "Flattened Flux", theme_manager):
+    if not _apply_no_title_styling_if_available(fig, ax, "Obs. Wavelength (Å)", "Flattened Flux", theme_manager):
         # Fallback styling if unified systems not available
-        ax.set_xlabel('Wavelength (Å)')
+        ax.set_xlabel('Obs. Wavelength (Å)')
         ax.set_ylabel('Flattened Flux')
         _apply_faint_grid(ax, theme_manager)
     

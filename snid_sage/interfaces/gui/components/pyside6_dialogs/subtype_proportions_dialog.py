@@ -215,7 +215,7 @@ class PySide6SubtypeProportionsDialog(QtWidgets.QDialog):
             "Subtype", "Count", "Percentage", "Avg RLAP", "Avg Redshift"
         ])
         self.stats_table.horizontalHeader().setStretchLastSection(True)
-        self.stats_table.setAlternatingRowColors(True)
+        self.stats_table.setAlternatingRowColors(False)
         self.stats_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         info_layout.addWidget(self.stats_table)
         

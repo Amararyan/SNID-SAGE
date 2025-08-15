@@ -23,6 +23,14 @@ except ImportError:
     pg = None
     EnhancedPlotWidget = None
 
+# Optional rest wavelength top axis support
+try:
+    from snid_sage.interfaces.gui.utils.pyqtgraph_rest_axis import RestWavelengthAxisItem
+    _REST_AXIS_AVAILABLE = True
+except Exception:
+    _REST_AXIS_AVAILABLE = False
+    RestWavelengthAxisItem = None  # type: ignore
+
 # Import logging
 try:
     from snid_sage.shared.utils.logging import get_logger
@@ -278,9 +286,19 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.plot_item = self.plot_widget.getPlotItem()
             
             self.plot_widget.setLabel('left', 'Flux')
-            self.plot_widget.setLabel('bottom', 'Wavelength (Å)')
+            self.plot_widget.setLabel('bottom', 'Obs. Wavelength (Å)')
             self.plot_widget.setMinimumWidth(600)
             self.plot_widget.setMinimumHeight(400)
+            # Show right axis (no label) and style
+            try:
+                self.plot_item.showAxis('right')
+                ra = self.plot_item.getAxis('right')
+                if ra:
+                    ra.setTextPen('black')
+                    ra.setPen('black')
+                    ra.setStyle(showValues=False)
+            except Exception:
+                pass
 
             # Enable subtle grid matching main GUI style
             try:
@@ -312,6 +330,24 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.plot_widget.setFocusPolicy(QtCore.Qt.ClickFocus)
             
             plot_frame_layout.addWidget(self.plot_widget)
+            # Attach rest wavelength top axis if available and set initial redshift
+            try:
+                if _REST_AXIS_AVAILABLE:
+                    rest_axis = RestWavelengthAxisItem('top')  # type: ignore
+                    try:
+                        top_axis = self.plot_item.getAxis('top')
+                        if top_axis is not None:
+                            self.plot_item.layout.removeItem(top_axis)
+                    except Exception:
+                        pass
+                    self.plot_item.layout.addItem(rest_axis, 1, 1)
+                    rest_axis.linkToView(self.plot_item.vb)
+                    # Initial z: prefer host_redshift (galaxy) for emission dialog; SN lines use effective internally
+                    z0 = float(getattr(self, 'host_redshift', 0.0) or 0.0)
+                    rest_axis.set_redshift(z0)
+                    self._rest_axis = rest_axis
+            except Exception:
+                self._rest_axis = None
         else:
             # Fallback
             placeholder = QtWidgets.QLabel("PyQtGraph not available")
@@ -365,12 +401,23 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         self.host_redshift = value
         self._update_redshift_displays()
         self._update_all_lines()
+        try:
+            if hasattr(self, '_rest_axis') and self._rest_axis is not None:
+                self._rest_axis.set_redshift(float(self.host_redshift or 0.0))
+        except Exception:
+            pass
     
     def _on_velocity_changed(self, value):
         """Handle velocity change"""
         self.velocity_shift = value
         self._update_redshift_displays()
         self._update_all_lines()
+        # Velocity affects SN lines only; keep top axis tied to host redshift for consistency
+        try:
+            if hasattr(self, '_rest_axis') and self._rest_axis is not None:
+                self._rest_axis.set_redshift(float(self.host_redshift or 0.0))
+        except Exception:
+            pass
     
     def _update_redshift_displays(self):
         """Update redshift display labels"""
@@ -1610,8 +1657,10 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     def _get_effective_sn_redshift(self):
         """Calculate effective SN redshift including velocity effect"""
         c_km_s = 299792.458  # Speed of light in km/s
+        # Positive ejecta velocity (expansion toward observer) should BLUESHIFT lines
+        # so it reduces the observed redshift relative to the host
         velocity_redshift_shift = self.velocity_shift / c_km_s
-        effective_sn_redshift = self.host_redshift + velocity_redshift_shift
+        effective_sn_redshift = self.host_redshift - velocity_redshift_shift
         return max(0.0, effective_sn_redshift)  # Ensure non-negative
 
     def _show_interaction_help(self):
@@ -1657,7 +1706,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
         help_text = f"""Step 2: Emission Line Analysis Help
 
 🎯 GOAL OF STEP 2:
-Analyze individual emission lines in detail using manual point selection to measure line properties like FWHM and line centers.
+Analyze individual emission lines in detail using manual point selection to measure line properties like velocity (from line width) and line centers.
 
 ⌨️ KEYBOARD & MOUSE INTERACTIONS:
 • Left Click: Add point snapped to the nearest spectrum bin
@@ -1684,7 +1733,7 @@ Analyze individual emission lines in detail using manual point selection to meas
 5. Repeat for other lines or export final results
 
 📊 RESULTS INCLUDE (minimal per line):
-• Line name, observed λ, and FWHM when available
+• Line name, observed λ, and velocity (km/s) when available
 """
         
         msg = QtWidgets.QMessageBox(self)

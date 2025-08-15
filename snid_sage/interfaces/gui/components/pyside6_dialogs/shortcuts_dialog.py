@@ -40,6 +40,12 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
             self.shortcuts = self._get_default_shortcuts()
         
         self.setup_ui()
+        # Ensure consistent cross-platform theming for table colors
+        try:
+            from snid_sage.interfaces.gui.utils.pyside6_theme_manager import apply_theme_to_widget
+            apply_theme_to_widget(self)
+        except Exception:
+            pass
     
     def _get_default_shortcuts(self):
         """Get default shortcuts if cross-platform manager unavailable"""
@@ -188,8 +194,8 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
         table.setHorizontalHeaderLabels(["Action", "Shortcut", "Description"])
         table.setRowCount(len(category_data["shortcuts"]))
         
-        # Configure table appearance
-        table.setAlternatingRowColors(True)
+        # Configure table appearance (no alternating row colors)
+        table.setAlternatingRowColors(False)
         table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         table.verticalHeader().setVisible(False)

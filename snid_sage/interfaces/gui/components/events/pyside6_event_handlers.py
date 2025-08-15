@@ -248,52 +248,50 @@ class PySide6EventHandlers(QtCore.QObject):
             )
             
             if file_path:
-                self.main_window.status_label.setText(f"Loading: {Path(file_path).name}")
-                self.main_window.file_status_label.setText(f"File: {Path(file_path).name}")
-                
-                # Try to load the spectrum data using app controller
-                if self.app_controller.load_spectrum_file(file_path):
-                    # Reset preprocessing status for new file
-                    self.main_window.preprocess_status_label.setText("Preprocessing not run")
-                    self.main_window.preprocess_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
-                    
-                    # CRITICAL: Ensure FILE_LOADED state is processed immediately
-                    # Force call our own _update_workflow_state to make sure Flux button becomes blue
-                    from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
-                    _LOGGER.info("🔧 FORCE CALLING: _update_workflow_state(FILE_LOADED) to ensure Flux button becomes blue")
-                    self.main_window._update_workflow_state(WorkflowState.FILE_LOADED)
-                    
-                    # Plot the loaded spectrum
-                    self.main_window.plot_manager.plot_spectrum(self.main_window.current_view)
-                    self.main_window.status_label.setText(f"Loaded: {Path(file_path).name}")
-                    
-                    # CRITICAL: Re-apply button states after plotting to ensure visual appearance
-                    # Sometimes the plotting operation can interfere with button styling
-                    _LOGGER.info("🔧 RE-APPLYING: Button states after plotting to ensure Flux button stays blue")
-                    self.main_window.unified_layout_manager.update_flux_flat_button_states(
-                        self.main_window,
-                        flux_active=True,    # Flux becomes active (blue)
-                        flat_active=False,   # Flat stays inactive
-                        flux_enabled=True,   # Flux becomes enabled
-                        flat_enabled=False   # Flat stays disabled until preprocessing
-                    )
-                    
-                    # Update file status label
-                    self.main_window.file_status_label.setText(f"File: {Path(file_path).name}")
-                    self.main_window.file_status_label.setStyleSheet("font-style: italic; color: #059669; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
-                    
-                    _LOGGER.info(f"Spectrum file loaded successfully: {file_path}")
-                else:
-                    self.main_window.status_label.setText(f"Error loading file")
-                    # Show error message
-                    QtWidgets.QMessageBox.warning(
-                        self.main_window, 
-                        "File Loading Error", 
-                        f"Could not load spectrum file."
-                    )
+                self.handle_open_spectrum_file(file_path)
                     
         except Exception as e:
             _LOGGER.error(f"Error handling file browse: {e}")
+
+    def handle_open_spectrum_file(self, file_path: str):
+        """Common handler to load a spectrum file path and update UI/state."""
+        try:
+            if not file_path:
+                return
+            self.main_window.status_label.setText(f"Loading: {Path(file_path).name}")
+            self.main_window.file_status_label.setText(f"File: {Path(file_path).name}")
+            # Try to load the spectrum data using app controller
+            if self.app_controller.load_spectrum_file(file_path):
+                # Reset preprocessing status for new file
+                self.main_window.preprocess_status_label.setText("Preprocessing not run")
+                self.main_window.preprocess_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
+                # Ensure FILE_LOADED state is processed immediately
+                from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
+                self.main_window._update_workflow_state(WorkflowState.FILE_LOADED)
+                # Plot the loaded spectrum
+                self.main_window.plot_manager.plot_spectrum(self.main_window.current_view)
+                self.main_window.status_label.setText(f"Loaded: {Path(file_path).name}")
+                # Re-apply button states after plotting
+                self.main_window.unified_layout_manager.update_flux_flat_button_states(
+                    self.main_window,
+                    flux_active=True,
+                    flat_active=False,
+                    flux_enabled=True,
+                    flat_enabled=False
+                )
+                # Update file status label
+                self.main_window.file_status_label.setText(f"File: {Path(file_path).name}")
+                self.main_window.file_status_label.setStyleSheet("font-style: italic; color: #059669; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
+                _LOGGER.info(f"Spectrum file loaded successfully: {file_path}")
+            else:
+                self.main_window.status_label.setText("Error loading file")
+                QtWidgets.QMessageBox.warning(
+                    self.main_window,
+                    "File Loading Error",
+                    "Could not load spectrum file."
+                )
+        except Exception as e:
+            _LOGGER.error(f"Error handling open spectrum file: {e}")
     
     def on_open_preprocessing_dialog(self):
         """Handle opening preprocessing dialog"""

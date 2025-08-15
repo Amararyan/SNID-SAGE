@@ -18,6 +18,22 @@ All notable changes to SNID SAGE will be documented in this file.
 
 ---
 
+## [0.5.0] - 2025-08-15
+
+### 🎉 First Fully Stable Release
+
+This release marks SNID SAGE's transition to a fully stable, production-ready application.
+
+### Added
+- REST and observed wavelength axes support (GUI and CLI)
+
+### Fixed
+- Resolved all known bugs and edge cases
+
+### Notes
+- **This is the first release officially recommended for production use**
+
+
 ## [0.4.1] - 2025-08-14
 
 ### Added

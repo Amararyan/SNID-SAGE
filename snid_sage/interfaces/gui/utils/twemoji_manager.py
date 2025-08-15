@@ -183,7 +183,9 @@ class TwemojiManager:
         """Return packaged SVG path if available inside snid_sage.images.twemoji."""
         try:
             # Prefer importlib.resources to work for both source and wheels
-            with resources.as_file(resources.files('snid_sage.images') / 'twemoji' / f'{codepoint}.svg') as svg_path:
+            # Use the root package ('snid_sage') to traverse into the 'images/twemoji' directory.
+            # This works even if 'images' is not a Python package.
+            with resources.as_file(resources.files('snid_sage') / 'images' / 'twemoji' / f'{codepoint}.svg') as svg_path:
                 if svg_path.exists():
                     return svg_path
         except Exception as exc:

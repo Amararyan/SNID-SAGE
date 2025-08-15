@@ -219,18 +219,37 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 self.template_data._create_mock_data()
             
     def _find_storage_file(self, storage_file: str) -> Optional[str]:
-        """Find the full path to a storage file"""
-        possible_paths = [
+        """Find the full path to a storage file (packaged or user)."""
+        # 1) Packaged templates directory via importlib.resources
+        try:
+            from importlib import resources
+            with resources.as_file(resources.files('snid_sage') / 'templates' / storage_file) as p:
+                if p.exists():
+                    _LOGGER.info(f"Found storage file at: {p}")
+                    return str(p)
+        except Exception:
+            pass
+
+        # 2) User templates directory resolved by TemplateService
+        try:
+            from snid_sage.interfaces.template_manager.services.template_service import _USER_DIR  # type: ignore
+            candidate = _USER_DIR / storage_file
+            if candidate.exists():
+                _LOGGER.info(f"Found storage file at: {candidate}")
+                return str(candidate)
+        except Exception:
+            pass
+
+        # 3) Legacy fallbacks
+        for path in [
             os.path.join("snid_sage", "templates", storage_file),
             os.path.join("templates", storage_file),
-            storage_file
-        ]
-        
-        for path in possible_paths:
+            storage_file,
+        ]:
             if os.path.exists(path):
                 _LOGGER.info(f"Found storage file at: {path}")
                 return path
-        
+
         _LOGGER.warning(f"Storage file {storage_file} not found in any of the expected locations")
         return None
         

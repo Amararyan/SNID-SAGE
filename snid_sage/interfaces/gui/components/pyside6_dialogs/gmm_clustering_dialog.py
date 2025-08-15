@@ -183,7 +183,6 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
                 border: 2px solid {self.colors['border']};
                 border-radius: 6px;
                 background: {self.colors['panel_bg']};
-                alternate-background-color: #f1f5f9;
                 selection-background-color: {self.colors['accent']};
                 gridline-color: {self.colors['border']};
             }}
@@ -337,7 +336,7 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
         table_layout = QtWidgets.QVBoxLayout(table_group)
         
         self.cluster_table = QtWidgets.QTableWidget()
-        self.cluster_table.setAlternatingRowColors(True)
+        self.cluster_table.setAlternatingRowColors(False)
         self.cluster_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         
         # Set up table columns

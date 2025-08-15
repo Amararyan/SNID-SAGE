@@ -498,6 +498,29 @@ class PySide6ThemeManager:
             border: 1px solid {colors['border']};
             gridline-color: {colors['border']};
             color: {colors['text_primary']};
+            selection-background-color: {colors['accent_primary']};
+            selection-color: {colors['text_on_accent']};
+        }}
+
+        /* Ensure consistent selection across platforms */
+        QTableWidget::item:selected {{
+            background: {colors['accent_primary']};
+            color: {colors['text_on_accent']};
+        }}
+
+        /* Apply same rules to QTableView in case it is used */
+        QTableView {{
+            background: {colors['bg_secondary']};
+            border: 1px solid {colors['border']};
+            gridline-color: {colors['border']};
+            color: {colors['text_primary']};
+            selection-background-color: {colors['accent_primary']};
+            selection-color: {colors['text_on_accent']};
+        }}
+
+        QTableView::item:selected {{
+            background: {colors['accent_primary']};
+            color: {colors['text_on_accent']};
         }}
         
         QListWidget {{
