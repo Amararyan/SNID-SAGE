@@ -111,4 +111,4 @@ The AI Assistant gets your SNID analysis results including:
 3. **Customize**: Configure preferred models and settings
 4. **Integration**: Incorporate AI analysis into your workflow
 
-For detailed AI analysis options, see [Analysis Types](analysis-types.md). 
+ 

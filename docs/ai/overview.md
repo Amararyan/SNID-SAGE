@@ -168,5 +168,4 @@ Available in the AI dialog:
 ## Related Documentation
 
 - [OpenRouter Setup](openrouter-setup.md) - Detailed OpenRouter configuration
-- [Analysis Types](analysis-types.md) - Different AI analysis options
 - [GUI Interface](../gui/interface-overview.md) - Using the GUI for AI features 

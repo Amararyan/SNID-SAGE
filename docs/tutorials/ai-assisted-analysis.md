@@ -143,7 +143,6 @@ python run_snid_cli.py config set ai.enable_caching true
 ## Related Documentation
 
 - [AI Overview](../ai/overview.md) - Complete AI capabilities guide
-- [Analysis Types](../ai/analysis-types.md) - Detailed analysis explanations
 - [OpenRouter Setup](../ai/openrouter-setup.md) - Configuration guide
 - [GUI Interface](../gui/interface-overview.md) - Using the GUI
 

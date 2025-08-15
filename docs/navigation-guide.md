@@ -23,7 +23,6 @@ Use these short paths. No deep trees, no duplicate links.
 ## AI
 - Overview: `ai/overview.md`
 - Setup: `ai/openrouter-setup.md`
-- What it can analyze: `ai/analysis-types.md`
 
 ## Help
 - Troubleshooting: `reference/troubleshooting.md`
