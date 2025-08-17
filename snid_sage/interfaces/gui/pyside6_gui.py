@@ -2005,6 +2005,8 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
             <li>{mod}+O : Load spectrum file</li>
             <li>{mod}+R : Run analysis</li>
             <li>{mod}+, : Open settings</li>
+            <li>{mod}+S : Save plot (PNG/JPG)</li>
+            <li>{mod}+Shift+S : Save plot (SVG)</li>
             </ul>
             <p><b>Note:</b></p>
             <ul>

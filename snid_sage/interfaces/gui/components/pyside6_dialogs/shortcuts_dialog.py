@@ -133,7 +133,9 @@ class PySide6ShortcutsDialog(QtWidgets.QDialog):
                     {"action": "SNID Configuration", "shortcut": f"{mod_key}+Shift+O", "description": "Configure SNID parameters"},
                     {"action": "Run Analysis", "shortcut": "F5", "description": "Run SNID analysis"},
                     {"action": "Preprocessing", "shortcut": "F6", "description": "Open Preprocessing dialog"},
-                    {"action": "Settings", "shortcut": f"{mod_key}+,", "description": "Open application settings"}
+                    {"action": "Settings", "shortcut": f"{mod_key}+,", "description": "Open application settings"},
+                    {"action": "Save Plot (PNG/JPG)", "shortcut": f"{mod_key}+S", "description": "Save the current plot as PNG/JPG"},
+                    {"action": "Save Plot (SVG)", "shortcut": f"{mod_key}+Shift+S", "description": "Save the current plot as SVG"}
                 ]
             },
             {

@@ -330,6 +330,12 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             self.plot_widget.setFocusPolicy(QtCore.Qt.ClickFocus)
             
             plot_frame_layout.addWidget(self.plot_widget)
+            # Always show the save icon for this dialog's plot
+            try:
+                if hasattr(self.plot_widget, 'show_save_button'):
+                    self.plot_widget.show_save_button()
+            except Exception:
+                pass
             # Attach rest wavelength top axis if available and set initial redshift
             try:
                 if _REST_AXIS_AVAILABLE:
@@ -577,6 +583,13 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             # Plot galaxy lines
             for line_name, (obs_wavelength, line_data) in self.galaxy_lines.items():
                 self._add_line_marker(obs_wavelength, line_name, 'blue', 'Galaxy')
+
+            # Ensure the save button is visible (always on in this dialog)
+            try:
+                if hasattr(self.plot_widget, 'show_save_button'):
+                    self.plot_widget.show_save_button()
+            except Exception:
+                pass
                 
         except Exception as e:
             _LOGGER.error(f"Error updating plot: {e}")

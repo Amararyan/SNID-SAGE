@@ -114,6 +114,10 @@ class PySide6EventHandlers(QtCore.QObject):
                 context=QtCore.Qt.ApplicationShortcut,
             )
 
+            # Plot saving shortcuts
+            CPW.create_shortcut(self.main_window, "Ctrl+S", self.on_save_plot_as_png, context=QtCore.Qt.ApplicationShortcut)
+            CPW.create_shortcut(self.main_window, "Ctrl+Shift+S", self.on_save_plot_as_svg, context=QtCore.Qt.ApplicationShortcut)
+
             # Quit application (cross-platform Ctrl/Cmd+Q)
             CPW.standard_shortcut(self.main_window, QtGui.QKeySequence.StandardKey.Quit, self.on_quit_application)
 
@@ -258,6 +262,41 @@ class PySide6EventHandlers(QtCore.QObject):
         try:
             if not file_path:
                 return
+            # If a spectrum is already loaded or there are preprocessing/analysis results,
+            # confirm with the user that loading a new spectrum will reset the GUI/state.
+            try:
+                has_loaded_spectrum = (
+                    getattr(self.app_controller, 'original_wave', None) is not None and
+                    getattr(self.app_controller, 'original_flux', None) is not None
+                )
+                preprocessed_present = bool(getattr(self.app_controller, 'processed_spectrum', None))
+                analysis_present = bool(getattr(self.app_controller, 'snid_results', None))
+                if has_loaded_spectrum or preprocessed_present or analysis_present:
+                    reply = QtWidgets.QMessageBox.question(
+                        self.main_window,
+                        "Load New Spectrum?",
+                        (
+                            "A spectrum is already loaded and may have preprocessing or analysis results.\n\n"
+                            "Loading a new spectrum will reset the GUI and clear the current spectrum, preprocessing, "
+                            "analysis results, overlays and related settings.\n\n"
+                            "Do you want to continue?"
+                        ),
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                        QtWidgets.QMessageBox.No
+                    )
+                    if reply != QtWidgets.QMessageBox.Yes:
+                        return
+                    # Reset to a clean initial state before loading the new file
+                    if hasattr(self.app_controller, 'reset_to_initial_state'):
+                        self.app_controller.reset_to_initial_state()
+                    # Ensure the main view is Flux for new loads
+                    try:
+                        self.main_window.current_view = 'flux'
+                    except Exception:
+                        pass
+            except Exception:
+                # If any issue occurs during state inspection, proceed without confirmation
+                pass
             self.main_window.status_label.setText(f"Loading: {Path(file_path).name}")
             self.main_window.file_status_label.setText(f"File: {Path(file_path).name}")
             # Try to load the spectrum data using app controller
@@ -696,7 +735,15 @@ class PySide6EventHandlers(QtCore.QObject):
             # 5. Reset view buttons to initial state
             self._reset_view_buttons_to_initial()
             
-            # 6. Clear the plot and show welcome message
+            # 6. Ensure plot mode is Spectrum and show welcome message
+            try:
+                from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PlotMode
+                # Switch stacked widget to PyQtGraph so the welcome message is visible
+                if getattr(self.main_window.plot_manager, 'current_plot_mode', None) != PlotMode.SPECTRUM:
+                    self.main_window.plot_manager.switch_to_plot_mode(PlotMode.SPECTRUM)
+            except Exception:
+                pass
+            # Clear the PyQtGraph plot and show the startup welcome state
             self.main_window.plot_manager.plot_pyqtgraph_welcome_message()
             
             # 7. Reset main status to initial message
@@ -953,3 +1000,19 @@ class PySide6EventHandlers(QtCore.QObject):
             _LOGGER.debug("Shortcuts dialog shown")
         except Exception as e:
             _LOGGER.error(f"Error showing shortcuts dialog: {e}") 
+
+    def on_save_plot_as_png(self):
+        """Save the currently visible plot as PNG/JPG via dialog."""
+        try:
+            if hasattr(self.main_window, 'plot_manager') and self.main_window.plot_manager:
+                self.main_window.plot_manager.save_current_plot_as_png_dialog()
+        except Exception as e:
+            _LOGGER.error(f"Error saving plot as PNG: {e}")
+
+    def on_save_plot_as_svg(self):
+        """Save the currently visible plot as SVG via dialog."""
+        try:
+            if hasattr(self.main_window, 'plot_manager') and self.main_window.plot_manager:
+                self.main_window.plot_manager.save_current_plot_as_svg_dialog()
+        except Exception as e:
+            _LOGGER.error(f"Error saving plot as SVG: {e}")

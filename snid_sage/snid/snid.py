@@ -691,7 +691,14 @@ def _run_forced_redshift_analysis_optimized(
     
     # Use unified storage for loading templates (same as normal analysis)
     try:
-        templates = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter, exclude_templates=exclude_templates)
+        # Default behavior: exclude Galaxy templates from forced analysis unless explicitly requested
+        effective_type_filter = type_filter
+        if not effective_type_filter:
+            effective_type_filter = [
+                # Include all known main types except Galaxy/NotSN flat galaxy aliases
+                'Ia', 'Ib', 'Ic', 'II', 'SLSN', 'LFBOT', 'TDE', 'KN', 'GAP', 'Star', 'AGN'
+            ]
+        templates = load_templates_unified(templates_dir, type_filter=effective_type_filter, template_names=template_filter, exclude_templates=exclude_templates)
         _LOG.info(f"✅ Loaded {len(templates)} templates using UNIFIED STORAGE for forced redshift analysis")
     except Exception as e:
         _LOG.warning(f"Unified storage failed in forced analysis, falling back to legacy loader: {e}")
@@ -1345,6 +1352,18 @@ def run_snid_analysis(
         # ============================================================================
         # STEP 7a: OPTIONAL FILTERING BY AGE AND TYPE
         # ============================================================================
+        # Default behavior: exclude Galaxy templates from full analysis unless explicitly requested
+        if not type_filter:
+            pre_count = len(templates)
+            templates = [
+                t for t in templates
+                if (str(t.get('type', '')) not in ('Galaxy', 'Gal') and
+                    not str(t.get('type', '')).startswith('Gal-'))
+            ]
+            if len(templates) < pre_count:
+                report_progress("Excluding galaxy templates from full analysis")
+                _LOG.info(f"Step 7a: Default exclusion of Galaxy templates: {pre_count} -> {len(templates)}")
+
         original_count = len(templates)
         
         if age_range is not None:
@@ -2194,15 +2213,53 @@ def run_snid_analysis(
         result.success = False
         report_progress("No good matches found")
 
-    # Store matches for plotting - ensure integer slice for GUI consistency
+    # Store matches for plotting - prefer clustered, thresholded, and RLAP-CCC-sorted results
     try:
         _mot = int(max_output_templates)
     except Exception:
         _mot = 5
     if _mot < 0:
         _mot = 0
-    result.best_matches = matches[:_mot]
-    result.top_matches = matches[:_mot]
+
+    # Determine base candidates for display
+    try:
+        if (
+            hasattr(result, 'clustering_results') and result.clustering_results and
+            result.clustering_results.get('success') and result.clustering_results.get('best_cluster') and
+            isinstance(result.clustering_results['best_cluster'].get('matches', []), list) and
+            len(result.clustering_results['best_cluster']['matches']) > 0
+        ):
+            overlay_candidates = list(result.clustering_results['best_cluster']['matches'])
+        elif hasattr(result, 'filtered_matches') and isinstance(result.filtered_matches, list) and result.filtered_matches:
+            overlay_candidates = list(result.filtered_matches)
+        else:
+            overlay_candidates = list(matches)
+    except Exception:
+        overlay_candidates = list(matches)
+
+    # If RLAP-CCC exists, apply the same threshold used for clustering to what we display
+    try:
+        any_ccc = any(('rlap_ccc' in m) for m in overlay_candidates)
+        if any_ccc and isinstance(rlap_ccc_threshold, (int, float)):
+            from snid_sage.shared.utils.math_utils import get_best_metric_value
+            filtered = [m for m in overlay_candidates if get_best_metric_value(m) >= float(rlap_ccc_threshold)]
+            # Fallback to original candidates if filtering removes all
+            if filtered:
+                overlay_candidates = filtered
+    except Exception:
+        pass
+
+    # Sort by best available metric (prefer RLAP-CCC; fallback to RLAP)
+    try:
+        from snid_sage.shared.utils.math_utils import get_best_metric_value
+        overlay_candidates.sort(key=get_best_metric_value, reverse=True)
+    except Exception:
+        # Fallback stable sort by rlap when utilities are unavailable
+        overlay_candidates.sort(key=lambda m: m.get('rlap_ccc', m.get('rlap', 0.0)), reverse=True)
+
+    # Expose top-N to GUI
+    result.best_matches = overlay_candidates[:_mot]
+    result.top_matches = overlay_candidates[:_mot]
     # Store all matches separately for potential future use
     result.all_matches = matches
 

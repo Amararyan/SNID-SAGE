@@ -130,3 +130,37 @@
   display: none !important;
 }
 
+/* Image styling with dark contours */
+.rst-content img {
+  border: 2px solid #374151; /* gray-700 - dark contour */
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  margin: 1em 0;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Hover effect for images */
+.rst-content img:hover {
+  border-color: #1f2937; /* gray-800 - slightly darker on hover */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Ensure images in code blocks don't get the border */
+.rst-content pre img,
+.rst-content code img {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+}
+
+.rst-content pre img:hover,
+.rst-content code img:hover {
+  border: none;
+  box-shadow: none;
+  transform: none;
+}
+

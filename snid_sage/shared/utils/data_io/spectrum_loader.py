@@ -297,16 +297,21 @@ def load_text_spectrum(filename: str, **kwargs) -> Tuple[np.ndarray, np.ndarray]
             
             # If first line has text that looks like a header, try skipping it
             if has_header:
+                # Use robust header-aware loader first (handles CSV headers like 'wave,flux,flux_err')
+                try:
+                    return _try_header_aware_loading(filename)
+                except Exception:
+                    pass
+                # Fallback: try naive skip of the first row with whitespace delimiter
                 try:
                     data = np.loadtxt(filename, comments='#', skiprows=1, **kwargs)
                     if data.ndim == 2 and data.shape[1] >= 2:
                         wavelength = data[:, 0]
                         flux = data[:, 1]
-                        # Validate the data
                         wavelength, flux = _validate_and_clean_arrays(wavelength, flux)
                         _LOGGER.info(f"✅ Text spectrum loaded (header skipped): {len(wavelength)} points")
                         return wavelength, flux
-                except Exception as e:
+                except Exception:
                     pass  # Fall through to other methods
             
             # Also check if the first line doesn't look like numbers
@@ -363,15 +368,13 @@ def load_text_spectrum(filename: str, **kwargs) -> Tuple[np.ndarray, np.ndarray]
         return wavelength, flux
         
     except (ValueError, TypeError) as e:
-        # Check if the error might be due to headers or mixed data types
-        if "could not convert string to float" in str(e) or "invalid literal" in str(e):
-            # Try loading with skiprows to skip potential headers
-            try:
-                return _try_header_aware_loading(filename)
-            except Exception:
-                pass
-        
-        # Try alternative loading methods
+        # First, try a robust header/delimiter-aware loader (handles 'wave,flux,flux_err')
+        try:
+            return _try_header_aware_loading(filename)
+        except Exception:
+            pass
+
+        # Then, try alternative loading methods
         try:
             return _try_alternative_text_loading(filename)
         except Exception:
@@ -540,6 +543,147 @@ def _detect_and_convert_wavelength_units(wavelength: np.ndarray) -> np.ndarray:
         return wavelength
 
 
+def _try_header_aware_loading(filename: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Try loading text files by detecting headers and delimiters, supporting cases like
+    'wave,flux,flux_err' (e.g., some Wiserep exports).
+
+    Parameters:
+        filename: Path to text file
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Wavelength and flux arrays
+    """
+    # Helper: detect delimiter from a sample line
+    def _detect_delimiter(sample: str) -> Optional[str]:
+        if ',' in sample:
+            return ','
+        if '\t' in sample:
+            return '\t'
+        if ';' in sample:
+            return ';'
+        # None means whitespace splitting
+        return None
+
+    # Helper: split a line by detected delimiter
+    def _split(line: str, delim: Optional[str]) -> list:
+        return line.split(delim) if delim is not None else line.split()
+
+    # Helper: determine whether tokens are numeric
+    def _all_numeric(tokens: list) -> bool:
+        for tok in tokens[:3]:  # sample a few tokens
+            try:
+                float(tok)
+            except Exception:
+                return False
+        return True if tokens else False
+
+    # Read first non-empty, non-comment line
+    first_content_line = None
+    with open(filename, 'r') as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line:
+                continue
+            if line.lstrip().startswith('#'):
+                continue
+            first_content_line = line
+            break
+
+    if first_content_line is None:
+        raise SpectrumLoadError("Empty or comment-only file")
+
+    delimiter = _detect_delimiter(first_content_line)
+    tokens = _split(first_content_line, delimiter)
+
+    # Identify if the first line is a header
+    header_candidates = {"wave", "wavelength", "lambda", "lam", "wl", "angstrom", "ang",
+                         "flux", "fnu", "flam", "counts", "spec", "spectrum", "intensity",
+                         "flux_err", "error", "err", "uncertainty"}
+    looks_like_header = (not _all_numeric(tokens)) or any(
+        any(ch.isalpha() for ch in t) for t in tokens
+    ) or any(t.strip().lower() in header_candidates for t in tokens)
+
+    # If there is a header, prefer pandas (if available) to select by column names
+    if looks_like_header:
+        # Try pandas path
+        try:
+            import pandas as pd
+            sep = delimiter if delimiter is not None else r'\s+'
+            df = pd.read_csv(filename, sep=sep, comment='#', header=0)
+
+            # Build a case-insensitive name map
+            name_map = {str(c).strip().lower(): c for c in df.columns}
+            wave_keys = ["wave", "wavelength", "lambda", "lam", "wl", "angstrom", "ang"]
+            flux_keys = ["flux", "fnu", "flam", "counts", "spec", "spectrum", "intensity"]
+
+            wave_col_name = next((name_map[k] for k in wave_keys if k in name_map), None)
+            flux_col_name = next((name_map[k] for k in flux_keys if k in name_map), None)
+
+            if wave_col_name is not None and flux_col_name is not None:
+                wavelength = df[wave_col_name].to_numpy()
+                flux = df[flux_col_name].to_numpy()
+                return _validate_and_clean_arrays(wavelength, flux)
+
+            # Fallback: choose the first two numeric-like columns
+            numeric_df = df.apply(pd.to_numeric, errors='coerce')
+            valid_cols = [c for c in numeric_df.columns if numeric_df[c].notna().any()]
+            if len(valid_cols) >= 2:
+                wavelength = numeric_df[valid_cols[0]].to_numpy()
+                flux = numeric_df[valid_cols[1]].to_numpy()
+                return _validate_and_clean_arrays(wavelength, flux)
+        except ImportError:
+            pass
+        except Exception:
+            # Fall back to numpy-based methods below
+            pass
+
+        # Try numpy genfromtxt with named columns
+        try:
+            arr = np.genfromtxt(
+                filename,
+                delimiter=delimiter if delimiter is not None else None,
+                names=True,
+                comments='#',
+                dtype=None,
+                encoding='utf-8'
+            )
+            if arr is not None and getattr(arr, 'dtype', None) is not None and arr.dtype.names:
+                name_map = {str(n).strip().lower(): str(n) for n in arr.dtype.names}
+                wave_keys = ["wave", "wavelength", "lambda", "lam", "wl", "angstrom", "ang"]
+                flux_keys = ["flux", "fnu", "flam", "counts", "spec", "spectrum", "intensity"]
+                wave_field = next((name_map[k] for k in wave_keys if k in name_map), None)
+                flux_field = next((name_map[k] for k in flux_keys if k in name_map), None)
+                if wave_field and flux_field:
+                    wavelength = np.asarray(arr[wave_field])
+                    flux = np.asarray(arr[flux_field])
+                    return _validate_and_clean_arrays(wavelength, flux)
+                # Fallback: first two fields
+                if len(arr.dtype.names) >= 2:
+                    wavelength = np.asarray(arr[arr.dtype.names[0]])
+                    flux = np.asarray(arr[arr.dtype.names[1]])
+                    return _validate_and_clean_arrays(wavelength, flux)
+        except Exception:
+            pass
+
+        raise SpectrumLoadError("Header detected but could not parse columns")
+
+    # No header detected; use delimiter-aware numeric loading
+    try:
+        data = np.loadtxt(filename, delimiter=delimiter if delimiter is not None else None, comments='#')
+        if data.ndim == 1:
+            flux = data
+            wavelength = np.arange(len(flux), dtype=float)
+        elif data.ndim == 2 and data.shape[1] >= 2:
+            wavelength = data[:, 0]
+            flux = data[:, 1]
+        else:
+            raise SpectrumLoadError(f"Unsupported data shape: {getattr(data, 'shape', None)}")
+        return _validate_and_clean_arrays(wavelength, flux)
+    except Exception as e:
+        raise SpectrumLoadError(str(e))
+
+
 def _try_alternative_text_loading(filename: str) -> Tuple[np.ndarray, np.ndarray]:
     """
     Try alternative methods for loading text files.
@@ -562,8 +706,8 @@ def _try_alternative_text_loading(filename: str) -> Tuple[np.ndarray, np.ndarray
     try:
         import pandas as pd
         
-        # Try whitespace-delimited
-        df = pd.read_csv(filename, delim_whitespace=True, header=None, comment='#')
+        # Try whitespace-delimited using regex separator (avoids FutureWarning)
+        df = pd.read_csv(filename, sep=r'\s+', header=None, comment='#')
         if len(df.columns) >= 2:
             return _validate_and_clean_arrays(df.iloc[:, 0].values, df.iloc[:, 1].values)
             

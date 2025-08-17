@@ -319,6 +319,13 @@ class EnhancedPlotWidget(pg.PlotWidget):
         
         # Hide save button initially (will be shown when data is plotted)
         self.save_proxy.hide()
+
+        # If visibility was requested before proxy was created, honor it now
+        if getattr(self, '_show_save_button', False):
+            try:
+                self.save_proxy.show()
+            except Exception:
+                pass
     
     def _show_export_menu(self):
         """Show context menu with export options"""
@@ -442,17 +449,33 @@ class EnhancedPlotWidget(pg.PlotWidget):
                 if hasattr(self, 'save_proxy'):
                     self.save_proxy.show()
     
+    # === Public wrappers for programmatic saving via keyboard shortcuts ===
+    def save_as_png_dialog(self):
+        """Open a dialog and save the current plot as PNG/JPG (screen-resolution)."""
+        try:
+            self._save_high_res_image()
+        except Exception as e:
+            _LOGGER.error(f"Error saving plot as PNG via dialog: {e}")
+    
+    def save_as_svg_dialog(self):
+        """Open a dialog and save the current plot as SVG vector graphics."""
+        try:
+            self._save_svg()
+        except Exception as e:
+            _LOGGER.error(f"Error saving plot as SVG via dialog: {e}")
+    
     def show_save_button(self):
         """Show the save button (call when data is plotted)"""
+        # Persist desired visibility even if proxy not yet created
+        self._show_save_button = True
         if hasattr(self, 'save_proxy') and self.save_proxy:
             self.save_proxy.show()
-            self._show_save_button = True
     
     def hide_save_button(self):
         """Hide the save button (call when plot is cleared)"""
+        self._show_save_button = False
         if hasattr(self, 'save_proxy') and self.save_proxy:
             self.save_proxy.hide()
-            self._show_save_button = False
     
     def apply_theme_colors(self, theme_colors: Optional[Dict[str, str]] = None):
         """Apply theme colors to the plot if needed"""

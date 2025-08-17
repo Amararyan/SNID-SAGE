@@ -971,6 +971,76 @@ class PySide6PlotManager:
             _LOGGER.error(f"Error creating subtype proportions plot: {e}")
             self.show_matplotlib_error(f"Error creating plot: {str(e)}")
     
+    # === Save/export helpers for current plot (invoked by keyboard shortcuts) ===
+    def save_current_plot_as_png_dialog(self):
+        """Open a dialog to save the currently visible plot as PNG/JPG.
+        - For spectrum (PyQtGraph): uses the plot widget's export routine.
+        - For analysis (Matplotlib): saves the current figure via savefig.
+        """
+        try:
+            if self.current_plot_mode == PlotMode.SPECTRUM and self.plot_widget is not None:
+                if hasattr(self.plot_widget, 'save_as_png_dialog'):
+                    self.plot_widget.save_as_png_dialog()
+                    return
+            # Matplotlib (analysis plots)
+            if self.current_plot_mode != PlotMode.SPECTRUM and self.matplotlib_figure is not None:
+                filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+                    self.main_window,
+                    "Save Plot as Image",
+                    "snid_sage_plot.png",
+                    "PNG Files (*.png);;JPEG Files (*.jpg);;All Files (*)"
+                )
+                if not filename:
+                    return
+                try:
+                    # Use figure dpi
+                    self.matplotlib_figure.savefig(filename, dpi=self.matplotlib_figure.dpi)
+                    _LOGGER.info(f"Matplotlib plot saved as image: {filename}")
+                    QtWidgets.QMessageBox.information(
+                        self.main_window,
+                        "Export Successful",
+                        f"Plot saved successfully:\n{os.path.basename(filename)}"
+                    )
+                except Exception as save_err:
+                    _LOGGER.error(f"Failed to save matplotlib image: {save_err}")
+                    QtWidgets.QMessageBox.warning(self.main_window, "Export Failed", str(save_err))
+        except Exception as e:
+            _LOGGER.error(f"Error during save_current_plot_as_png_dialog: {e}")
+    
+    def save_current_plot_as_svg_dialog(self):
+        """Open a dialog to save the currently visible plot as SVG.
+        - For spectrum (PyQtGraph): uses the plot widget's SVG export.
+        - For analysis (Matplotlib): saves the current figure as SVG.
+        """
+        try:
+            if self.current_plot_mode == PlotMode.SPECTRUM and self.plot_widget is not None:
+                if hasattr(self.plot_widget, 'save_as_svg_dialog'):
+                    self.plot_widget.save_as_svg_dialog()
+                    return
+            # Matplotlib (analysis plots)
+            if self.current_plot_mode != PlotMode.SPECTRUM and self.matplotlib_figure is not None:
+                filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+                    self.main_window,
+                    "Save Plot as SVG",
+                    "snid_sage_plot.svg",
+                    "SVG Files (*.svg);;All Files (*)"
+                )
+                if not filename:
+                    return
+                try:
+                    self.matplotlib_figure.savefig(filename, format='svg')
+                    _LOGGER.info(f"Matplotlib plot saved as SVG: {filename}")
+                    QtWidgets.QMessageBox.information(
+                        self.main_window,
+                        "Export Successful",
+                        f"Plot saved successfully:\n{os.path.basename(filename)}"
+                    )
+                except Exception as save_err:
+                    _LOGGER.error(f"Failed to save matplotlib SVG: {save_err}")
+                    QtWidgets.QMessageBox.warning(self.main_window, "Export Failed", str(save_err))
+        except Exception as e:
+            _LOGGER.error(f"Error during save_current_plot_as_svg_dialog: {e}")
+    
 
     
     def show_matplotlib_error(self, error_msg):
