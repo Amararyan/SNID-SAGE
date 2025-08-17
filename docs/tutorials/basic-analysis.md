@@ -151,54 +151,70 @@ The subtype analysis reveals:
 
 ## Essential Keyboard Shortcuts
 
-### General Shortcuts
+### Quick Workflow Shortcuts
 - **Ctrl+O** (Windows/Linux) / **Cmd+O** (macOS): Open spectrum file
-- **Ctrl+S** / **Cmd+S**: Save results
+- **Ctrl+Enter** / **Cmd+Enter**: Quick workflow (preprocessing + analysis)
+- **Ctrl+Shift+Enter** / **Cmd+Shift+Enter**: Extended quick workflow (preprocessing + analysis + auto cluster)
+- **Ctrl+Shift+R** / **Cmd+Shift+R**: Reset application
+
+### Analysis and Configuration
+- **F5**: Run analysis
+- **F6**: Open preprocessing dialog
+- **Ctrl+R** / **Cmd+R**: Run analysis
+- **Ctrl+Shift+O** / **Cmd+Shift+O**: Open SNID configuration
+- **Ctrl+,** / **Cmd+,**: Open application settings
+
+### View Controls
+- **F**: Switch to flux view
+- **T**: Switch to flat view
+- **Spacebar**: Toggle view mode
+
+### Template Navigation
+- **← (Left Arrow)**: Previous template
+- **→ (Right Arrow)**: Next template
+
+### Help and Application
+- **F1**: Show keyboard shortcuts help
+- **Ctrl+/** / **Cmd+/**: Alternative shortcuts help
 - **Ctrl+Q** / **Cmd+Q**: Quit application
-- **F1**: Open help documentation
-
-### Analysis Shortcuts
-- **Ctrl+Enter** / **Cmd+Enter**: Apply preprocessing and start analysis
-- **Shift+Enter**: Quick analysis with default settings
-- **Ctrl+A** / **Cmd+A**: Start full analysis
-- **Escape**: Cancel current operation
-
-### Navigation Shortcuts
-- **Ctrl+Z** / **Cmd+Z**: Undo last action
-- **Ctrl+Y** / **Cmd+Y**: Redo action
-- **Ctrl+F** / **Cmd+F**: Find in results
-- **Ctrl+P** / **Cmd+P**: Print or export plot
+- **Ctrl+G** / **Cmd+G**: Start games
 
 ### Right-Click Context Menus
-- **Right-click on plot**: Access quick preprocessing, analysis, and export options
-- **Right-click on results**: Copy, export, or get detailed information
-- **Right-click on templates**: View template details and comparisons
+- **Right-click on preprocessing button**: Quick preprocessing
+- **Right-click on analysis button**: Quick analysis
+- **Right-click on plot save button**: Export options (high-res image, SVG)
 
 ## Interpreting Your Results
 
-### Match Scores
-- **Score > 10**: Excellent match
-- **Score 5-10**: Good match
-- **Score 1-5**: Fair match
-- **Score < 1**: Poor match
+### Match Quality Assessment
+Based on the penalized top-5 mean score:
+- **Score ≥ 10.0**: High quality - Excellent match quality
+- **Score ≥ 5.0**: Medium quality - Good match quality  
+- **Score < 5.0**: Low quality - Poor match quality
 
-### Redshift Confidence
-- **High confidence**: Multiple templates agree on redshift
+### Match Confidence Levels
+- **High confidence**: RLAP > 10 and LAP > 5
+- **Moderate confidence**: RLAP > 5 and LAP > 3
+- **Low confidence**: RLAP > 2
+- **Very low confidence**: RLAP ≤ 2
+
+### Redshift Consistency
+- **High confidence**: Multiple templates agree on redshift with low error
 - **Medium confidence**: Some disagreement between templates
 - **Low confidence**: Wide range of redshift estimates
 
 ### Spectral Classification
-- **Primary type**: Most likely classification
+- **Primary type**: Most likely classification from template matches
 - **Subtypes**: Detailed classification within the primary type
-- **Confidence**: How certain the classification is
+- **Type confidence**: Based on cluster quality and template agreement
 
 ## Next Steps
 
-1. **Save your results**: Use File → Save Results to preserve your analysis
-2. **Export plots**: Right-click on plots to save as images
-3. **Try different preprocessing**: Experiment with different settings
-4. **Compare multiple spectra**: Load additional files for comparison
-5. **Advanced analysis**: Explore the full analysis options for more control
+1. **Export plots**: Use the save button on plots to export as high-resolution images or SVG
+2. **Try different preprocessing**: Experiment with different preprocessing settings
+3. **Compare multiple spectra**: Load additional files for comparison
+4. **Advanced analysis**: Explore the full analysis options for more control
+5. **Configure SNID parameters**: Use Ctrl+Shift+O to adjust analysis settings
 
 ## Troubleshooting
 
