@@ -1361,7 +1361,6 @@ def run_snid_analysis(
                     not str(t.get('type', '')).startswith('Gal-'))
             ]
             if len(templates) < pre_count:
-                report_progress("Excluding galaxy templates from full analysis")
                 _LOG.info(f"Step 7a: Default exclusion of Galaxy templates: {pre_count} -> {len(templates)}")
 
         original_count = len(templates)
