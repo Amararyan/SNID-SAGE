@@ -26,5 +26,5 @@ For step-by-step workflows and expanded CLI usage, see the tutorial: [Template M
 - Keep metadata complete for research reuse
 
 ### Related CLI
-See `snid template` subcommands for scripting the same operations.
+See `sage templates` subcommands for scripting the same operations.
 

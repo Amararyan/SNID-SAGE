@@ -334,6 +334,7 @@ statistics_*
 examples/
 spectral_lines/
 wise_spectra/
+OLD_ICONS/
 
 # ===== MARKDOWN FILES =====
 # Track markdown files (remove previous global ignore). No entries here on purpose.

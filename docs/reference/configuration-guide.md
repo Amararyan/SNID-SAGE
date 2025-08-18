@@ -5,7 +5,7 @@ This guide lists implemented configuration options and how to access them via GU
 ## Access
 
 - GUI: Settings → Configuration
-- CLI: `snid config show|get|set|reset`
+- CLI: `sage config show|get|set|reset`
 
 ## Categories (implemented)
 
@@ -18,9 +18,9 @@ This guide lists implemented configuration options and how to access them via GU
 ## Examples
 
 ```powershell
-snid config show
-snid config set templates.default_dir C:\\data\\snid_templates
-snid config get analysis.rlapmin; snid config set analysis.rlapmin 5.0
+sage config show
+sage config set templates.default_dir C:\\data\\snid_templates
+sage config get analysis.rlapmin; sage config set analysis.rlapmin 5.0
 ```
 
 ## Notes

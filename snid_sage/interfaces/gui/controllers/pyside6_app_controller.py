@@ -666,7 +666,7 @@ class PySide6AppController(QtCore.QObject):
                     search_range = mode_config.get('search_range', 0.001)
                     zmin = max(-0.01, redshift_value - search_range)
                     zmax = min(1.0, redshift_value + search_range)
-                    progress_callback(f"Searching around z = {redshift_value:.6f} ± {search_range:.3f}", 45)
+                    progress_callback(f"Searching around z = {redshift_value:.6f} ± {search_range:.6f}", 45)
                     _LOGGER.info(f"Using SEARCH MODE around z = {redshift_value:.6f} (range: {zmin:.4f} to {zmax:.4f})")
             
             # Fallback to legacy manual_redshift if no mode config
@@ -683,7 +683,7 @@ class PySide6AppController(QtCore.QObject):
             
             else:
                 # Pure automatic redshift determination
-                progress_callback(f"Automatic redshift search (range: {zmin:.3f} to {zmax:.3f})", 45)
+                progress_callback(f"Automatic redshift search (range: {zmin:.6f} to {zmax:.6f})", 45)
                 _LOGGER.info(f"Using automatic redshift determination (range {zmin:.4f} to {zmax:.4f})")
             
             progress_callback("Running template correlation analysis...", 50)

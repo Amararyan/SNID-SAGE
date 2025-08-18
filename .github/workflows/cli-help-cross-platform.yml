@@ -1944,14 +1944,14 @@ jobs:
         run: |
           set -euxo pipefail
           echo "Testing basic help commands..."
-          snid --help
+          sage --help
           # Skip snid-sage --help as it's a GUI launcher, not a CLI command
           
           echo "Testing command-specific help..."
-          snid identify --help
-          snid batch --help
-          snid template --help
-          snid config --help
+          sage identify --help
+          sage batch --help
+          sage template --help
+          sage config --help
         continue-on-error: true
 
       - name: Test CLI help commands (PowerShell)
@@ -1960,15 +1960,15 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Testing basic help commands..."
-          snid --help
+          sage --help
           
           # Skip snid-sage --help as it's a GUI launcher, not a CLI command
           
           Write-Host "Testing command-specific help..."
-          snid identify --help
-          snid batch --help
-          snid template --help
-          snid config --help
+          sage identify --help
+          sage batch --help
+          sage template --help
+          sage config --help
         continue-on-error: true
 
       - name: Test CLI spectrum analysis - Basic (bash)
@@ -1980,7 +1980,7 @@ jobs:
           mkdir -p results_basic
           
           echo "Testing basic spectrum identification..."
-          snid identify test_data/tns_2024ggi.dat --output-dir results_basic/ --minimal --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_basic/ --minimal --verbose
           
           echo "Checking output files..."
           ls -la results_basic/
@@ -2005,7 +2005,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path results_basic
           
           Write-Host "Testing basic spectrum identification..."
-          snid identify test_data/tns_2024ggi.dat --output-dir results_basic/ --minimal --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_basic/ --minimal --verbose
           
           Write-Host "Checking output files..."
           Get-ChildItem results_basic/
@@ -2031,19 +2031,19 @@ jobs:
           
           echo "Testing with redshift constraints..."
           mkdir -p results_redshift
-          snid identify test_data/tns_2024ggi.dat --output-dir results_redshift/ --minimal --zmin 0.0 --zmax 0.1 --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_redshift/ --minimal --zmin 0.0 --zmax 0.1 --verbose
           
           echo "Testing with preprocessing options..."
           mkdir -p results_preprocess
-          snid identify test_data/tns_2024ggi.dat --output-dir results_preprocess/ --minimal --aband-remove --skyclip --savgol-window 11 --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_preprocess/ --minimal --aband-remove --skyclip --savgol-window 11 --verbose
           
           echo "Testing with type filtering..."
           mkdir -p results_typefilter
-          snid identify test_data/tns_2024ggi.dat --output-dir results_typefilter/ --minimal --type-filter Ia Ib Ic --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_typefilter/ --minimal --type-filter Ia Ib Ic --verbose
           
           echo "Testing complete mode (if time permits)..."
           mkdir -p results_complete
-          snid identify test_data/tns_2024ggi.dat --output-dir results_complete/ --complete --verbose || echo "Complete mode test completed or failed"
+          sage identify test_data/tns_2024ggi.dat --output-dir results_complete/ --complete --verbose || echo "Complete mode test completed or failed"
         continue-on-error: true
 
       - name: Test CLI with various parameters (PowerShell)
@@ -2053,21 +2053,21 @@ jobs:
         run: |
           Write-Host "Testing with redshift constraints..."
           New-Item -ItemType Directory -Force -Path results_redshift
-          snid identify test_data/tns_2024ggi.dat --output-dir results_redshift/ --minimal --zmin 0.0 --zmax 0.1 --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_redshift/ --minimal --zmin 0.0 --zmax 0.1 --verbose
           
           Write-Host "Testing with preprocessing options..."
           New-Item -ItemType Directory -Force -Path results_preprocess
-          snid identify test_data/tns_2024ggi.dat --output-dir results_preprocess/ --minimal --aband-remove --skyclip --savgol-window 11 --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_preprocess/ --minimal --aband-remove --skyclip --savgol-window 11 --verbose
           
           Write-Host "Testing with type filtering..."
           New-Item -ItemType Directory -Force -Path results_typefilter
-          snid identify test_data/tns_2024ggi.dat --output-dir results_typefilter/ --minimal --type-filter Ia Ib Ic --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir results_typefilter/ --minimal --type-filter Ia Ib Ic --verbose
           
           Write-Host "Testing complete mode (with timeout)..."
           New-Item -ItemType Directory -Force -Path results_complete
           $job = Start-Job -ScriptBlock {
             param($dataFile, $outputDir)
-            snid identify $dataFile --output-dir $outputDir --complete --verbose
+            sage identify $dataFile --output-dir $outputDir --complete --verbose
           } -ArgumentList "test_data/tns_2024ggi.dat", "results_complete/"
           
           if (Wait-Job $job -Timeout 300) {
@@ -2087,11 +2087,11 @@ jobs:
           set -euxo pipefail
           
           echo "Testing template listing..."
-          snid template list --help
+          sage template list --help
           
           echo "Testing config commands..."
-          snid config show --format json
-          snid config show --format table
+          sage config show --format json
+          sage config show --format table
         continue-on-error: true
 
       - name: Test template commands (PowerShell)
@@ -2100,11 +2100,11 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Testing template listing..."
-          snid template list --help
+          sage template list --help
           
           Write-Host "Testing config commands..."
-          snid config show --format json
-          snid config show --format table
+          sage config show --format json
+          sage config show --format table
         continue-on-error: true
 
       - name: Test batch processing (bash)
@@ -2120,7 +2120,7 @@ jobs:
           cp test_data/tns_2024ggi.dat batch_input/spectrum2.dat
           
           echo "Testing batch processing..."
-          snid batch "batch_input/*.dat" --output-dir batch_output/ --minimal --verbose
+          sage batch "batch_input/*.dat" --output-dir batch_output/ --minimal --verbose
           
           echo "Checking batch output..."
           ls -la batch_output/
@@ -2146,7 +2146,7 @@ jobs:
           Copy-Item "test_data/tns_2024ggi.dat" "batch_input/spectrum2.dat"
           
           Write-Host "Testing batch processing..."
-          snid batch "batch_input/*.dat" --output-dir batch_output/ --minimal --verbose
+          sage batch "batch_input/*.dat" --output-dir batch_output/ --minimal --verbose
           
           Write-Host "Checking batch output..."
           Get-ChildItem batch_output/
@@ -2295,11 +2295,11 @@ jobs:
           echo "Testing CLI launcher scripts..."
           
           # Test that entry points are working
-          which snid || echo "snid command not found in PATH"
+          which sage || echo "sage command not found in PATH"
           which snid-sage || echo "snid-sage command not found in PATH"
           
           # Test version reporting
-          snid --version
+          sage --version
           
           echo "SUCCESS: CLI launcher tests completed"
         continue-on-error: true
@@ -2313,7 +2313,7 @@ jobs:
           
           # Time the basic analysis
           start_time=$(date +%s)
-          snid identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
+          sage identify test_data/tns_2024ggi.dat --output-dir benchmark_results/ --minimal --verbose
           end_time=$(date +%s)
           
           duration=$((end_time - start_time))

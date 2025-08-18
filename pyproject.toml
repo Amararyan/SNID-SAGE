@@ -87,10 +87,10 @@ Repository = "https://github.com/FiorenSt/SNID-SAGE.git"
 "Download" = "https://github.com/FiorenSt/SNID-SAGE/archive/refs/heads/main.zip"
 
 [project.scripts]
-snid = "snid_sage.interfaces.cli.main:main"
+sage = "snid_sage.interfaces.cli.main:main"
 snid-sage = "snid_sage.interfaces.gui.launcher:main"
-snid-lines = "snid_sage.interfaces.line_manager.launcher:main"
-snid-templates = "snid_sage.interfaces.template_manager.launcher:main"
+snid-sage-lines = "snid_sage.interfaces.line_manager.launcher:main"
+snid-sage-templates = "snid_sage.interfaces.template_manager.launcher:main"
 
 [tool.setuptools]
 include-package-data = true

@@ -127,31 +127,31 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.epilog = """
 Examples:
   # Basic identification with auto-discovered templates
-  snid identify spectrum.txt --output-dir results/
+  sage identify spectrum.txt --output-dir results/
   
   # Basic identification with explicit templates directory
-  snid identify spectrum.txt templates/ --output-dir results/
+  sage identify spectrum.txt templates/ --output-dir results/
   
   # With Savitzky-Golay smoothing (11-pixel window, 3rd order polynomial)
-  snid identify spectrum.txt --output-dir results/ --savgol-window 11 --savgol-order 3
+  sage identify spectrum.txt --output-dir results/ --savgol-window 11 --savgol-order 3
   
   # Minimal mode - main result file only, no additional outputs
-  snid identify spectrum.txt --output-dir results/ --minimal
+  sage identify spectrum.txt --output-dir results/ --minimal
   
   # Complete mode - all outputs + comprehensive GUI-style plots
-  snid identify spectrum.txt --output-dir results/ --complete
+  sage identify spectrum.txt --output-dir results/ --complete
   
   # Force specific redshift (skips redshift search)
-  snid identify spectrum.txt --forced-redshift 0.05 --output-dir results/
+  sage identify spectrum.txt --forced-redshift 0.05 --output-dir results/
   
   # Use only specific templates with complete analysis
-  snid identify spectrum.txt --template-filter sn1994I sn2004aw sn2007gr --complete --output-dir results/
+  sage identify spectrum.txt --template-filter sn1994I sn2004aw sn2007gr --complete --output-dir results/
   
   # Filter by supernova type with comprehensive outputs
-  snid identify spectrum.txt --type-filter Ia IIn --complete --output-dir results/
+  sage identify spectrum.txt --type-filter Ia IIn --complete --output-dir results/
   
   # Age filtering with full analysis
-  snid identify spectrum.txt --age-min 0 --age-max 20 --complete --output-dir results/
+  sage identify spectrum.txt --age-min 0 --age-max 20 --complete --output-dir results/
     """
     # Required arguments
     parser.add_argument(

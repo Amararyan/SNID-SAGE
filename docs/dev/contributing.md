@@ -57,10 +57,10 @@ pip install -r requirements-dev.txt
 #### **3. Verify Installation**
 ```bash
 # Test CLI
-python run_snid_cli.py --version
+sage --version
 
 # Test GUI
-python run_snid_gui.py
+snid-sage
 
 # Run tests
 python -m pytest tests/ -v
@@ -136,13 +136,13 @@ git push origin feature/your-feature-name
 #### **Formatting**
 ```bash
 # Auto-format code
-black snid/ interfaces/ shared/ tests/
+black snid_sage/ interfaces/ shared/ tests/
 
 # Check style
-flake8 snid/ interfaces/ shared/ tests/
+flake8 snid_sage/ interfaces/ shared/ tests/
 
 # Type checking
-mypy snid/ interfaces/ shared/
+mypy snid_sage/ interfaces/ shared/
 ```
 
 #### **Naming Conventions**
@@ -207,7 +207,7 @@ correlation_coefficient = 0.87  # Good match threshold
 ### **Directory Structure**
 ```
 SNID_SAGE/
-├── snid/                    # Core algorithm
+├── snid_sage/               # Core algorithm
 ├── interfaces/              # User interfaces
 │   ├── cli/                # Command-line interface
 │   ├── gui/                # Graphical interface
@@ -284,7 +284,7 @@ tests/
 ```python
 import pytest
 import numpy as np
-from snid.preprocessing import normalize_spectrum
+from snid_sage.snid.preprocessing import normalize_spectrum
 
 def test_normalize_spectrum():
     """Test spectrum normalization."""
@@ -332,10 +332,10 @@ def test_cli_identify_command(tmpdir):
 pytest
 
 # Run with coverage
-pytest --cov=snid --cov=interfaces --cov=shared
+pytest --cov=snid_sage --cov=interfaces --cov=shared
 
 # Run specific test file
-pytest tests/unit/test_snid_core.py -v
+pytest tests/unit/test_snid_sage_core.py -v
 
 # Run tests matching pattern
 pytest -k "test_normalize" -v

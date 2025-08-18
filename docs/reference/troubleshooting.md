@@ -7,13 +7,13 @@ This guide helps you diagnose and fix common issues with SNID SAGE installation,
 ### GUI Won't Start
 ```bash
 # Try CLI instead
-snid --version
+sage --version
 ```
 
 ### Analysis Fails Immediately
 ```bash
 # Test with sample data
-snid data/sn2003jo.dat --output-dir test_results/
+sage data/SN2018bif.fits --output-dir test_results/
 ```
 
 ### No Results/Poor Classification
@@ -22,7 +22,7 @@ snid data/sn2003jo.dat --output-dir test_results/
 head -10 your_spectrum.dat
 
 # Try with preprocessing
-snid spectrum.dat --output-dir results/ --savgol-window 11
+sage spectrum.dat --output-dir results/ --savgol-window 11
 ```
 
 ---
@@ -90,7 +90,7 @@ echo $DISPLAY
 ssh -X username@hostname
 
 # Or use CLI interface instead
-snid spectrum.dat --output-dir results/
+sage spectrum.dat --output-dir results/
 ```
 
 **3. Windows Graphics Issues**

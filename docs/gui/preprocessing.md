@@ -32,10 +32,10 @@ How to prepare spectra before analysis.
 - Keep `apodize_percent` modest to preserve edges
 
 ### CLI parity
-GUI options map to `snid` flags:
+GUI options map to `sage` flags:
 
 ```bash
-snid spectrum.dat --output-dir results/ \
+sage spectrum.dat --output-dir results/ \
   --savgol-window 11 --savgol-order 3 \
   --aband-remove --skyclip \
   --emclip-z 0.02 --emwidth 40 \

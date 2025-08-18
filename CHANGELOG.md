@@ -2,80 +2,22 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
-## [0.4.0] - 2025-01-XX
-
-### First Fully Stable Release
-
-- **GUI**: Complete PySide6/Qt interface with modern styling
-- **CLI**: Full command-line interface with batch processing
-- **AI Integration**: OpenRouter-powered analysis assistance
-- **Templates**: Comprehensive template library with 500+ spectra
-- **Documentation**: Complete user guides and tutorials
-
-
-## [0.4.1] - 2025-08-14
-
-### Added
-- Automatic version checking on startup (GUI and CLI). The check is non-blocking and only notifies when an update is available.
-
-### Fixed
-- Cross‑platform keyboard shortcuts: corrected Ctrl (Windows/Linux) vs Cmd (macOS) handling across GUI menus and dialogs.
-
-### Notes
-- Version numbering managed by setuptools_scm; publish by tagging `v0.4.1`.
-
----
-
-## [0.4.0] - 2025-08-14
+## [0.6.0] - 2025-08-18
 
 ### Changed
-- Prepare documentation for 0.4.0 release
-- Mark 0.4.0 as current release across docs
-
-### Fixed
-- Minor documentation inconsistencies referencing 0.3.0
-
-### Notes
-- Version numbering managed by setuptools_scm; publish by tagging `v0.4.0`
-
----
-
-## [0.3.0] - 2025-08-07
-
-### Added
-- PySide6-based modern GUI interface
-- Enhanced interactive plotting capabilities with pyqtgraph
-- Better performance for real-time spectrum analysis
-- Improved dialog systems and user interface components
-
-### Changed
-- **BREAKING**: Migrated GUI framework from tkinter to PySide6/Qt
-- **BREAKING**: Replaced matplotlib-based plots with pyqtgraph for better performance
-- Updated GUI interface for modern Qt-based experience
-- Improved cross-platform compatibility with Qt framework
-
-### Removed
-- Legacy tkinter-based GUI components
-- ttkbootstrap dependency (replaced by Qt styling)
+- **BREAKING**: CLI command renamed from `snid` to `sage` to avoid conflicts with existing SNID tool
+- **BREAKING**: GUI utility commands renamed from `snid-lines`/`snid-templates` to `snid-sage-lines`/`snid-sage-templates`
+- Updated all documentation to reflect new command names
+- CLI tutorial now uses real analysis results from SN2018bif.fits
 
 ### Technical
-- Added PySide6==6.9.0 as GUI dependency
-- Added pyqtgraph>=0.13.0 for high-performance plotting
-- Updated build system to handle Qt resources
-- Improved packaging for Qt-based distribution
+- Updated `pyproject.toml` entry points for new command names
+- Modified CLI modules to use `sage` command name
+- Updated all documentation examples and references
 
 ### Migration Notes
-- Installation is simplified: `pip install snid-sage` installs the full application
-- Configuration files remain compatible
-- CLI interface unchanged
-
----
-
-## [0.2.0] - 2025
-
-### Added
-- Beta release with core functionality
-- Template-based supernova classification
-- CLI and tkinter-based GUI interfaces
+- CLI users: replace `snid` with `sage` in all commands
+- GUI users: no changes needed for main `snid-sage` command
+- GUI utility users: update to `snid-sage-lines` and `snid-sage-templates`
 
 ---

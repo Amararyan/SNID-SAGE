@@ -101,10 +101,10 @@ pip install -e .
 ### Test Installation
 ```bash
 # Check version
-snid --version
+sage --version
 
 # Test CLI
-snid --help
+sage --help
 
 # Test GUI launch
 snid-sage
@@ -163,7 +163,7 @@ pip install --upgrade PySide6
 **Template Library Issues**
 ```bash
 # Check template installation
-snid templates list
+sage templates list
 
 # Reinstall templates
 pip install --upgrade snid-sage

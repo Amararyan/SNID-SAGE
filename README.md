@@ -56,10 +56,10 @@ snid-sage
 ### Use the CLI
 ```bash
 # Single spectrum analysis (templates auto-discovered). Saves summary (.output) and plots by default
-snid data/sn2003jo.dat -o results/
+sage data/sn2003jo.dat -o results/
 
 # Batch processing (default saves per-object summary and plots)
-snid batch "data/*.dat" -o results/
+sage batch "data/*.dat" -o results/
 ```
 
 ## Documentation & Support

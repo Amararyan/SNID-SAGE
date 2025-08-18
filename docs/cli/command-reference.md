@@ -19,34 +19,34 @@ pip install snid-sage
 
 ### Verify Installation
 ```bash
-snid --version
-snid --help
+sage --version
+sage --help
 ```
 
 ## Core Commands
 
-### `snid`
+### `sage`
 
 Analyze a single spectrum against the template library with cluster-aware analysis and detailed outputs.
 
 #### Basic Usage
 ```bash
-snid <spectrum_file> [options]
+sage <spectrum_file> [options]
 ```
 
 #### Examples
 ```bash
 # Basic analysis
-snid data/sn2024ggi.dat
+sage data/sn2024ggi.dat
 
 # With output directory
-snid data/sn2024ggi.dat --output-dir results/
+sage data/sn2024ggi.dat --output-dir results/
 
 # With specific redshift
-snid data/sn2024ggi.dat --forced-redshift 0.045
+sage data/sn2024ggi.dat --forced-redshift 0.045
 
 # Complete mode with all plots
-snid data/sn2024ggi.dat --complete
+sage data/sn2024ggi.dat --complete
 ```
 
 #### Output Modes
@@ -70,34 +70,34 @@ snid data/sn2024ggi.dat --complete
 #### Examples
 ```bash
 # Standard mode - main outputs without detailed plots
-snid data/sn2024ggi.dat --output-dir results/
+sage data/sn2024ggi.dat --output-dir results/
 
 # Complete mode - all outputs including detailed GUI-style plots
-snid data/sn2024ggi.dat --output-dir results/ --complete
+sage data/sn2024ggi.dat --output-dir results/ --complete
 ```
 
-### `snid batch`
+### `sage batch`
 
 Process multiple spectra simultaneously with optimized workflows and detailed reporting.
 
 #### Basic Usage
 ```bash
-snid batch <input_pattern> [options]
+sage batch <input_pattern> [options]
 ```
 
 #### Examples
 ```bash
 # Process all .dat files in a directory
-snid batch "data/*.dat" --output-dir batch_results/
+sage batch "data/*.dat" --output-dir batch_results/
 
 # Process specific files
-snid batch "data/sn2024*.dat" --output-dir results/
+sage batch "data/sn2024*.dat" --output-dir results/
 
 # With template directory
-snid batch "data/*.dat" templates/ --output-dir results/
+sage batch "data/*.dat" templates/ --output-dir results/
 
 # Parallel processing
-snid batch "data/*.dat" --output-dir results/ --parallel 4
+sage batch "data/*.dat" --output-dir results/ --parallel 4
 ```
 
 #### Batch Options
@@ -110,23 +110,23 @@ snid batch "data/*.dat" --output-dir results/ --parallel 4
 --age-max DAYS          # Maximum template age
 ```
 
-### `snid config`
+### `sage config`
 
 Manage SNID SAGE configuration settings.
 
 #### Basic Usage
 ```bash
-snid config <command> [options]
+sage config <command> [options]
 ```
 
 #### Commands
 ```bash
-snid config show                    # Show current configuration
-snid config set <key> <value>       # Set configuration value
-snid config get <key>               # Get configuration value
-snid config reset                   # Reset to defaults
-snid config export                  # Export configuration
-snid config import <file>           # Import configuration
+sage config show                    # Show current configuration
+sage config set <key> <value>       # Set configuration value
+sage config get <key>               # Get configuration value
+sage config reset                   # Reset to defaults
+sage config export                  # Export configuration
+sage config import <file>           # Import configuration
 ```
 
 #### Configuration Keys
@@ -150,50 +150,50 @@ preprocessing.telluric_correction   # Telluric correction
 #### Examples
 ```bash
 # Show current configuration
-snid config show
+sage config show
 
 # Set template directory
-snid config set paths.templates_dir /path/to/templates
+sage config set paths.templates_dir /path/to/templates
 
 # Set analysis parameters
-snid config set analysis.min_correlation 0.8
-snid config set analysis.max_redshift 0.1
+sage config set analysis.min_correlation 0.8
+sage config set analysis.max_redshift 0.1
 
 # Export configuration
-snid config export > my_config.yaml
+sage config export > my_config.yaml
 ```
 
-### `snid templates`
+### `sage templates`
 
 Manage template library and template-related operations.
 
 #### Basic Usage
 ```bash
-snid templates <command> [options]
+sage templates <command> [options]
 ```
 
 #### Commands
 ```bash
-snid templates list                  # List available templates
-snid templates info <template>       # Show template information
-snid templates search <query>        # Search templates
-snid templates validate              # Validate template library
-snid templates update                # Update template library
+sage templates list                  # List available templates
+sage templates info <template>       # Show template information
+sage templates search <query>        # Search templates
+sage templates validate              # Validate template library
+sage templates update                # Update template library
 ```
 
 #### Examples
 ```bash
 # List all templates
-snid templates list
+sage templates list
 
 # Search for Type Ia templates
-snid templates search "Ia"
+sage templates search "Ia"
 
 # Show template information
-snid templates info "SN1994D"
+sage templates info "SN1994D"
 
 # Validate template library
-snid templates validate
+sage templates validate
 ```
 
 ## Advanced Options
@@ -239,7 +239,7 @@ snid templates validate
 
 for file in data/*.dat; do
     echo "Analyzing $file..."
-    snid identify "$file" \
+    sage identify "$file" \
         --output-dir "results/$(basename "$file" .dat)" \
         --min-correlation 0.85 \
         --save-plots
@@ -256,7 +256,7 @@ log_file="batch_results/analysis.log"
 
 echo "Starting batch analysis at $(date)" > "$log_file"
 
-snid batch "data/*.dat" \
+sage batch "data/*.dat" \
     --output-dir batch_results/ \
     --parallel 4 \
     --min-correlation 0.8 \
@@ -272,19 +272,19 @@ echo "Batch analysis completed at $(date)" >> "$log_file"
 # Set up analysis configuration
 
 # Set template directory
-snid config set paths.templates_dir /path/to/templates
+sage config set paths.templates_dir /path/to/templates
 
 # Set analysis parameters
-snid config set analysis.min_correlation 0.85
-snid config set analysis.max_redshift 0.1
-snid config set analysis.age_range "-10,30"
+sage config set analysis.min_correlation 0.85
+sage config set analysis.max_redshift 0.1
+sage config set analysis.age_range "-10,30"
 
 # Set preprocessing parameters
-snid config set preprocessing.smoothing_window 15
-snid config set preprocessing.smoothing_order 3
+sage config set preprocessing.smoothing_window 15
+sage config set preprocessing.smoothing_order 3
 
 # Export configuration
-snid config export > analysis_config.yaml
+sage config export > analysis_config.yaml
 ```
 
 ### Integration with Other Tools
@@ -298,7 +298,7 @@ def analyze_spectrum(spectrum_file, output_dir):
     """Analyze spectrum using SNID SAGE CLI"""
     
     cmd = [
-        'snid', 'identify', spectrum_file,
+        'sage', 'identify', spectrum_file,
         '--output-dir', output_dir,
         '--output-format', 'json',
         '--min-correlation', '0.8'
@@ -327,7 +327,7 @@ for file in data/*.dat; do
     echo "Processing $file..." >> report.txt
     
     # Run analysis
-    snid identify "$file" --output-dir "results/$(basename "$file" .dat)"
+    sage identify "$file" --output-dir "results/$(basename "$file" .dat)"
     
     # Extract results
     if [ -f "results/$(basename "$file" .dat)/results.json" ]; then
@@ -359,13 +359,13 @@ pip install --upgrade snid-sage
 #### Template Library Issues
 ```bash
 # Check template directory
-snid config get paths.templates_dir
+sage config get paths.templates_dir
 
 # Validate templates
-snid templates validate
+sage templates validate
 
 # Update templates
-snid templates update
+sage templates update
 ```
 
 #### Analysis Failures
@@ -374,7 +374,7 @@ snid templates update
 file data/sn2024ggi.dat
 
 # Run with verbose output
-snid identify data/sn2024ggi.dat --verbose
+sage identify data/sn2024ggi.dat --verbose
 
 # Check error logs
 cat results/error.log

@@ -129,13 +129,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Special case: if first argument looks like a spectrum file,
     # treat it as the default "identify" command for convenience
     if len(argv) >= 1 and not argv[0].startswith('-') and argv[0] not in ['identify', 'batch', 'config']:
-        # Implicit identify mode: snid <spectrum> [templates/]
+        # Implicit identify mode: sage <spectrum> [templates/]
         # Show a brief interactive tip only in verbose/debug to avoid default noise
         try:
             wants_verbose = any(f in argv for f in ['-v', '--verbose', '-d', '--debug'])
             if sys.stderr.isatty() and wants_verbose:
                 print(
-                    "Tip: 'snid <file>' runs 'snid identify <file>'. Use 'snid identify' for clarity.",
+                    "Tip: 'sage <file>' runs 'sage identify <file>'. Use 'sage identify' for clarity.",
                     file=sys.stderr
                 )
         except Exception:

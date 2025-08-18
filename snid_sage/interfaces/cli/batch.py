@@ -754,22 +754,22 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.epilog = """
 Examples:
   # Auto-discover templates - minimal mode (only summary report)
-  snid batch "spectra/*" --output-dir results/ --minimal
+  sage batch "spectra/*" --output-dir results/ --minimal
   
   # Auto-discover templates - complete mode (all outputs + 3D plots)
-  snid batch "spectra/*" --output-dir results/ --complete
+  sage batch "spectra/*" --output-dir results/ --complete
   
   # Auto-discover templates - default mode (main outputs + summary)
-  snid batch "spectra/*" --output-dir results/
+  sage batch "spectra/*" --output-dir results/
   
   # Explicit templates directory
-  snid batch "spectra/*" templates/ --output-dir results/
+  sage batch "spectra/*" templates/ --output-dir results/
   
   # Custom redshift range with auto-discovery
-  snid batch "*.dat" --zmin 0.0 --zmax 0.5 --output-dir results/
+  sage batch "*.dat" --zmin 0.0 --zmax 0.5 --output-dir results/
   
   # With forced redshift and explicit templates
-  snid batch "*.dat" templates/ --forced-redshift 0.1 --output-dir results/
+  sage batch "*.dat" templates/ --forced-redshift 0.1 --output-dir results/
     """
     
     # Required arguments
@@ -904,7 +904,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     report.append("")
     
     report.append(f"ANALYSIS PARAMETERS:")
-    report.append(f"   Redshift Search Range: {args.zmin:.3f} ≤ z ≤ {args.zmax:.3f}")
+    report.append(f"   Redshift Search Range: {args.zmin:.6f} ≤ z ≤ {args.zmax:.6f}")
     if args.forced_redshift is not None:
         report.append(f"   Forced Redshift: z = {args.forced_redshift:.6f}")
     if args.type_filter:

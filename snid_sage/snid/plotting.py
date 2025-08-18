@@ -1451,19 +1451,8 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
                 
                 # DON'T filter template - only input spectrum should be filtered
                 
-                # Simple scaling to match input flux level
-                if len(plot_flux) > 0 and input_flux is not None:
-                    # Interpolate input flux at template wavelengths for scaling
-                    interp_input = np.interp(plot_wave, input_wave, input_flux)
-                    
-                    # Scale template to match input flux level
-                    input_median = np.median(interp_input)
-                    template_median = np.median(plot_flux)
-                    
-                    if template_median > 0:
-                        scale_factor = input_median / template_median
-                        plot_flux *= scale_factor
-                    
+                # Plot without any amplitude rescaling to match GUI behavior
+                if len(plot_flux) > 0:
                     ax.plot(plot_wave, plot_flux, color='#E74C3C', linewidth=2,
                            label='Template')
                     template_plotted = True
