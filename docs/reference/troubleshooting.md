@@ -396,7 +396,7 @@ snid spectrum.dat --output-dir results/ --minimal
 ### Before Asking for Help:
 
 1. **Check this guide** - Most issues are covered here
-2. **Search documentation** - Use the navigation guide
+2. **Search documentation** - Use the main documentation index
 3. **Try verbose mode** - `--verbose` provides detailed info
 4. **Check system requirements** - Ensure compatibility
 

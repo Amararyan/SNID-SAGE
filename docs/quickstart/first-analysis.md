@@ -49,6 +49,10 @@ Once loaded, your spectrum appears in the main plot area. The interface shows:
 3. **Left-click** for **"Advanced Manual Preprocessing"** (custom settings)
 4. Review the cleaned spectrum
 
+![Quick Preprocessing - Flattened](../images/2.QuickPreprocessing_Flattened.png)
+
+The flattened view shows the continuum-removed spectrum, making absorption and emission features more prominent. This is the direct output of preprocessing.
+
 ![Quick Preprocessing - Flux](../images/2.QuickPreprocessing_Flux.png)
 
 The preprocessing dialog shows your spectrum with preprocessing options:
@@ -57,9 +61,7 @@ The preprocessing dialog shows your spectrum with preprocessing options:
 - **Continuum removal**: Normalize the spectrum
 - **Apodization**: Smooth spectral edges
 
-![Quick Preprocessing - Flattened](../images/2.QuickPreprocessing_Flattened.png)
-
-The flattened view shows the continuum-removed spectrum, making absorption and emission features more prominent.
+You can switch to the flux view by clicking the **Flux** button in the top-left corner.
 
 ### Step 4: Run Analysis
 1. Click **"SNID Analysis"** button (magenta - now enabled)

@@ -78,8 +78,6 @@ nav:
   - Start:
     - Installation: installation/installation.md
     - First Analysis: quickstart/first-analysis.md
-    - Task Hub: task-hub.md
-    - Navigation Guide: navigation-guide.md
 
   - Using SNID SAGE:
     - GUI Overview: gui/interface-overview.md

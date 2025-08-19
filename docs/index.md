@@ -34,12 +34,7 @@ Welcome to the **SNID SAGE** documentation – a complete guide to Supernova spe
   
   [GUI Guide](gui/interface-overview.md) · [CLI Reference](cli/command-reference.md)
 
-- **Task Hub**
 
-  ---
-  One-liners and deep links for common tasks.
-
-  [Task Hub](task-hub.md)
 
 - **AI Features**
 
