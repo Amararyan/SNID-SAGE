@@ -2,22 +2,15 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
-## [0.6.0] - 2025-08-18
+## [0.6.0] - 2025-08-19
 
-### Changed
-- **BREAKING**: CLI command renamed from `snid` to `sage` to avoid conflicts with existing SNID tool
-- **BREAKING**: GUI utility commands renamed from `snid-lines`/`snid-templates` to `snid-sage-lines`/`snid-sage-templates`
-- Updated all documentation to reflect new command names
-- CLI tutorial now uses real analysis results from SN2018bif.fits
+- BREAKING: CLI renamed `snid` → `sage`; GUI utilities → `snid-sage-lines` / `snid-sage-templates`. Docs and entry points updated. Migration: replace `snid` with `sage`; main `snid-sage` unchanged.
 
-### Technical
-- Updated `pyproject.toml` entry points for new command names
-- Modified CLI modules to use `sage` command name
-- Updated all documentation examples and references
+- Analysis and messaging improvements:
+  - Distinguish “weak match” vs “no matches” in GUI/CLI; cluster “no valid clusters” logs downgraded to INFO.
+  - GUI: clearer status and dialogs for weak/no-match; added suggestion to reduce overlap threshold (`lapmin`).
+  - CLI: “No good matches” suggestions now include lowering `lapmin`.
+  - Batch CLI: adds “(weak)” marker in per-spectrum lines and suppresses cluster warnings.
 
-### Migration Notes
-- CLI users: replace `snid` with `sage` in all commands
-- GUI users: no changes needed for main `snid-sage` command
-- GUI utility users: update to `snid-sage-lines` and `snid-sage-templates`
-
----
+- Clustering/logging:
+  - More precise INFO messages for “no matches above RLAP-CCC” and “no types for clustering”.

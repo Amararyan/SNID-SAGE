@@ -203,6 +203,23 @@ class PySide6WorkflowManager:
                     # No controller available - fall back to basic state check
                     return state_requirement_met
             
+            # Special case for advanced features after analysis: require reliable matches
+            if definition.name in [
+                'emission_line_btn', 'cluster_summary_btn', 'gmm_btn',
+                'redshift_age_btn', 'subtype_proportions_btn', 'chat_btn'
+            ] and state_requirement_met:
+                if hasattr(self.main_window, 'app_controller') and self.main_window.app_controller:
+                    controller = self.main_window.app_controller
+                    res = getattr(controller, 'snid_results', None)
+                    if res is None:
+                        return False
+                    # Reliable if clustering succeeded or thresholded filtered_matches exist
+                    has_cluster = bool(getattr(res, 'clustering_results', None)) and res.clustering_results.get('success', False)
+                    has_thresholded = bool(getattr(res, 'filtered_matches', []))
+                    return bool(has_cluster or has_thresholded)
+                else:
+                    return False
+            
             # For all other buttons, just use the basic workflow state check
             return state_requirement_met
             

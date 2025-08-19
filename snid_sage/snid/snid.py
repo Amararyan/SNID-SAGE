@@ -1753,7 +1753,8 @@ def run_snid_analysis(
     # ============================================================================
     
     # Compute RLAP-CCC metric before clustering (multiply RLAP with capped CCC similarity)
-    if len(matches) >= 3:
+    # Always compute when we have any matches so weak/single-match cases still use RLAP-CCC
+    if len(matches) >= 1:
         # Check if RLAP-CCC is already computed for all matches
         already_computed = all('rlap_ccc' in match for match in matches)
         
@@ -1794,6 +1795,12 @@ def run_snid_analysis(
     # ============================================================================
     
     clustering_results = None
+    # Pre-compute RLAP-CCC thresholded list for fallback paths and summary logic
+    try:
+        from snid_sage.shared.utils.math_utils import get_best_metric_value
+        thresholded_matches = [m for m in matches if get_best_metric_value(m) >= float(rlap_ccc_threshold)]
+    except Exception:
+        thresholded_matches = list(matches)
     
     if len(matches) >= 1:  # Allow clustering with any number of matches
         try:
@@ -1825,15 +1832,27 @@ def run_snid_analysis(
                 result.clustering_results = clustering_results
                 result.clustering_method = 'cosmological_gmm'
             else:
-                _LOG.warning("Cosmological GMM clustering failed to find good clusters")
-                filtered_matches = matches
+                # Separate cases: no survivors vs weak survivors
+                if len(thresholded_matches) == 0:
+                    _LOG.info("No matches survived RLAP-CCC threshold; skipping clustering")
+                else:
+                    _LOG.info("Clustering not reliable; proceeding with weak matches without forming a cluster")
+                # If nothing survives the RLAP-CCC threshold, treat as no matches
+                # Otherwise, treat surviving matches as weak (no clusters)
+                filtered_matches = thresholded_matches
                 result.clustering_method = 'none'
+                # Preserve the failure reason for summary/GUI messaging
+                try:
+                    result.clustering_failure_reason = clustering_results.get('reason')
+                except Exception:
+                    result.clustering_failure_reason = 'unknown'
                 result.clustering_results = None
                 
         except ImportError as e:
             _LOG.error(f"Could not import improved clustering (sklearn required): {e}")
-            filtered_matches = matches
+            filtered_matches = thresholded_matches
             result.clustering_method = 'none'
+            result.clustering_failure_reason = 'exception'
             result.clustering_results = None
         except Exception as e:
             _LOG.error(f"Top-10% RLAP clustering failed: {e}")
@@ -1841,8 +1860,9 @@ def run_snid_analysis(
             result.clustering_method = 'none'
             result.clustering_results = None
     else:
-        filtered_matches = matches
+        filtered_matches = thresholded_matches
         result.clustering_method = 'none'
+        result.clustering_failure_reason = 'insufficient_matches'
         result.clustering_results = None
         _LOG.info(f"Not enough matches for GMM clustering, using all {len(matches)} matches")
 
@@ -1851,7 +1871,12 @@ def run_snid_analysis(
     # Statistical analysis and type determination (same as original)
     result.initial_redshift = compute_initial_redshift(matches)
 
-    report_progress("Determining supernova type classification")
+    # Only report type classification step when there are reliable matches to classify
+    try:
+        if filtered_matches and len(filtered_matches) > 0:
+            report_progress("Determining supernova type classification")
+    except Exception:
+        pass
     _LOG.info("Running type determination analysis...")
     
     # Use cluster-aware subtype determination if clustering was successful
@@ -2242,9 +2267,8 @@ def run_snid_analysis(
         if any_ccc and isinstance(rlap_ccc_threshold, (int, float)):
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             filtered = [m for m in overlay_candidates if get_best_metric_value(m) >= float(rlap_ccc_threshold)]
-            # Fallback to original candidates if filtering removes all
-            if filtered:
-                overlay_candidates = filtered
+            # Do NOT fallback if filtering removes all — empty list correctly signals no reliable matches
+            overlay_candidates = filtered
     except Exception:
         pass
 

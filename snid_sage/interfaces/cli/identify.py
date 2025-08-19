@@ -923,7 +923,7 @@ def main(args: argparse.Namespace) -> int:
                     print("  • Try Advanced Preprocessing (smoothing, wavelength masks, continuum)")
                     print("  • Adjust the redshift search range or try a manual redshift estimate")
                     print("  • Mask strong sky/telluric features; increase S/N if possible")
-                    print("  • Ensure the correct template sets are enabled")
+                    print("  • Reduce spectrum–template overlap threshold (lapmin) to allow more partial matches")
                 return 2
             else:
                 print(f"\nSNID analysis failed for {spectrum_name}")

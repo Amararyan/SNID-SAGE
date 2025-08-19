@@ -338,6 +338,19 @@ def process_single_spectrum_optimized(
         if result.success:
             # Create GUI-style summary with cluster-aware analysis
             summary = _create_cluster_aware_summary(result, spectrum_name, spectrum_path)
+            # Flag weak match if clustering failed but some matches survived threshold
+            try:
+                has_clusters = bool(getattr(result, 'clustering_results', None)) and getattr(result, 'clustering_results', {}).get('success', False)
+                surviving = len(getattr(result, 'filtered_matches', []) or [])
+                weak_match = (not has_clusters) and (surviving > 0)
+            except Exception:
+                weak_match = False
+
+            if weak_match:
+                summary['weak_match'] = True
+            else:
+                summary['weak_match'] = False
+
             return spectrum_name, True, "Success", summary
         else:
             return spectrum_name, False, "No good matches found", {
@@ -1329,11 +1342,11 @@ def main(args: argparse.Namespace) -> int:
                         type_display = f"{consensus_type} {consensus_subtype}".strip()
                         metric_str = f"{best_metric_name}={best_metric_value:.1f}"
                         z_value = redshift
-                        print(
-                            f"[{i}/{len(input_files)}] {name}: {type_display} z={z_value:.6f} {metric_str} tpl={best_template_short}"
-                        )
+                        weak_note = " (weak)" if summary.get('weak_match') else ""
+                        print(f"[{i}/{len(input_files)}] {name}: {type_display}{weak_note} z={z_value:.6f} {metric_str} tpl={best_template_short}")
                     else:
-                        print(f"      {name}: {type_display} z={redshift:.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
+                        weak_note = " (weak)" if summary.get('weak_match') else ""
+                        print(f"      {name}: {type_display}{weak_note} z={redshift:.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
                 else:
                     if not is_quiet and not brief_mode:
                         print(f"      {name}: success")

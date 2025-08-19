@@ -233,7 +233,7 @@ def perform_direct_gmm_clustering(
         _LOGGER.info(f"✅ Proceeding with {len(filtered_matches)} matches for clustering")
     
     if not filtered_matches:
-        _LOGGER.warning(f"No matches above RLAP-CCC threshold {rlap_ccc_threshold:.1f}")
+        _LOGGER.info(f"No matches above RLAP-CCC threshold {rlap_ccc_threshold:.1f}")
         return {'success': False, 'reason': 'no_matches_above_threshold'}
     
     # Group filtered matches by type
@@ -252,7 +252,7 @@ def perform_direct_gmm_clustering(
     }
     
     if not filtered_type_groups:
-        _LOGGER.warning("No types have any matches for clustering")
+        _LOGGER.info("No types have any matches for clustering")
         return {'success': False, 'reason': 'no_matches'}
     
     _LOGGER.info(f"📊 Processing {len(filtered_type_groups)} types: {list(filtered_type_groups.keys())}")
@@ -423,7 +423,7 @@ def perform_direct_gmm_clustering(
     
     # Select best cluster using the new top-5 best metric method
     if not all_cluster_candidates:
-        _LOGGER.warning("No valid clusters found")
+        _LOGGER.info("No valid clusters found")
         return {'success': False, 'reason': 'no_clusters'}
     
     # Use the new top-5 method for cluster selection

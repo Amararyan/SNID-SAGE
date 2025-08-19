@@ -746,8 +746,12 @@ class PySide6AppController(QtCore.QObject):
                     num_best = len(self.snid_results.best_matches)
             except Exception:
                 num_best = 0
-            # Treat as success only if engine succeeded AND (a good cluster exists OR we have any matches)
-            final_success = bool(is_engine_success and (has_good_cluster or num_best >= 1))
+            # Treat as success only if engine succeeded AND (a good cluster exists OR thresholded matches exist)
+            try:
+                thresholded_count = len(getattr(self.snid_results, 'filtered_matches', []) or [])
+            except Exception:
+                thresholded_count = 0
+            final_success = bool(is_engine_success and (has_good_cluster or thresholded_count >= 1))
 
             if final_success:
                 progress_callback("Analysis completed successfully!", 100)
@@ -755,10 +759,10 @@ class PySide6AppController(QtCore.QObject):
                 self.analysis_completed.emit(True)
                 _LOGGER.info("SNID analysis completed successfully (valid cluster found)")
             else:
-                progress_callback("Analysis inconclusive: no reliable cluster found", 100)
+                progress_callback("Analysis inconclusive: no reliable matches above threshold", 100)
                 self.analysis_running = False
                 self.analysis_completed.emit(False)
-                _LOGGER.info("SNID analysis inconclusive - no proper matching cluster")
+                _LOGGER.info("SNID analysis inconclusive - no reliable matches above threshold")
             
         except InterruptedError:
             # Graceful cancellation path

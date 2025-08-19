@@ -79,10 +79,19 @@ class UnifiedResultsFormatter:
         
         # Determine which metric is being used
         self.use_rlap_cos = False
+        # Default to RLAP-CCC when any enhanced metric is available on best match; fallback to RLAP
         self.metric_name = "RLAP"
         if hasattr(result, 'clustering_results') and result.clustering_results:
             self.use_rlap_cos = result.clustering_results.get('use_rlap_cos', False)
             self.metric_name = result.clustering_results.get('metric_used', 'RLAP-CCC' if self.use_rlap_cos else 'RLAP')
+        else:
+            try:
+                # Inspect best match to decide metric label
+                best_list = getattr(result, 'filtered_matches', None) or getattr(result, 'best_matches', None) or []
+                if best_list and isinstance(best_list, list) and ('rlap_ccc' in best_list[0]):
+                    self.metric_name = 'RLAP-CCC'
+            except Exception:
+                pass
         
         # Create standardized summary data
         self.summary_data = self._create_standardized_summary()
@@ -575,10 +584,9 @@ class UnifiedResultsFormatter:
                     if margin_text:
                         best_type_info_parts.append(f"margin over next-best type {second_best_type}: +{margin_text}%")
         # Compose Best Type line
-        if best_type_info_parts:
-            lines.append(f"Best Type: {s['consensus_type']} ({'; '.join(best_type_info_parts)})")
-        else:
-            lines.append(f"Best Type: {s['consensus_type']}")
+        lines.append(
+            f"Best Type: {s['consensus_type']} ({'; '.join(best_type_info_parts)})" if best_type_info_parts else f"Best Type: {s['consensus_type']}"
+        )
         
         # Subtype with confidence and margin consolidated into parentheses (no indent) and renamed to Best Subtype
         if s['consensus_subtype'] and s['consensus_subtype'] != 'Unknown':
@@ -607,7 +615,10 @@ class UnifiedResultsFormatter:
         # Measurements are integrated into the Best Type section (no separate header)
         
         # Use enhanced (weighted) redshift if clustering was used, otherwise regular
-        if s['has_clustering'] and s['enhanced_redshift'] != s['redshift']:
+        # Suppress redshift display when not clustered and matches are too few (≤2)
+        template_count = len(s.get('template_matches', [])) if isinstance(s.get('template_matches', []), list) else 0
+        suppress_redshift_age = (not s['has_clustering']) and (template_count <= 2)
+        if (not suppress_redshift_age) and s['has_clustering'] and s['enhanced_redshift'] != s['redshift']:
             # Check if we're using subtype-specific redshift
             if s.get('using_subtype_redshift', False):
                 # Show subtype-specific redshift as primary
@@ -644,12 +655,12 @@ class UnifiedResultsFormatter:
                 notes_str = f" ({'; '.join(notes)})" if notes else ""
                 redshift_text = f"Redshift: {s['enhanced_redshift']:.6f} ± {s['enhanced_redshift_error']:.6f}{notes_str}"
                 lines.append(redshift_text)
-        else:
+        elif not suppress_redshift_age:
             # Regular redshift from best template
             lines.append(f"Redshift: {s['redshift']:.6f} ± {s['redshift_error']:.6f} (correlation fit uncertainty)")
         
-        # Display age information
-        if s['enhanced_age'] is not None and np.isfinite(s['enhanced_age']):
+        # Display age information (suppress in weak/no-cluster small-match cases)
+        if (not suppress_redshift_age) and s['enhanced_age'] is not None and np.isfinite(s['enhanced_age']):
             # Check if we're using subtype-specific age
             if s.get('using_subtype_age', False):
                 # Show subtype-specific age as primary with inline weighting note
@@ -746,6 +757,26 @@ class UnifiedResultsFormatter:
                     f"{age_str:>{age_w}}"
                 )
         
+        # Weak/no-match note for cases with no clustering and very few thresholded matches
+        try:
+            # If clustering failed or absent, check number of filtered matches that survive RLAP-CCC threshold
+            result = self.result
+            failure_reason = getattr(result, 'clustering_failure_reason', '')
+            has_clusters = bool(getattr(result, 'clustering_results', None)) and getattr(result, 'clustering_results', {}).get('success', False)
+            if not has_clusters:
+                fm = getattr(result, 'filtered_matches', []) or []
+                # Determine if best metric is RLAP-CCC by inspecting fields
+                any_ccc = any(('rlap_ccc' in m) for m in fm)
+                surviving = len(fm)
+                if surviving == 0:
+                    lines.append("")
+                    lines.append("No matches above RLAP-CCC threshold. Try Advanced Preprocessing or different parameters.")
+                elif surviving <= 2:
+                    lines.append("")
+                    lines.append("Only weak match(es) above RLAP-CCC threshold. Results may be unreliable.")
+        except Exception:
+            pass
+
         # Filter out empty strings and join
         return "\n".join(line for line in lines if line is not None)
     

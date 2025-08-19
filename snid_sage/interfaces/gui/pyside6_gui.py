@@ -1028,7 +1028,10 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                             # No clustering - tailor message based on match quality and keep open briefly
                             results = getattr(self.app_controller, 'snid_results', None)
                             type_conf = getattr(results, 'type_confidence', 0.0) if results else 0.0
-                            is_weak = (type_conf < 0.30)
+                            # Weak if low confidence OR no matches above RLAP-CCC threshold
+                            fm = getattr(results, 'filtered_matches', []) if results else []
+                            is_above_threshold = bool(fm and len(fm) > 0)
+                            is_weak = (type_conf < 0.30) or (not is_above_threshold)
                             msg = (
                                 "Only a weak match was found – try Advanced Preprocessing (smoothing, masking, continuum) to improve results."
                                 if is_weak else
@@ -1075,16 +1078,23 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 # Update status label based on result quality
                 results = getattr(self.app_controller, 'snid_results', None)
                 type_conf = getattr(results, 'type_confidence', 0.0) if results else 0.0
-                if not has_good_cluster and type_conf < 0.30:
-                    self.status_label.setText("Analysis finished with weak match – consider Advanced Preprocessing")
+                fm = getattr(results, 'filtered_matches', []) if results else []
+                if (not has_good_cluster):
+                    if not fm:
+                        self.status_label.setText("Analysis inconclusive – no reliable matches above threshold")
+                    elif type_conf < 0.30:
+                        self.status_label.setText("Analysis weak – only low-quality matches above threshold")
+                    else:
+                        self.status_label.setText("SNID analysis completed")
                 else:
                     self.status_label.setText("SNID analysis completed")
                 
-                # Enable analysis plot buttons
+                # Enable analysis plot/navigation buttons only when we have reliable matches
+                reliable = bool(getattr(results, 'clustering_results', None) and results.clustering_results.get('success')) or bool(fm)
                 for btn in self.analysis_plot_buttons:
-                    btn.setEnabled(True)
+                    btn.setEnabled(reliable)
                 for btn in self.nav_buttons:
-                    btn.setEnabled(True)
+                    btn.setEnabled(reliable)
                 
                 # CRITICAL: Refresh workflow manager button states after analysis completion
                 # This ensures navigation buttons get proper styling when templates become available
@@ -1092,9 +1102,9 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     self.workflow_manager.refresh_button_states()
                     _LOGGER.debug("🔄 Workflow manager button states refreshed after analysis completion")
                 
-                # Enable advanced features
-                self.emission_line_overlay_btn.setEnabled(True)
-                self.ai_assistant_btn.setEnabled(True)
+                # Enable advanced features only when we have reliable matches above threshold
+                self.emission_line_overlay_btn.setEnabled(reliable)
+                self.ai_assistant_btn.setEnabled(reliable)
                 
                 # Update status indicators
                 self.config_status_label.setText("Analysis Complete")
@@ -1107,13 +1117,23 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     # No clustering - provide quality-aware guidance instead of success prompt
                     results = getattr(self.app_controller, 'snid_results', None)
                     type_conf = getattr(results, 'type_confidence', 0.0) if results else 0.0
-                    if type_conf < 0.30:
+                    fm = getattr(results, 'filtered_matches', []) if results else []
+                    if not fm:
                         QtWidgets.QMessageBox.information(
                             self,
-                            "Weak Match Found",
+                            "No Reliable Matches",
                             (
-                                "Only a weak match was found for this spectrum.\n\n"
+                                "The analysis completed, but no reliable matches were found above the RLAP-CCC threshold.\n\n"
                                 "Try Advanced Preprocessing (smoothing, wavelength masks, continuum adjustments) to improve the results."
+                            )
+                        )
+                    elif type_conf < 0.30:
+                        QtWidgets.QMessageBox.information(
+                            self,
+                            "Weak Matches",
+                            (
+                                "Only weak match(es) were found above the RLAP-CCC threshold. Results may be unreliable.\n\n"
+                                "You can try Advanced Preprocessing (smoothing, wavelength masks, continuum adjustments) to improve the results."
                             )
                         )
                     else:
@@ -1151,7 +1171,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     # Inconclusive: no good matches found – guide the user
                     self.status_label.setText("Analysis inconclusive – no good matches found")
                     self.config_status_label.setText("Inconclusive")
-                    self.config_status_label.setStyleSheet("font-style: italic; color: #d97706;")
+                    self.config_status_label.setStyleSheet("font-style: italic; color: #d97706; font-size: 10px !important; font-weight: normal !important; font-family: 'Arial', 'Helvetica', 'Segoe UI', 'Ubuntu', 'DejaVu Sans', sans-serif !important; line-height: 1.0 !important;")
 
                     QtWidgets.QMessageBox.information(
                         self,
@@ -1162,7 +1182,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                             "• Use Advanced Preprocessing (smoothing, wavelength masks, continuum).\n"
                             "• Adjust the redshift search range or try a manual redshift estimate.\n"
                             "• Mask strong sky/telluric features; increase S/N if possible.\n"
-                            "• Ensure the correct template sets are enabled."
+                            "• Reduce spectrum–template overlap threshold (lapmin) to allow more partial matches."
                         )
                     )
                 else:
