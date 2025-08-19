@@ -387,8 +387,14 @@ class UnifiedResultsFormatter:
             'cluster_statistical_significance': winning_cluster.get('confidence_assessment', {}).get('statistical_significance', '') if winning_cluster else '',
             'cluster_second_best_type': winning_cluster.get('confidence_assessment', {}).get('second_best_type', '') if winning_cluster else '',
             
-            # Template matches (ALL from active matches if clustering, otherwise top 10)
-            'template_matches': self._format_template_matches(cluster_matches) if winning_cluster and cluster_matches else self._format_template_matches(active_matches[:10]),
+            # Template matches (ALL from active matches if clustering, otherwise respect engine-selected count)
+            'template_matches': (
+                self._format_template_matches(cluster_matches)
+                if winning_cluster and cluster_matches
+                else self._format_template_matches(
+                    active_matches[: max(1, len(getattr(result, 'best_matches', []) or []))]
+                )
+            ),
             
             # Additional clustering statistics
             'clustering_overview': self._get_clustering_overview() if hasattr(result, 'clustering_results') else None,

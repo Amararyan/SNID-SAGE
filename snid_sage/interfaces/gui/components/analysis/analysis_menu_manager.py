@@ -268,13 +268,23 @@ class AnalysisMenuManager:
             self.main_window.status_label.setText("Running quick SNID analysis...")
             
             # Run analysis via app controller with default parameters
+            # Respect configured max_output_templates if available
+            try:
+                configured_max = (
+                    int(self.app_controller.current_config.get('analysis', {}).get('max_output_templates', 10))
+                    if hasattr(self.app_controller, 'current_config') and self.app_controller.current_config is not None
+                    else 10
+                )
+            except Exception:
+                configured_max = 10
+
             success = self.app_controller.run_analysis(
                 zmin=-0.01,
                 zmax=1.0,
                 age_range=None,
                 lapmin=0.3,
                 rlapmin=5.0,
-                max_output_templates=10,
+                max_output_templates=configured_max,
                 verbose=False,
                 show_plots=False,
                 save_plots=False
@@ -614,11 +624,19 @@ class AnalysisMenuManager:
                                                           reverse=True)
                         
                         # Update best_matches to only contain cluster templates
-                        max_templates = 10  # Default limit
-                        snid_results.best_matches = cluster_matches_sorted[:max_templates]
+                        # Preserve the engine-selected number of templates (respects user setting)
+                        try:
+                            engine_limit = len(getattr(snid_results, 'best_matches', []) or [])
+                            if engine_limit <= 0:
+                                engine_limit = len(getattr(snid_results, 'top_matches', []) or [])
+                        except Exception:
+                            engine_limit = 10
+                        if engine_limit <= 0:
+                            engine_limit = 10
+                        snid_results.best_matches = cluster_matches_sorted[:engine_limit]
                         
                         # Also update top_matches and filtered_matches for consistency
-                        snid_results.top_matches = cluster_matches_sorted[:max_templates]
+                        snid_results.top_matches = cluster_matches_sorted[:engine_limit]
                         snid_results.filtered_matches = cluster_matches_sorted
                         
                         _LOGGER.info(f"🎯 Filtered templates: {len(cluster_matches)} cluster matches -> "

@@ -970,8 +970,12 @@ class PySide6ManualRedshiftDialog(QtWidgets.QDialog):
                 rlapmin=2.0,  # Lower threshold for galaxy detection
                 lapmin=0.15,  # Lower overlap requirement for galaxies
                 peak_window_size=20,  # Larger window for broader galaxy features
-                # Output control
-                max_output_templates=20,
+                # Output control: respect configured max_output_templates when available
+                max_output_templates=(
+                    int(self.parent_gui.app_controller.current_config.get('analysis', {}).get('max_output_templates', 20))
+                    if hasattr(self, 'parent_gui') and hasattr(self.parent_gui, 'app_controller') and hasattr(self.parent_gui.app_controller, 'current_config') and self.parent_gui.app_controller.current_config is not None
+                    else 20
+                ),
                 verbose=False,
                 show_plots=False,
                 save_plots=False,

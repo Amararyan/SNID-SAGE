@@ -208,7 +208,7 @@ class EmissionLineStep2Analysis:
             self.parent.step2_next_btn.setEnabled(has_lines and self.current_line_index < len(self.available_lines) - 1)
     
     def on_zoom_changed(self, value):
-        """Handle zoom range change with fixed zoom value of 100"""
+        """Handle zoom range change with fixed zoom value of 150"""
         # Fixed zoom value of 100 Å - always plot focused line
         self.plot_focused_line()
     
@@ -256,7 +256,7 @@ class EmissionLineStep2Analysis:
                 return
             
             # Find region around line
-            zoom_range = 100  # Fixed zoom value
+            zoom_range = 150  # Fixed zoom value
             mask = (wave >= obs_wavelength - zoom_range) & (wave <= obs_wavelength + zoom_range)
             
             if not np.any(mask):
@@ -558,7 +558,7 @@ class EmissionLineStep2Analysis:
                 )
     
     def plot_focused_line(self):
-        """Plot focused view of current line with fixed zoom value of 100"""
+        """Plot focused view of current line with fixed zoom value of 150"""
         if not PYQTGRAPH_AVAILABLE or not self.parent.plot_item or not self.available_lines:
             return
         
@@ -568,8 +568,8 @@ class EmissionLineStep2Analysis:
             line_collection = self.parent.sn_lines if line_type == 'sn' else self.parent.galaxy_lines
             obs_wavelength, line_data = line_collection[line_name]
             
-            # Fixed zoom value of 100 Å
-            zoom_range = 100
+            # Fixed zoom value of 150 Å
+            zoom_range = 150
             
             # Get spectrum data
             wave = self.spectrum_data.get('wave', np.array([]))
