@@ -37,16 +37,16 @@ sage <spectrum_file> [options]
 #### Examples
 ```bash
 # Basic analysis
-sage data/sn2024ggi.dat
+sage data/SN2018bif.csv
 
 # With output directory
-sage data/sn2024ggi.dat --output-dir results/
+sage data/SN2018bif.csv --output-dir results/
 
 # With specific redshift
-sage data/sn2024ggi.dat --forced-redshift 0.045
+sage data/SN2018bif.csv --forced-redshift 0.018
 
 # Complete mode with all plots
-sage data/sn2024ggi.dat --complete
+sage data/SN2018bif.csv --complete
 ```
 
 #### Output Modes
@@ -70,10 +70,10 @@ sage data/sn2024ggi.dat --complete
 #### Examples
 ```bash
 # Standard mode - main outputs without detailed plots
-sage data/sn2024ggi.dat --output-dir results/
+sage data/SN2018bif.csv --output-dir results/
 
 # Complete mode - all outputs including detailed GUI-style plots
-sage data/sn2024ggi.dat --output-dir results/ --complete
+sage data/SN2018bif.csv --output-dir results/ --complete
 ```
 
 ### `sage batch`
@@ -371,10 +371,10 @@ sage templates update
 #### Analysis Failures
 ```bash
 # Check input file format
-file data/sn2024ggi.dat
+file data/SN2018bif.csv
 
 # Run with verbose output
-sage identify data/sn2024ggi.dat --verbose
+sage identify data/SN2018bif.csv --verbose
 
 # Check error logs
 cat results/error.log

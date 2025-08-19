@@ -11,7 +11,7 @@ SNID SAGE provides a Python API for:
 - **Result processing** and export
 - **Workflow automation** and customization
 
-## Quick Start
+## First Analysis
 
 ### **Basic Usage**
 ```python
@@ -639,7 +639,7 @@ except Exception as e:
 
 - **[CLI Reference](../cli/command-reference.md)** - Command-line interface
 - **[GUI Manual](../gui/interface-overview.md)** - Graphical interface
-- **[Tutorial](../tutorials/basic-analysis.md)** - Step-by-step guide
+- **[First Analysis](../quickstart/first-analysis.md)** - Step-by-step guide
 - **[Template Guide](../data/template-library.md)** - Template management
 
 ---

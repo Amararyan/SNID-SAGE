@@ -65,7 +65,7 @@ sage batch "data/*.dat" -o results/
 ## Documentation & Support
 
 - **[Complete Documentation](https://fiorenst.github.io/SNID-SAGE/)**
-- **[Quick Start Guide](https://fiorenst.github.io/SNID-SAGE/quickstart/first-analysis/)**
+- **[First Analysis Guide](https://fiorenst.github.io/SNID-SAGE/quickstart/first-analysis/)**
 - **[GUI Manual](https://fiorenst.github.io/SNID-SAGE/gui/interface-overview/)**
 - **[CLI Reference](https://fiorenst.github.io/SNID-SAGE/cli/command-reference/)**
 - **[AI Integration](https://fiorenst.github.io/SNID-SAGE/ai/overview/)**

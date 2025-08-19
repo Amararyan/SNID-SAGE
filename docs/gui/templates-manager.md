@@ -2,7 +2,7 @@
 
 Interactive manager for exploring, creating, and organizing templates.
 
-For step-by-step workflows and expanded CLI usage, see the tutorial: [Template Management](../tutorials/template-management.md).
+For step-by-step workflows and expanded CLI usage, see the [CLI Reference](../cli/command-reference.md).
 
 ### Overview
 - Left: Template browser (search, type filter)

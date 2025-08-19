@@ -182,7 +182,7 @@ pip install --upgrade snid-sage
 
 1. **Test Installation**: Run `snid-sage` to launch the GUI
 2. **Get Sample Data**: Download test spectra from TNS
-3. **Read Documentation**: Start with the [Quick Start Guide](../quickstart/first-analysis.md)
+3. **Read Documentation**: Start with the [First Analysis Guide](../quickstart/first-analysis.md)
 4. **Configure AI**: Set up OpenRouter for AI features (optional)
 
 ## Support

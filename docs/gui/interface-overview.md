@@ -85,6 +85,6 @@ See [Troubleshooting](../reference/troubleshooting.md).
 - ??? tip "Common parameters"
     Frequent controls and defaults are summarized in the [Parameters Reference](../reference/parameters.md). Use this as a quick cheat sheet while exploring the GUI.
 
-- [Quick Start Tutorial](../quickstart/first-analysis.md) - Your first analysis
-- [Advanced Analysis](../tutorials/advanced-analysis.md) - Deep dive into tools
+- [First Analysis](../quickstart/first-analysis.md) - Your first analysis
+- [CLI Reference](../cli/command-reference.md) - Deep dive into tools
 - [CLI Reference](../cli/command-reference.md) - Command-line alternative 

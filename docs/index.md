@@ -5,7 +5,7 @@ Welcome to the **SNID SAGE** documentation – a complete guide to Supernova spe
 ## Quick Links
  
 !!! tip "New to SNID SAGE? Start here"
-    1) [Installation](installation/installation.md) → 2) [Quick Start](quickstart/first-analysis.md) → 3) [GUI Overview](gui/interface-overview.md)
+    1) [Installation](installation/installation.md) → 2) [First Analysis](quickstart/first-analysis.md) → 3) [GUI Overview](gui/interface-overview.md)
  
 !!! info "Power users"
     Prefer scripting and automation? Jump to the [CLI Command Reference](cli/command-reference.md) and [Batch Processing](cli/batch-processing.md).
@@ -17,7 +17,7 @@ Welcome to the **SNID SAGE** documentation – a complete guide to Supernova spe
   ---
   New to SNID SAGE? Install the package and run your first analysis.
   
-  [Quick Start](quickstart/first-analysis.md)
+  [First Analysis](quickstart/first-analysis.md)
 
 - **Installation**
 
@@ -58,14 +58,14 @@ Welcome to the **SNID SAGE** documentation – a complete guide to Supernova spe
 Essential information for a fast first analysis.
 
 - **[Installation](installation/installation.md)** – Setup instructions
-- **[Quick Start](quickstart/first-analysis.md)** – A minimal end-to-end run
+- **[First Analysis](quickstart/first-analysis.md)** – A minimal end-to-end run
 - **[GUI Overview](gui/interface-overview.md)**
 - **[CLI Reference](cli/command-reference.md)**
 
 ### User Guides
 
 - **Interfaces** – GUI and CLI usage
-- **Analysis** – Data formats, advanced workflows, template management
+- **Analysis** – [Data formats](reference/supported-formats.md), advanced workflows, template management
 - **AI Features** – Local and remote LLM integration
 
 ### Tutorials & Examples
@@ -76,7 +76,7 @@ Hands-on walkthroughs covering basic to advanced use-cases.
 ## Need Help?
 
 - **[Troubleshooting](reference/troubleshooting.md)** – Diagnosing issues
-- **GitHub Issues** – Report bugs or request features
+- **[GitHub Issues](https://github.com/FiorenSt/SNID-SAGE/issues)** – Report bugs or request features
 
 ---
 

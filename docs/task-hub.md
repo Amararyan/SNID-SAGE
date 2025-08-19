@@ -12,12 +12,13 @@ Quick links to common workflows with one-liners and deep links.
   ```powershell
   sage batch "data/*.dat" templates/ --output-dir results/
   ```
+- Supported formats: FITS (.fits, .fit), ASCII (.dat, .txt, .csv, .flm)
+See: Supported Formats → `reference/supported-formats.md`
 
 ### Use a known redshift
 ```powershell
 sage spectrum.dat --output-dir results/ --forced-redshift 0.045
 ```
-See: GUI Redshift & Age → `gui/redshift-age.md`
 
 ### Improve a noisy spectrum
 ```powershell

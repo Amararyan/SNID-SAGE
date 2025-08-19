@@ -711,6 +711,11 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             self._update_preview()
         except Exception:
             pass
+        # Ensure plots are centered when a new step page opens
+        try:
+            self._trigger_auto_rescale()
+        except Exception:
+            pass
     
     # Step-0 UI handled in steps.step0_masking
     
@@ -834,6 +839,11 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                         _LOGGER.warning(f"Widget deletion during final refresh: {e}")
                     else:
                         raise
+                # After moving to next step, autoscale both plots to keep spectra centered
+                try:
+                    self._trigger_auto_rescale()
+                except Exception:
+                    pass
             
         except RuntimeError as e:
             if "Internal C++ object" in str(e):
@@ -904,6 +914,11 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             # Update UI and preview
             self._update_step_display()
             self._update_preview()
+            # Recenter plots after restart
+            try:
+                self._trigger_auto_rescale()
+            except Exception:
+                pass
             
             _LOGGER.info("Advanced preprocessing restarted to Step 1 (initial state)")
         except Exception as e:
@@ -1378,9 +1393,41 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             self.plot_manager.update_standard_preview(
                 current_wave, current_flux, preview_wave, preview_flux, mask_regions
             )
+            # If we're in masking step, rescale the bottom plot to the masked preview's range
+            if self.current_step == 0:
+                try:
+                    QtCore.QTimer.singleShot(10, self._auto_rescale_bottom_plot_y)
+                except Exception:
+                    try:
+                        self._auto_rescale_bottom_plot_y()
+                    except Exception:
+                        pass
             
         except Exception as e:
             _LOGGER.error(f"Error updating preview: {e}")
+
+    def _auto_rescale_bottom_plot_y(self):
+        """Auto-rescale the Y-axis of the bottom preview plot (masking step focus)."""
+        try:
+            if not hasattr(self, 'bottom_plot_widget') or not self.bottom_plot_widget:
+                return
+            plot_item = self.bottom_plot_widget.getPlotItem()
+            if not plot_item:
+                return
+            try:
+                plot_item.enableAutoRange(axis='y', enable=True)
+            except Exception:
+                pass
+            try:
+                vb = plot_item.getViewBox()
+                if vb:
+                    vb.autoRange()
+                else:
+                    plot_item.autoRange()
+            except Exception:
+                pass
+        except Exception:
+            pass
     
     def _apply_zero_padding_removal(self, wave, flux):
         """Apply zero padding removal like the main GUI"""
@@ -1508,6 +1555,60 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             
         except Exception as e:
             _LOGGER.debug(f"Error during preprocessing dialog cleanup: {e}")
+
+    def _trigger_auto_rescale(self):
+        """Schedule an auto-rescale of both preview plots to ensure they are centered.
+
+        Uses a short single-shot timer so that it runs after plot data updates and
+        layout changes, reducing risk of acting on deleted C++ objects.
+        """
+        try:
+            QtCore.QTimer.singleShot(50, self._auto_rescale_both_plots)
+        except Exception:
+            # Fallback to immediate rescale
+            try:
+                self._auto_rescale_both_plots()
+            except Exception:
+                pass
+
+    def _auto_rescale_both_plots(self):
+        """Autoscale both the top and bottom preview plots safely."""
+        try:
+            for widget_name in ('top_plot_widget', 'bottom_plot_widget'):
+                plot_widget = getattr(self, widget_name, None)
+                if not plot_widget:
+                    continue
+                try:
+                    plot_item = plot_widget.getPlotItem()
+                    if not plot_item:
+                        continue
+                    # Give some padding and enable auto-range on both axes
+                    try:
+                        vb = plot_item.getViewBox()
+                        if vb:
+                            try:
+                                vb.setDefaultPadding(0.08)
+                            except Exception:
+                                pass
+                    except Exception:
+                        vb = None
+                    try:
+                        plot_item.enableAutoRange(axis='x', enable=True)
+                        plot_item.enableAutoRange(axis='y', enable=True)
+                    except Exception:
+                        pass
+                    # Perform the auto-range operation
+                    try:
+                        if vb:
+                            vb.autoRange()
+                        else:
+                            plot_item.autoRange()
+                    except Exception:
+                        pass
+                except Exception:
+                    continue
+        except Exception:
+            pass
     
     def closeEvent(self, event):
         """Handle dialog closing with proper cleanup"""
