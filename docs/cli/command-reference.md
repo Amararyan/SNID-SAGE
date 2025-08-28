@@ -10,6 +10,16 @@ The CLI offers:
 - Configuration management
 - Template and data management
 
+### Supported input formats
+
+SNID SAGE accepts common text and binary spectrum formats:
+- .txt, .dat, .ascii, .asci
+- .csv
+- .flm
+- .fits, .fit
+
+Files can have header rows; CSVs with headers (e.g., wave,flux,flux_err) are supported.
+
 ## Installation
 
 ### Install SNID SAGE CLI
@@ -96,13 +106,12 @@ sage batch "data/sn2024*.dat" --output-dir results/
 # With template directory
 sage batch "data/*.dat" templates/ --output-dir results/
 
-# Parallel processing
-sage batch "data/*.dat" --output-dir results/ --parallel 4
+# Batch processing
+sage batch "data/*.dat" --output-dir results/
 ```
 
 #### Batch Options
 ```bash
---parallel N            # Use N parallel processes
 --output-dir DIR        # Output directory for results
 --template-dir DIR      # Custom template directory
 --type-filter TYPE      # Filter templates by type
@@ -258,7 +267,6 @@ echo "Starting batch analysis at $(date)" > "$log_file"
 
 sage batch "data/*.dat" \
     --output-dir batch_results/ \
-    --parallel 4 \
     --min-correlation 0.8 \
     --save-plots \
     2>&1 | tee -a "$log_file"
@@ -392,14 +400,12 @@ cat results/error.log
 ## Performance Tips
 
 ### Optimization
-- Use `--parallel` for batch processing
 - Set appropriate `--min-correlation` threshold
 - Use `--type-filter` to limit template search
 - Enable `--quiet` for scripted workflows
 
 ### Resource Management
 - Monitor memory usage for large batch jobs
-- Use appropriate number of parallel processes
 - Clean up temporary files regularly
 - Use SSD storage for better I/O performance
 

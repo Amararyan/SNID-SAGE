@@ -283,7 +283,7 @@ class PySide6PlotManager:
             if not paths:
                 return
             # Prefer known spectrum extensions; otherwise take the first path
-            supported_exts = {'.dat', '.txt', '.ascii', '.asci', '.fits', '.flm'}
+            supported_exts = {'.dat', '.txt', '.ascii', '.asci', '.csv', '.fits', '.flm'}
             chosen = None
             for p in paths:
                 try:

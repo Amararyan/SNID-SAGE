@@ -721,6 +721,41 @@ def _try_alternative_text_loading(filename: str) -> Tuple[np.ndarray, np.ndarray
     except:
         pass
     
+    # Fallback: manual robust parser tolerant to quotes and mixed delimiters
+    try:
+        waves: list = []
+        fluxes: list = []
+        with open(filename, 'r', encoding='utf-8', errors='ignore') as fh:
+            for raw in fh:
+                s = raw.strip()
+                if not s:
+                    continue
+                # Skip comments
+                if s.startswith('#'):
+                    continue
+                # Remove surrounding quotes and trailing delimiter cruft
+                # Many PESSTO/Wiserep exports look like: "w,f,e,bg",,
+                s = s.replace('"', '').rstrip(',;')
+                # Normalize delimiters to whitespace
+                s = s.replace(',', ' ').replace('\t', ' ')
+                parts = [p for p in s.split() if p]
+                if len(parts) < 2:
+                    continue
+                # Skip header-like rows
+                if any(ch.isalpha() for ch in parts[0]):
+                    continue
+                try:
+                    w = float(parts[0])
+                    f = float(parts[1])
+                except Exception:
+                    continue
+                waves.append(w)
+                fluxes.append(f)
+        if len(waves) > 0:
+            return _validate_and_clean_arrays(np.asarray(waves, dtype=float), np.asarray(fluxes, dtype=float))
+    except Exception:
+        pass
+
     raise SpectrumLoadError("All text loading methods failed")
 
 

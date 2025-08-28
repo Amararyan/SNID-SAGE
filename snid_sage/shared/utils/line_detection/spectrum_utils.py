@@ -173,6 +173,33 @@ def wavelength_to_velocity(w1, w2):
     return c * (w2 - w1) / w1
 
 
+def compute_effective_sn_redshift(host_redshift: float, velocity_kms: float, use_relativistic: bool = True) -> float:
+    """Compute effective SN redshift given host redshift and ejecta velocity.
+
+    Positive velocity means approaching observer (blueshift), which reduces the
+    effective redshift of SN features relative to the host.
+
+    If use_relativistic is True, apply the multiplicative composition of
+    cosmological and peculiar (Doppler) shifts:
+
+        (1 + z_eff) = (1 + z_host) * sqrt((1 - beta) / (1 + beta))
+
+    where beta = v/c with v>0 for approaching. For small |beta|, this reduces to
+    z_eff ≈ z_host - v/c.
+    """
+    c = 299792.458
+    try:
+        beta = float(velocity_kms) / c
+        if use_relativistic and abs(beta) > 1e-2:
+            # Relativistic Doppler factor for approaching source (blueshift)
+            doppler_factor = ((1.0 - beta) / (1.0 + beta)) ** 0.5
+            return (1.0 + float(host_redshift)) * doppler_factor - 1.0
+        else:
+            return float(host_redshift) - beta
+    except Exception:
+        return float(host_redshift)
+
+
 def apply_moving_average(data, window_size=5):
     """Apply simple moving average smoothing"""
     if window_size <= 1:

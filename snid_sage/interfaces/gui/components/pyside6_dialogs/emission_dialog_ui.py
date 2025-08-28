@@ -60,7 +60,7 @@ class EmissionDialogUIBuilder:
         redshift_layout.addLayout(velocity_layout)
         
         # Redshift info display
-        self.dialog.redshift_info_label = QtWidgets.QLabel("Galaxy lines use Host z. SN lines use Host z + ejecta velocity.")
+        self.dialog.redshift_info_label = QtWidgets.QLabel("Galaxy lines use Host z. SN lines use Host z − v/c (v>0 blueshift).")
         self.dialog.redshift_info_label.setWordWrap(True)
         self.dialog.redshift_info_label.setStyleSheet(f"color: {self.dialog.colors['text_secondary']}; font-style: italic; margin-top: 8px; font-size: 9pt;")
         redshift_layout.addWidget(self.dialog.redshift_info_label)

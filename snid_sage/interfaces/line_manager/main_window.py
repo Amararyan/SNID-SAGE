@@ -526,7 +526,7 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             self,
             "Select Spectrum File",
             "",
-            "All Supported (*.txt *.dat *.ascii *.asci *.fits *.flm);;Text Files (*.txt *.dat *.ascii *.asci *.flm);;FITS Files (*.fits);;FLM Files (*.flm);;All Files (*.*)"
+            "All Supported (*.txt *.dat *.ascii *.asci *.csv *.fits *.flm);;Text/CSV Files (*.txt *.dat *.ascii *.asci *.csv *.flm);;FITS Files (*.fits);;FLM Files (*.flm);;All Files (*.*)"
         )
         if file_path:
             self.file_path_edit.setText(file_path)
@@ -1018,7 +1018,7 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
                 continue
             origin = (entry.get('origin', '') or '').lower()
             z_apply = sn_z if origin == 'sn' else host_z
-            z_apply = max(0.0, z_apply)
+            z_apply = z_apply
             obs_angstrom = air * (1.0 + z_apply)
             obs_pos = to_axis_units(obs_angstrom)
             if in_range_only and (min_w is not None and max_w is not None):
@@ -1076,12 +1076,11 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
     def _get_effective_sn_redshift(self) -> float:
         """Galaxy host redshift plus ejecta velocity translated to redshift units."""
         try:
-            c_km_s = 299792.458
-            # Positive ejecta velocity (expansion toward observer) should BLUESHIFT lines
-            # hence decrease the effective redshift.
-            return max(0.0, float(self.host_redshift) - float(self.velocity_shift) / c_km_s)
+            from snid_sage.shared.utils.line_detection.spectrum_utils import compute_effective_sn_redshift
+            return compute_effective_sn_redshift(self.host_redshift, self.velocity_shift, use_relativistic=True)
         except Exception:
-            return max(0.0, float(getattr(self, 'host_redshift', 0.0) or 0.0))
+            c_km_s = 299792.458
+            return float(getattr(self, 'host_redshift', 0.0) or 0.0) - float(getattr(self, 'velocity_shift', 0.0) or 0.0) / c_km_s
 
 
 def _split_csv(text: str) -> List[str]:

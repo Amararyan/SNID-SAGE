@@ -432,7 +432,7 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
             # Just log the calculation for debugging if needed
             c_km_s = 299792.458  # Speed of light in km/s
             velocity_redshift_shift = self.velocity_shift / c_km_s
-            effective_sn_redshift = self.host_redshift + velocity_redshift_shift
+            effective_sn_redshift = self.host_redshift - velocity_redshift_shift
             if effective_sn_redshift < 0:
                 effective_sn_redshift = 0.0
             
@@ -1669,12 +1669,13 @@ class PySide6MultiStepEmissionAnalysisDialog(QtWidgets.QDialog):
     
     def _get_effective_sn_redshift(self):
         """Calculate effective SN redshift including velocity effect"""
-        c_km_s = 299792.458  # Speed of light in km/s
-        # Positive ejecta velocity (expansion toward observer) should BLUESHIFT lines
-        # so it reduces the observed redshift relative to the host
-        velocity_redshift_shift = self.velocity_shift / c_km_s
-        effective_sn_redshift = self.host_redshift - velocity_redshift_shift
-        return max(0.0, effective_sn_redshift)  # Ensure non-negative
+        # Use shared utility with relativistic handling
+        try:
+            from snid_sage.shared.utils.line_detection.spectrum_utils import compute_effective_sn_redshift
+            return compute_effective_sn_redshift(self.host_redshift, self.velocity_shift, use_relativistic=True)
+        except Exception:
+            c_km_s = 299792.458
+            return float(self.host_redshift) - float(self.velocity_shift) / c_km_s
 
     def _show_interaction_help(self):
         """Show help dialog for mouse interactions and shortcuts"""

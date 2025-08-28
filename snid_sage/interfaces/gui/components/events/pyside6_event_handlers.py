@@ -248,7 +248,7 @@ class PySide6EventHandlers(QtCore.QObject):
                 self.main_window,
                 "Load Spectrum File",
                 "",
-                "Spectrum Files (*.dat *.txt *.ascii *.asci *.fits *.flm);;All Files (*)"
+                "Spectrum Files (*.dat *.txt *.ascii *.asci *.csv *.fits *.flm);;All Files (*)"
             )
             
             if file_path:
