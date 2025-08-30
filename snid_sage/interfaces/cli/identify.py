@@ -214,6 +214,55 @@ Examples:
     
     # Preprocessing options
     preproc_group = parser.add_argument_group("Preprocessing Options")
+    # Early spike masking (enabled by default; can be disabled)
+    preproc_group.add_argument(
+        "--no-spike-masking",
+        dest="spike_masking",
+        action="store_false",
+        help="Disable early spike masking step (enabled by default)"
+    )
+    preproc_group.add_argument(
+        "--spike-floor-z",
+        type=float,
+        default=50.0,
+        help="Minimum floor-relative robust z for outlier detection (default: 50.0)"
+    )
+    preproc_group.add_argument(
+        "--spike-baseline-window",
+        type=int,
+        default=501,
+        help="Running median window size in pixels (odd, large; default: 501)"
+    )
+    preproc_group.add_argument(
+        "--spike-baseline-width",
+        type=float,
+        default=None,
+        help="Baseline width in wavelength units; overrides pixel window when set"
+    )
+    preproc_group.add_argument(
+        "--spike-rel-edge-ratio",
+        type=float,
+        default=2.0,
+        help="Require center residual to exceed neighbors by this factor (default: 2.0)"
+    )
+    preproc_group.add_argument(
+        "--spike-min-separation",
+        type=int,
+        default=2,
+        help="Minimum pixel separation between removed spikes (default: 2)"
+    )
+    preproc_group.add_argument(
+        "--spike-max-removals",
+        type=int,
+        default=None,
+        help="Optional cap on number of removed spikes per spectrum"
+    )
+    preproc_group.add_argument(
+        "--spike-min-abs-resid",
+        type=float,
+        default=None,
+        help="Minimum absolute residual amplitude (flux units) to consider a spike"
+    )
     preproc_group.add_argument(
         "--savgol-window", 
         type=int, 
@@ -809,6 +858,14 @@ def main(args: argparse.Namespace) -> int:
         # Preprocess spectrum
         processed_spectrum, preprocessing_trace = preprocess_spectrum(
             args.spectrum_path,
+            spike_masking=getattr(args, 'spike_masking', True),
+            spike_floor_z=getattr(args, 'spike_floor_z', 20.0),
+            spike_baseline_window=getattr(args, 'spike_baseline_window', 501),
+            spike_baseline_width=getattr(args, 'spike_baseline_width', None),
+            spike_rel_edge_ratio=getattr(args, 'spike_rel_edge_ratio', 1.5),
+            spike_min_separation=getattr(args, 'spike_min_separation', 2),
+            spike_max_removals=getattr(args, 'spike_max_removals', None),
+            spike_min_abs_resid=getattr(args, 'spike_min_abs_resid', None),
                 savgol_window=savgol_window,
             savgol_order=args.savgol_order,
                 aband_remove=args.aband_remove,
@@ -971,8 +1028,13 @@ def main(args: argparse.Namespace) -> int:
                     spectrum_name = Path(args.spectrum_path).stem
                     # Redshift vs Age (cluster-aware inside the function)
                     redshift_age_file = output_dir_path / f"{spectrum_name}_redshift_age.png"
-                    fig = plot_redshift_age(result, save_path=str(redshift_age_file))
-                    plt.close(fig)
+                    try:
+                        fig = plot_redshift_age(result)
+                        if fig and fig.axes and fig.axes[0].has_data():
+                            fig.savefig(str(redshift_age_file), dpi=150, bbox_inches='tight')
+                        plt.close(fig)
+                    except Exception as pe:
+                        logging.getLogger('snid_sage.snid.identify').warning(f"Redshift-age plot failed: {pe}")
 
                     # Choose the same match the GUI would show: winning cluster → filtered → best
                     plot_matches = []
@@ -988,11 +1050,21 @@ def main(args: argparse.Namespace) -> int:
                         plot_matches = sorted(plot_matches, key=get_best_metric_value, reverse=True)
                         top_match = plot_matches[0]
                         flux_file = output_dir_path / f"{spectrum_name}_flux_spectrum.png"
-                        fig = plot_flux_comparison(top_match, result, save_path=str(flux_file))
-                        plt.close(fig)
+                        try:
+                            fig = plot_flux_comparison(top_match, result)
+                            if fig and fig.axes and fig.axes[0].has_data():
+                                fig.savefig(str(flux_file), dpi=150, bbox_inches='tight')
+                            plt.close(fig)
+                        except Exception as fe:
+                            logging.getLogger('snid_sage.snid.identify').warning(f"Flux spectrum plot failed: {fe}")
                         flat_file = output_dir_path / f"{spectrum_name}_flattened_spectrum.png"
-                        fig = plot_flat_comparison(top_match, result, save_path=str(flat_file))
-                        plt.close(fig)
+                        try:
+                            fig = plot_flat_comparison(top_match, result)
+                            if fig and fig.axes and fig.axes[0].has_data():
+                                fig.savefig(str(flat_file), dpi=150, bbox_inches='tight')
+                            plt.close(fig)
+                        except Exception as fe2:
+                            logging.getLogger('snid_sage.snid.identify').warning(f"Flattened spectrum plot failed: {fe2}")
                 except Exception as e:
                     import logging
                     logging.getLogger('snid_sage.snid.identify').debug(f"Default plot generation failed: {e}")

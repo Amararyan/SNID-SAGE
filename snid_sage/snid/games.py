@@ -1378,7 +1378,9 @@ def run_debris_game(use_deluxe_background: bool = True):
                 for b in bullets[:]:
                     if distance(debris.pos, b.pos) < DEBRIS_SIZES[debris.size] * 0.5:
                         bullets.remove(b)
-                        debris_field.remove(debris)
+                        # Debris may have been removed by a concurrent chain explosion timer
+                        if debris in debris_field:
+                            debris_field.remove(debris)
                         score += 150 * debris.size
                         
                         # Create explosion and potential chain reaction

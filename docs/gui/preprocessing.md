@@ -2,6 +2,11 @@
 
 How to prepare spectra before analysis.
 
+### Step 0: Cosmic-ray cleanup (new in 0.7.0)
+- Automatically detects and corrects obvious cosmic-ray hits prior to standard preprocessing.
+- Enabled by default in quick preprocessing; can be toggled in the manual wizard.
+- Keeps genuine narrow features by limiting width and amplitude thresholds.
+
 ### Quick SNID Preprocessing
 - Purpose: Minimal steps to prepare a spectrum for SNID.
 - Actions: log rebinning, optional smoothing, apodization, continuum handling.

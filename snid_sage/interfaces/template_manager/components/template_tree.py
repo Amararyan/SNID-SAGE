@@ -143,47 +143,40 @@ class TemplateTreeWidget(QtWidgets.QTreeWidget):
             self.template_selected.emit(template_name, template_info)
     
     def filter_templates(self, search_text: str = "", type_filter: str = "All Types"):
-        """Filter templates based on search text and type"""
+        """Filter templates based on search text and selected type.
+        Types are dynamic; no special 'Other' bucket.
+        """
         search_text = search_text.lower()
-        
-        # Iterate through all items in the tree
+
         root = self.invisibleRootItem()
         for i in range(root.childCount()):
             type_item = root.child(i)
             type_name = type_item.text(0)
-            
-            # Check type filter
-            type_visible = (type_filter == "All Types" or 
-                          type_filter == type_name or
-                          (type_filter == "Other" and type_name not in ["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star"]))
-            
-            # Check individual templates within this type
+
+            type_visible = (type_filter == "All Types" or type_filter == type_name)
+
             template_count = 0
             visible_templates = 0
-            
+
             for j in range(type_item.childCount()):
                 template_item = type_item.child(j)
                 template_name = template_item.text(0).lower()
                 template_type = template_item.text(1).lower()
-                
-                # Check search filter
-                search_visible = (search_text == "" or 
-                                search_text in template_name or
-                                search_text in template_type)
-                
+
+                search_visible = (not search_text or search_text in template_name or search_text in template_type)
+
                 template_visible = type_visible and search_visible
                 template_item.setHidden(not template_visible)
-                
+
                 template_count += 1
                 if template_visible:
                     visible_templates += 1
-            
-            # Update type item text with filtered count
+
             if visible_templates > 0:
                 type_item.setText(0, f"{type_name} ({visible_templates}/{template_count})")
                 type_item.setHidden(False)
             else:
-                type_item.setHidden(not type_visible or search_text != "")
+                type_item.setHidden(not type_visible or bool(search_text))
                 if not type_item.isHidden():
                     type_item.setText(0, f"{type_name} (0/{template_count})")
     

@@ -141,9 +141,63 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             )
             
             # Stage memory no longer used for UI controls (revert removed)
+            # Auto-run spike detection and add to masks for Step 0 visualization
+            try:
+                from snid_sage.snid.preprocessing import find_spike_indices
+                idx = find_spike_indices(
+                    self.original_wave,
+                    self.original_flux,
+                    floor_z=50.0,
+                    baseline_window=501,
+                    baseline_width=None,
+                    rel_edge_ratio=2.0,
+                    min_separation=2,
+                    max_removals=None,
+                    min_abs_resid=None,
+                )
+                if idx is not None and len(idx) > 0:
+                    # Group contiguous indices into wavelength intervals
+                    w = self.original_wave
+                    idx_sorted = np.array(sorted(set(map(int, idx.tolist()))), int)
+                    groups = []
+                    start = idx_sorted[0]
+                    prev = idx_sorted[0]
+                    for k in idx_sorted[1:]:
+                        if k == prev + 1:
+                            prev = k
+                        else:
+                            groups.append((start, prev))
+                            start = k
+                            prev = k
+                    groups.append((start, prev))
+                    # Convert to small mask regions around spikes
+                    auto_masks = []
+                    for a, b in groups:
+                        # Expand region to include one bin before and after the spike run
+                        a_exp = max(0, a - 1)
+                        b_exp = min(len(w) - 1, b + 1)
+                        wl_min = float(w[a_exp])
+                        wl_max = float(w[b_exp])
+                        if wl_max < wl_min:
+                            wl_min, wl_max = wl_max, wl_min
+                        auto_masks.append((wl_min, wl_max))
+                    # Defer adding to widget until widgets are initialized
+                    self._initial_auto_masks = auto_masks
+                    _LOGGER.info(f"Auto spike masking proposed {len(auto_masks)} regions for initial masking display")
+                else:
+                    self._initial_auto_masks = []
+            except Exception as e:
+                self._initial_auto_masks = []
+                _LOGGER.debug(f"Auto spike detection skipped: {e}")
         
         self.setup_ui()
         self._initialize_components()
+        # If we have auto masks, add them now to masking widget so they're shown in red and editable
+        try:
+            if hasattr(self, '_initial_auto_masks') and self._initial_auto_masks and self.masking_widget:
+                self.masking_widget.set_mask_regions(self._initial_auto_masks)
+        except Exception as e:
+            _LOGGER.debug(f"Failed to add auto masks to widget: {e}")
         self._update_preview()
         
         # Debug logging

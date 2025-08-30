@@ -1108,19 +1108,22 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
         fig.tight_layout()
         return fig
     
+    # Determine if clustering succeeded; if so, do not re-apply a strict RLAP filter
+    clustering_ok = bool(getattr(result, 'clustering_results', None)) and bool(getattr(result, 'clustering_results', {}).get('success', False))
     
-    rlapmin = getattr(result, 'rlapmin', 5.0)  # Get the threshold used in analysis
-    matches = [m for m in matches if m.get('rlap', 0) >= rlapmin]
-    
-    if not matches:
-        ax.text(0.5, 0.5, f"No matches above RLAP threshold ({rlapmin})", 
-               ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, 
-               transform=ax.transAxes)
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-        ax.axis('off')
-        fig.tight_layout()
-        return fig
+    # Use configured RLAP threshold when clustering is not available; otherwise respect clustering survivors
+    if not clustering_ok:
+        rlapmin = getattr(result, 'min_rlap', getattr(result, 'rlapmin', 5.0))
+        matches = [m for m in matches if m.get('rlap', 0) >= rlapmin]
+        if not matches:
+            ax.text(0.5, 0.5, f"No matches above RLAP threshold ({rlapmin})", 
+                   ha='center', va='center', fontsize=PLOT_ERROR_FONTSIZE, 
+                   transform=ax.transAxes)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.axis('off')
+            fig.tight_layout()
+            return fig
     
     # Extract data from all matches (GUI-style)
     data = []
@@ -1208,7 +1211,9 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
             z_margin = z_range * 0.03  # 3% margin like Fortran
             
         if age_range == 0:
-            age_margin = 5.0  # Default age margin
+            # Single-point or flat age distribution: apply sensible default margins
+            age_margin_bottom = 5.0
+            age_margin_top = 5.0
         else:
             age_margin_bottom = age_range * 0.10  # 10% bottom margin like Fortran
             age_margin_top = age_range * 0.15     # 15% top margin like Fortran

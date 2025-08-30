@@ -303,8 +303,14 @@ def process_single_spectrum_optimized(
                 spectrum_name = Path(spectrum_path).stem
                 # Redshift vs Age (already cluster-aware inside the function)
                 redshift_age_file = sdir / f"{spectrum_name}_redshift_age.png"
-                fig = plot_redshift_age(result, save_path=str(redshift_age_file))
-                plt.close(fig)
+                try:
+                    fig = plot_redshift_age(result)
+                    # Only save if plot contains data (non-empty axes)
+                    if fig and fig.axes and fig.axes[0].has_data():
+                        fig.savefig(str(redshift_age_file), dpi=150, bbox_inches='tight')
+                    plt.close(fig)
+                except Exception as pe:
+                    logging.getLogger('snid_sage.snid.batch').warning(f"Redshift-age plot failed: {pe}")
 
                 # Choose the same match the GUI would show: winning cluster → filtered → best
                 plot_matches = []
@@ -326,12 +332,24 @@ def process_single_spectrum_optimized(
                 if plot_matches:
                     plot_matches = sorted(plot_matches, key=get_best_metric_value, reverse=True)
                     top_match = plot_matches[0]
+                    # Flux overlay
                     flux_file = sdir / f"{spectrum_name}_flux_spectrum.png"
-                    fig = plot_flux_comparison(top_match, result, save_path=str(flux_file))
-                    plt.close(fig)
+                    try:
+                        fig = plot_flux_comparison(top_match, result)
+                        if fig and fig.axes and fig.axes[0].has_data():
+                            fig.savefig(str(flux_file), dpi=150, bbox_inches='tight')
+                        plt.close(fig)
+                    except Exception as fe:
+                        logging.getLogger('snid_sage.snid.batch').warning(f"Flux spectrum plot failed: {fe}")
+                    # Flat overlay
                     flat_file = sdir / f"{spectrum_name}_flattened_spectrum.png"
-                    fig = plot_flat_comparison(top_match, result, save_path=str(flat_file))
-                    plt.close(fig)
+                    try:
+                        fig = plot_flat_comparison(top_match, result)
+                        if fig and fig.axes and fig.axes[0].has_data():
+                            fig.savefig(str(flat_file), dpi=150, bbox_inches='tight')
+                        plt.close(fig)
+                    except Exception as fe2:
+                        logging.getLogger('snid_sage.snid.batch').warning(f"Flattened spectrum plot failed: {fe2}")
             except Exception as e:
                 logging.getLogger('snid_sage.snid.batch').debug(f"Default plot generation failed: {e}")
         
@@ -1096,12 +1114,15 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
                                if s.get('cluster_confidence_level') == 'Medium')
         low_confidence = sum(1 for _, _, _, s in successful_results 
                             if s.get('cluster_confidence_level') == 'Low')
+        very_low_confidence = sum(1 for _, _, _, s in successful_results 
+                                 if s.get('cluster_confidence_level') == 'Very Low')
         
         report.append(f"\nCLASSIFICATION CONFIDENCE:")
         if cluster_count > 0:
             report.append(f"   High Confidence: {high_confidence}/{success_count} ({high_confidence/success_count*100:.1f}%)")
             report.append(f"   Medium Confidence: {medium_confidence}/{success_count} ({medium_confidence/success_count*100:.1f}%)")
             report.append(f"   Low Confidence: {low_confidence}/{success_count} ({low_confidence/success_count*100:.1f}%)")
+            report.append(f"   Very Low Confidence: {very_low_confidence}/{success_count} ({very_low_confidence/success_count*100:.1f}%)")
         else:
             report.append(f"   Note: Using legacy analysis method (no cluster-based confidence available)")
         

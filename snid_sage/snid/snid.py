@@ -101,6 +101,15 @@ def preprocess_spectrum(
     input_spectrum: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     *,
     # Preprocessing options
+    # Step 0a: spike masking (early outlier removal)
+    spike_masking: bool = True,
+    spike_floor_z: float = 50.0,
+    spike_baseline_window: int = 501,
+    spike_baseline_width: float | None = None,
+    spike_rel_edge_ratio: float = 2.0,
+    spike_min_separation: int = 2,
+    spike_max_removals: Optional[int] = None,
+    spike_min_abs_resid: Optional[float] = None,
     savgol_window: int = 0,
     savgol_fwhm: float = 0.0,
     savgol_order: int = 3,
@@ -196,6 +205,34 @@ def preprocess_spectrum(
     input_spec = {'wave': wave.copy(), 'flux': flux.copy()}
     trace["step0_wave"], trace["step0_flux"] = wave.copy(), flux.copy()
     
+    # ============================================================================
+    # STEP 0a: EARLY SPIKE MASKING (optional default)
+    # ============================================================================
+    # Allow skipping via skip_steps or parameter toggle
+    if ("spike_masking" not in skip_steps) and spike_masking:
+        try:
+            from .preprocessing import apply_spike_mask
+            wave, flux, spike_info = apply_spike_mask(
+                wave,
+                flux,
+                floor_z=spike_floor_z,
+                baseline_window=spike_baseline_window,
+                baseline_width=spike_baseline_width,
+                rel_edge_ratio=spike_rel_edge_ratio,
+                min_separation=spike_min_separation,
+                max_removals=spike_max_removals,
+                min_abs_resid=spike_min_abs_resid,
+            )
+            _LOG.info(
+                f"Step 0a: Spike masking removed {len(spike_info.get('removed_indices', []))} spikes"
+            )
+            trace["step0a_removed_indices"] = spike_info.get("removed_indices", np.array([], int))
+            trace["step0a_wave"], trace["step0a_flux"] = wave.copy(), flux.copy()
+        except Exception as e:
+            _LOG.warning(f"Step 0a: Spike masking skipped due to error: {e}")
+    else:
+        _LOG.info("Step 0a: Spike masking skipped")
+
     # ============================================================================
     # STEP 1: CLIPPING IN LINEAR WAVELENGTH
     # ============================================================================

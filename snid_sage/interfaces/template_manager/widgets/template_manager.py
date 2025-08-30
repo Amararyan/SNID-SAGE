@@ -79,7 +79,17 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         
         self.edit_name = QtWidgets.QLineEdit()
         self.edit_type = QtWidgets.QComboBox()
-        self.edit_type.addItems(["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star", "Other"])
+        # Populate dynamically from merged index
+        try:
+            svc = get_template_service()
+            by_type = svc.get_merged_index().get('by_type', {})
+            dynamic_types = sorted(list(by_type.keys()))
+            if dynamic_types:
+                self.edit_type.addItems(dynamic_types)
+            else:
+                self.edit_type.addItems(["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star"])  # minimal fallback
+        except Exception:
+            self.edit_type.addItems(["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star"])  # fallback
         self.edit_subtype = QtWidgets.QLineEdit()
         self.edit_age = create_flexible_double_input(min_val=-999.9, max_val=999.9, suffix=" days", default=0.0)
         

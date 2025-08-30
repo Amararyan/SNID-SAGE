@@ -112,7 +112,16 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         search_layout.addWidget(self.search_edit)
         
         self.type_filter = QtWidgets.QComboBox()
-        self.type_filter.addItems(["All Types", "Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star", "Other"])
+        # Populate dynamically from merged index
+        try:
+            from .services.template_service import get_template_service
+            by_type = get_template_service().get_merged_index().get('by_type', {})
+            dynamic_types = sorted(list(by_type.keys()))
+            self.type_filter.addItem("All Types")
+            self.type_filter.addItems(dynamic_types)
+        except Exception:
+            # Fallback to minimal defaults
+            self.type_filter.addItems(["All Types", "Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star"])
         self.type_filter.currentTextChanged.connect(self._filter_templates)
         search_layout.addWidget(self.type_filter)
         

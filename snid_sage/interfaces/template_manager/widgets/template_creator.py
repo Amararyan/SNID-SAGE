@@ -80,7 +80,17 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         
         self.name_edit = QtWidgets.QLineEdit()
         self.type_combo = QtWidgets.QComboBox()
-        self.type_combo.addItems(["Ia", "Ib", "Ic", "II", "IIn", "IIP", "AGN", "Galaxy", "Star", "SLSN", "KN", "Other"])
+        # Populate dynamically from merged index
+        try:
+            svc = get_template_service()
+            by_type = svc.get_merged_index().get('by_type', {})
+            dynamic_types = sorted(list(by_type.keys()))
+            if dynamic_types:
+                self.type_combo.addItems(dynamic_types)
+            else:
+                self.type_combo.addItems(["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star"])  # minimal fallback
+        except Exception:
+            self.type_combo.addItems(["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star"])  # fallback
         
         self.subtype_edit = QtWidgets.QLineEdit()
         self.age_spinbox = create_flexible_double_input(min_val=-999.9, max_val=999.9, suffix=" days", default=0.0)

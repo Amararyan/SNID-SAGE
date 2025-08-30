@@ -198,6 +198,225 @@ def apodize(arr, n1, n2, percent=5.0):
     return out
 
 # ------------------------------------------------------------------
+# spike masking (floor-relative outlier removal)
+# ------------------------------------------------------------------
+def _robust_scale(x: np.ndarray) -> Tuple[float, float]:
+    """Return (robust_sigma, median) using MAD; fallback to std if MAD=0.
+
+    Ensures sigma is never zero by adding a tiny term scaled to data magnitude.
+    """
+    x = np.asarray(x, float)
+    med = float(np.median(x))
+    mad = float(np.median(np.abs(x - med)))
+    sigma = 1.4826 * mad if mad > 0 else float(np.std(x))
+    scale_ref = float(np.median(np.abs(x))) if np.median(np.abs(x)) != 0 else float(np.max(np.abs(x)) or 1.0)
+    return float(max(sigma, 1e-6 * scale_ref + 1e-30)), med
+
+
+def _nms_runs(core: np.ndarray, strength: np.ndarray) -> np.ndarray:
+    """Non-maximum suppression across contiguous True runs in `core`.
+
+    Keeps, for each run, the index with the highest `strength` value.
+    """
+    idx_keep: list[int] = []
+    n = int(core.size)
+    i = 0
+    while i < n:
+        if bool(core[i]):
+            j = i
+            while j + 1 < n and bool(core[j + 1]):
+                j += 1
+            run = np.arange(i, j + 1)
+            idx_keep.append(int(run[np.argmax(strength[run])]))
+            i = j + 1
+        else:
+            i += 1
+    return np.array(sorted(idx_keep), dtype=int)
+
+
+def _running_median_pixels(x: np.ndarray, window: int) -> np.ndarray:
+    """Running median on a pixel window (odd); reflective padding at edges."""
+    w = int(max(3, int(window) | 1))
+    n = x.size
+    if n == 0:
+        return x.astype(float)
+    if w > n:
+        w = n if (n % 2 == 1) else (n - 1)
+        w = max(3, int(w))
+    half = w // 2
+    padded = np.pad(x.astype(float), (half, half), mode="reflect")
+    out = np.empty(n, float)
+    for i in range(n):
+        out[i] = float(np.median(padded[i:i + w]))
+    return out
+
+
+def _effective_window_from_wavelengths(wave_sorted: np.ndarray, baseline_width: float) -> int:
+    """Compute odd integer pixel window from median Δλ and desired width."""
+    if wave_sorted.size < 3 or baseline_width <= 0:
+        return 3
+    diffs = np.diff(wave_sorted.astype(float))
+    positive_diffs = diffs[diffs > 0]
+    if positive_diffs.size == 0:
+        return 3
+    dw = float(np.median(positive_diffs))
+    if dw <= 0:
+        return 3
+    approx = int(max(3, round(baseline_width / dw)))
+    return int(approx | 1)
+
+
+def _running_median_wavelength(wave_sorted: np.ndarray, flux_sorted: np.ndarray, width: float) -> np.ndarray:
+    """Running median using fixed wavelength window width on sorted wavelengths."""
+    n = flux_sorted.size
+    out = np.empty(n, float)
+    if n == 0:
+        return flux_sorted.astype(float)
+    if not np.all(np.diff(wave_sorted.astype(float)) >= 0):
+        raise ValueError("wave_sorted must be sorted ascending for wavelength-based median")
+    halfw = float(width) * 0.5
+    for i in range(n):
+        wl = float(wave_sorted[i])
+        left = int(np.searchsorted(wave_sorted, wl - halfw, side="left"))
+        right = int(np.searchsorted(wave_sorted, wl + halfw, side="right"))
+        if right <= left:
+            out[i] = float(flux_sorted[i])
+        else:
+            out[i] = float(np.median(flux_sorted[left:right]))
+    return out
+
+
+def find_spike_indices(
+    wave: np.ndarray,
+    flux: np.ndarray,
+    *,
+    floor_z: float = 50.0,
+    baseline_window: int = 501,
+    baseline_width: float | None = None,
+    rel_edge_ratio: float = 2.0,
+    min_separation: int = 2,
+    max_removals: int | None = None,
+    min_abs_resid: float | None = None,
+) -> np.ndarray:
+    """Detect spike indices as extreme floor-relative outliers.
+
+    Returns indices in the original (unsorted) ordering.
+    """
+    w = np.asarray(wave, float)
+    f = np.asarray(flux, float)
+    mask = np.isfinite(w) & np.isfinite(f)
+    if not np.any(mask):
+        return np.array([], dtype=int)
+    w = w[mask]
+    f = f[mask]
+    order = np.argsort(w)
+    w_sorted = w[order]
+    f_sorted = f[order]
+
+    if baseline_width is not None and float(baseline_width) > 0:
+        floor = _running_median_wavelength(w_sorted, f_sorted, float(baseline_width))
+        eff_window = _effective_window_from_wavelengths(w_sorted, float(baseline_width))
+    else:
+        eff_window = int(baseline_window)
+        floor = _running_median_pixels(f_sorted, eff_window)
+
+    resid = f_sorted - floor
+    sR, _ = _robust_scale(resid)
+    if sR <= 0:
+        return np.array([], dtype=int)
+    z = resid / sR
+
+    core = np.abs(z) >= float(floor_z)
+    if min_abs_resid is not None and float(min_abs_resid) > 0:
+        core &= (np.abs(resid) >= float(min_abs_resid))
+
+    cand = _nms_runs(core, np.abs(z))
+
+    extrema: list[int] = []
+    n = int(f_sorted.size)
+    for i in cand:
+        if n == 1:
+            extrema.append(int(i))
+        elif i == 0:
+            if (resid[0] > 0 and resid[0] > resid[1] and resid[0] >= rel_edge_ratio * max(resid[1], 0.0)) or \
+               (resid[0] < 0 and resid[0] < resid[1] and abs(resid[0]) >= rel_edge_ratio * abs(min(resid[1], 0.0))):
+                extrema.append(int(i))
+        elif i == n - 1:
+            if (resid[-1] > 0 and resid[-1] > resid[-2] and resid[-1] >= rel_edge_ratio * max(resid[-2], 0.0)) or \
+               (resid[-1] < 0 and resid[-1] < resid[-2] and abs(resid[-1]) >= rel_edge_ratio * abs(min(resid[-2], 0.0))):
+                extrema.append(int(i))
+        else:
+            edge_max = max(resid[i - 1], resid[i + 1], 0.0)
+            edge_min = min(resid[i - 1], resid[i + 1], 0.0)
+            if (resid[i] > 0 and resid[i] > resid[i - 1] and resid[i] > resid[i + 1] and resid[i] >= rel_edge_ratio * edge_max) or \
+               (resid[i] < 0 and resid[i] < resid[i - 1] and resid[i] < resid[i + 1] and abs(resid[i]) >= rel_edge_ratio * abs(edge_min)):
+                extrema.append(int(i))
+
+    idx_sorted = np.array(sorted(extrema), dtype=int)
+
+    # Enforce minimum separation by descending |z|
+    if idx_sorted.size > 1 and int(min_separation) > 1:
+        order_by_strength = idx_sorted[np.argsort(-np.abs(z[idx_sorted]))]
+        keep: list[int] = []
+        taken = np.zeros(n, dtype=bool)
+        for i in order_by_strength:
+            lo = max(0, int(i) - int(min_separation))
+            hi = min(n, int(i) + int(min_separation) + 1)
+            if not taken[lo:hi].any():
+                keep.append(int(i))
+                taken[lo:hi] = True
+        idx_sorted = np.array(sorted(keep), dtype=int)
+
+    if max_removals is not None and idx_sorted.size > int(max_removals):
+        strongest = idx_sorted[np.argsort(-np.abs(z[idx_sorted]))][: int(max_removals)]
+        idx_sorted = np.array(sorted(strongest), dtype=int)
+
+    # Map back to original indices
+    original_indices_sorted = np.where(mask)[0][order][idx_sorted]
+    return original_indices_sorted.astype(int)
+
+
+def apply_spike_mask(
+    wave: np.ndarray,
+    flux: np.ndarray,
+    *,
+    floor_z: float = 50.0,
+    baseline_window: int = 501,
+    baseline_width: float | None = None,
+    rel_edge_ratio: float = 2.0,
+    min_separation: int = 2,
+    max_removals: int | None = None,
+    min_abs_resid: float | None = None,
+) -> Tuple[np.ndarray, np.ndarray, dict]:
+    """Remove spike indices and return cleaned (wave, flux) plus diagnostics dict."""
+    idx_core = find_spike_indices(
+        wave,
+        flux,
+        floor_z=floor_z,
+        baseline_window=baseline_window,
+        baseline_width=baseline_width,
+        rel_edge_ratio=rel_edge_ratio,
+        min_separation=min_separation,
+        max_removals=max_removals,
+        min_abs_resid=min_abs_resid,
+    )
+    if idx_core.size == 0:
+        return wave, flux, {"removed_indices": np.array([], dtype=int), "core_indices": np.array([], dtype=int)}
+    # Expand to include one bin before and after each detected spike index
+    n = len(flux)
+    expanded = set()
+    for i in idx_core.tolist():
+        expanded.add(int(i))
+        if i - 1 >= 0:
+            expanded.add(int(i - 1))
+        if i + 1 < n:
+            expanded.add(int(i + 1))
+    idx_expanded = np.array(sorted(expanded), dtype=int)
+    mask = np.ones(n, dtype=bool)
+    mask[idx_expanded] = False
+    return wave[mask], flux[mask], {"removed_indices": idx_expanded, "core_indices": idx_core}
+
+# ------------------------------------------------------------------
 # log-λ rebin, continuum spline  (unchanged from previous version)
 # ------------------------------------------------------------------
 def log_rebin(
