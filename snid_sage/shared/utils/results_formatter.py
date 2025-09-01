@@ -304,6 +304,17 @@ class UnifiedResultsFormatter:
             subtype_margin_over_second = getattr(result, 'subtype_margin_over_second', 0)
             second_best_subtype = getattr(result, 'second_best_subtype', None)
         
+        # If there is no clustering and one or two surviving matches, adopt top match subtype
+        try:
+            if (winning_cluster is None) and isinstance(active_matches, list) and (1 <= len(active_matches) <= 2):
+                single_match = active_matches[0]
+                single_tpl = single_match.get('template', {}) if isinstance(single_match.get('template'), dict) else {}
+                single_subtype = single_tpl.get('subtype', '') if isinstance(single_tpl, dict) else ''
+                if single_subtype and single_subtype.strip() != '' and single_subtype != 'Unknown':
+                    consensus_subtype = single_subtype
+        except Exception:
+            pass
+
         # Create standardized summary
         summary = {
             # Basic identification
