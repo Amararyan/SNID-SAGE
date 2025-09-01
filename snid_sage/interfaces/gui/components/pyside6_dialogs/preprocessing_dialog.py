@@ -1447,8 +1447,9 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
             self.plot_manager.update_standard_preview(
                 current_wave, current_flux, preview_wave, preview_flux, mask_regions
             )
-            # If we're in masking step, rescale the bottom plot to the masked preview's range
-            if self.current_step == 0:
+            # If we're in masking step or step 3/6 (log rebin & scaling),
+            # rescale the bottom plot to the preview's range
+            if self.current_step in (0, 2):
                 try:
                     QtCore.QTimer.singleShot(10, self._auto_rescale_bottom_plot_y)
                 except Exception:

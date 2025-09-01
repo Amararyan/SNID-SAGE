@@ -2,12 +2,18 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
+## [0.7.1] - 2025-09-01
+
+- Bug fixes:
+  - Fixed autoscaling issue in plot display within the advanced preprocessing interface
+  - Fixed subtype fetching in batch summary when only a single match survives
+
 ## [0.7.0] - 2025-08-30
 
 - New preprocessing: added Step 0 to automatically detect and correct obvious cosmic-ray hits before standard preprocessing.
 - Batch mode plotting: fixed inconsistencies when only weak matches are found; summary lines and generated plots now reflect weak-match status consistently.
 
-## [0.6.1] - 2025-01-27
+## [0.6.1] - 2025-08-20
 
 - Bug fixes and improvements:
   - Improved error handling for template loading failures in .csv

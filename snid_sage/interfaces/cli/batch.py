@@ -467,6 +467,16 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
         if isinstance(top_tpl, dict):
             summary['age'] = top_tpl.get('age', summary.get('age', None))
 
+        # If clustering failed and there is exactly one surviving match, use its subtype
+        # for the consensus_subtype shown in batch one-line summaries
+        try:
+            if (not summary.get('has_clustering')) and (len(cluster_matches) == 1):
+                top_subtype = top_tpl.get('subtype', '') if isinstance(top_tpl, dict) else ''
+                if top_subtype and top_subtype.strip() != '':
+                    summary['consensus_subtype'] = top_subtype
+        except Exception:
+            pass
+
     # Add cluster statistics if available
     if winning_cluster:
         summary['cluster_type'] = winning_cluster.get('type', 'Unknown')
