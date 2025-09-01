@@ -1222,7 +1222,7 @@
     },
     "ASASSN-15ga": {
       "type": "Ia",
-      "subtype": "Ia-pec",
+      "subtype": "Ia-91bg",
       "age": 10.0,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -1233,7 +1233,7 @@
     },
     "ASASSN-15hy": {
       "type": "Ia",
-      "subtype": "Ia-pec",
+      "subtype": "Ia-03fg",
       "age": 102.0,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -3532,7 +3532,7 @@
     },
     "sn2005hk": {
       "type": "Ia",
-      "subtype": "Ia-pec",
+      "subtype": "Ia-02cx",  
       "age": -9.3,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -4577,7 +4577,7 @@
     },
     "sn2008A": {
       "type": "Ia",
-      "subtype": "Ia-pec",
+      "subtype": "Ia-02cx",
       "age": -7.9,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -4588,7 +4588,7 @@
     },
     "sn2008ae": {
       "type": "Ia",
-      "subtype": "Ia-pec",
+      "subtype": "Ia-02cx",
       "age": -1.0,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -4742,7 +4742,7 @@
     },
     "sn2013gr": {
       "type": "Ia",
-      "subtype": "Ia-pec",
+      "subtype": "Ia-02cx",
       "age": -13.0,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -4797,7 +4797,7 @@
     },
     "sn2016ado": {
       "type": "Ia",
-      "subtype": "Ia-pec",
+      "subtype": "Ia-02cx",
       "age": 13.0,
       "redshift": 0.0,
       "phase": "Unknown",

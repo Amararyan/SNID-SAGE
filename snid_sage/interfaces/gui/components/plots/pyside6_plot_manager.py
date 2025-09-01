@@ -612,14 +612,25 @@ class PySide6PlotManager:
             
             # Check if we have SNID results for template overlays
             app_controller = self.main_window.app_controller
-            if (hasattr(app_controller, 'snid_results') and 
-                app_controller.snid_results and 
-                hasattr(app_controller.snid_results, 'best_matches') and 
-                app_controller.snid_results.best_matches):
-                
-                # Plot spectrum with template overlay
-                self.plot_spectrum_with_template_overlay(view_type)
-                return
+            if hasattr(app_controller, 'snid_results') and app_controller.snid_results:
+                # Prefer best_matches; fallback to filtered_matches or top_matches so single survivors still show
+                has_best = hasattr(app_controller.snid_results, 'best_matches') and app_controller.snid_results.best_matches
+                has_filtered = hasattr(app_controller.snid_results, 'filtered_matches') and app_controller.snid_results.filtered_matches
+                has_top = hasattr(app_controller.snid_results, 'top_matches') and app_controller.snid_results.top_matches
+
+                if has_best or has_filtered or has_top:
+                    # If best is empty but filtered/top exist, temporarily expose them as best for overlay rendering
+                    if not has_best:
+                        try:
+                            if has_filtered:
+                                app_controller.snid_results.best_matches = app_controller.snid_results.filtered_matches
+                            elif has_top:
+                                app_controller.snid_results.best_matches = app_controller.snid_results.top_matches
+                        except Exception:
+                            pass
+                    # Plot spectrum with template overlay
+                    self.plot_spectrum_with_template_overlay(view_type)
+                    return
             
             # Get spectrum data for current view (no templates)
             wave, flux = app_controller.get_spectrum_for_view(view_type)

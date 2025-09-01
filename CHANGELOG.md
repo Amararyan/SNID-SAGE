@@ -2,6 +2,19 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
+## [0.7.3] - 2025-09-01
+
+- Template corrections:
+  - Fixed incorrect subtype classifications for several Type Ia templates:
+    - `sn2005hk`: corrected from `Ia-pec` to `Ia-02cx`
+    - `sn2008A`: corrected from `Ia-pec` to `Ia-02cx`
+    - `sn2013gr`: corrected from `Ia-pec` to `Ia-02cx`
+    - `sn2016ado`: corrected from `Ia-pec` to `Ia-02cx`
+    - `sn2008ae`: corrected from `Ia-pec` to `Ia-02cx`
+    - `ASASSN-15ga`: corrected from `Ia-pec` to `Ia-91bg`
+    - `ASASSN-15hy`: corrected from `Ia-pec` to `Ia-03fg`
+
+
 ## [0.7.2] - 2025-09-01
 
 - Bug fixes:

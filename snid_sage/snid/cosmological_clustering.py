@@ -1089,10 +1089,29 @@ def _calculate_cluster_confidence(cluster_scores: List[Dict[str, Any]], metric_n
             'statistical_significance': 'N/A'
         }
     
-    best_score = cluster_scores[0]['penalized_score']
-    second_best_score = cluster_scores[1]['penalized_score']
+    # Determine the first runner-up cluster that is NOT of the same type as the winner
+    winning_type = cluster_scores[0]['cluster_type']
+    competitor_info = None
+    for i in range(1, len(cluster_scores)):
+        if cluster_scores[i]['cluster_type'] != winning_type:
+            competitor_info = cluster_scores[i]
+            break
     
-    # Calculate margin
+    # If no different-type competitor exists, consider confidence High by consistency
+    if competitor_info is None:
+        return {
+            'confidence_level': 'High',
+            'confidence_description': 'All top clusters share the same type; no different-type competitor',
+            'margin_vs_second': float('inf'),
+            'relative_margin': float('inf'),
+            'statistical_significance': 'N/A',
+            'second_best_type': 'N/A'
+        }
+    
+    best_score = cluster_scores[0]['penalized_score']
+    second_best_score = competitor_info['penalized_score']
+    
+    # Calculate margin vs next-best different-type cluster
     margin = best_score - second_best_score
     relative_margin = margin / second_best_score if second_best_score > 0 else float('inf')
     
@@ -1110,14 +1129,12 @@ def _calculate_cluster_confidence(cluster_scores: List[Dict[str, Any]], metric_n
         confidence_level = 'Very Low'
         confidence_description = f'Winning cluster is only {relative_margin*100:.1f}% better than second best'
     
-    # Simple t-test approximation for statistical significance
-    # This is a simplified approach - in practice you'd want more sophisticated statistics
+    # Simple t-test approximation for statistical significance using the selected competitor
     if len(cluster_scores) >= 2:
         best_values = cluster_scores[0]['top_5_values']
-        second_values = cluster_scores[1]['top_5_values']
+        second_values = competitor_info['top_5_values']
         
         if len(best_values) >= 2 and len(second_values) >= 2:
-            # Perform simple t-test
             try:
                 t_stat, p_value = stats.ttest_ind(best_values, second_values)
                 if p_value < 0.01:
@@ -1141,7 +1158,7 @@ def _calculate_cluster_confidence(cluster_scores: List[Dict[str, Any]], metric_n
         'margin_vs_second': margin,
         'relative_margin': relative_margin,
         'statistical_significance': statistical_significance,
-        'second_best_type': cluster_scores[1]['cluster_type'] if len(cluster_scores) > 1 else 'N/A'
+        'second_best_type': competitor_info['cluster_type']
     }
 
 

@@ -46,6 +46,13 @@ try:
 except ImportError:
     MATH_UTILS_AVAILABLE = False
 
+# Import string utility to clean template names (with safe fallback)
+try:
+    from snid_sage.shared.utils import clean_template_name  # type: ignore
+except Exception:
+    def clean_template_name(name):
+        return name
+
 
 class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
     """
@@ -101,6 +108,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         self.ax = None   # Main 3D plot axes
         self.matches_fig = None  # Matches figure
         self.matches_axes = []   # Matches subplot axes
+        self.scatter_to_index = {}  # Map matplotlib scatter artists to cluster indices
         
         # Colors for different supernova types
         self.type_colors = self._get_type_colors()
@@ -379,8 +387,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         layout.addWidget(self.plot_widget)
         
         # Connect matplotlib events for interactivity
-        self.plot_widget.mpl_connect('motion_notify_event', self._on_plot_hover)
-        self.plot_widget.mpl_connect('button_press_event', self._on_plot_click)
+        self.plot_widget.mpl_connect('pick_event', self._on_plot_pick)
     
     def _create_right_panel(self, layout):
         """Create right panel with template matches using matplotlib"""
@@ -466,8 +473,15 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         if not MATPLOTLIB_AVAILABLE or not self.all_candidates:
             return
             
+        # Preserve current view (especially azimuth) to avoid resetting angle on redraws
+        try:
+            current_azim = getattr(self.ax, 'azim', 45)
+        except Exception:
+            current_azim = 45
+
         self.ax.clear()
         self.scatter_plots.clear()
+        self.scatter_to_index.clear()
         
         # Prepare type mapping with consistent ordering
         unique_types = sorted(list(set(c.get('type', 'Unknown') for c in self.all_candidates)))
@@ -511,11 +525,21 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             color = self.type_colors.get(candidate['type'], self.type_colors['Unknown'])
             
             # Plot all points
-            scatter = self.ax.scatter(candidate_redshifts, candidate_type_indices, candidate_metrics,
-                                    c=color, s=size, alpha=alpha,
-                                    edgecolors=edgecolor, linewidths=linewidth)
+            scatter = self.ax.scatter(
+                candidate_redshifts,
+                candidate_type_indices,
+                candidate_metrics,
+                c=color,
+                s=size,
+                alpha=alpha,
+                edgecolors=edgecolor,
+                linewidths=linewidth,
+                picker=5  # enable picking with 5px tolerance
+            )
             
             self.scatter_plots.append((scatter, i, candidate))
+            # Map this scatter artist to its cluster index for quick lookup on pick
+            self.scatter_to_index[scatter] = i
         
         # Enhanced 3D setup
         self.ax.set_xlabel('Redshift (z)', color='#000000', fontsize=16, labelpad=15)
@@ -524,8 +548,8 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
         self.ax.set_yticks(range(len(unique_types)))
         self.ax.set_yticklabels(unique_types, fontsize=12)
         
-        # Set view and enable ONLY horizontal rotation
-        self.ax.view_init(elev=25, azim=45)
+        # Set view and enable ONLY horizontal rotation, preserving current azimuth
+        self.ax.view_init(elev=25, azim=current_azim)
         self.ax.set_box_aspect([2.5, 1.0, 1.5])
         
         # Enhanced 3D styling with completely white background
@@ -593,23 +617,43 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 candidate_type_indices = [type_to_index[candidate['type']]] * len(candidate_redshifts)
                 
                 # Add highlighted scatter with BLACK edges
-                highlight_scatter = self.ax.scatter(candidate_redshifts, candidate_type_indices, candidate_metrics,
-                                                  c=self.type_colors.get(candidate['type'], self.type_colors['Unknown']), 
-                                                  s=50, alpha=1.0,
-                                                  edgecolors='black', linewidths=1.2, zorder=3)
+                # Add highlighted scatter with picking disabled (so picks map to the base scatter only)
+                highlight_scatter = self.ax.scatter(
+                    candidate_redshifts,
+                    candidate_type_indices,
+                    candidate_metrics,
+                    c=self.type_colors.get(candidate['type'], self.type_colors['Unknown']),
+                    s=50,
+                    alpha=1.0,
+                    edgecolors='black',
+                    linewidths=1.2,
+                    zorder=3,
+                    picker=False
+                )
                 
         except Exception as e:
             _LOGGER.debug(f"Error adding persistent highlight: {e}")
     
-    def _on_plot_hover(self, event):
-        """Handle plot hover events"""
-        # For now, keep it simple - hover functionality can be added later if needed
-        pass
-    
-    def _on_plot_click(self, event):
-        """Handle plot click events"""
-        # For now, use dropdown for selection - click selection can be added later if needed
-        pass
+    def _on_plot_pick(self, event):
+        """Handle matplotlib pick events to support left-click selection of clusters"""
+        try:
+            # Ensure this came from a mouse event and is a left-click
+            mouse_event = getattr(event, 'mouseevent', None)
+            if mouse_event is None or mouse_event.button != 1:
+                return
+
+            artist = getattr(event, 'artist', None)
+            if artist is None:
+                return
+
+            # If the picked artist corresponds to a cluster scatter, select that cluster
+            cluster_index = self.scatter_to_index.get(artist)
+            if cluster_index is None:
+                return
+
+            self._select_cluster(cluster_index)
+        except Exception as pick_err:
+            _LOGGER.debug(f"Pick handling error: {pick_err}")
     
     def _on_cluster_changed(self, index):
         """Handle cluster dropdown selection change"""
@@ -717,7 +761,6 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                     
                     if t_wave is not None and t_flux is not None:
                         # Clean template name to remove _epoch_X suffix
-                        from snid_sage.shared.utils import clean_template_name
                         template_name = clean_template_name(match.get('name', 'Unknown'))
                         ax.plot(t_wave, t_flux, color='#E74C3C', linewidth=1.0, alpha=0.9,
                                label=f"Template: {template_name}", zorder=3)
