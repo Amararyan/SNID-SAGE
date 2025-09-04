@@ -41,6 +41,7 @@ except ImportError:
 
 # Import core SNID functionality
 from snid_sage.snid.snid import run_snid as python_snid, preprocess_spectrum, run_snid_analysis
+from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
 
 # Import configuration and utilities
 from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
@@ -178,6 +179,46 @@ class PySide6AppController(QtCore.QObject):
                         f"wavelength range {self.original_wave[0]:.1f}-{self.original_wave[-1]:.1f} Å")
             _LOGGER.info(f"✅ Flux range: {np.min(self.original_flux):.2e} to {np.max(self.original_flux):.2e}")
             
+            # Early optical grid range check
+            try:
+                gmin, gmax = 2500.0, 10000.0
+                wmin = float(np.min(self.original_wave))
+                wmax = float(np.max(self.original_wave))
+                has_overlap = (wmax >= gmin) and (wmin <= gmax)
+                if not has_overlap:
+                    QtWidgets.QMessageBox.critical(
+                        self.main_window,
+                        "Spectrum Out of Range",
+                        (
+                            f"The loaded spectrum range {wmin:.1f}-{wmax:.1f} Å is outside "
+                            f"the optical grid {gmin:.0f}-{gmax:.0f} Å."
+                        ),
+                    )
+                    return False
+                # Enforce minimum overlap of 2000 Å with optical grid
+                overlap_angstrom = max(0.0, min(wmax, gmax) - max(wmin, gmin))
+                if overlap_angstrom < 2000.0:
+                    QtWidgets.QMessageBox.critical(
+                        self.main_window,
+                        "Insufficient Overlap",
+                        (
+                            f"The spectrum overlaps the optical grid by only {overlap_angstrom:.1f} Å, "
+                            f"which is insufficient (< 2000 Å)."
+                        ),
+                    )
+                    return False
+                if (wmin < gmin) or (wmax > gmax):
+                    QtWidgets.QMessageBox.information(
+                        self.main_window,
+                        "Spectrum Will Be Clipped",
+                        (
+                            f"The spectrum extends beyond the optical grid {gmin:.0f}-{gmax:.0f} Å.\n"
+                            f"It will be clipped to the grid during preprocessing."
+                        ),
+                    )
+            except Exception:
+                pass
+
             # Update workflow state
             self.update_workflow_state(WorkflowState.FILE_LOADED)
             
@@ -355,27 +396,37 @@ class PySide6AppController(QtCore.QObject):
             # Use file path if available, otherwise use wave/flux arrays
             if self.current_file_path:
                 # Preprocess from file
-                processed_spectrum, trace = preprocess_spectrum(
-                    spectrum_path=self.current_file_path,
-                    # Default parameters for quick preprocessing
-                    savgol_window=kwargs.get('savgol_window', 0),
-                    savgol_order=kwargs.get('savgol_order', 3),
-                    aband_remove=kwargs.get('aband_remove', False),
-                    skyclip=kwargs.get('skyclip', False),
-                    emclip_z=kwargs.get('emclip_z', -1.0),
-                    emwidth=kwargs.get('emwidth', 40.0),
-                    wavelength_masks=kwargs.get('wavelength_masks', []),
-                    apodize_percent=kwargs.get('apodize_percent', 10.0),
-                    skip_steps=kwargs.get('skip_steps', []),
-                    verbose=kwargs.get('verbose', False)
-                )
+                try:
+                    processed_spectrum, trace = preprocess_spectrum(
+                        spectrum_path=self.current_file_path,
+                        # Default parameters for quick preprocessing
+                        savgol_window=kwargs.get('savgol_window', 0),
+                        savgol_order=kwargs.get('savgol_order', 3),
+                        aband_remove=kwargs.get('aband_remove', False),
+                        skyclip=kwargs.get('skyclip', False),
+                        emclip_z=kwargs.get('emclip_z', -1.0),
+                        emwidth=kwargs.get('emwidth', 40.0),
+                        wavelength_masks=kwargs.get('wavelength_masks', []),
+                        apodize_percent=kwargs.get('apodize_percent', 10.0),
+                        skip_steps=kwargs.get('skip_steps', []),
+                        verbose=kwargs.get('verbose', False),
+                        clip_to_grid=True
+                    )
+                except SpectrumProcessingError as e:
+                    QtWidgets.QMessageBox.critical(self.main_window, "Preprocessing Error", str(e))
+                    return False
             else:
                 # Preprocess from arrays using input_spectrum API
-                processed_spectrum, trace = preprocess_spectrum(
-                    input_spectrum=(self.original_wave, self.original_flux),
-                    skip_steps=kwargs.get('skip_steps', []),
-                    verbose=kwargs.get('verbose', False)
-                )
+                try:
+                    processed_spectrum, trace = preprocess_spectrum(
+                        input_spectrum=(self.original_wave, self.original_flux),
+                        skip_steps=kwargs.get('skip_steps', []),
+                        verbose=kwargs.get('verbose', False),
+                        clip_to_grid=True
+                    )
+                except SpectrumProcessingError as e:
+                    QtWidgets.QMessageBox.critical(self.main_window, "Preprocessing Error", str(e))
+                    return False
             
             # Store processed spectrum
             self.processed_spectrum = processed_spectrum

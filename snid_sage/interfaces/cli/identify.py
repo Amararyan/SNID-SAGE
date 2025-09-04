@@ -17,6 +17,7 @@ import csv
 import numpy as np
 
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
+from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
 from snid_sage.snid.io import read_spectrum
 from snid_sage.shared.utils.math_utils import (
     calculate_weighted_redshift_balanced,
@@ -855,27 +856,32 @@ def main(args: argparse.Namespace) -> int:
         # Prepare savgol filter parameters  
         savgol_window = args.savgol_window if args.savgol_window > 0 else 0
         
-        # Preprocess spectrum
-        processed_spectrum, preprocessing_trace = preprocess_spectrum(
-            args.spectrum_path,
-            spike_masking=getattr(args, 'spike_masking', True),
-            spike_floor_z=getattr(args, 'spike_floor_z', 20.0),
-            spike_baseline_window=getattr(args, 'spike_baseline_window', 501),
-            spike_baseline_width=getattr(args, 'spike_baseline_width', None),
-            spike_rel_edge_ratio=getattr(args, 'spike_rel_edge_ratio', 1.5),
-            spike_min_separation=getattr(args, 'spike_min_separation', 2),
-            spike_max_removals=getattr(args, 'spike_max_removals', None),
-            spike_min_abs_resid=getattr(args, 'spike_min_abs_resid', None),
+        # Preprocess spectrum with grid validation/auto-clipping
+        try:
+            processed_spectrum, preprocessing_trace = preprocess_spectrum(
+                args.spectrum_path,
+                spike_masking=getattr(args, 'spike_masking', True),
+                spike_floor_z=getattr(args, 'spike_floor_z', 20.0),
+                spike_baseline_window=getattr(args, 'spike_baseline_window', 501),
+                spike_baseline_width=getattr(args, 'spike_baseline_width', None),
+                spike_rel_edge_ratio=getattr(args, 'spike_rel_edge_ratio', 1.5),
+                spike_min_separation=getattr(args, 'spike_min_separation', 2),
+                spike_max_removals=getattr(args, 'spike_max_removals', None),
+                spike_min_abs_resid=getattr(args, 'spike_min_abs_resid', None),
                 savgol_window=savgol_window,
-            savgol_order=args.savgol_order,
+                savgol_order=args.savgol_order,
                 aband_remove=args.aband_remove,
                 skyclip=args.skyclip,
-            emclip_z=args.emclip_z,
-            emwidth=args.emwidth,
-            wavelength_masks=args.wavelength_masks,
-            apodize_percent=args.apodize_percent,
-                verbose=args.verbose
+                emclip_z=args.emclip_z,
+                emwidth=args.emwidth,
+                wavelength_masks=args.wavelength_masks,
+                apodize_percent=args.apodize_percent,
+                verbose=args.verbose,
+                clip_to_grid=True
             )
+        except SpectrumProcessingError as e:
+            print(f"[ERROR] {e}", file=sys.stderr)
+            return 2
             
         # Prepare age range
         age_range = None

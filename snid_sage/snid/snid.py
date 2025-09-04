@@ -50,6 +50,7 @@ from .plotting import (
     plot_correlation_function, plot_redshift_age,
     plot_type_fractions
 )
+from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
 
 # Constants
 NW = 1024  # Standard number of wavelength bins
@@ -120,7 +121,12 @@ def preprocess_spectrum(
     wavelength_masks: Optional[List[Tuple[float, float]]] = None,
     apodize_percent: float = 10.0,
     skip_steps: Optional[List[str]] = None,
-    verbose: bool = False
+    verbose: bool = False,
+    # Grid handling
+    clip_to_grid: bool = True,
+    grid_min_wave: Optional[float] = None,
+    grid_max_wave: Optional[float] = None,
+    min_overlap_angstrom: float = 2000.0,
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
     """
     Preprocess a spectrum for SNID analysis.
@@ -204,6 +210,54 @@ def preprocess_spectrum(
     # Store original input
     input_spec = {'wave': wave.copy(), 'flux': flux.copy()}
     trace["step0_wave"], trace["step0_flux"] = wave.copy(), flux.copy()
+
+    # ------------------------------------------------------------------------
+    # STEP 0b: VALIDATE/CLIP TO GRID RANGE BEFORE FURTHER PROCESSING
+    # ------------------------------------------------------------------------
+    # Determine grid bounds to use for validation
+    gmin = float(grid_min_wave) if grid_min_wave is not None else float(MINW)
+    gmax = float(grid_max_wave) if grid_max_wave is not None else float(MAXW)
+
+    wmin = float(np.min(wave)) if len(wave) else np.nan
+    wmax = float(np.max(wave)) if len(wave) else np.nan
+
+    if not np.isfinite(wmin) or not np.isfinite(wmax):
+        raise SpectrumProcessingError("Input spectrum has invalid wavelength bounds")
+
+    # Check overlap with the optical grid
+    has_overlap = (wmax >= gmin) and (wmin <= gmax)
+    if not has_overlap:
+        msg = (
+            f"Spectrum wavelength range {wmin:.1f}-{wmax:.1f} Å is completely outside "
+            f"the optical grid {gmin:.0f}-{gmax:.0f} Å."
+        )
+        _LOG.error(msg)
+        raise SpectrumProcessingError(msg)
+
+    # Require minimum overlap with the grid in Angstroms
+    overlap_angstrom = max(0.0, min(wmax, gmax) - max(wmin, gmin))
+    if overlap_angstrom < float(min_overlap_angstrom):
+        msg = (
+            f"Insufficient overlap with optical grid: only {overlap_angstrom:.1f} Å "
+            f"(< {float(min_overlap_angstrom):.0f} Å required)."
+        )
+        _LOG.error(msg)
+        raise SpectrumProcessingError(msg)
+
+    # Clip to grid if spectrum extends beyond bounds
+    if clip_to_grid and ((wmin < gmin) or (wmax > gmax)):
+        mask = (wave >= gmin) & (wave <= gmax)
+        prev_len = len(wave)
+        wave = wave[mask]
+        flux = flux[mask]
+        _LOG.warning(
+            f"Step 0b: Clipped spectrum to grid bounds {gmin:.0f}-{gmax:.0f} Å "
+            f"(kept {len(wave)}/{prev_len} points)"
+        )
+        trace["step0b_clipped_to_grid"] = True
+        trace["step0b_wave"], trace["step0b_flux"] = wave.copy(), flux.copy()
+    else:
+        trace["step0b_clipped_to_grid"] = False
     
     # ============================================================================
     # STEP 0a: EARLY SPIKE MASKING (optional default)

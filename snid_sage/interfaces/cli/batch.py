@@ -19,8 +19,11 @@ from datetime import datetime
 import json
 import time
 import numpy as np
+import csv
+import re
 
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
+from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
 from snid_sage.shared.utils.math_utils import (
     calculate_weighted_redshift_balanced,
     calculate_weighted_age,
@@ -218,7 +221,9 @@ def process_single_spectrum_optimized(
     spectrum_path: str,
     template_manager: BatchTemplateManager,
     output_dir: str,
-    args: argparse.Namespace
+    args: argparse.Namespace,
+    *,
+    forced_redshift_override: Optional[float] = None
 ) -> Tuple[str, bool, str, Dict[str, Any]]:
     """
     Process a single spectrum using pre-loaded templates via first-class API.
@@ -243,16 +248,36 @@ def process_single_spectrum_optimized(
         spectrum_output_dir.mkdir(parents=True, exist_ok=True)
     
     try:
-        # STEP 1: Preprocess spectrum
-        processed_spectrum, _ = preprocess_spectrum(
-            spectrum_path=spectrum_path,
-            savgol_window=getattr(args, 'savgol_window', 0),
-            savgol_order=getattr(args, 'savgol_order', 3),
-            aband_remove=getattr(args, 'aband_remove', False),
-            skyclip=getattr(args, 'skyclip', False),
-            wavelength_masks=getattr(args, 'wavelength_masks', None),
-            verbose=False  # Suppress preprocessing output in batch mode
-        )
+        # STEP 1: Preprocess spectrum with grid validation/auto-clipping
+        try:
+            processed_spectrum, _ = preprocess_spectrum(
+                spectrum_path=spectrum_path,
+                savgol_window=getattr(args, 'savgol_window', 0),
+                savgol_order=getattr(args, 'savgol_order', 3),
+                aband_remove=getattr(args, 'aband_remove', False),
+                skyclip=getattr(args, 'skyclip', False),
+                wavelength_masks=getattr(args, 'wavelength_masks', None),
+                verbose=False,  # Suppress preprocessing output in batch mode
+                clip_to_grid=True
+            )
+        except SpectrumProcessingError as e:
+            msg = str(e)
+            # Classify error type for clearer reporting
+            lower_msg = msg.lower()
+            if 'completely outside' in lower_msg or 'outside the optical grid' in lower_msg:
+                error_type = 'out_of_grid'
+            elif 'insufficient overlap' in lower_msg:
+                error_type = 'insufficient_overlap'
+            else:
+                error_type = 'spectrum_processing_error'
+            return spectrum_name, False, msg, {
+                'spectrum': spectrum_name,
+                'file_path': spectrum_path,
+                'success': False,
+                'error': msg,
+                'error_type': error_type,
+                'error_class': 'SpectrumProcessingError'
+            }
         
         # STEP 2: Get filtered templates (no reloading!)
         filtered_templates = template_manager.get_filtered_templates(
@@ -271,12 +296,19 @@ def process_single_spectrum_optimized(
         # STEP 3: Run SNID analysis using first-class API with preloaded templates
         # NOTE: run_snid_analysis currently manages template loading internally.
         # We do not pass preloaded templates here to avoid interface mismatch.
+        # Determine if a forced redshift is being used for this spectrum
+        used_forced_redshift = (
+            forced_redshift_override
+            if forced_redshift_override is not None
+            else args.forced_redshift
+        )
+
         result, _ = run_snid_analysis(
             processed_spectrum=processed_spectrum,
             templates_dir=template_manager.templates_dir,
             zmin=args.zmin,
             zmax=args.zmax,
-            forced_redshift=args.forced_redshift,
+            forced_redshift=used_forced_redshift,
             verbose=False,
             show_plots=False,
             save_plots=False
@@ -356,6 +388,15 @@ def process_single_spectrum_optimized(
         if result.success:
             # Create GUI-style summary with cluster-aware analysis
             summary = _create_cluster_aware_summary(result, spectrum_name, spectrum_path)
+            # Record whether a fixed redshift was used and its value
+            try:
+                summary['redshift_fixed'] = used_forced_redshift is not None
+                summary['redshift_fixed_value'] = (
+                    float(used_forced_redshift) if used_forced_redshift is not None else None
+                )
+            except Exception:
+                summary['redshift_fixed'] = False
+                summary['redshift_fixed_value'] = None
             # Flag weak match if clustering failed but some matches survived threshold
             try:
                 has_clusters = bool(getattr(result, 'clustering_results', None)) and getattr(result, 'clustering_results', {}).get('success', False)
@@ -811,12 +852,35 @@ Examples:
   
   # With forced redshift and explicit templates
   sage batch "*.dat" templates/ --forced-redshift 0.1 --output-dir results/
+
+  # NEW: List mode using CSV with per-row redshift (forced when provided)
+  sage batch --list-csv "C:\\Users\\stoppa\\PycharmProjects\\SNID_SAGE\\data\\VolumeLimited\\tns_names_redshifts_and_spectra.csv" --output-dir results/
+  # If your CSV uses different column names
+  sage batch --list-csv input.csv --path-column file --redshift-column z --output-dir results/
     """
     
-    # Required arguments
+    # Input source options
     parser.add_argument(
-        "input_pattern", 
-        help="Pattern for input spectrum files (e.g., 'spectra/*' for all files in folder)"
+        "input_pattern",
+        nargs="?",
+        help="Glob pattern for input spectrum files (e.g., 'spectra/*'). Omit when using --list-csv."
+    )
+    parser.add_argument(
+        "--list-csv",
+        dest="list_csv",
+        help="CSV file listing spectra to analyze. Must contain a path column; optional redshift column to force per-spectrum redshift."
+    )
+    parser.add_argument(
+        "--path-column",
+        dest="path_column",
+        default="path",
+        help="Column name in --list-csv containing spectrum paths (default: path)"
+    )
+    parser.add_argument(
+        "--redshift-column",
+        dest="redshift_column",
+        default="redshift",
+        help="Column name in --list-csv containing forced redshift values (default: redshift)"
     )
     parser.add_argument(
         "templates_dir", 
@@ -932,7 +996,12 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     # Summary
     report.append("BATCH PROCESSING SUMMARY")
     report.append("-"*50)
-    report.append(f"Input Pattern: {args.input_pattern}")
+    if getattr(args, 'list_csv', None):
+        report.append(f"Input List CSV: {args.list_csv}")
+        report.append(f"Columns: path='{getattr(args, 'path_column', 'path')}', redshift='{getattr(args, 'redshift_column', 'redshift')}'")
+        report.append("Per-spectrum forced redshift: applied where provided in CSV")
+    else:
+        report.append(f"Input Pattern: {args.input_pattern}")
     report.append(f"Templates Directory: {args.templates_dir}")
     report.append(f"Analysis Mode: {'Minimal (summary only)' if args.minimal else 'Complete (all outputs + plots)' if args.complete else 'Standard (main outputs)'}")
     report.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -966,7 +1035,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
         # Header (include redshift error and age)
         header = (
             f"{'Spectrum':<16} {'Type':<7} {'Subtype':<9} {'Template':<18} "
-            f"{'z':<8} {'±Error':<10} {'Age':<6} {'RLAP-CCC':<10} {'Quality':<8} {'Status':<1}"
+            f"{'z':<8} {'±Error':<10} {'Age':<6} {'RLAP-CCC':<10} {'Quality':<8} {'zFixed':<6} {'Status':<1}"
         )
         report.append(header)
         report.append("-" * len(header))
@@ -1013,10 +1082,11 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             rlap_cos = f"{get_best_metric_value(summary):.1f}"
             status_marker = "✓"
+            zfixed = "Y" if summary.get('redshift_fixed') else "N"
             
             row = (
                 f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
-                f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {status_marker}"
+                f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {zfixed:<6} {status_marker}"
             )
             report.append(row)
 
@@ -1035,7 +1105,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
                 status_marker = 'x'
                 row = (
                     f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
-                    f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {status_marker}"
+                    f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {'N':<6} {status_marker}"
                 )
                 report.append(row)
         
@@ -1075,6 +1145,15 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
                 report.append(f"   Best Match Redshift: {summary.get('redshift', 0):.6f} ± {summary.get('redshift_error', 0):.6f}")
             else:
                 report.append(f"   Redshift: {summary.get('redshift', 0):.6f} ± {summary.get('redshift_error', 0):.6f}")
+
+            # Redshift mode
+            if summary.get('redshift_fixed'):
+                try:
+                    report.append(f"   Redshift Mode: Fixed at z={summary.get('redshift_fixed_value', 0):.6f}")
+                except Exception:
+                    report.append("   Redshift Mode: Fixed")
+            else:
+                report.append("   Redshift Mode: Search within zmin/zmax")
             
             # Use best available metric (RLAP-CCC if available, otherwise RLAP)
             from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
@@ -1239,11 +1318,92 @@ def main(args: argparse.Namespace) -> int:
         pipeline_logger = logging.getLogger('snid_sage.snid.pipeline')
         pipeline_logger.setLevel(logging.CRITICAL)  # Only critical errors, not "no matches"
         
-        # Find input files
-        input_files = glob.glob(args.input_pattern)
-        if not input_files:
-            print(f"[ERROR] No files found matching pattern: {args.input_pattern}", file=sys.stderr)
+        # Determine input source (glob pattern or list CSV)
+        items: List[Dict[str, Any]] = []
+        using_list_csv = bool(getattr(args, 'list_csv', None))
+        if (not using_list_csv) and (not getattr(args, 'input_pattern', None)):
+            print("[ERROR] Provide an input pattern or use --list-csv to supply a file list.", file=sys.stderr)
             return 1
+        if using_list_csv:
+            # Read items from CSV
+            try:
+                with open(args.list_csv, 'r', newline='', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    # Normalize header names for robust matching
+                    headers = reader.fieldnames or []
+                    norm_map = {h: re.sub(r'[^a-z0-9]', '', h.lower()) for h in headers}
+
+                    # Determine actual path and redshift keys
+                    desired_path_key = getattr(args, 'path_column', 'path') or 'path'
+                    desired_redshift_key = getattr(args, 'redshift_column', 'redshift') or 'redshift'
+
+                    def resolve_column(desired: str, candidates: List[str]) -> Optional[str]:
+                        # Exact match first
+                        if desired in headers:
+                            return desired
+                        # Try case-insensitive exact
+                        for h in headers:
+                            if h.lower() == desired.lower():
+                                return h
+                        # Try normalized candidates
+                        desired_norm = re.sub(r'[^a-z0-9]', '', desired.lower())
+                        all_candidates = [desired_norm] + candidates
+                        for h, n in norm_map.items():
+                            if n in all_candidates:
+                                return h
+                        return None
+
+                    path_candidates_norm = [
+                        'path', 'file', 'spectrum', 'spectrumpath', 'pathname'
+                    ]
+                    redshift_candidates_norm = [
+                        'redshift', 'hostz', 'sherlockhostz', 'z', 'hostredshift'
+                    ]
+
+                    actual_path_key = resolve_column(desired_path_key, path_candidates_norm)
+                    actual_redshift_key = resolve_column(desired_redshift_key, redshift_candidates_norm)
+
+                    base_dir = Path(args.list_csv).parent
+                    for row in reader:
+                        path_val = row.get(actual_path_key) if actual_path_key else None
+                        if not path_val or str(path_val).strip() == "":
+                            continue
+                        path_str = str(path_val).strip()
+                        # Resolve relative to CSV directory
+                        try:
+                            p = Path(path_str)
+                            if not p.is_absolute():
+                                p = (base_dir / p).resolve()
+                            path_str = str(p)
+                        except Exception:
+                            pass
+                        redshift_val: Optional[float] = None
+                        raw_z = row.get(actual_redshift_key) if actual_redshift_key else None
+                        if raw_z is not None and str(raw_z).strip() != "":
+                            try:
+                                zf = float(raw_z)
+                                if np.isfinite(zf):
+                                    redshift_val = float(zf)
+                            except Exception:
+                                redshift_val = None
+                        items.append({"path": path_str, "redshift": redshift_val})
+            except FileNotFoundError:
+                print(f"[ERROR] CSV file not found: {args.list_csv}", file=sys.stderr)
+                return 1
+            except Exception as e:
+                print(f"[ERROR] Failed to read CSV '{args.list_csv}': {e}", file=sys.stderr)
+                return 1
+            input_files = [it["path"] for it in items]
+            if not input_files:
+                print(f"[ERROR] No valid rows found in CSV: {args.list_csv}", file=sys.stderr)
+                return 1
+        else:
+            # Pattern-based discovery
+            input_files = glob.glob(args.input_pattern)
+            if not input_files:
+                print(f"[ERROR] No files found matching pattern: {args.input_pattern}", file=sys.stderr)
+                return 1
+            items = [{"path": p, "redshift": None} for p in input_files]
         
         # Determine mode
         if args.minimal:
@@ -1279,6 +1439,8 @@ def main(args: argparse.Namespace) -> int:
             print(f"   Redshift Range: {args.zmin:.6f} to {args.zmax:.6f}")
             if args.forced_redshift is not None:
                 print(f"   Forced Redshift: {args.forced_redshift:.6f}")
+            if using_list_csv:
+                print(f"   Input list CSV: {args.list_csv} (path='{getattr(args, 'path_column', 'path')}', redshift='{getattr(args, 'redshift_column', 'redshift')}')")
             print(f"   Error Handling: {'Stop on first failure' if args.stop_on_error else 'Continue on failures (default)'}")
             print("")
         
@@ -1306,7 +1468,9 @@ def main(args: argparse.Namespace) -> int:
         if not is_quiet and not brief_mode:
             print("[INFO] Starting optimized sequential processing...")
 
-        for i, spectrum_path in enumerate(input_files, 1):
+        for i, item in enumerate(items, 1):
+            spectrum_path = item["path"]
+            per_row_forced_z = item.get("redshift", None)
             is_tty = sys.stdout.isatty()
             show_progress = (not args.verbose) and (not is_quiet) and (not getattr(args, 'no_progress', False)) and is_tty
             if args.verbose and not brief_mode:
@@ -1317,7 +1481,8 @@ def main(args: argparse.Namespace) -> int:
                     print(f"   Progress: {i}/{len(input_files)} ({i/len(input_files)*100:.0f}%)")
 
             name, success, message, summary = process_single_spectrum_optimized(
-                spectrum_path, template_manager, args.output_dir, args
+                spectrum_path, template_manager, args.output_dir, args,
+                forced_redshift_override=per_row_forced_z
             )
 
             results.append((name, success, message, summary))
@@ -1325,12 +1490,17 @@ def main(args: argparse.Namespace) -> int:
             if not success:
                 failed_count += 1
                 if brief_mode and not is_quiet:
-                    # Distinguish normal no-match vs actual error
+                    # Distinguish normal no-match vs actual error and include error type when available
                     if ("No good matches" in message) or ("No templates after filtering" in message):
                         status = "no-match"
+                        print(f"[{i}/{len(input_files)}] {name}: {status}")
                     else:
                         status = "error"
-                    print(f"[{i}/{len(input_files)}] {name}: {status}")
+                        etype = summary.get('error_type') if isinstance(summary, dict) else None
+                        if etype:
+                            print(f"[{i}/{len(input_files)}] {name}: {status} ({etype})")
+                        else:
+                            print(f"[{i}/{len(input_files)}] {name}: {status}")
                 else:
                     if "No good matches" in message or "No templates after filtering" in message:
                         # Normal outcome - no match found
@@ -1339,7 +1509,11 @@ def main(args: argparse.Namespace) -> int:
                     else:
                         # Actual error
                         if not is_quiet:
-                            print(f"      [ERROR] {name}: {message}")
+                            etype = summary.get('error_type') if isinstance(summary, dict) else None
+                            if etype:
+                                print(f"      [ERROR] {name}: {message} [{etype}]")
+                            else:
+                                print(f"      [ERROR] {name}: {message}")
                 if args.stop_on_error:
                     if not is_quiet and not brief_mode:
                         print("Stopping due to error.")
