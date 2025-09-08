@@ -60,6 +60,9 @@ sage data/sn2003jo.dat -o results/
 
 # Batch processing (default saves per-object summary and plots)
 sage batch "data/*.dat" -o results/
+
+# Batch from a CSV list with per-row redshift (if provided)
+sage batch --list-csv "data/spectra_list.csv" -o results/
 ```
 
 ## Documentation & Support

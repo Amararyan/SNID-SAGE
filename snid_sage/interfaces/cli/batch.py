@@ -308,6 +308,9 @@ def process_single_spectrum_optimized(
             templates_dir=template_manager.templates_dir,
             zmin=args.zmin,
             zmax=args.zmax,
+            rlapmin=getattr(args, 'rlapmin', 4.0),
+            lapmin=getattr(args, 'lapmin', 0.3),
+            rlap_ccc_threshold=getattr(args, 'rlap_ccc_threshold', 1.8),
             forced_redshift=used_forced_redshift,
             verbose=False,
             show_plots=False,
@@ -854,7 +857,7 @@ Examples:
   sage batch "*.dat" templates/ --forced-redshift 0.1 --output-dir results/
 
   # NEW: List mode using CSV with per-row redshift (forced when provided)
-  sage batch --list-csv "C:\\Users\\stoppa\\PycharmProjects\\SNID_SAGE\\data\\VolumeLimited\\tns_names_redshifts_and_spectra.csv" --output-dir results/
+  sage batch --list-csv "data/spectra_list.csv" --output-dir results/
   # If your CSV uses different column names
   sage batch --list-csv input.csv --path-column file --redshift-column z --output-dir results/
     """
@@ -918,6 +921,25 @@ Examples:
         type=float, 
         default=1,
         help="Maximum redshift to consider"
+    )
+    analysis_group.add_argument(
+        "--rlapmin",
+        type=float,
+        default=4.0,
+        help="Minimum rlap value required"
+    )
+    analysis_group.add_argument(
+        "--lapmin",
+        type=float,
+        default=0.3,
+        help="Minimum overlap fraction required"
+    )
+    analysis_group.add_argument(
+        "--rlap-ccc-threshold",
+        dest="rlap_ccc_threshold",
+        type=float,
+        default=1.8,
+        help="Minimum RLAP-CCC value required for clustering"
     )
     analysis_group.add_argument(
         "--forced-redshift", 
@@ -1282,6 +1304,112 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
     return "\n".join(report)
 
 
+def _export_results_table(results: List[Tuple], output_dir: Path) -> Optional[Path]:
+    """Export per-spectrum results to CSV with clear best-match column names."""
+    # Build rows in a deterministic column order
+    columns = [
+        'file',
+        'path',
+        'type',
+        'subtype',
+        'pred_redshift',
+        'pred_redshift_err',
+        'pred_age',
+        'pred_age_err',
+        'best_match_redshift',
+        'best_match_redshift_err',
+        'best_match_age',
+        'rlap_ccc',
+        'quality',
+        'confidence',
+        # Helpful extras
+        'best_template',
+        'zfixed',
+        'zfixed_value',
+        'weak_match',
+        'success',
+        'error'
+    ]
+
+    rows: List[Dict[str, Any]] = []
+
+    for name, success, message, summary in results:
+        row: Dict[str, Any] = {c: None for c in columns}
+
+        if success and isinstance(summary, dict) and summary.get('success', False):
+            # Identification
+            row['file'] = summary.get('spectrum', name)
+            row['path'] = summary.get('file_path')
+            # Classification
+            row['type'] = summary.get('consensus_type', 'Unknown')
+            row['subtype'] = summary.get('consensus_subtype', 'Unknown')
+
+            # Predicted redshift/age: prefer cluster-weighted when available
+            pred_z = None
+            pred_z_err = None
+            if summary.get('has_clustering') and ('cluster_redshift_weighted' in summary):
+                pred_z = summary.get('cluster_redshift_weighted')
+                pred_z_err = summary.get('cluster_redshift_weighted_uncertainty')
+            if pred_z is None or (isinstance(pred_z, float) and np.isnan(pred_z)):
+                pred_z = summary.get('redshift')
+                pred_z_err = summary.get('redshift_error')
+            row['pred_redshift'] = pred_z
+            row['pred_redshift_err'] = pred_z_err
+
+            pred_age = summary.get('cluster_age_weighted') if 'cluster_age_weighted' in summary else None
+            if pred_age is None or (isinstance(pred_age, float) and np.isnan(pred_age)):
+                pred_age = summary.get('age')
+            row['pred_age'] = pred_age
+            row['pred_age_err'] = summary.get('cluster_age_uncertainty') if 'cluster_age_uncertainty' in summary else None
+
+            # Best match (top template) parameters
+            row['best_match_redshift'] = summary.get('redshift')
+            row['best_match_redshift_err'] = summary.get('redshift_error')
+            row['best_match_age'] = summary.get('age')
+
+            # Analysis quality metrics
+            try:
+                row['rlap_ccc'] = summary.get('rlap_ccc', get_best_metric_value(summary))
+            except Exception:
+                row['rlap_ccc'] = summary.get('rlap', None)
+
+            row['quality'] = summary.get('cluster_quality_category', 'N/A' if not summary.get('has_clustering') else None)
+            row['confidence'] = summary.get('cluster_confidence_level', 'unknown')
+
+            # Extras
+            try:
+                row['best_template'] = clean_template_name(summary.get('best_template', 'Unknown'))
+            except Exception:
+                row['best_template'] = summary.get('best_template')
+            row['zfixed'] = bool(summary.get('redshift_fixed', False))
+            row['zfixed_value'] = summary.get('redshift_fixed_value')
+            row['weak_match'] = bool(summary.get('weak_match', False))
+            row['success'] = True
+            row['error'] = ''
+        else:
+            # Failure row
+            row['file'] = name
+            row['path'] = summary.get('file_path') if isinstance(summary, dict) else None
+            row['success'] = False
+            row['error'] = message
+
+        rows.append(row)
+
+    # Always write CSV only
+    csv_path = output_dir / 'batch_results.csv'
+    try:
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=columns)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+    except Exception as e:
+        logging.getLogger('snid_sage.snid.batch').warning(f"Failed to write CSV results: {e}")
+        return None
+
+    return csv_path
+
+
 def main(args: argparse.Namespace) -> int:
     """Main function for the simplified batch command."""
     try:
@@ -1577,6 +1705,11 @@ def main(args: argparse.Namespace) -> int:
 
         if not is_quiet and not brief_mode:
             print(f"[SUCCESS] Summary report: {summary_path}")
+
+        # Export tabular results (CSV only)
+        csv_file = _export_results_table(results, output_dir)
+        if not is_quiet and csv_file:
+            print(f"Results table (CSV): {csv_file}")
 
         # Show what was created
         if not is_quiet and not brief_mode and not args.minimal and successful_count > 0:

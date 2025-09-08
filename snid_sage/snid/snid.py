@@ -1250,8 +1250,8 @@ def run_snid_analysis(
     exclude_templates: Optional[List[str]] = None,
     peak_window_size: int = 10,
     lapmin: float = 0.3,
-    rlapmin: float = 5,
-    rlap_ccc_threshold: float = 1.5,  # NEW: RLAP-CCC threshold for clustering
+    rlapmin: float = 4,
+    rlap_ccc_threshold: float = 1.8,  # NEW: RLAP-CCC threshold for clustering
     # NEW: Forced redshift parameter
     forced_redshift: Optional[float] = None,
     # Output options
@@ -2482,7 +2482,7 @@ def run_snid(
     apodize_percent: float = 10.0,
     peak_window_size: int = 10,
     lapmin: float = 0.3,
-    rlapmin: float = 5,
+    rlapmin: float = 4,
 
     # NEW: Forced redshift parameter
     forced_redshift: Optional[float] = None,
@@ -2840,7 +2840,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", "-o", help="Directory for output files")
     parser.add_argument("--zmin", type=float, default=-0.01, help="Minimum redshift to consider")
     parser.add_argument("--zmax", type=float, default=1.0, help="Maximum redshift to consider")
-    parser.add_argument("--rlapmin", type=float, default=5.0, help="Minimum rlap value required")
+    parser.add_argument("--rlapmin", type=float, default=4.0, help="Minimum rlap value required")
     parser.add_argument("--lapmin", type=float, default=0.3, help="Minimum overlap fraction required")
     parser.add_argument("--aband-remove", action="store_true", help="Remove telluric A-band")
     parser.add_argument("--skyclip", action="store_true", help="Clip sky emission lines")

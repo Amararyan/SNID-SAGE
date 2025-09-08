@@ -750,7 +750,8 @@ class PySide6AppController(QtCore.QObject):
                 template_filter=analysis_kwargs.get('template_filter', None),
                 peak_window_size=analysis_kwargs.get('peak_window_size', 10),
                 lapmin=analysis_kwargs.get('lapmin', 0.3),
-                rlapmin=analysis_kwargs.get('rlapmin', 5.0),
+                rlapmin=float(analysis_kwargs.get('rlapmin', 4.0)),
+                rlap_ccc_threshold=float(analysis_kwargs.get('rlap_ccc_threshold', 1.8)),
                 forced_redshift=forced_redshift,  # NEW: Pass forced redshift parameter
                 max_output_templates=analysis_kwargs.get('max_output_templates', 10),
                 verbose=analysis_kwargs.get('verbose', False),

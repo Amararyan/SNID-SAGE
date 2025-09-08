@@ -273,9 +273,9 @@ class ConfigurationManager:
                 'max_output_templates': 10,
                 'wavelength_tolerance': 10.0,
                 # SNID-specific parameters
-                'rlapmin': 5.0,
+                'rlapmin': 4.0,
                 'lapmin': 0.3,
-                'rlap_ccc_threshold': 1.5,  # NEW: RLAP-CCC threshold for clustering
+                'rlap_ccc_threshold': 1.8,  # NEW: RLAP-CCC threshold for clustering
 
                 'wmin': None,  # Optional wavelength limits
                 'wmax': None,

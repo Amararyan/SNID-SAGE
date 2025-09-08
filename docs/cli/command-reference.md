@@ -92,7 +92,8 @@ Process multiple spectra simultaneously with optimized workflows and detailed re
 
 #### Basic Usage
 ```bash
-sage batch <input_pattern> [options]
+sage batch <input_pattern> [templates/] [options]
+sage batch --list-csv <file.csv> [templates/] [options]
 ```
 
 #### Examples
@@ -108,16 +109,29 @@ sage batch "data/*.dat" templates/ --output-dir results/
 
 # Batch processing
 sage batch "data/*.dat" --output-dir results/
+
+# List-based batch from CSV (per-row redshift when present)
+sage batch --list-csv "data/spectra_list.csv" --output-dir results/
+
+# Custom column names in CSV
+sage batch --list-csv input.csv --path-column "Spectrum Path" --redshift-column "Host Redshift" --output-dir results/
 ```
 
 #### Batch Options
 ```bash
---output-dir DIR        # Output directory for results
---template-dir DIR      # Custom template directory
---type-filter TYPE      # Filter templates by type
---age-min DAYS          # Minimum template age
---age-max DAYS          # Maximum template age
+--output-dir DIR          # Output directory for results
+--type-filter TYPE...     # Filter templates by type
+--template-filter NAME... # Restrict to specific templates
+--zmin FLOAT              # Min redshift for search (default: -0.01)
+--zmax FLOAT              # Max redshift for search (default: 1.0)
+--forced-redshift FLOAT   # Force a fixed redshift for all spectra
+--list-csv FILE           # CSV list of spectra (columns: path[, redshift])
+--path-column NAME        # Column name for spectrum paths in --list-csv (default: path)
+--redshift-column NAME    # Column name for per-row redshift in --list-csv (default: redshift)
 ```
+
+Outputs:
+- Per spectrum result files; summary includes a `zFixed` column indicating whether a fixed redshift was used for that spectrum.
 
 ### `sage config`
 

@@ -202,7 +202,7 @@ Examples:
     analysis_group.add_argument(
         "--rlapmin", 
         type=float, 
-        default=5.0, 
+        default=4.0, 
         help="Minimum rlap value required"
     )
     analysis_group.add_argument(

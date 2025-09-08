@@ -110,8 +110,8 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             'age_min': -9999,  # Default minimum age (shows "No minimum")
             'age_max': 9999,   # Default maximum age (shows "No maximum") 
             'lapmin': 0.3,
-            'rlapmin': 5.0,
-            'rlap_ccc_threshold': 1.5,  # NEW: RLAP-CCC threshold for clustering
+            'rlapmin': 4.0,
+            'rlap_ccc_threshold': 1.8,  # NEW: RLAP-CCC threshold for clustering
             'max_output_templates': 10,
             
             
@@ -386,12 +386,12 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         self.widgets['lapmin'].setToolTip("Minimum overlap fraction required between spectrum and template (any precision)")
         correlation_layout.addRow("Minimum Overlap (lapmin):", self.widgets['lapmin'])
         
-        self.widgets['rlapmin'] = create_flexible_double_input(min_val=0.0, max_val=20.0, default=0.0)
+        self.widgets['rlapmin'] = create_flexible_double_input(min_val=0.0, max_val=20.0, default=4.0)
         self.widgets['rlapmin'].setToolTip("Minimum relative overlap for a good match (any precision)")
         correlation_layout.addRow("Minimum Relative Overlap (rlapmin):", self.widgets['rlapmin'])
         
-        self.widgets['rlap_ccc_threshold'] = create_flexible_double_input(min_val=0.0, max_val=50.0, default=1.5)
-        self.widgets['rlap_ccc_threshold'].setToolTip("Minimum RLAP-CCC value required for clustering (default: 1.5, any precision)")
+        self.widgets['rlap_ccc_threshold'] = create_flexible_double_input(min_val=0.0, max_val=50.0, default=1.8)
+        self.widgets['rlap_ccc_threshold'].setToolTip("Minimum RLAP-CCC value required for clustering (default: 1.8, any precision)")
         correlation_layout.addRow("RLAP-CCC Clustering Threshold:", self.widgets['rlap_ccc_threshold'])
         
         # Removed Peak Window Size option from configuration UI

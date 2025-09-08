@@ -5,6 +5,7 @@ All notable changes to SNID SAGE will be documented in this file.
 ## [0.7.4] - 2025-09-04
 
 - Enhanced wavelength range validation requiring minimum 2000 Å overlap with optical grid (2500-10000 Å), with automatic clipping and improved error handling across CLI, GUI, and core preprocessing.
+- CLI: Added list-based batch mode `--list-csv` that accepts a CSV with a path column and optional per-row redshift column. Per-row redshift is applied as a fixed redshift for that spectrum; relative paths are resolved relative to the CSV file. Summary report now includes a `zFixed` column.
 
 ## [0.7.3] - 2025-09-02
 
