@@ -276,7 +276,7 @@
     },
     "sn1998S": {
       "type": "II",
-      "subtype": "IIn",
+      "subtype": "II-flash",
       "age": -13.1,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -793,7 +793,7 @@
     },
     "sn2016cvk": {
       "type": "II",
-      "subtype": "IIP",
+      "subtype": "IIn",
       "age": 77.0,
       "redshift": 0.0,
       "phase": "Unknown",
@@ -3532,7 +3532,7 @@
     },
     "sn2005hk": {
       "type": "Ia",
-      "subtype": "Ia-02cx",  
+      "subtype": "Ia-02cx",
       "age": -9.3,
       "redshift": 0.0,
       "phase": "Unknown",

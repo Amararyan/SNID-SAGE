@@ -335,6 +335,7 @@ examples/
 spectral_lines/
 wise_spectra/
 OLD_ICONS/
+VolumeLimited/
 
 # ===== MARKDOWN FILES =====
 # Track markdown files (remove previous global ignore). No entries here on purpose.

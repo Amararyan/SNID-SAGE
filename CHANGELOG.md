@@ -2,6 +2,10 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
+## [0.7.5] - 2025-09-14
+
+- Template metadata corrections: updated `sn2016cvk` subtype from IIP to IIn and `sn1998S` subtype from IIn to II-flash in both JSON index and HDF5 storage files.
+
 ## [0.7.4] - 2025-09-04
 
 - Enhanced wavelength range validation requiring minimum 2000 Å overlap with optical grid (2500-10000 Å), with automatic clipping and improved error handling across CLI, GUI, and core preprocessing.
