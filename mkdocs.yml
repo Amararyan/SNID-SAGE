@@ -93,7 +93,7 @@ nav:
     - OpenRouter Setup: ai/openrouter-setup.md
 
   - Data & Templates:
-    - Supported Formats: data/supported-formats.md
+    - Supported Formats: reference/supported-formats.md
     - Data Preparation: data/data-preparation.md
     - Template Library: data/template-library.md
     - Custom Templates: data/custom-templates.md

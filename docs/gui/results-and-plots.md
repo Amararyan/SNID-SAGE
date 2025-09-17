@@ -1,19 +1,36 @@
 ## Results and Plots
 
-After analysis:
-- Summary shows type, best template, confidence, redshift, age
-- Open dialogs for cluster summary, subtype proportions, redshift–age
+Note: This page is a work in progress.
 
-Plots:
-- Comparison (flux and flattened), redshift–age, 3D clustering (if available)
+### After analysis
 
-Export:
-- Use File → Export or dialog Save/Export
-- PNG for quick sharing; PDF/SVG for publications
+| Area | Contents |
+|---|---|
+| Summary | Type, best template, confidence, redshift, age |
+| Dialogs | Cluster summary, subtype proportions, redshift–age |
 
-CLI outputs:
-- Standard: `{name}.output`, `{name}.fluxed`, `{name}.flattened`
-- Complete adds plot files (`comparison`, `3d_gmm_clustering`, `redshift_age`, `cluster_subtypes`)
+### Plots
+
+| Plot | Description |
+|---|---|
+| Comparison | Flux and flattened comparisons vs best match |
+| Redshift–Age | Scatter/summary of redshift vs age |
+| 3D clustering | Type-aware GMM visualization (if available) |
+
+### Export
+
+| Method | Notes |
+|---|---|
+| File → Export | Export from main window |
+| Dialog Save/Export | Export from individual dialogs |
+| Formats | PNG for quick sharing; PDF/SVG for publications |
+
+### CLI outputs
+
+| Mode | Files |
+|---|---|
+| Standard | `{name}.output`, `{name}.fluxed`, `{name}.flattened` |
+| Complete | Adds plot files (`comparison`, `3d_gmm_clustering`, `redshift_age`, `cluster_subtypes`) |
 
 ```powershell
 sage data\sn2003jo.dat --output-dir results\ --complete

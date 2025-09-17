@@ -3,15 +3,21 @@
 Use AI to summarize, interpret, and draft text based on your SNID results.
 
 ### Features
-- Quick Summary: short explanation of classification
-- Detailed Analysis: structured scientific interpretation
-- Scientific Context: literature-style discussion
-- Publication Text: methods/results text blocks
+
+| Feature | Description |
+|---|---|
+| Quick Summary | Short explanation of classification |
+| Detailed Analysis | Structured scientific interpretation |
+| Scientific Context | Literature-style discussion |
+| Publication Text | Methods/results text blocks |
 
 ### Configuration
-- Provider: OpenRouter (default)
-- Model: choose per analysis (quality vs. cost)
-- API Key: Settings → AI → API key
+
+| Setting | Notes |
+|---|---|
+| Provider | OpenRouter (default) |
+| Model | Choose per analysis (quality vs. cost) |
+| API Key | Settings → AI → API key |
 
 ### Workflow
 1. Complete SNID analysis

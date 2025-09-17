@@ -1,5 +1,7 @@
 # API Reference
 
+Note: This page is a work in progress.
+
 Complete API reference for SNID SAGE's programmatic interface, including all classes, methods, and functions.
 
 ## Overview
@@ -78,10 +80,11 @@ def run_snid(
     age_range: Optional[Tuple[float, float]] = None,
     type_filter: Optional[List[str]] = None,
     template_filter: Optional[List[str]] = None,
+    exclude_templates: Optional[List[str]] = None,
     forced_redshift: Optional[float] = None,
     peak_window_size: int = 10,
     lapmin: float = 0.3,
-    rlapmin: float = 5,
+    rlapmin: float = 4,
     # Output options
     output_dir: Optional[str] = None,
     output_main: bool = False,
@@ -103,43 +106,47 @@ def run_snid(
 ```
 
 **Parameters:**
-- `spectrum_path` (str): Path to input spectrum file
-- `templates_dir` (str): Path to template library directory
-- `preprocessed_spectrum` (tuple, optional): Pre-processed (wave, flux) arrays
-- `skip_preprocessing_steps` (list, optional): Steps to skip in preprocessing
-- `savgol_window` (int): Savitzky-Golay filter window size (0 = no filtering)
-- `savgol_fwhm` (float): Savitzky-Golay filter FWHM in Angstroms
-- `savgol_order` (int): Savitzky-Golay filter polynomial order
-- `aband_remove` (bool): Remove telluric A-band
-- `skyclip` (bool): Clip sky emission lines
-- `emclip_z` (float): Redshift for emission line clipping (-1 to disable)
-- `emwidth` (float): Width for emission line clipping
-- `wavelength_masks` (list): Wavelength ranges to mask
-- `apodize_percent` (float): Percentage of spectrum ends to apodize
-- `zmin` (float): Minimum redshift to search
-- `zmax` (float): Maximum redshift to search
-- `age_range` (tuple, optional): Age range filter for templates
-- `type_filter` (list, optional): Supernova types to include
-- `template_filter` (list, optional): Specific templates to use
-- `forced_redshift` (float, optional): Force analysis at specific redshift
-- `peak_window_size` (int): Window size for peak detection
-- `lapmin` (float): Minimum overlap fraction
-- `rlapmin` (float): Minimum rlap value
-- `output_dir` (str, optional): Directory for output files
-- `output_main` (bool): Generate main output file
-- `output_fluxed` (bool): Generate fluxed spectrum file
-- `output_flattened` (bool): Generate flattened spectrum file
-- `output_correlation` (bool): Generate correlation files
-- `output_plots` (bool): Generate plots
-- `plot_types` (list, optional): Types of plots to generate
-- `max_output_templates` (int): Maximum templates in output
-- `max_plot_templates` (int): Maximum templates to plot
-- `plot_figsize` (tuple): Figure size for plots
-- `plot_dpi` (int): DPI for saved plots
-- `verbose` (bool): Print detailed information
-- `show_plots` (bool): Display plots
-- `save_plots` (bool): Save plots to files
-- `plot_dir` (str, optional): Directory for saved plots
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| spectrum_path | str | — | Path to input spectrum file |
+| templates_dir | str | — | Path to template library directory |
+| preprocessed_spectrum | tuple or None | None | Pre-processed (wave, flux) arrays to skip preprocessing |
+| skip_preprocessing_steps | list or None | None | Specific preprocessing steps to skip |
+| savgol_window | int | 0 | Savitzky–Golay filter window size (0 = no filtering) |
+| savgol_fwhm | float | 0.0 | Savitzky–Golay FWHM in Å (alternative to window size) |
+| savgol_order | int | 3 | Savitzky–Golay polynomial order |
+| aband_remove | bool | False | Remove telluric A-band |
+| skyclip | bool | False | Clip sky emission lines |
+| emclip_z | float | -1.0 | Redshift for emission line clipping (-1 to disable) |
+| emwidth | float | 40.0 | Width for emission line clipping (Å) |
+| wavelength_masks | list or None | None | Wavelength ranges to mask |
+| apodize_percent | float | 10.0 | Percentage of spectrum ends to apodize |
+| zmin | float | -0.01 | Minimum redshift to search |
+| zmax | float | 1.0 | Maximum redshift to search |
+| age_range | tuple or None | None | Age range filter for templates |
+| type_filter | list or None | None | Supernova types to include |
+| template_filter | list or None | None | Specific templates to use |
+| exclude_templates | list or None | None | Templates to exclude |
+| forced_redshift | float or None | None | Force analysis at specific redshift |
+| peak_window_size | int | 10 | Window size for peak detection |
+| lapmin | float | 0.3 | Minimum overlap fraction |
+| rlapmin | float | 4 | Minimum RLAP value |
+| output_dir | str or None | None | Directory for output files |
+| output_main | bool | False | Generate main output file |
+| output_fluxed | bool | False | Generate fluxed spectrum file |
+| output_flattened | bool | False | Generate flattened spectrum file |
+| output_correlation | bool | False | Generate correlation files |
+| output_plots | bool | False | Generate plots |
+| plot_types | list or None | None | Types of plots to generate |
+| max_output_templates | int | 5 | Maximum templates in output |
+| max_plot_templates | int | 20 | Maximum templates to plot |
+| plot_figsize | tuple | (10, 8) | Figure size for plots |
+| plot_dpi | int | 150 | DPI for saved plots |
+| verbose | bool | False | Print detailed information |
+| show_plots | bool | True | Display plots |
+| save_plots | bool | False | Save plots to files |
+| plot_dir | str or None | None | Directory for saved plots |
 
 **Returns:**
 - `SNIDResult`: Analysis results object
@@ -154,6 +161,15 @@ def preprocess_spectrum(
     spectrum_path: Optional[str] = None,
     input_spectrum: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     *,
+    # Preprocessing options
+    spike_masking: bool = True,
+    spike_floor_z: float = 50.0,
+    spike_baseline_window: int = 501,
+    spike_baseline_width: float | None = None,
+    spike_rel_edge_ratio: float = 2.0,
+    spike_min_separation: int = 2,
+    spike_max_removals: Optional[int] = None,
+    spike_min_abs_resid: Optional[float] = None,
     savgol_window: int = 0,
     savgol_fwhm: float = 0.0,
     savgol_order: int = 3,
@@ -164,24 +180,44 @@ def preprocess_spectrum(
     wavelength_masks: Optional[List[Tuple[float, float]]] = None,
     apodize_percent: float = 10.0,
     skip_steps: Optional[List[str]] = None,
-    verbose: bool = False
+    verbose: bool = False,
+    # Grid handling
+    clip_to_grid: bool = True,
+    grid_min_wave: Optional[float] = None,
+    grid_max_wave: Optional[float] = None,
+    min_overlap_angstrom: float = 2000.0,
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]
 ```
 
 **Parameters:**
-- `spectrum_path` (str, optional): Path to spectrum file
-- `input_spectrum` (tuple, optional): (wavelength, flux) arrays
-- `savgol_window` (int): Savitzky-Golay filter window size
-- `savgol_fwhm` (float): Savitzky-Golay filter FWHM
-- `savgol_order` (int): Savitzky-Golay filter order
-- `aband_remove` (bool): Remove telluric A-band
-- `skyclip` (bool): Clip sky emission lines
-- `emclip_z` (float): Redshift for emission line clipping
-- `emwidth` (float): Width for emission line clipping
-- `wavelength_masks` (list): Wavelength ranges to mask
-- `apodize_percent` (float): Percentage to apodize
-- `skip_steps` (list, optional): Steps to skip
-- `verbose` (bool): Print detailed information
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| spectrum_path | str or None | None | Path to spectrum file |
+| input_spectrum | tuple or None | None | (wavelength, flux) arrays |
+| spike_masking | bool | True | Enable early spike masking |
+| spike_floor_z | float | 50.0 | Floor-relative robust z for outlier detection |
+| spike_baseline_window | int | 501 | Running median window (pixels) |
+| spike_baseline_width | float or None | None | Baseline width in wavelength units |
+| spike_rel_edge_ratio | float | 2.0 | Center residual vs neighbors ratio |
+| spike_min_separation | int | 2 | Minimum pixel separation between spikes |
+| spike_max_removals | int or None | None | Cap on number of removed spikes |
+| spike_min_abs_resid | float or None | None | Minimum absolute residual amplitude |
+| savgol_window | int | 0 | Savitzky–Golay window (0 disables) |
+| savgol_fwhm | float | 0.0 | Savitzky–Golay FWHM in Å |
+| savgol_order | int | 3 | Savitzky–Golay polynomial order |
+| aband_remove | bool | False | Remove telluric A-band |
+| skyclip | bool | False | Clip sky emission lines |
+| emclip_z | float | -1.0 | Redshift for emission line clipping (-1 disables) |
+| emwidth | float | 40.0 | Emission clipping width (Å) |
+| wavelength_masks | list or None | None | Wavelength ranges to mask |
+| apodize_percent | float | 10.0 | Percentage to apodize |
+| skip_steps | list or None | None | Preprocessing steps to skip |
+| verbose | bool | False | Print detailed information |
+| clip_to_grid | bool | True | Clip to standard analysis grid |
+| grid_min_wave | float or None | None | Minimum wavelength for grid clipping |
+| grid_max_wave | float or None | None | Maximum wavelength for grid clipping |
+| min_overlap_angstrom | float | 2000.0 | Minimum wavelength overlap required (Å) |
 
 **Returns:**
 - `processed_spectrum` (dict): Processed spectrum data
@@ -215,7 +251,8 @@ def run_snid_analysis(
     forced_redshift: Optional[float] = None,
     peak_window_size: int = 10,
     lapmin: float = 0.3,
-    rlapmin: float = 5,
+    rlapmin: float = 4,
+    rlap_ccc_threshold: float = 1.8,
     max_output_templates: int = 5,
     verbose: bool = False,
     show_plots: bool = True,
@@ -226,24 +263,28 @@ def run_snid_analysis(
 ```
 
 **Parameters:**
-- `processed_spectrum` (dict): Preprocessed spectrum from `preprocess_spectrum()`
-- `templates_dir` (str): Path to template library
-- `zmin` (float): Minimum redshift
-- `zmax` (float): Maximum redshift
-- `age_range` (tuple, optional): Age range filter
-- `type_filter` (list, optional): Type filter
-- `template_filter` (list, optional): Template name filter
-- `exclude_templates` (list, optional): Templates to exclude
-- `forced_redshift` (float, optional): Force specific redshift
-- `peak_window_size` (int): Peak detection window
-- `lapmin` (float): Minimum overlap
-- `rlapmin` (float): Minimum rlap
-- `max_output_templates` (int): Maximum output templates
-- `verbose` (bool): Verbose output
-- `show_plots` (bool): Show plots
-- `save_plots` (bool): Save plots
-- `plot_dir` (str, optional): Plot directory
-- `progress_callback` (callable, optional): Progress callback
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| processed_spectrum | dict | — | Preprocessed spectrum from `preprocess_spectrum()` |
+| templates_dir | str | — | Path to template library |
+| zmin | float | -0.01 | Minimum redshift |
+| zmax | float | 1.0 | Maximum redshift |
+| age_range | tuple or None | None | Age range filter |
+| type_filter | list or None | None | Type filter |
+| template_filter | list or None | None | Template name filter |
+| exclude_templates | list or None | None | Templates to exclude |
+| forced_redshift | float or None | None | Force specific redshift |
+| peak_window_size | int | 10 | Peak detection window |
+| lapmin | float | 0.3 | Minimum overlap |
+| rlapmin | float | 4 | Minimum RLAP |
+| rlap_ccc_threshold | float | 1.8 | Threshold for clustering quality (RLAP-CCC) |
+| max_output_templates | int | 5 | Maximum output templates |
+| verbose | bool | False | Verbose output |
+| show_plots | bool | True | Show plots |
+| save_plots | bool | False | Save plots |
+| plot_dir | str or None | None | Plot directory |
+| progress_callback | callable or None | None | Progress callback |
 
 **Returns:**
 - `SNIDResult`: Analysis results
@@ -311,19 +352,22 @@ def to_dict(self) -> Dict[str, Any]
 Read spectrum from file.
 
 ```python
-def read_spectrum(filename: str) -> Tuple[np.ndarray, np.ndarray]
+def read_spectrum(filename: str, apodize: bool = False) -> Tuple[np.ndarray, np.ndarray]
 ```
 
 **Parameters:**
-- `filename` (str): Path to spectrum file
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| filename | str | — | Path to spectrum file |
+| apodize | bool | False | Whether to apodize the spectrum |
 
 **Returns:**
 - `wavelength` (np.ndarray): Wavelength array
 - `flux` (np.ndarray): Flux array
 
 **Supported formats:**
-- ASCII text files (.dat, .txt, .ascii)
-- CSV files (.csv)
+- ASCII text files (.dat, .txt, .ascii, .asci, .csv, .flm)
 - FITS files (.fits, .fit)
 
 ### **load_templates()**
@@ -334,16 +378,19 @@ Load template library.
 def load_templates(
     template_dir: str,
     flatten: bool = True
-) -> Tuple[List[Dict], Dict]
+) -> Tuple[List[Dict[str, Any]], Dict[str, int]]
 ```
 
 **Parameters:**
-- `template_dir` (str): Template directory
-- `flatten` (bool): Whether to flatten templates
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| template_dir | str | — | Template directory |
+| flatten | bool | True | Whether to flatten templates |
 
 **Returns:**
 - `templates` (list): List of template dictionaries
-- `metadata` (dict): Template metadata
+- `type_counts` (dict): Counts of templates by type
 
 ### **write_result()**
 
@@ -351,16 +398,17 @@ Write analysis results to file.
 
 ```python
 def write_result(
-    filename: str,
     result: SNIDResult,
-    format: str = 'json'
-)
+    filename: str
+) -> None
 ```
 
 **Parameters:**
-- `filename` (str): Output filename
-- `result` (SNIDResult): Analysis results
-- `format` (str): Output format ('json', 'txt')
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| result | SNIDResult | — | Analysis results |
+| filename | str | — | Output filename |
 
 ---
 
@@ -412,14 +460,15 @@ Rebin spectrum to logarithmic wavelength grid.
 def log_rebin(
     wave: np.ndarray,
     flux: np.ndarray,
-    num_points: int = 1024
 ) -> Tuple[np.ndarray, np.ndarray]
 ```
 
 **Parameters:**
-- `wave` (np.ndarray): Input wavelength
-- `flux` (np.ndarray): Input flux
-- `num_points` (int): Number of output points
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| wave | np.ndarray | — | Input wavelength |
+| flux | np.ndarray | — | Input flux |
 
 **Returns:**
 - `log_wave` (np.ndarray): Log-rebinned wavelength
@@ -432,15 +481,21 @@ Fit and remove continuum.
 ```python
 def fit_continuum(
     flux: np.ndarray,
+    *,
     method: str = "spline",
-    sigma: float = 50
+    knotnum: int = 13,
+    izoff: int = 0,
 ) -> Tuple[np.ndarray, np.ndarray]
 ```
 
 **Parameters:**
-- `flux` (np.ndarray): Input flux
-- `method` (str): Fitting method
-- `sigma` (float): Smoothing parameter
+
+| Name | Type | Default | Description |
+|---|---|---:|---|
+| flux | np.ndarray | — | Input flux |
+| method | str | "spline" | Fitting method |
+| knotnum | int | 13 | Number of spline knots |
+| izoff | int | 0 | Index offset parameter |
 
 **Returns:**
 - `flat_flux` (np.ndarray): Flattened flux

@@ -1,13 +1,18 @@
 ## Templates GUI
 
+Note: This page is a work in progress.
+
 Interactive manager for exploring, creating, and organizing templates.
 
 For step-by-step workflows and expanded CLI usage, see the [CLI Reference](../cli/command-reference.md).
 
 ### Overview
-- Left: Template browser (search, type filter)
-- Right: Tabs for Viewer, Create, Manage, Compare, Statistics
-- Status bar: template count
+
+| Area | Contents |
+|---|---|
+| Left | Template browser (search, type filter) |
+| Right | Tabs for Viewer, Create, Manage, Compare, Statistics |
+| Status bar | Template count |
 
 ### Data source and overrides
 - The browser lists templates using a merged index:

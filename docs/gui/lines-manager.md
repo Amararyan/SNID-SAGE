@@ -1,15 +1,23 @@
 ## Lines GUI
 
+Note: This page is a work in progress.
+
 Spin-off GUI to manage spectral lines and user presets, with a light spectrum preview.
 
 ### Tabs
-- Lines: searchable table of effective lines (built-in + user)
-- Presets: define criteria sets (category, origin, SN types, strength, phase, name patterns)
+
+| Tab | Purpose |
+|---|---|
+| Lines | Searchable table of effective lines (built-in + user) |
+| Presets | Define criteria sets (category, origin, SN types, strength, phase, name patterns) |
 
 ### Lines panel
-- Add/Edit/Delete user lines
-- Columns: Name, Air/Vac wavelengths, Category, Origin, SN Types
-- Bold rows = user-defined entries
+
+| Action | Details |
+|---|---|
+| Manage lines | Add/Edit/Delete user lines |
+| Columns | Name, Air/Vac wavelengths, Category, Origin, SN Types |
+| Styling | Bold rows = user-defined entries |
 
 ### Test Spectrum
 - Load a spectrum and preview with line overlays (pyqtgraph)

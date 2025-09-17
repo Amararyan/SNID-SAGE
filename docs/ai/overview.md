@@ -1,5 +1,7 @@
 # AI Integration in SNID SAGE
 
+Note: This page is a work in progress.
+
 SNID SAGE includes optional AI-powered analysis to help interpret your spectrum classification results. This guide covers the AI features and how to use them.
 
 ## AI Features

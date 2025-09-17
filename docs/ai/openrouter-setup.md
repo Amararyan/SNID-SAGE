@@ -1,5 +1,7 @@
 # OpenRouter Setup for SNID SAGE
 
+Note: This page is a work in progress.
+
 SNID SAGE uses OpenRouter to provide AI-powered spectrum analysis. This guide covers the essential setup steps.
 
 ## Setup Overview

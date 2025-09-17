@@ -30,36 +30,40 @@ After analysis: Results dialogs, overlays, clustering, AI Assistant
 
 Most options are set here. For a compact list of parameters and defaults, see the [Parameters Reference](../reference/parameters.md).
 
-- Input: file path, redshift (manual or auto), wavelength range
-- Preprocessing: smoothing (window/order), telluric A-band, skyline clipping, custom masks
-- Templates: type filters, age range, minimum correlation, wavelength overlap
+| Group | Controls | Usage |
+|---|---|---|
+| Input | File path; Redshift (manual/auto); Wavelength range | Load spectrum and set optional fixed redshift and analysis window |
+| Preprocessing | Smoothing (window/order); Telluric A-band; Skyline clipping; Custom masks | Clean spectrum before analysis; map to CLI flags like `--savgol-window`, `--aband-remove`, `--skyclip` |
+| Templates | Type filters; Age range; Minimum correlation; Wavelength overlap | Restrict/guide matching for speed and precision |
 
 ## Spectrum Display
 
-- Pan: drag; Zoom: wheel or box; Reset: double-click
-- Toggle view: flux vs flattened; show/hide grid and legend
-- Overlays: template matches, masks, line IDs, optional errors
+| Action | How | Notes |
+|---|---|---|
+| Pan | Drag | |
+| Zoom | Wheel or box | |
+| Reset | Double-click | Restores view |
+| Toggle view | Flux vs flattened | Also show/hide grid and legend |
+| Overlays | Template matches, masks, line IDs, optional errors | Configure in Controls/Dialogs |
 
 ## Results
 
-- Status area: type, best template, confidence, redshift, age
-- Dialogs: cluster summary, subtype proportions, redshift–age
-- Export: save figures and data from dialogs
+| Area | Contents | Actions |
+|---|---|---|
+| Status | Type, best template, confidence, redshift, age | Quick overview |
+| Dialogs | Cluster summary, subtype proportions, redshift–age | Open after analysis |
+| Export | Save figures and data from dialogs | PNG/SVG/PDF supported |
 
 ## AI Assistant
 
-- Quick Summary, Detailed Analysis, Scientific Context, Publication text
-- Configure API key and model in Settings → AI
-
-## Keyboard Shortcuts
-
-- Ctrl+O load; Ctrl+S save; Ctrl+Q quit
-- Ctrl+Enter quick preprocess + analysis; F5 run analysis; F6 preprocessing
-- Esc cancel; Space toggle view; Tab/Enter navigate
-
-## Theme
-
-Light and dark themes; toggle in header.
+| Feature | Description | Where |
+|---|---|---|
+| Quick Summary | Short explanation of classification | AI Assistant button |
+| Detailed Analysis | Structured scientific interpretation | AI Assistant button |
+| Scientific Context | Literature-style discussion | AI Assistant button |
+| Publication Text | Methods/results blocks | AI Assistant button |
+| Configuration | Provider, Model, API key | Settings → AI |
+ 
 
 ## Notes
 
