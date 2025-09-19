@@ -7,6 +7,12 @@ Efficiently process many spectra with the CLI `batch` command.
 ```powershell
 # Process multiple spectra; write outputs under results/
 sage batch "data/*.dat" --output-dir results/
+
+# Parallel: use all CPU cores (Windows, macOS, Linux)
+sage batch "data/*.dat" --output-dir results/ --workers -1
+
+# Parallel: specify number of workers
+sage batch "data/*.dat" --output-dir results/ --workers 4
 ```
 
 ### List-based input (CSV)
@@ -47,6 +53,7 @@ Notes:
 | `--verbose` | Verbose console output |
 | `--brief` / `--full` | Toggle concise vs detailed console output |
 | `--no-progress` | Disable progress output |
+| `--workers INT` | Parallel workers: 0=sequential (default), -1=all cores, N=fixed |
 
 ```powershell
 # Redshift search range
@@ -63,6 +70,9 @@ sage batch "data/*.dat" --type-filter Ia Ib Ic --output-dir results/
 
 # Stop on first error; increase verbosity
 sage batch "data/*.dat" --stop-on-error --verbose --output-dir results/
+
+# Parallel on all cores (cross-platform)
+sage batch "data/*.dat" --output-dir results/ --workers -1
 ```
 
 ## Output structure (default)
@@ -79,10 +89,13 @@ With `--complete`, additional plots are generated (comparison, clustering, redsh
 - Use `--type-filter` to reduce runtime on large template sets
 - Prefer `--minimal` for quick surveys; rerun interesting cases with `--complete`
  - When using CSV lists, keep spectrum paths relative to the CSV folder for portability
+ - Parallelism uses only Python standard library; no extra packages required
+ - On multi-core systems, start with `--workers -1`; reduce if memory is limited
 
 ## Troubleshooting
 
-- “Out of memory” on large batches: narrow the type range or run in smaller batches
+- “Out of memory” on large batches: narrow the type range, reduce `--workers`, or run smaller batches
+- Windows/macOS/Linux supported: ensure you run from a normal shell; the CLI handles process spawning safely
 
 ## See also
 

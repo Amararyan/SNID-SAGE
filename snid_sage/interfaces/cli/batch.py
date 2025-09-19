@@ -21,6 +21,7 @@ import time
 import numpy as np
 import csv
 import re
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
 from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
@@ -215,6 +216,82 @@ class BatchTemplateManager:
     def load_time(self) -> float:
         """Get time taken to load templates."""
         return self._load_time or 0.0
+
+
+_WORKER_TM: Optional[BatchTemplateManager] = None
+_WORKER_ARGS_CACHE: Optional[Dict[str, Any]] = None
+
+
+def _mp_worker_initializer(templates_dir: str,
+                           type_filter: Optional[List[str]],
+                           template_filter: Optional[List[str]]) -> None:
+    """Per-process initializer: load all templates once for this worker process."""
+    global _WORKER_TM, _WORKER_ARGS_CACHE
+    try:
+        # Avoid BLAS over-subscription inside processes
+        os.environ.setdefault('OMP_NUM_THREADS', '1')
+        os.environ.setdefault('MKL_NUM_THREADS', '1')
+    except Exception:
+        pass
+
+    # Suppress verbose logging inside worker processes (keep console clean)
+    try:
+        logging.disable(logging.INFO)
+        logging.getLogger().setLevel(logging.WARNING)
+    except Exception:
+        pass
+
+    # Build a per-process template manager and pre-load templates (all relevant HDF5 files)
+    _WORKER_TM = BatchTemplateManager(templates_dir, verbose=False)
+    _WORKER_TM.load_templates_once()
+
+    # Pre-warm unified storage path so subsequent analysis calls are fast
+    try:
+        from snid_sage.snid.core.integration import load_templates_unified
+        _ = load_templates_unified(templates_dir, type_filter=type_filter, template_names=template_filter)
+    except Exception:
+        # Non-fatal; run_snid_analysis will still load via unified storage
+        pass
+
+    _WORKER_ARGS_CACHE = {
+        'type_filter': type_filter,
+        'template_filter': template_filter,
+        'templates_dir': templates_dir,
+    }
+
+
+def _mp_process_one(index: int,
+                    spectrum_path: str,
+                    forced_redshift: Optional[float],
+                    output_dir: str,
+                    args_dict: Dict[str, Any]) -> Tuple[int, Tuple[str, bool, str, Dict[str, Any]]]:
+    """Process exactly one spectrum in a worker process and return (index, result_tuple)."""
+    # Rebuild a minimal argparse-like object for reuse of existing functions
+    args = argparse.Namespace(**args_dict)
+
+    # Use per-process template manager created in initializer
+    global _WORKER_TM
+    if _WORKER_TM is None:
+        _WORKER_TM = BatchTemplateManager(args.templates_dir, verbose=False)
+        _WORKER_TM.load_templates_once()
+
+    try:
+        name, success, message, summary = process_single_spectrum_optimized(
+            spectrum_path,
+            _WORKER_TM,
+            output_dir,
+            args,
+            forced_redshift_override=forced_redshift
+        )
+        return index, (name, success, message, summary)
+    except Exception as e:
+        name = Path(spectrum_path).stem
+        return index, (name, False, str(e), {
+            'spectrum': name,
+            'file_path': spectrum_path,
+            'success': False,
+            'error': str(e)
+        })
 
 
 def process_single_spectrum_optimized(
@@ -979,7 +1056,13 @@ Examples:
     parser.set_defaults(brief=True)
     
     # Processing options
-    # Parallelism removed to avoid unsafe shared state; always sequential
+    parallel_group = parser.add_argument_group("Parallel Processing")
+    parallel_group.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="Number of worker processes (0 = sequential, -1 = use all CPU cores)"
+    )
     parser.add_argument(
         "--stop-on-error", 
         action="store_true",
@@ -999,7 +1082,7 @@ Examples:
 
 
 
-def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> str:
+def generate_summary_report(results: List[Tuple], args: argparse.Namespace, wall_elapsed_seconds: Optional[float] = None) -> str:
     """Generate a clean, comprehensive summary report focused on batch processing success."""
     successful_results = [r for r in results if r[1] and r[3]]
     failed_results = [r for r in results if not r[1]]
@@ -1248,14 +1331,16 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace) -> s
             avg_cluster_size = total_cluster_size / cluster_count
             report.append(f"   Average cluster size: {avg_cluster_size:.1f} template matches")
         
-        # Runtime statistics
-        all_runtimes = [summary.get('runtime', 0) for _, _, _, summary in successful_results if summary.get('runtime', 0) > 0]
-        if all_runtimes:
-            avg_runtime = sum(all_runtimes) / len(all_runtimes)
-            total_runtime = sum(all_runtimes)
-            report.append(f"\nPERFORMANCE STATISTICS:")
+    # Runtime statistics
+    all_runtimes = [summary.get('runtime', 0) for _, _, _, summary in successful_results if summary.get('runtime', 0) > 0]
+    if all_runtimes or wall_elapsed_seconds is not None:
+        avg_runtime = (sum(all_runtimes) / len(all_runtimes)) if all_runtimes else 0.0
+        total_runtime = float(wall_elapsed_seconds) if wall_elapsed_seconds is not None else float(sum(all_runtimes))
+        report.append(f"\nPERFORMANCE STATISTICS:")
+        if avg_runtime > 0:
             report.append(f"   Average analysis time: {avg_runtime:.1f} seconds per spectrum")
-            report.append(f"   Total analysis time: {total_runtime:.1f} seconds")
+        report.append(f"   Total analysis time: {total_runtime:.1f} seconds")
+        if total_runtime > 0 and success_count > 0:
             report.append(f"   Throughput: {success_count/total_runtime*60:.1f} spectra per minute")
         
         # Type distribution (for reference only - not scientifically aggregated)
@@ -1577,6 +1662,8 @@ def main(args: argparse.Namespace) -> int:
         # ============================================================================
         if not is_quiet and not brief_mode:
             print("Loading templates once for entire batch...")
+        # Start wall-clock timer before heavy work (template load + processing)
+        start_time = time.time()
         template_manager = BatchTemplateManager(args.templates_dir, verbose=args.verbose)
         
         if not template_manager.load_templates_once():
@@ -1588,101 +1675,237 @@ def main(args: argparse.Namespace) -> int:
             print(f"Ready to process {len(input_files)} spectra with {template_manager.template_count} templates")
             print("")
         
-        # Process spectra
-        results = []
+        # Process spectra (parallel or sequential)
+        results: List[Tuple[str, bool, str, Dict[str, Any]]] = []
         failed_count = 0
-        
-        # Always sequential processing with optimized template loading
-        if not is_quiet and not brief_mode:
-            print("[INFO] Starting optimized sequential processing...")
 
-        for i, item in enumerate(items, 1):
-            spectrum_path = item["path"]
-            per_row_forced_z = item.get("redshift", None)
-            is_tty = sys.stdout.isatty()
-            show_progress = (not args.verbose) and (not is_quiet) and (not getattr(args, 'no_progress', False)) and is_tty
-            if args.verbose and not brief_mode:
-                print(f"[{i:3d}/{len(input_files):3d}] {Path(spectrum_path).name}")
-            else:
-                # Lightweight progress
-                if show_progress and (i % 10 == 0 or i == len(input_files)) and not brief_mode:
-                    print(f"   Progress: {i}/{len(input_files)} ({i/len(input_files)*100:.0f}%)")
+        use_parallel = int(getattr(args, 'workers', 0) or 0) != 0
+        max_workers = int(args.workers or 0)
+        if max_workers < 0:
+            try:
+                max_workers = os.cpu_count() or 1
+            except Exception:
+                max_workers = 1
 
-            name, success, message, summary = process_single_spectrum_optimized(
-                spectrum_path, template_manager, args.output_dir, args,
-                forced_redshift_override=per_row_forced_z
-            )
+        if use_parallel:
+            # In parallel mode, default to brief output even if user didn't pass --brief
+            brief_mode = True if not getattr(args, 'full', False) else False
+            if not is_quiet and not brief_mode:
+                print(f"[INFO] Starting parallel processing with {max_workers} worker(s)...")
 
-            results.append((name, success, message, summary))
+            # Build a lightweight dict of args to send to workers
+            args_dict = {
+                'minimal': bool(args.minimal),
+                'complete': bool(args.complete),
+                'zmin': float(args.zmin),
+                'zmax': float(args.zmax),
+                'rlapmin': float(getattr(args, 'rlapmin', 4.0)),
+                'lapmin': float(getattr(args, 'lapmin', 0.3)),
+                'rlap_ccc_threshold': float(getattr(args, 'rlap_ccc_threshold', 1.8)),
+                'forced_redshift': getattr(args, 'forced_redshift', None),
+                'type_filter': getattr(args, 'type_filter', None),
+                'template_filter': getattr(args, 'template_filter', None),
+                'no_plots': bool(getattr(args, 'no_plots', False)),
+                'templates_dir': template_manager.templates_dir,
+            }
 
-            if not success:
-                failed_count += 1
-                if brief_mode and not is_quiet:
-                    # Distinguish normal no-match vs actual error and include error type when available
-                    if ("No good matches" in message) or ("No templates after filtering" in message):
-                        status = "no-match"
-                        print(f"[{i}/{len(input_files)}] {name}: {status}")
-                    else:
-                        status = "error"
-                        etype = summary.get('error_type') if isinstance(summary, dict) else None
-                        if etype:
-                            print(f"[{i}/{len(input_files)}] {name}: {status} ({etype})")
-                        else:
+            # Submit all tasks at once; each task is ~30s so overhead is negligible
+            submitted = 0
+            processed = 0
+            progress_every = max(10, len(items) // 10)  # ~10 updates
+            try:
+                with ProcessPoolExecutor(max_workers=max_workers,
+                                         initializer=_mp_worker_initializer,
+                                         initargs=(template_manager.templates_dir,
+                                                   getattr(args, 'type_filter', None),
+                                                   getattr(args, 'template_filter', None))) as ex:
+                    collected: List[Tuple[int, Tuple[str, bool, str, Dict[str, Any]]]] = []
+                    futures = []
+                    for idx, item in enumerate(items):
+                        fut = ex.submit(
+                            _mp_process_one,
+                            idx,
+                            item['path'],
+                            item.get('redshift', None),
+                            args.output_dir,
+                            args_dict
+                        )
+                        futures.append(fut)
+                        submitted += 1
+
+                    for fut in as_completed(futures):
+                        idx, res = fut.result()
+                        collected.append((idx, res))
+                        processed += 1
+
+                        # Brief per-item one-liner (unordered, as futures complete)
+                        if not is_quiet:
+                            name, success, message, summary = res
+                            if success and isinstance(summary, dict):
+                                consensus_type = summary.get('consensus_type', 'Unknown')
+                                consensus_subtype = summary.get('consensus_subtype', '')
+                                # Prefer cluster-weighted redshift if available
+                                if summary.get('has_clustering') and ('cluster_redshift_weighted' in summary):
+                                    z_value = summary.get('cluster_redshift_weighted', 0.0)
+                                else:
+                                    z_value = summary.get('redshift', 0.0)
+                                # Metric
+                                try:
+                                    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+                                    best_metric_value = get_best_metric_value(summary)
+                                    best_metric_name = get_best_metric_name(summary)
+                                except Exception:
+                                    best_metric_value = summary.get('rlap', 0.0)
+                                    best_metric_name = 'RLAP'
+                                # Template short
+                                best_template = str(summary.get('best_template', 'Unknown'))
+                                best_template_short = best_template[:18]
+                                weak_note = " (weak)" if summary.get('weak_match') else ""
+                                type_display = f"{consensus_type} {consensus_subtype}".strip()
+                                try:
+                                    print(f"[{processed}/{len(items)}] {name}: {type_display}{weak_note} z={float(z_value):.6f} {best_metric_name}={best_metric_value:.1f} tpl={best_template_short}")
+                                except Exception:
+                                    print(f"[{processed}/{len(items)}] {name}: {type_display}{weak_note}")
+                            else:
+                                # Failure: distinguish no-match vs error
+                                if ("No good matches" in message) or ("No templates after filtering" in message):
+                                    status = "no-match"
+                                    print(f"[{processed}/{len(items)}] {name}: {status}")
+                                else:
+                                    status = "error"
+                                    etype = summary.get('error_type') if isinstance(summary, dict) else None
+                                    if etype:
+                                        print(f"[{processed}/{len(items)}] {name}: {status} ({etype})")
+                                    else:
+                                        print(f"[{processed}/{len(items)}] {name}: {status}")
+
+                        # Periodic overall progress (only in non-brief detailed mode)
+                        if (not args.verbose) and (not is_quiet) and (not getattr(args, 'no_progress', False)) and (not brief_mode):
+                            if (processed % progress_every == 0) or (processed == len(items)):
+                                print(f"   Progress: {processed}/{len(items)} ({processed/len(items)*100:.0f}%)")
+
+            except KeyboardInterrupt:
+                print("[INFO] Cancellation requested. Shutting down workers...", file=sys.stderr)
+                # Executor context manager will handle shutdown
+                raise
+
+            # Restore original order by index
+            collected_sorted = [res for _, res in sorted(collected, key=lambda x: x[0])]
+            results = collected_sorted
+
+            # Count failures; suppress per-item logs in parallel unless explicitly verbose
+            for i, (name, success, message, summary) in enumerate(results, 1):
+                if not success:
+                    failed_count += 1
+                    if (not is_quiet) and (args.verbose or getattr(args, 'full', False)):
+                        if ("No good matches" in message) or ("No templates after filtering" in message):
+                            status = "no-match"
                             print(f"[{i}/{len(input_files)}] {name}: {status}")
-                else:
-                    if "No good matches" in message or "No templates after filtering" in message:
-                        # Normal outcome - no match found
-                        if not is_quiet:
-                            print(f"      {name}: No good matches found")
-                    else:
-                        # Actual error
-                        if not is_quiet:
+                        else:
+                            status = "error"
                             etype = summary.get('error_type') if isinstance(summary, dict) else None
                             if etype:
-                                print(f"      [ERROR] {name}: {message} [{etype}]")
+                                print(f"[{i}/{len(input_files)}] {name}: {status} ({etype})")
                             else:
-                                print(f"      [ERROR] {name}: {message}")
-                if args.stop_on_error:
-                    if not is_quiet and not brief_mode:
-                        print("Stopping due to error.")
-                    break
-            else:
-                # Success - show one-line summary
-                if summary and isinstance(summary, dict) and not is_quiet:
-                    consensus_type = summary.get('consensus_type', 'Unknown')
-                    consensus_subtype = summary.get('consensus_subtype', '')
-
-                    # Use cluster-weighted redshift if available, otherwise regular redshift
-                    if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
-                        redshift = summary['cluster_redshift_weighted']
-                        z_marker = "*"  # Marker without emoji
-                    else:
-                        redshift = summary.get('redshift', 0)
-                        z_marker = ""
-
-                    # Use best available metric (prefer RLAP-CCC; RLAP only if RLAP-CCC absent)
-                    from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
-                    best_metric_value = get_best_metric_value(summary)
-                    best_metric_name = get_best_metric_name(summary)
-
-                    # Format subtype display
-                    type_display = f"{consensus_type} {consensus_subtype}".strip()
-
-                    if brief_mode:
-                        # Brief enriched line with key info similar to the summary file
-                        best_template = str(summary.get('best_template', 'Unknown'))
-                        best_template_short = best_template[:18]
-                        type_display = f"{consensus_type} {consensus_subtype}".strip()
-                        metric_str = f"{best_metric_name}={best_metric_value:.1f}"
-                        z_value = redshift
-                        weak_note = " (weak)" if summary.get('weak_match') else ""
-                        print(f"[{i}/{len(input_files)}] {name}: {type_display}{weak_note} z={z_value:.6f} {metric_str} tpl={best_template_short}")
-                    else:
-                        weak_note = " (weak)" if summary.get('weak_match') else ""
-                        print(f"      {name}: {type_display}{weak_note} z={redshift:.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
+                                print(f"[{i}/{len(input_files)}] {name}: {status}")
                 else:
-                    if not is_quiet and not brief_mode:
-                        print(f"      {name}: success")
+                    if summary and isinstance(summary, dict) and (not is_quiet) and (args.verbose or getattr(args, 'full', False)):
+                        consensus_type = summary.get('consensus_type', 'Unknown')
+                        consensus_subtype = summary.get('consensus_subtype', '')
+                        if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
+                            redshift = summary['cluster_redshift_weighted']
+                            z_marker = "*"
+                        else:
+                            redshift = summary.get('redshift', 0)
+                            z_marker = ""
+                        from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+                        best_metric_value = get_best_metric_value(summary)
+                        best_metric_name = get_best_metric_name(summary)
+                        type_display = f"{consensus_type} {consensus_subtype}".strip()
+                        if brief_mode:
+                            best_template = str(summary.get('best_template', 'Unknown'))
+                            best_template_short = best_template[:18]
+                            metric_str = f"{best_metric_name}={best_metric_value:.1f}"
+                            weak_note = " (weak)" if summary.get('weak_match') else ""
+                            print(f"[{i}/{len(input_files)}] {name}: {type_display}{weak_note} z={float(redshift):.6f} {metric_str} tpl={best_template_short}")
+                        else:
+                            weak_note = " (weak)" if summary.get('weak_match') else ""
+                            print(f"      {name}: {type_display}{weak_note} z={float(redshift):.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
+        else:
+            # Sequential fallback (current behavior)
+            if not is_quiet and not brief_mode:
+                print("[INFO] Starting optimized sequential processing...")
+
+            for i, item in enumerate(items, 1):
+                spectrum_path = item["path"]
+                per_row_forced_z = item.get("redshift", None)
+                is_tty = sys.stdout.isatty()
+                show_progress = (not args.verbose) and (not is_quiet) and (not getattr(args, 'no_progress', False)) and is_tty
+                if args.verbose and not brief_mode:
+                    print(f"[{i:3d}/{len(input_files):3d}] {Path(spectrum_path).name}")
+                else:
+                    if show_progress and (i % 10 == 0 or i == len(input_files)) and not brief_mode:
+                        print(f"   Progress: {i}/{len(input_files)} ({i/len(input_files)*100:.0f}%)")
+
+                name, success, message, summary = process_single_spectrum_optimized(
+                    spectrum_path, template_manager, args.output_dir, args,
+                    forced_redshift_override=per_row_forced_z
+                )
+
+                results.append((name, success, message, summary))
+
+                if not success:
+                    failed_count += 1
+                    if brief_mode and not is_quiet:
+                        if ("No good matches" in message) or ("No templates after filtering" in message):
+                            status = "no-match"
+                            print(f"[{i}/{len(input_files)}] {name}: {status}")
+                        else:
+                            status = "error"
+                            etype = summary.get('error_type') if isinstance(summary, dict) else None
+                            if etype:
+                                print(f"[{i}/{len(input_files)}] {name}: {status} ({etype})")
+                            else:
+                                print(f"[{i}/{len(input_files)}] {name}: {status}")
+                    else:
+                        if "No good matches" in message or "No templates after filtering" in message:
+                            if not is_quiet:
+                                print(f"      {name}: No good matches found")
+                        else:
+                            if not is_quiet:
+                                etype = summary.get('error_type') if isinstance(summary, dict) else None
+                                if etype:
+                                    print(f"      [ERROR] {name}: {message} [{etype}]")
+                                else:
+                                    print(f"      [ERROR] {name}: {message}")
+                    if args.stop_on_error:
+                        if not is_quiet and not brief_mode:
+                            print("Stopping due to error.")
+                        break
+                else:
+                    if summary and isinstance(summary, dict) and not is_quiet:
+                        consensus_type = summary.get('consensus_type', 'Unknown')
+                        consensus_subtype = summary.get('consensus_subtype', '')
+                        if summary.get('has_clustering') and 'cluster_redshift_weighted' in summary:
+                            redshift = summary['cluster_redshift_weighted']
+                            z_marker = "*"
+                        else:
+                            redshift = summary.get('redshift', 0)
+                            z_marker = ""
+                        from snid_sage.shared.utils.math_utils import get_best_metric_value, get_best_metric_name
+                        best_metric_value = get_best_metric_value(summary)
+                        best_metric_name = get_best_metric_name(summary)
+                        type_display = f"{consensus_type} {consensus_subtype}".strip()
+                        if brief_mode:
+                            best_template = str(summary.get('best_template', 'Unknown'))
+                            best_template_short = best_template[:18]
+                            metric_str = f"{best_metric_name}={best_metric_value:.1f}"
+                            z_value = redshift
+                            weak_note = " (weak)" if summary.get('weak_match') else ""
+                            print(f"[{i}/{len(input_files)}] {name}: {type_display}{weak_note} z={float(z_value):.6f} {metric_str} tpl={best_template_short}")
+                        else:
+                            weak_note = " (weak)" if summary.get('weak_match') else ""
+                            print(f"      {name}: {type_display}{weak_note} z={float(redshift):.6f} {best_metric_name}={best_metric_value:.1f} {z_marker}")
         
         # Results summary
         successful_count = len(results) - failed_count
@@ -1694,12 +1917,18 @@ def main(args: argparse.Namespace) -> int:
             else:
                 print(f"\nCompleted: {success_rate:.1f}% success ({successful_count}/{len(results)})")
 
-        # Generate summary report
+        # Generate summary report (use wall-clock time for correct parallel stats)
         summary_path = output_dir / "batch_analysis_report.txt"
         if not is_quiet and not brief_mode:
             print("Generating summary report...")
 
-        summary_report = generate_summary_report(results, args)
+        # Compute wall-clock elapsed time from first template load to now
+        try:
+            wall_elapsed = time.time() - start_time
+        except Exception:
+            wall_elapsed = None
+
+        summary_report = generate_summary_report(results, args, wall_elapsed_seconds=wall_elapsed)
         with open(summary_path, 'w', encoding='utf-8') as f:
             f.write(summary_report)
 
