@@ -388,7 +388,13 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
                     ra.setStyle(showValues=False)
             except Exception:
                 pass
-            self._spectrum_curve = self.plot_item.plot(pen=pg.mkPen('#444444', width=1))
+            self._spectrum_curve = self.plot_item.plot(
+                pen=pg.mkPen('#444444', width=1),
+                connect='all',
+                autoDownsample=False,
+                clipToView=False,
+                downsample=1,
+            )
             self._overlay_lines_items: List[Any] = []
             preview_vbox.addWidget(self.plot_widget)
             # Attach rest wavelength top axis and link to view

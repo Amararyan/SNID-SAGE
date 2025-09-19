@@ -582,7 +582,16 @@ class EmissionLineStep2Analysis:
             self.parent.plot_item.clear()
             
             # Always plot the full spectrum first (in light gray)
-            self.parent.plot_item.plot(wave, flux, pen=pg.mkPen(color='lightgray', width=1), name='Full Spectrum')
+            self.parent.plot_item.plot(
+                wave,
+                flux,
+                pen=pg.mkPen(color='lightgray', width=1),
+                name='Full Spectrum',
+                connect='all',
+                autoDownsample=False,
+                clipToView=False,
+                downsample=1,
+            )
             
             # Create focused plot region mask
             mask = (wave >= obs_wavelength - zoom_range) & (wave <= obs_wavelength + zoom_range)
@@ -591,7 +600,16 @@ class EmissionLineStep2Analysis:
                 # Plot focused region in darker color
                 focused_wave = wave[mask]
                 focused_flux = flux[mask]
-                self.parent.plot_item.plot(focused_wave, focused_flux, pen=pg.mkPen(color='black', width=2), name='Focused Region')
+                self.parent.plot_item.plot(
+                    focused_wave,
+                    focused_flux,
+                    pen=pg.mkPen(color='black', width=2),
+                    name='Focused Region',
+                    connect='all',
+                    autoDownsample=False,
+                    clipToView=False,
+                    downsample=1,
+                )
                 
                 # Set view range to focused area
                 self.parent.plot_widget.setXRange(obs_wavelength - zoom_range, obs_wavelength + zoom_range)
@@ -623,7 +641,11 @@ class EmissionLineStep2Analysis:
                     point_waves,
                     point_fluxes,
                     pen=pg.mkPen(color='orange', width=2, style=QtCore.Qt.SolidLine),
-                    name='Manual Points Path'
+                    name='Manual Points Path',
+                    connect='all',
+                    autoDownsample=False,
+                    clipToView=False,
+                    downsample=1,
                 )
                 # Scatter markers on top
                 scatter = pg.ScatterPlotItem(
@@ -646,7 +668,11 @@ class EmissionLineStep2Analysis:
                         [left_lambda, right_lambda],
                         [half_level, half_level],
                         pen=pg.mkPen(color=(0, 150, 0), width=2, style=QtCore.Qt.DashLine),
-                        name='FWHM'
+                        name='FWHM',
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
                     )
                     # Stash into latest result if it exists
                     if self.available_lines:

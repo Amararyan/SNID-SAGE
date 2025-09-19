@@ -685,7 +685,16 @@ class PySide6PlotManager:
             
             # Use same blue as Flux/Flat buttons for consistency
             pen = pg.mkPen(color='#3b82f6', width=2)  # Same blue as Flux/Flat buttons
-            curve = self.plot_item.plot(wave, flux_data, pen=pen, name='Spectrum')
+            curve = self.plot_item.plot(
+                wave,
+                flux_data,
+                pen=pen,
+                name='Spectrum',
+                connect='all',
+                autoDownsample=False,
+                clipToView=False,
+                downsample=1,
+            )
             _LOGGER.debug("Data plotted with blue pen matching Flux/Flat buttons")
             
             # FIXED: Replace problematic auto-ranging with stable range setting
@@ -802,11 +811,29 @@ class PySide6PlotManager:
             
             # Plot observed spectrum (same blue as Flux/Flat buttons)
             obs_pen = pg.mkPen(color='#3b82f6', width=2)  # Same blue as Flux/Flat buttons
-            obs_curve = self.plot_item.plot(obs_wave, obs_flux, pen=obs_pen, name='Observed Spectrum')
+            obs_curve = self.plot_item.plot(
+                obs_wave,
+                obs_flux,
+                pen=obs_pen,
+                name='Observed Spectrum',
+                connect='all',
+                autoDownsample=False,
+                clipToView=False,
+                downsample=1,
+            )
             
             # Plot template spectrum (red)
             template_pen = pg.mkPen(color='#E74C3C', width=2)  # Red for template
-            template_curve = self.plot_item.plot(template_wave, template_flux, pen=template_pen, name='Template')
+            template_curve = self.plot_item.plot(
+                template_wave,
+                template_flux,
+                pen=template_pen,
+                name='Template',
+                connect='all',
+                autoDownsample=False,
+                clipToView=False,
+                downsample=1,
+            )
             
             # FIXED: Replace problematic auto-ranging with stable range setting
             # Disable all auto-ranging to prevent spinning axes
@@ -1137,7 +1164,16 @@ class PySide6PlotManager:
                 top_plot_item.clear()
                 
                 if current_wave is not None and current_flux is not None:
-                    top_plot_item.plot(current_wave, current_flux, pen=pg.mkPen(color='blue', width=2), name="Current")
+                    top_plot_item.plot(
+                        current_wave,
+                        current_flux,
+                        pen=pg.mkPen(color='blue', width=2),
+                        name="Current",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                     self.top_preview_widget.setTitle("Current State")
             
             # Update bottom plot with preview data
@@ -1146,7 +1182,16 @@ class PySide6PlotManager:
                 bottom_plot_item.clear()
                 
                 if preview_wave is not None and preview_flux is not None:
-                    bottom_plot_item.plot(preview_wave, preview_flux, pen=pg.mkPen(color='cyan', width=2), name="Preview")
+                    bottom_plot_item.plot(
+                        preview_wave,
+                        preview_flux,
+                        pen=pg.mkPen(color='cyan', width=2),
+                        name="Preview",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                     self.bottom_preview_widget.setTitle("Preview (After Current Step)")
                 
             _LOGGER.debug("Standard preview updated with dual plots")
@@ -1163,14 +1208,31 @@ class PySide6PlotManager:
                 top_plot_item.clear()
                 
                 if current_wave is not None and current_flux is not None:
-                    top_plot_item.plot(current_wave, current_flux, pen=pg.mkPen(color='blue', width=2), name="Current")
+                    top_plot_item.plot(
+                        current_wave,
+                        current_flux,
+                        pen=pg.mkPen(color='blue', width=2),
+                        name="Current",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                 
                 # Plot continuum points if available (line only, no symbols)
                 if continuum_points:
                     x_points = [p[0] for p in continuum_points]
                     y_points = [p[1] for p in continuum_points]
-                    top_plot_item.plot(x_points, y_points, pen=pg.mkPen(color='red', width=2, style=QtCore.Qt.DashLine), 
-                                     name="Continuum")
+                    top_plot_item.plot(
+                        x_points,
+                        y_points,
+                        pen=pg.mkPen(color='red', width=2, style=QtCore.Qt.DashLine),
+                        name="Continuum",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                 
                 self.top_preview_widget.setTitle("Current State with Continuum")
             
@@ -1180,7 +1242,16 @@ class PySide6PlotManager:
                 bottom_plot_item.clear()
                 
                 if preview_wave is not None and preview_flux is not None:
-                    bottom_plot_item.plot(preview_wave, preview_flux, pen=pg.mkPen(color='cyan', width=2), name="Preview")
+                    bottom_plot_item.plot(
+                        preview_wave,
+                        preview_flux,
+                        pen=pg.mkPen(color='cyan', width=2),
+                        name="Preview",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                     self.bottom_preview_widget.setTitle("Preview (After Continuum Removal)")
                 
             _LOGGER.debug("Interactive preview updated with dual plots")

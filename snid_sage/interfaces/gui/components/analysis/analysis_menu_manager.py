@@ -205,7 +205,13 @@ class AnalysisMenuManager:
                     dlg = getattr(self.main_window, 'progress_dialog', None)
                     if dlg:
                         try:
-                            dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
+                            # Route via controller for strict ordering
+                            main_window = getattr(self, 'main_window', None)
+                            app_controller = getattr(main_window, 'app_controller', None)
+                            if app_controller and hasattr(app_controller, 'post_progress'):
+                                app_controller.post_progress("Another analysis start was requested; already running. Please wait or cancel.", 0.0)
+                            else:
+                                dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
                             dlg.raise_()
                             dlg.activateWindow()
                         except Exception:
@@ -258,7 +264,11 @@ class AnalysisMenuManager:
                     self.main_window, 
                     "Quick SNID Analysis"
                 )
-                self.main_window.progress_dialog.add_progress_line("Starting quick analysis with default settings...", "info")
+                # Route via sequenced emitter
+                if hasattr(self.main_window, 'app_controller') and hasattr(self.main_window.app_controller, 'post_progress'):
+                    self.main_window.app_controller.post_progress("Starting quick analysis with default settings...", 0.0)
+                else:
+                    self.main_window.progress_dialog.add_progress_line("Starting quick analysis with default settings...", "info")
             except ImportError:
                 # Fallback if progress dialog not available
                 self.main_window.progress_dialog = None
@@ -347,7 +357,12 @@ class AnalysisMenuManager:
                     dlg = getattr(self.main_window, 'progress_dialog', None)
                     if dlg:
                         try:
-                            dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
+                            main_window = getattr(self, 'main_window', None)
+                            app_controller = getattr(main_window, 'app_controller', None)
+                            if app_controller and hasattr(app_controller, 'post_progress'):
+                                app_controller.post_progress("Another analysis start was requested; already running. Please wait or cancel.", 0.0)
+                            else:
+                                dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
                             dlg.raise_()
                             dlg.activateWindow()
                         except Exception:
@@ -462,7 +477,10 @@ class AnalysisMenuManager:
                     self.main_window, 
                     "Advanced SNID Analysis"
                 )
-                self.main_window.progress_dialog.add_progress_line("Starting advanced analysis with configured settings...", "info")
+                if hasattr(self.main_window, 'app_controller') and hasattr(self.main_window.app_controller, 'post_progress'):
+                    self.main_window.app_controller.post_progress("Starting advanced analysis with configured settings...", 0.0)
+                else:
+                    self.main_window.progress_dialog.add_progress_line("Starting advanced analysis with configured settings...", "info")
             except ImportError:
                 # Fallback if progress dialog not available
                 self.main_window.progress_dialog = None

@@ -449,7 +449,11 @@ class PySide6EventHandlers(QtCore.QObject):
                     dlg = getattr(self.main_window, 'progress_dialog', None)
                     if dlg:
                         try:
-                            dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
+                            # Route via controller for strict ordering
+                            if hasattr(self.app_controller, 'post_progress'):
+                                self.app_controller.post_progress("Another analysis start was requested; already running. Please wait or cancel.", 0.0)
+                            else:
+                                dlg.add_progress_line("Another analysis start was requested; already running. Please wait or cancel.", "warning")
                             dlg.raise_()
                             dlg.activateWindow()
                         except Exception:

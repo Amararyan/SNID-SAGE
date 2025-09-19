@@ -464,7 +464,16 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 top_plot_item.clear()
                 
                 if current_wave is not None and current_flux is not None:
-                    top_plot_item.plot(current_wave, current_flux, pen=pg.mkPen(color='#3b82f6', width=2), name="Current")
+                    top_plot_item.plot(
+                        current_wave,
+                        current_flux,
+                        pen=pg.mkPen(color='#3b82f6', width=2),
+                        name="Current",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                 
                 # Show mask regions (red bands) only in step 0 (Masking step)
                 if mask_regions and self.current_step == 0:
@@ -485,7 +494,16 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 bottom_plot_item.clear()
                 
                 if preview_wave is not None and preview_flux is not None:
-                    bottom_plot_item.plot(preview_wave, preview_flux, pen=pg.mkPen(color='#10b981', width=2), name="Preview")
+                    bottom_plot_item.plot(
+                        preview_wave,
+                        preview_flux,
+                        pen=pg.mkPen(color='#10b981', width=2),
+                        name="Preview",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                 
             _LOGGER.debug("Standard preview updated with dual plots")
             
@@ -501,14 +519,31 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 top_plot_item.clear()
                 
                 if current_wave is not None and current_flux is not None:
-                    top_plot_item.plot(current_wave, current_flux, pen=pg.mkPen(color='#3b82f6', width=2), name="Current")
+                    top_plot_item.plot(
+                        current_wave,
+                        current_flux,
+                        pen=pg.mkPen(color='#3b82f6', width=2),
+                        name="Current",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                 
                 # Plot continuum points if available (line only, no symbols)
                 if continuum_points:
                     x_points = [p[0] for p in continuum_points]
                     y_points = [p[1] for p in continuum_points]
-                    top_plot_item.plot(x_points, y_points, pen=pg.mkPen(color='red', width=2, style=QtCore.Qt.DashLine), 
-                                     name="Continuum")
+                    top_plot_item.plot(
+                        x_points,
+                        y_points,
+                        pen=pg.mkPen(color='red', width=2, style=QtCore.Qt.DashLine),
+                        name="Continuum",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
             
             # Update bottom plot with preview data
             if hasattr(self, 'bottom_plot_widget') and self.bottom_plot_widget:
@@ -516,7 +551,16 @@ class PySide6PreprocessingDialog(QtWidgets.QDialog):
                 bottom_plot_item.clear()
                 
                 if preview_wave is not None and preview_flux is not None:
-                    bottom_plot_item.plot(preview_wave, preview_flux, pen=pg.mkPen(color='#10b981', width=2), name="Preview")
+                    bottom_plot_item.plot(
+                        preview_wave,
+                        preview_flux,
+                        pen=pg.mkPen(color='#10b981', width=2),
+                        name="Preview",
+                        connect='all',
+                        autoDownsample=False,
+                        clipToView=False,
+                        downsample=1,
+                    )
                 
             _LOGGER.debug("Interactive preview updated with dual plots")
             

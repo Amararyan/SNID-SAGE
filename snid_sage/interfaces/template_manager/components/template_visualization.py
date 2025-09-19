@@ -341,9 +341,14 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 
                 # Create plot curve
                 curve = self.plot_item.plot(
-                    self.template_data.wave_data, flux,
+                    self.template_data.wave_data,
+                    flux,
                     pen=pg.mkPen(color=colors[i], width=1.5),
-                    name=f"Age: {age:.1f} days"
+                    name=f"Age: {age:.1f} days",
+                    connect='all',
+                    autoDownsample=False,
+                    clipToView=False,
+                    downsample=1,
                 )
                 legend_items.append((curve, f"Age: {age:.1f} days"))
             else:
@@ -379,9 +384,14 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 
                 # Plot the epoch
                 curve = self.plot_item.plot(
-                    self.template_data.wave_data, epoch['flux'],
+                    self.template_data.wave_data,
+                    epoch['flux'],
                     pen=pg.mkPen(color='blue', width=2),
-                    name=f"Age: {age:.1f} days"
+                    name=f"Age: {age:.1f} days",
+                    connect='all',
+                    autoDownsample=False,
+                    clipToView=False,
+                    downsample=1,
                 )
                 
                 # Add legend
@@ -400,7 +410,15 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         flux = np.exp(-0.5 * ((wave - 5000) / 1000)**2) + 0.1 * np.random.normal(0, 1, 1000)
         
         # Plot sample data
-        self.plot_item.plot(wave, flux, pen=pg.mkPen(color='blue', width=1.5))
+        self.plot_item.plot(
+            wave,
+            flux,
+            pen=pg.mkPen(color='blue', width=1.5),
+            connect='all',
+            autoDownsample=False,
+            clipToView=False,
+            downsample=1,
+        )
         
         # Add text overlay
         text_item = pg.TextItem('Sample spectrum (real data not available)', 

@@ -274,9 +274,14 @@ class InteractiveRedshiftPlotWidget(QtWidgets.QWidget):
         
         # Plot the spectrum
         self.spectrum_plot = self.plot_item.plot(
-            self.wavelengths, self.flux, 
+            self.wavelengths,
+            self.flux,
             pen=pg.mkPen('black', width=1),
-            name='Spectrum'
+            name='Spectrum',
+            connect='all',
+            autoDownsample=False,
+            clipToView=False,
+            downsample=1,
         )
         
         # Set plot range based on actual data

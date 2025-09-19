@@ -174,7 +174,11 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         self.app_controller.analysis_completed.connect(self._on_analysis_completed)
         self.app_controller.preprocessing_completed.connect(self._on_preprocessing_completed)
         self.app_controller.workflow_state_changed.connect(self._on_workflow_state_changed)
+        # Keep legacy connection for any code still emitting unordered updates
         self.app_controller.progress_updated.connect(self._on_progress_updated)
+        # Consume strictly ordered progress messages
+        if hasattr(self.app_controller, 'ordered_progress_updated'):
+            self.app_controller.ordered_progress_updated.connect(self._on_ordered_progress_updated)
         self.app_controller.cluster_selection_needed.connect(self._on_cluster_selection_needed)
         
         # Initialize workflow manager
@@ -1293,6 +1297,15 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     self.progress_dialog.add_progress_line(message, "info")
         except Exception as e:
             _LOGGER.error(f"Error handling progress update: {e}")
+
+    @QtCore.Slot(int, str, float)
+    def _on_ordered_progress_updated(self, seq: int, message: str, progress: float):
+        """Handle strictly ordered progress updates (seq-enforced)."""
+        try:
+            # Reuse same rendering logic but trust ordering from controller
+            self._on_progress_updated(message, progress)
+        except Exception as e:
+            _LOGGER.error(f"Error handling ordered progress update: {e}")
     
     # View management - delegate to event handlers
     def _on_view_change(self, view_type):

@@ -62,6 +62,15 @@ def get_qt_mpl() -> Tuple["object", "object", "object", "object"]:
     mpl.rcParams.setdefault("figure.raise_window", False)
     mpl.rcParams.setdefault("figure.autolayout", True)
     mpl.rcParams.setdefault("savefig.dpi", "figure")
+    # Force full path fidelity: disable simplification/segment chunking
+    try:
+        mpl.rcParams.update({
+            'path.simplify': False,
+            'agg.path.chunksize': 0,
+            'lines.antialiased': True,
+        })
+    except Exception:
+        pass
 
     return plt, Figure, FigureCanvas, NavigationToolbar
 

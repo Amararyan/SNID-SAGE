@@ -78,6 +78,8 @@ class PySide6AppController(QtCore.QObject):
     preprocessing_completed = QtCore.Signal(bool)  # True for success, False for failure
     workflow_state_changed = QtCore.Signal(object)  # WorkflowState object
     progress_updated = QtCore.Signal(str, float)  # message, progress percentage
+    # New: strictly ordered progress updates (seq, message, progress)
+    ordered_progress_updated = QtCore.Signal(int, str, float)
     cluster_selection_needed = QtCore.Signal(object)  # SNID result with clustering
     
     def __init__(self, main_window):
@@ -116,6 +118,11 @@ class PySide6AppController(QtCore.QObject):
         # Data storage
         self.spectrum_data = None
         self.analysis_results = None
+
+        # Ordered progress state
+        self._progress_seq_counter = 0
+        self._next_expected_seq = 1
+        self._pending_progress_by_seq = {}
         
         # Initialize configuration
         self._init_configuration()
@@ -567,6 +574,13 @@ class PySide6AppController(QtCore.QObject):
             self.analysis_running = False
             return False
 
+    # Public helper to post a sequenced progress message from the GUI/main thread
+    def post_progress(self, message: str, progress: float = 0.0) -> None:
+        try:
+            self._enqueue_ordered_progress_from_thread(message or "", float(progress or 0.0))
+        except Exception as e:
+            _LOGGER.debug(f"post_progress failed: {e}")
+
     def run_snid_analysis(self, config_params: Dict[str, Any]) -> bool:
         """
         Run SNID analysis with configuration parameters
@@ -618,9 +632,11 @@ class PySide6AppController(QtCore.QObject):
                         return
                     
                     # Use Qt's thread-safe signal mechanism to update GUI
+                    # Allocate a strictly increasing sequence number here in the worker thread
+                    # Use a small critical section via invokeMethod to increment atomically on the GUI thread
                     QtCore.QMetaObject.invokeMethod(
                         self,
-                        "_update_progress_from_thread",
+                        "_enqueue_ordered_progress_from_thread",
                         QtCore.Qt.QueuedConnection,
                         QtCore.Q_ARG(str, message),
                         QtCore.Q_ARG(float, float(progress) if progress is not None else 0.0)
@@ -881,6 +897,34 @@ class PySide6AppController(QtCore.QObject):
             self.progress_updated.emit(message, progress)
         except Exception as e:
             _LOGGER.warning(f"Error emitting progress update: {e}")
+
+    @QtCore.Slot(str, float)
+    def _enqueue_ordered_progress_from_thread(self, message: str, progress: float):
+        """Allocate sequence and emit ordered progress; coalesce out-of-order arrivals."""
+        try:
+            # Assign sequence number
+            self._progress_seq_counter += 1
+            seq = self._progress_seq_counter
+            # Buffer
+            self._pending_progress_by_seq[seq] = (message, progress)
+            # Try to flush in order
+            self._flush_ordered_progress()
+        except Exception as e:
+            _LOGGER.debug(f"Non-fatal ordered progress enqueue issue: {e}")
+
+    def _flush_ordered_progress(self):
+        """Emit buffered progress updates in strict increasing sequence order."""
+        try:
+            while self._next_expected_seq in self._pending_progress_by_seq:
+                message, progress = self._pending_progress_by_seq.pop(self._next_expected_seq)
+                # Emit ordered signal
+                try:
+                    self.ordered_progress_updated.emit(self._next_expected_seq, message or "", float(progress or 0.0))
+                except Exception as e:
+                    _LOGGER.debug(f"Ordered progress emit issue: {e}")
+                self._next_expected_seq += 1
+        except Exception as e:
+            _LOGGER.debug(f"Non-fatal ordered progress flush issue: {e}")
     
     def is_analysis_running(self) -> bool:
         """Check if analysis is currently running"""
