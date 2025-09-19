@@ -1334,14 +1334,19 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace, wall
     # Runtime statistics
     all_runtimes = [summary.get('runtime', 0) for _, _, _, summary in successful_results if summary.get('runtime', 0) > 0]
     if all_runtimes or wall_elapsed_seconds is not None:
-        avg_runtime = (sum(all_runtimes) / len(all_runtimes)) if all_runtimes else 0.0
-        total_runtime = float(wall_elapsed_seconds) if wall_elapsed_seconds is not None else float(sum(all_runtimes))
+        avg_cpu_runtime = (sum(all_runtimes) / len(all_runtimes)) if all_runtimes else 0.0
+        total_wall_runtime = float(wall_elapsed_seconds) if wall_elapsed_seconds is not None else float(sum(all_runtimes))
+        avg_effective_runtime = (total_wall_runtime / success_count) if (success_count > 0 and total_wall_runtime > 0) else 0.0
+        is_parallel = bool(int(getattr(args, 'workers', 0) or 0) != 0)
         report.append(f"\nPERFORMANCE STATISTICS:")
-        if avg_runtime > 0:
-            report.append(f"   Average analysis time: {avg_runtime:.1f} seconds per spectrum")
-        report.append(f"   Total analysis time: {total_runtime:.1f} seconds")
-        if total_runtime > 0 and success_count > 0:
-            report.append(f"   Throughput: {success_count/total_runtime*60:.1f} spectra per minute")
+        # Only show CPU average in sequential mode to avoid confusion in parallel runs
+        if (not is_parallel) and avg_cpu_runtime > 0:
+            report.append(f"   Average analysis time: {avg_cpu_runtime:.1f} seconds per spectrum")
+        if avg_effective_runtime > 0:
+            report.append(f"   Average effective time per spectrum (wall): {avg_effective_runtime:.1f} seconds")
+        report.append(f"   Total analysis time: {total_wall_runtime:.1f} seconds")
+        if total_wall_runtime > 0 and success_count > 0:
+            report.append(f"   Throughput: {success_count/total_wall_runtime*60:.1f} spectra per minute")
         
         # Type distribution (for reference only - not scientifically aggregated)
         type_counts = {}
