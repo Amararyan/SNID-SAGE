@@ -422,8 +422,12 @@ class DialogManager:
         """Handle successful settings dialog completion"""
         if hasattr(dialog, 'result'):
             settings = dialog.result
-            if hasattr(self.app_controller, 'apply_gui_settings'):
-                self.app_controller.apply_gui_settings(settings)
+            # Persist settings on main window for runtime use
+            try:
+                if hasattr(self.main_window, 'apply_settings'):
+                    self.main_window.apply_settings(settings)
+            except Exception:
+                pass
             
             self.main_window.status_label.setText("Settings updated")
             _LOGGER.info("Settings updated successfully")

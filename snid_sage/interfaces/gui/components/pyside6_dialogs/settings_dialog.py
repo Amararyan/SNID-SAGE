@@ -139,6 +139,15 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         # Header
         self._create_header(main_layout)
         
+        # Snapshot current GUI state to allow cancel-revert of live changes
+        try:
+            if hasattr(self.parent_gui, 'snapshot_gui_state'):
+                self._initial_gui_state = self.parent_gui.snapshot_gui_state()
+            else:
+                self._initial_gui_state = None
+        except Exception:
+            self._initial_gui_state = None
+        
         # Tabbed content
         self._create_tabbed_content(main_layout)
         
@@ -200,66 +209,11 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         """)
         
         # Create tabs
-        self._create_appearance_tab(tab_widget)
         self._create_display_tab(tab_widget)
-        self._create_behavior_tab(tab_widget)
-        self._create_advanced_tab(tab_widget)
         
         layout.addWidget(tab_widget, 1)
     
-    def _create_appearance_tab(self, tab_widget):
-        """Create appearance settings tab"""
-        tab = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(15)
-        
-        # Font settings group
-        font_group = QtWidgets.QGroupBox("Font & Typography")
-        font_layout = QtWidgets.QGridLayout(font_group)
-        
-        # Font family
-        font_layout.addWidget(QtWidgets.QLabel("Font Family:"), 0, 0)
-        self.widgets['font_family'] = QtWidgets.QComboBox()
-        self.widgets['font_family'].addItems(self.available_fonts)
-        self.widgets['font_family'].currentTextChanged.connect(self._update_font_preview)
-        font_layout.addWidget(self.widgets['font_family'], 0, 1)
-        
-        # Font size
-        font_layout.addWidget(QtWidgets.QLabel("Font Size:"), 1, 0)
-        self.widgets['font_size'] = create_flexible_int_input(min_val=8, max_val=24, default=10)
-        self.widgets['font_size'].setValue(10)
-        self.widgets['font_size'].valueChanged.connect(self._update_font_preview)
-        font_layout.addWidget(self.widgets['font_size'], 1, 1)
-        
-        # Font preview
-        font_layout.addWidget(QtWidgets.QLabel("Preview:"), 2, 0)
-        self.font_samples['main'] = QtWidgets.QLabel("The quick brown fox jumps over the lazy dog 0123456789")
-        self.font_samples['main'].setStyleSheet(f"border: 1px solid {self.colors['border']}; padding: 8px;")
-        font_layout.addWidget(self.font_samples['main'], 2, 1)
-        
-        layout.addWidget(font_group)
-        
-        # Theme settings group  
-        theme_group = QtWidgets.QGroupBox("Theme & Colors")
-        theme_layout = QtWidgets.QGridLayout(theme_group)
-        
-        # Theme selection
-        theme_layout.addWidget(QtWidgets.QLabel("Theme:"), 0, 0)
-        self.widgets['theme'] = QtWidgets.QComboBox()
-        self.widgets['theme'].addItems(["Light", "Dark", "Auto (System)"])
-        theme_layout.addWidget(self.widgets['theme'], 0, 1)
-        
-        # Accent color
-        theme_layout.addWidget(QtWidgets.QLabel("Accent Color:"), 1, 0)
-        self.widgets['accent_color'] = QtWidgets.QComboBox()
-        self.widgets['accent_color'].addItems(["Blue", "Purple", "Green", "Orange", "Red"])
-        theme_layout.addWidget(self.widgets['accent_color'], 1, 1)
-        
-        layout.addWidget(theme_group)
-        
-        layout.addStretch()
-        tab_widget.addTab(tab, "🎨 Appearance")
+    # Appearance tab removed per requirements
     
     def _create_display_tab(self, tab_widget):
         """Create display settings tab"""
@@ -268,198 +222,42 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
         
-        # Window settings group
-        window_group = QtWidgets.QGroupBox("Window & Display")
-        window_layout = QtWidgets.QGridLayout(window_group)
+        # Interface scale group
+        scale_group = QtWidgets.QGroupBox("Interface Scale")
+        scale_layout = QtWidgets.QGridLayout(scale_group)
         
-        # Window size
-        window_layout.addWidget(QtWidgets.QLabel("Default Window Size:"), 0, 0)
-        size_widget = QtWidgets.QWidget()
-        size_layout = QtWidgets.QHBoxLayout(size_widget)
-        size_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.widgets['window_width'] = create_flexible_int_input(min_val=800, max_val=3840, default=1200)
-        self.widgets['window_width'].setValue(1200)
-        size_layout.addWidget(self.widgets['window_width'])
-        
-        size_layout.addWidget(QtWidgets.QLabel("×"))
-        
-        self.widgets['window_height'] = create_flexible_int_input(min_val=600, max_val=2160, default=800)
-        self.widgets['window_height'].setValue(800)
-        size_layout.addWidget(self.widgets['window_height'])
-        
-        size_layout.addStretch()
-        window_layout.addWidget(size_widget, 0, 1)
-        
-        # DPI scaling
-        window_layout.addWidget(QtWidgets.QLabel("DPI Scaling:"), 1, 0)
-        self.widgets['dpi_scaling'] = QtWidgets.QComboBox()
-        self.widgets['dpi_scaling'].addItems(["Auto", "100%", "125%", "150%", "175%", "200%"])
-        window_layout.addWidget(self.widgets['dpi_scaling'], 1, 1)
+        scale_layout.addWidget(QtWidgets.QLabel("UI Scale (%):"), 0, 0)
+        self.widgets['ui_scale_percent'] = create_flexible_int_input(min_val=50, max_val=300, default=100)
+        self.widgets['ui_scale_percent'].setValue(100)
+        try:
+            self.widgets['ui_scale_percent'].valueChanged.connect(self._on_ui_scale_changed)
+        except Exception:
+            pass
+        scale_layout.addWidget(self.widgets['ui_scale_percent'], 0, 1)
         
         # Remember window position
         self.widgets['remember_position'] = QtWidgets.QCheckBox("Remember window position on exit")
-        window_layout.addWidget(self.widgets['remember_position'], 2, 0, 1, 2)
+        scale_layout.addWidget(self.widgets['remember_position'], 1, 0, 1, 2)
         
-        layout.addWidget(window_group)
-        
-        # Plot settings group
-        plot_group = QtWidgets.QGroupBox("Plot Display")
-        plot_layout = QtWidgets.QGridLayout(plot_group)
-        
-        # Anti-aliasing
-        self.widgets['plot_antialiasing'] = QtWidgets.QCheckBox("Enable plot anti-aliasing")
-        plot_layout.addWidget(self.widgets['plot_antialiasing'], 0, 0, 1, 2)
-        
-        # Default plot size
-        plot_layout.addWidget(QtWidgets.QLabel("Default Plot Resolution:"), 2, 0)
-        self.widgets['plot_dpi'] = create_flexible_int_input(min_val=72, max_val=300, suffix=" DPI", default=100)
-        self.widgets['plot_dpi'].setValue(100)
-        plot_layout.addWidget(self.widgets['plot_dpi'], 2, 1)
-        
-        layout.addWidget(plot_group)
+        layout.addWidget(scale_group)
         
         layout.addStretch()
         tab_widget.addTab(tab, "🖥️ Display")
     
 
     
-    def _create_behavior_tab(self, tab_widget):
-        """Create behavior settings tab"""
-        tab = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(15)
-        
-        # General behavior group
-        general_group = QtWidgets.QGroupBox("General Behavior")
-        general_layout = QtWidgets.QGridLayout(general_group)
-        
-        # Auto-save settings
-        self.widgets['auto_save_settings'] = QtWidgets.QCheckBox("Auto-save settings on exit")
-        general_layout.addWidget(self.widgets['auto_save_settings'], 0, 0, 1, 2)
-        
-        # Confirm before exit
-        self.widgets['confirm_exit'] = QtWidgets.QCheckBox("Confirm before exiting application")
-        general_layout.addWidget(self.widgets['confirm_exit'], 1, 0, 1, 2)
-        
-        # Show splash screen
-        self.widgets['show_splash'] = QtWidgets.QCheckBox("Show splash screen on startup")
-        general_layout.addWidget(self.widgets['show_splash'], 2, 0, 1, 2)
-        
-        layout.addWidget(general_group)
-        
-        # Analysis settings group
-        analysis_group = QtWidgets.QGroupBox("Analysis Behavior")
-        analysis_layout = QtWidgets.QGridLayout(analysis_group)
-        
-        # Auto-run after load
-        self.widgets['auto_preprocess'] = QtWidgets.QCheckBox("Auto-preprocess loaded spectra")
-        analysis_layout.addWidget(self.widgets['auto_preprocess'], 0, 0, 1, 2)
-        
-        # Show progress dialogs
-        self.widgets['show_progress'] = QtWidgets.QCheckBox("Show progress dialogs during analysis")
-        analysis_layout.addWidget(self.widgets['show_progress'], 1, 0, 1, 2)
-        
-        # Max templates to display
-        analysis_layout.addWidget(QtWidgets.QLabel("Max templates to display:"), 2, 0)
-        self.widgets['max_templates'] = create_flexible_int_input(min_val=5, max_val=50, default=10)
-        self.widgets['max_templates'].setValue(10)
-        analysis_layout.addWidget(self.widgets['max_templates'], 2, 1)
-        
-        layout.addWidget(analysis_group)
-        
-        layout.addStretch()
-        tab_widget.addTab(tab, "⚡ Behavior")
+    # Behavior tab removed per requirements
     
-    def _create_advanced_tab(self, tab_widget):
-        """Create advanced settings tab"""
-        tab = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(tab)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(15)
-        
-        # Performance group (informational)
-        performance_group = QtWidgets.QGroupBox("Performance")
-        performance_layout = QtWidgets.QGridLayout(performance_group)
-
-        info_label = QtWidgets.QLabel(
-            "CPU usage is managed by NumPy/BLAS.\n"
-            "To limit CPU threads, set environment variables such as \n"
-            "OMP_NUM_THREADS, MKL_NUM_THREADS, or OPENBLAS_NUM_THREADS before launching."
-        )
-        info_label.setWordWrap(True)
-        performance_layout.addWidget(info_label, 0, 0, 1, 2)
-
-        layout.addWidget(performance_group)
-        
-        # Debug group
-        debug_group = QtWidgets.QGroupBox("Debug & Logging")
-        debug_layout = QtWidgets.QGridLayout(debug_group)
-        
-        # Log level
-        debug_layout.addWidget(QtWidgets.QLabel("Log Level:"), 0, 0)
-        self.widgets['log_level'] = QtWidgets.QComboBox()
-        self.widgets['log_level'].addItems(["ERROR", "WARNING", "INFO", "DEBUG"])
-        debug_layout.addWidget(self.widgets['log_level'], 0, 1)
-        
-        # Enable debug mode
-        self.widgets['debug_mode'] = QtWidgets.QCheckBox("Enable debug mode")
-        debug_layout.addWidget(self.widgets['debug_mode'], 1, 0, 1, 2)
-        
-        layout.addWidget(debug_group)
-        
-        # Reset section
-        reset_group = QtWidgets.QGroupBox("Reset Options")
-        reset_layout = QtWidgets.QVBoxLayout(reset_group)
-        
-        reset_button = QtWidgets.QPushButton("Reset All Settings to Defaults")
-        reset_button.setStyleSheet(f"""
-            QPushButton {{
-                background: {self.colors['btn_warning']};
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background: {self._darken_color(self.colors['btn_warning'])};
-            }}
-        """)
-        reset_button.clicked.connect(self._reset_to_defaults)
-        reset_layout.addWidget(reset_button)
-        
-        layout.addWidget(reset_group)
-        
-        layout.addStretch()
-        tab_widget.addTab(tab, "Advanced")
+    # Advanced tab removed per requirements
     
     def _create_footer_buttons(self, layout):
         """Create footer button section"""
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.setSpacing(10)
         
-        # Apply button
-        apply_btn = QtWidgets.QPushButton("Apply")
-        apply_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {self.colors['btn_success']};
-                color: white;
-                border: none;
-                padding: 8px 20px;
-                border-radius: 4px;
-                font-weight: bold;
-                min-width: 80px;
-            }}
-            QPushButton:hover {{
-                background: {self._darken_color(self.colors['btn_success'])};
-            }}
-        """)
-        apply_btn.clicked.connect(self._apply_settings)
-        
         # OK button
         ok_btn = QtWidgets.QPushButton("OK")
+        ok_btn.setObjectName("ok_btn")
         ok_btn.setStyleSheet(f"""
             QPushButton {{
                 background: {self.colors['btn_primary']};
@@ -479,6 +277,7 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         
         # Cancel button
         cancel_btn = QtWidgets.QPushButton("Cancel")
+        cancel_btn.setObjectName("cancel_btn")
         cancel_btn.setStyleSheet(f"""
             QPushButton {{
                 background: {self.colors['text_secondary']};
@@ -493,14 +292,21 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
                 background: {self._darken_color(self.colors['text_secondary'])};
             }}
         """)
-        cancel_btn.clicked.connect(self.reject)
+        cancel_btn.clicked.connect(self._cancel_clicked)
         
         button_layout.addStretch()
-        button_layout.addWidget(apply_btn)
         button_layout.addWidget(ok_btn)
         button_layout.addWidget(cancel_btn)
         
         layout.addLayout(button_layout)
+        
+        # Enhance buttons for consistent click feedback
+        try:
+            from snid_sage.interfaces.gui.utils.dialog_button_enhancer import enhance_dialog_with_preset
+            theme_mgr = getattr(self.parent_gui, 'theme_manager', None)
+            enhance_dialog_with_preset(self, 'settings_dialog', theme_mgr)
+        except Exception:
+            pass
     
     def _update_font_preview(self):
         """Update font preview"""
@@ -541,27 +347,16 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         except Exception as e:
             _LOGGER.warning(f"Could not load saved OpenRouter settings: {e}")
         
-        # Set default values or load from settings
+        # Set default values or load from settings (include persisted UI scale)
+        try:
+            qsettings = QtCore.QSettings("SNID_SAGE", "GUI")
+            persisted_scale = int(qsettings.value("ui_scale_percent", 100))
+        except Exception:
+            persisted_scale = 100
         defaults = {
-            'font_family': 'Arial',
-            'font_size': 10,
-            'theme': 'Light',
-            'accent_color': 'Blue',
-            'window_width': 1200,
-            'window_height': 800,
-            'dpi_scaling': 'Auto',
+            'ui_scale_percent': persisted_scale,
             'remember_position': True,
-            'plot_antialiasing': True,
-            'plot_dpi': 100,
-            'auto_save_settings': True,
-            'confirm_exit': True,
-            'show_splash': True,
-            'auto_preprocess': False,
-            'show_progress': True,
-            'max_templates': 10,
-            'log_level': 'INFO',
-            'debug_mode': False,
-            # AI settings
+            # AI settings (kept for future expansion; no widgets here)
             'openrouter_api_key': saved_api_key,
             'favorite_model': saved_model
         }
@@ -569,7 +364,8 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
         for key, default_value in defaults.items():
             if key in self.widgets:
                 widget = self.widgets[key]
-                value = self.settings.get(key, default_value)
+                # Prefer persisted values; then current settings; then defaults
+                value = default_value if key not in self.settings else self.settings.get(key, default_value)
                 
                 if isinstance(widget, QtWidgets.QComboBox):
                     index = widget.findText(str(value))
@@ -601,8 +397,7 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
                                     widget.setCurrentItem(item)
                                     break
         
-        # Update font preview
-        self._update_font_preview()
+        # Appearance tab removed; no font preview update
     
     def _collect_settings(self) -> Dict[str, Any]:
         """Collect settings from widgets"""
@@ -686,23 +481,43 @@ class PySide6SettingsDialog(QtWidgets.QDialog):
     def _ok_clicked(self):
         """Handle OK button click"""
         self.result = self._collect_settings()
+        # Persist UI scale percent before apply
+        try:
+            if 'ui_scale_percent' in self.result:
+                ui_scale = int(self.result['ui_scale_percent'])
+                if 50 <= ui_scale <= 300:
+                    QtCore.QSettings("SNID_SAGE", "GUI").setValue("ui_scale_percent", ui_scale)
+        except Exception:
+            pass
         self._apply_settings()
         self.accept()
+
+    def _cancel_clicked(self):
+        """Revert live changes to initial state and close dialog without applying anything."""
+        try:
+            if getattr(self, '_initial_gui_state', None) is not None and hasattr(self.parent_gui, 'restore_gui_state'):
+                self.parent_gui.restore_gui_state(self._initial_gui_state)
+        except Exception:
+            pass
+        self.reject()
+
+    def _on_ui_scale_changed(self, percent: int):
+        """Preview UI scale immediately without persisting."""
+        try:
+            base_w, base_h = (900, 600)
+            if hasattr(self.parent_gui, 'unified_layout_manager'):
+                try:
+                    base_w, base_h = self.parent_gui.unified_layout_manager.settings.default_window_size
+                except Exception:
+                    pass
+            scaled_w = max(100, int(base_w * int(percent) / 100))
+            scaled_h = max(100, int(base_h * int(percent) / 100))
+            if hasattr(self.parent_gui, 'resize'):
+                self.parent_gui.resize(scaled_w, scaled_h)
+        except Exception:
+            pass
     
-    def _reset_to_defaults(self):
-        """Reset all settings to defaults"""
-        reply = QtWidgets.QMessageBox.question(
-            self,
-            "Reset Settings",
-            "Are you sure you want to reset all settings to defaults?\n\nThis action cannot be undone.",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No
-        )
-        
-        if reply == QtWidgets.QMessageBox.Yes:
-            self.settings.clear()
-            self._load_current_values()
-            _LOGGER.info("Settings reset to defaults")
+    # Reset to defaults action removed with Advanced tab
     
     def add_settings_changed_callback(self, callback: Callable[[Dict[str, Any]], None]):
         """Add callback for settings changes"""

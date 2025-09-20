@@ -275,6 +275,49 @@ class PySide6PlotManager:
             _LOGGER.error(f"Error initializing PyQtGraph plot: {e}")
             self.init_fallback_plot()
 
+    def set_antialiasing(self, enabled: bool) -> None:
+        """Enable or disable antialiasing for plots (both global and widget level)."""
+        try:
+            if PYQTGRAPH_AVAILABLE and pg is not None:
+                try:
+                    pg.setConfigOptions(antialias=bool(enabled))
+                except Exception:
+                    pass
+            if getattr(self, 'plot_widget', None):
+                try:
+                    # Fallback helper used elsewhere in this file
+                    if hasattr(self.plot_widget, 'setConfigOption'):
+                        self.plot_widget.setConfigOption('antialias', bool(enabled))
+                except Exception:
+                    pass
+            # Matplotlib (if present): set global rcParam so new lines honor the choice
+            try:
+                if MATPLOTLIB_AVAILABLE and plt is not None:
+                    plt.rcParams['lines.antialiased'] = bool(enabled)
+            except Exception:
+                pass
+            _LOGGER.debug(f"Plot antialiasing set to {enabled}")
+        except Exception as e:
+            _LOGGER.debug(f"Non-fatal: could not set antialiasing: {e}")
+
+    def apply_plot_settings(self, settings: Dict[str, Any]) -> None:
+        """Apply plot-related runtime settings from GUI settings dict."""
+        try:
+            aa = bool(settings.get('plot_antialiasing', True))
+            self.set_antialiasing(aa)
+        except Exception as e:
+            _LOGGER.debug(f"Non-fatal: apply_plot_settings failed: {e}")
+
+    def get_antialiasing(self) -> Optional[bool]:
+        """Return current antialiasing setting if available."""
+        try:
+            if PYQTGRAPH_AVAILABLE and pg is not None:
+                val = pg.getConfigOption('antialias')
+                return bool(val)
+        except Exception:
+            pass
+        return None
+
     def _on_files_dropped(self, paths):
         """Handle files dropped onto the PyQtGraph plot widget.
         Accepts first supported spectrum file and forwards to the standard loader.

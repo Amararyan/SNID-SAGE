@@ -375,20 +375,25 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         except Exception as e:
             _LOGGER.warning(f"Could not set window icon: {e}")
         
-        # Use unified layout manager settings for window sizing
+        # Use unified layout manager settings for window sizing and apply persisted UI scale
         if hasattr(self, 'unified_layout_manager'):
             settings = self.unified_layout_manager.settings
             default_size = settings.default_window_size
             min_size = settings.minimum_window_size
-            # No maximum size to allow full maximization
         else:
-            # Fallback to default values
             default_size = (900, 600)
             min_size = (700, 500)
-            # No maximum size to allow full maximization
         
-        # Set calculated sizes
-        self.resize(*default_size)
+        # Apply persisted UI scale percentage (QSettings) to default size
+        try:
+            app_settings = QtCore.QSettings("SNID_SAGE", "GUI")
+            ui_scale_percent = int(app_settings.value("ui_scale_percent", 100))
+            ui_scale_percent = max(50, min(300, ui_scale_percent))
+            scaled_w = int(default_size[0] * ui_scale_percent / 100)
+            scaled_h = int(default_size[1] * ui_scale_percent / 100)
+            self.resize(scaled_w, scaled_h)
+        except Exception:
+            self.resize(*default_size)
         self.setMinimumSize(*min_size)
         # Remove maximum size restriction to allow full maximization
         # self.setMaximumSize(*max_size)  # Commented out to enable maximize button
@@ -449,6 +454,104 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
         main_layout = self.unified_layout_manager.create_main_layout(self, central_widget)
         
         _LOGGER.debug("Interface layout created with unified layout manager - no conflicts")
+
+        # Re-apply persisted UI scale after layout manager (which sets default size)
+        try:
+            app_settings = QtCore.QSettings("SNID_SAGE", "GUI")
+            ui_scale_percent = int(app_settings.value("ui_scale_percent", 100))
+            ui_scale_percent = max(50, min(300, ui_scale_percent))
+            if hasattr(self, 'unified_layout_manager'):
+                base_size = self.unified_layout_manager.settings.default_window_size
+            else:
+                base_size = (900, 600)
+            scaled_w = int(base_size[0] * ui_scale_percent / 100)
+            scaled_h = int(base_size[1] * ui_scale_percent / 100)
+            self.resize(scaled_w, scaled_h)
+        except Exception:
+            pass
+
+        # Initialize in-memory GUI settings dict
+        self.gui_settings: Dict[str, Any] = {}
+
+    def apply_settings(self, settings: Dict[str, Any]):
+        """Apply GUI settings coming from the Settings dialog at runtime."""
+        try:
+            self.gui_settings.update(settings or {})
+        except Exception:
+            self.gui_settings = dict(settings or {})
+
+        # Apply font appearance
+        try:
+            font_family = self.gui_settings.get('font_family')
+            font_size = self.gui_settings.get('font_size')
+            if font_family or font_size:
+                current_font = self.font() if hasattr(self, 'font') else None
+                f_family = font_family or (current_font.family() if current_font else 'Arial')
+                f_size = int(font_size) if font_size else (current_font.pointSize() if current_font else 10)
+                qf = QtGui.QFont(f_family, f_size)
+                self.setFont(qf)
+        except Exception as e:
+            _LOGGER.debug(f"Non-fatal: could not apply font settings: {e}")
+
+        # Apply window size and optional center; remember_position is handled by QSettings if added later
+        try:
+            ui_scale_percent = self.gui_settings.get('ui_scale_percent')
+            if isinstance(ui_scale_percent, int) and 50 <= ui_scale_percent <= 300:
+                # Persist via QSettings and resize according to baseline default size
+                app_settings = QtCore.QSettings("SNID_SAGE", "GUI")
+                app_settings.setValue("ui_scale_percent", ui_scale_percent)
+                # Compute size relative to current default baseline (use unified layout manager or fallback)
+                if hasattr(self, 'unified_layout_manager'):
+                    base_size = self.unified_layout_manager.settings.default_window_size
+                else:
+                    base_size = (900, 600)
+                scaled_w = int(base_size[0] * ui_scale_percent / 100)
+                scaled_h = int(base_size[1] * ui_scale_percent / 100)
+                self.resize(scaled_w, scaled_h)
+        except Exception as e:
+            _LOGGER.debug(f"Non-fatal: could not apply window size: {e}")
+
+        # Apply plot preferences
+        try:
+            if hasattr(self, 'plot_manager') and self.plot_manager:
+                self.plot_manager.apply_plot_settings(self.gui_settings)
+        except Exception as e:
+            _LOGGER.debug(f"Non-fatal: could not apply plot settings: {e}")
+
+    def snapshot_gui_state(self) -> Dict[str, Any]:
+        """Capture current window/plot settings for temporary restore."""
+        state: Dict[str, Any] = {}
+        try:
+            geom = self.geometry()
+            state['window_width'] = int(geom.width())
+            state['window_height'] = int(geom.height())
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'plot_manager') and self.plot_manager:
+                aa = self.plot_manager.get_antialiasing()
+                if aa is not None:
+                    state['plot_antialiasing'] = bool(aa)
+        except Exception:
+            pass
+        return state
+
+    def restore_gui_state(self, state: Dict[str, Any]) -> None:
+        """Restore previously captured window/plot settings."""
+        try:
+            w = state.get('window_width')
+            h = state.get('window_height')
+            if isinstance(w, int) and isinstance(h, int) and w > 0 and h > 0:
+                self.resize(w, h)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'plot_manager') and self.plot_manager:
+                aa = state.get('plot_antialiasing')
+                if aa is not None:
+                    self.plot_manager.set_antialiasing(bool(aa))
+        except Exception:
+            pass
     
     def _plot_clean_welcome_message(self):
         """Show clean welcome message without demo spectrum - delegate to plot manager"""
