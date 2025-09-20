@@ -2,6 +2,12 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
+## [0.8.0] - 2025-09-20
+
+- Improved plot graphics
+- New display settings
+- Batch: optimal parallel execution
+
 ## [0.7.5] - 2025-09-14
 
 - Template metadata corrections: updated `sn2016cvk` subtype from IIP to IIn and `sn1998S` subtype from IIn to II-flash in both JSON index and HDF5 storage files.
