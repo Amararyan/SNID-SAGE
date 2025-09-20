@@ -754,6 +754,8 @@ def _save_spectrum_outputs(
     """
     Save spectrum outputs based on the analysis mode using GUI-style cluster-aware approach.
     """
+    # Ensure output_dir supports Path-style '/' operations even if a string was passed
+    output_dir = Path(output_dir)
     try:
         # Extract spectrum name from path
         spectrum_name = Path(spectrum_path).stem
