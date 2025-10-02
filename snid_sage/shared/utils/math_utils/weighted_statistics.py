@@ -33,14 +33,14 @@ def calculate_combined_weights(
     Returns
     -------
     np.ndarray
-        Combined weights = exp(rlap_cos) / σ²
+        Combined weights = exp(sqrt(rlap_cos)) / σ²
         
     Notes
     -----
     Statistical Formulation:
-    - Quality weight: q_i = exp(rlap_cos_i) 
+    - Quality weight: q_i = exp(sqrt(rlap_cos_i)) 
     - Precision weight: p_i = 1/σ²_i
-    - Combined weight: w_i = q_i × p_i = exp(rlap_cos_i) / σ²_i
+    - Combined weight: w_i = q_i × p_i = exp(sqrt(rlap_cos_i)) / σ²_i
     
     This gives high-quality templates with low uncertainty the highest influence,
     which is statistically optimal for uncertainty propagation.
@@ -62,7 +62,8 @@ def calculate_combined_weights(
     safe_uncertainties = np.maximum(uncertainties, uncertainty_floor)
     
     # Calculate combined weights
-    quality_weights = np.exp(rlap_cos_values)  # Exponential quality weighting
+    # Use tempered exponential to avoid explosive growth for high RLAP values
+    quality_weights = np.exp(np.sqrt(rlap_cos_values))  # Exponential of sqrt(RLAP-Cos)
     precision_weights = 1.0 / (safe_uncertainties ** 2)  # Inverse variance weighting
     combined_weights = quality_weights * precision_weights
     
@@ -88,13 +89,13 @@ def apply_exponential_weighting(rlap_cos_values: Union[np.ndarray, List[float]])
     Returns
     -------
     np.ndarray
-        Exponentially weighted values
+        Exponentially weighted values with sqrt tempering
         
     Notes
     -----
-    Transformation: w_exp = exp(rlap_cos)
+    Transformation: w_exp = exp(sqrt(rlap_cos))
     
-    This gives higher-quality templates exponentially more influence while
+    This tempers growth to avoid domination by a single very high score while still
     maintaining the relative ordering and statistical properties needed for
     robust weighted estimation.
     """
@@ -104,9 +105,9 @@ def apply_exponential_weighting(rlap_cos_values: Union[np.ndarray, List[float]])
     if len(rlap_cos_values) == 0:
         return np.array([])
     
-    # Apply exponential weighting
-    # Use base e (natural exponential) as determined by analysis
-    exponential_weights = np.exp(rlap_cos_values)
+    # Apply tempered exponential weighting: exp(sqrt(x))
+    # Use base e (natural exponential)
+    exponential_weights = np.exp(np.sqrt(rlap_cos_values))
     
     # Log the transformation for debugging
     if len(rlap_cos_values) > 0:
@@ -146,7 +147,7 @@ def calculate_weighted_redshift_balanced(
     Notes
     -----
     Statistical Method:
-    - Combined weights: w_i = exp(rlap_cos_i) / σ²_i
+    - Combined weights: w_i = exp(sqrt(rlap_cos_i)) / σ²_i
     - Weighted mean: z = Σ(w_i * z_i) / Σ(w_i)  
     - Final uncertainty: σ_final = √(Σ(w_i * σ_i²)) / Σ(w_i)
     
@@ -222,7 +223,7 @@ def calculate_weighted_age_estimate(
     Notes
     -----
     Statistical Method:
-    - Weights: w_i = exp(rlap_cos_i)
+    - Weights: w_i = exp(sqrt(rlap_cos_i))
     - Weighted mean: age = Σ(w_i * age_i) / Σ(w_i)
     
     No uncertainty is computed since individual age uncertainties are 
@@ -294,7 +295,7 @@ def calculate_uncertainty_aware_estimates(
     Notes
     -----
     Statistical Method (Inverse Variance Weighting with Quality):
-    - Combined weights: w_i = exp(rlap_cos_i) / σ²_i
+    - Combined weights: w_i = exp(sqrt(rlap_cos_i)) / σ²_i
     - Weighted mean: z = Σ(w_i * z_i) / Σ(w_i)  
     - Final uncertainty: σ_final = 1 / √(Σ(w_i))
     
@@ -485,7 +486,7 @@ def calculate_joint_weighted_estimates(
     - Standard errors: σ_x = √(Var(x)/N_eff), σ_y = √(Var(y)/N_eff)
     
     Weight Transformation:
-    - For optimal results, weights should be exponentially transformed: w = exp(rlap_cos)
+    - For optimal results, weights should be exponentially transformed: w = exp(sqrt(rlap_cos))
     - Use apply_exponential_weighting() function before calling this function
     """
     redshifts = np.asarray(redshifts, dtype=float)

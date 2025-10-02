@@ -216,7 +216,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         
         try:
             # Use preprocessed spectrum if available, otherwise load and preprocess
-            if self.current_spectrum:
+            if self.current_spectrum is not None:
                 spectrum_data = self.current_spectrum
             else:
                 # Load spectrum and apply quick preprocessing
@@ -237,9 +237,18 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
                         'flat': flux / np.median(flux)
                     }
             
-            # Extract wave/flux arrays
-            wave = spectrum_data.get('processed_wave') or spectrum_data.get('wave') or spectrum_data.get('wavelength')
-            flux = spectrum_data.get('flat') or spectrum_data.get('processed_flux') or spectrum_data.get('flux')
+            # Extract wave/flux arrays without triggering numpy truth-value errors
+            wave = spectrum_data.get('processed_wave', None)
+            if wave is None:
+                wave = spectrum_data.get('wave', None)
+                if wave is None:
+                    wave = spectrum_data.get('wavelength', None)
+
+            flux = spectrum_data.get('flat', None)
+            if flux is None:
+                flux = spectrum_data.get('processed_flux', None)
+                if flux is None:
+                    flux = spectrum_data.get('flux', None)
             if wave is None or flux is None:
                 raise ValueError("No valid wave/flux in spectrum data")
 

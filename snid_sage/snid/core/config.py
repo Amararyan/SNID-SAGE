@@ -55,7 +55,7 @@ class SNIDConfig:
     peak_window_size: int = 10
     lapmin: float = 0.3
     rlapmin: float = 5.0
-    rlap_ccc_threshold: float = 1.5  # NEW: RLAP-CCC threshold for clustering
+    rlap_ccc_threshold: float = 1.8  # NEW: RLAP-CCC threshold for clustering
 
     forced_redshift: Optional[float] = None
     

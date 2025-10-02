@@ -337,6 +337,8 @@ wise_spectra/
 OLD_ICONS/
 VolumeLimited/
 SIMULATIONS/
+RESULTS_IA/
+TESTING_TEMPLATES/
 
 # ===== MARKDOWN FILES =====
 # Track markdown files (remove previous global ignore). No entries here on purpose.

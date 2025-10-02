@@ -168,7 +168,7 @@ def perform_direct_gmm_clustering(
     top_percentage: float = 0.10,
     verbose: bool = False,
     use_rlap_cos: bool = True,  # DEPRECATED: Now uses get_best_metric_value() automatically
-    rlap_ccc_threshold: float = 1.5  # NEW: RLAP-CCC threshold for clustering
+    rlap_ccc_threshold: float = 1.8  # NEW: RLAP-CCC threshold for clustering
 ) -> Dict[str, Any]:
     """
     Direct GMM clustering on redshift values with automatic best metric selection.

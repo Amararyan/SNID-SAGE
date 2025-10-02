@@ -470,7 +470,7 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
                     top_percentage=0.10,
                     verbose=True,
                     use_rlap_cos=True,  # Use RLAP-Cos for better discrimination
-                    rlap_ccc_threshold=1.5  # Default RLAP-CCC threshold
+                    rlap_ccc_threshold=1.8  # Default RLAP-CCC threshold
                 )
                 
                 # If clustering failed (e.g., too few/weak survivors), create a weak fallback so UI can still render
