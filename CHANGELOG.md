@@ -2,6 +2,10 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
+## [0.8.1] - 2025-10-03
+
+- Weighting: use sqrt(RLAP) instead of RLAP directly in weighting formula
+
 ## [0.8.0] - 2025-09-20
 
 - Improved plot graphics
