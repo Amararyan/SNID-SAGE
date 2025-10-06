@@ -2,9 +2,20 @@
 
 All notable changes to SNID SAGE will be documented in this file.
 
+## [0.9.0] - 2025-10-07
+
+- Clustering: Adopted weighted 1-D GMM as default for cosmological clustering.
+  - Per-sample weights: w_i = exp(sqrt(RLAP-CCC_i)) / σ_{z,i}^2
+  - Weighted BIC model selection with resampling fallback if `sample_weight` is unsupported
+  - Enforced contiguity plus hard gap splitting at Δz > 0.025; clusters are annotated with `segment_id`, `gap_split`, and point `indices`
+- Uncertainty: Cluster redshift uncertainty now uses the standard error of the double-weighted mean
+  - σ_SE = sqrt(Σ w_i σ_i^2 / Σ w_i)
+- Template correction: `LSQ12fhs` subtype updated from `Ia-pec` to `Ia-02cx` in index and HDF5
+
 ## [0.8.1] - 2025-10-03
 
 - Weighting: use sqrt(RLAP) instead of RLAP directly in weighting formula
+
 
 ## [0.8.0] - 2025-09-20
 

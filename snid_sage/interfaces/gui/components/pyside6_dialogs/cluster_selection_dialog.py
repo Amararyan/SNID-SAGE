@@ -514,7 +514,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
             candidate_type_indices = [type_to_index[candidate['type']]] * len(candidate_redshifts)
             
             # Visual style: consistent size, no transparency
-            size = 40  # Smaller points for better readability
+            size = 30  # Slightly smaller points for better readability
             alpha = 1.0  # No transparency as requested
             
             # Gray edges for all by default (black edges added later for selected)
@@ -623,7 +623,7 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                     candidate_type_indices,
                     candidate_metrics,
                     c=self.type_colors.get(candidate['type'], self.type_colors['Unknown']),
-                    s=50,
+                    s=40,
                     alpha=1.0,
                     edgecolors='black',
                     linewidths=1.2,

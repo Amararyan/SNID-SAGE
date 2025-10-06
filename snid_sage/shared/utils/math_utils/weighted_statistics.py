@@ -184,16 +184,17 @@ def calculate_weighted_redshift_balanced(
     
     # Calculate combined weights (quality × precision)
     combined_weights = calculate_combined_weights(valid_rlap, valid_sigma)
-    
+
     # Weighted mean
     sum_w = np.sum(combined_weights)
     z_weighted = np.sum(combined_weights * valid_z) / sum_w
+
+    # Conservative RMS-style uncertainty propagation:
+    # σ_final = sqrt( Σ w_i σ_i^2 / Σ w_i )
+    weighted_var = float(np.sum(combined_weights * (valid_sigma ** 2)) / sum_w)
+    sigma_final = float(np.sqrt(weighted_var))
     
-    # Final uncertainty using weighted RMS
-    weighted_var = np.sum(combined_weights * valid_sigma**2) / sum_w
-    sigma_final = np.sqrt(weighted_var)
-    
-    logger.info(f"Balanced redshift: {z_weighted:.6f}±{sigma_final:.6f}, N={N}")
+    logger.info(f"Balanced redshift (RMS): {z_weighted:.6f}±{sigma_final:.6f}, N={N}")
     
     return float(z_weighted), float(sigma_final)
 

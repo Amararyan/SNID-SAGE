@@ -489,15 +489,17 @@ def _perform_direct_gmm_clustering(
     try:
         redshifts = np.array([m['redshift'] for m in type_matches])
         rlaps = np.array([m['rlap'] for m in type_matches])  # Keep for compatibility
-        from snid_sage.shared.utils.math_utils import get_best_metric_value
+        from snid_sage.shared.utils.math_utils import get_best_metric_value, calculate_combined_weights
+        from snid_sage.shared.utils.match_utils import extract_redshift_sigma
         metric_values = np.array([get_best_metric_value(m) for m in type_matches])  # Use best available metric (CCC > Cos > RLAP)
+        sigmas = np.array([extract_redshift_sigma(m) for m in type_matches], dtype=float)
         
         # Suppress sklearn convergence warnings for cleaner output
         import warnings
         from sklearn.exceptions import ConvergenceWarning
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
         
-        # Step 1: Find optimal number of clusters using BIC
+        # Step 1: Build double weights and find optimal number of clusters using weighted BIC
         n_matches = len(type_matches)
         max_clusters_actual = min(max_clusters, n_matches // 2 + 1)
         
@@ -508,6 +510,17 @@ def _perform_direct_gmm_clustering(
                 type_matches, sn_type, redshifts, rlaps, quality_threshold, "best_metric"
             )
         
+        # Double weights: exp(sqrt(metric)) / sigma^2
+        # Use existing utility and then normalize to preserve BIC scale comparability
+        # calculate_combined_weights expects uncertainties (sigma), matches our sigmas
+        raw_weights = calculate_combined_weights(metric_values, sigmas)
+        # Guard against degenerate sums
+        sum_w = float(np.sum(raw_weights)) if raw_weights.size else 0.0
+        if sum_w > 0:
+            weights = raw_weights * (len(raw_weights) / sum_w)
+        else:
+            weights = np.ones_like(metric_values, dtype=float)
+
         bic_scores = []
         models = []
         
@@ -519,12 +532,33 @@ def _perform_direct_gmm_clustering(
                 covariance_type='full',  # Same as transformation_comparison_test.py
                 tol=1e-6  # Same as transformation_comparison_test.py
             )
-            
+
             # Cluster directly on redshift values (no transformation)
             features = redshifts.reshape(-1, 1)
-            gmm.fit(features)
-            
-            bic = gmm.bic(features)
+
+            # Weighted fit and weighted BIC; fallback to resampling if needed
+            d = features.shape[1]
+            try:
+                gmm.fit(features, sample_weight=weights)
+                logprob = gmm.score_samples(features)
+                # Parameter count for full covariance
+                p = (n_clusters - 1) + n_clusters * d + n_clusters * d * (d + 1) / 2.0
+                bic = -2.0 * float(np.sum(weights * logprob)) + float(p) * np.log(float(np.sum(weights)))
+            except TypeError:
+                # Resampling fallback
+                rng = np.random.RandomState(42)
+                # Target size similar to test script bounds
+                target = int(min(max(len(features) * 5, 300), 5000)) if len(features) > 0 else 0
+                if target > 0:
+                    p_norm = weights / float(np.sum(weights)) if np.sum(weights) > 0 else np.full_like(weights, 1.0 / len(weights))
+                    idx = rng.choice(np.arange(len(features)), size=target, replace=True, p=p_norm)
+                    features_rs = features[idx]
+                    gmm.fit(features_rs)
+                    bic = float(gmm.bic(features_rs))
+                else:
+                    gmm.fit(features)
+                    bic = float(gmm.bic(features))
+
             bic_scores.append(bic)
             models.append(gmm)
         
@@ -539,7 +573,7 @@ def _perform_direct_gmm_clustering(
         gamma = best_gmm.predict_proba(features)
 
         # Enforce contiguity in 1D redshift: split any non-contiguous cluster into
-        # contiguous segments along sorted redshift order
+        # contiguous segments along sorted redshift order, then split by hard gaps
         order = np.argsort(redshifts)
         labels_sorted = labels[order]
 
@@ -566,17 +600,44 @@ def _perform_direct_gmm_clustering(
         split_applied = any(cnt > 1 for cnt in label_to_run_count.values())
 
         final_clusters = []
-        if split_applied:
-            # Rebuild responsibilities with one column per segment; assign mass of
-            # original label only to its contiguous segment for each point
-            n_segments = len(segments)
+        # Hard gap split: 0.025
+        MAX_GAP_Z = 0.025
+
+        # Helper: split a sorted-by-z absolute index run by redshift gaps
+        def _split_by_gap(abs_idx: np.ndarray, z: np.ndarray) -> List[np.ndarray]:
+            if abs_idx.size <= 1:
+                return [abs_idx]
+            parts: List[np.ndarray] = []
+            start = 0
+            for r in range(1, abs_idx.size):
+                if abs(z[abs_idx[r]] - z[abs_idx[r-1]]) > MAX_GAP_Z:
+                    parts.append(abs_idx[start:r])
+                    start = r
+            parts.append(abs_idx[start:])
+            return parts
+
+        # Build final segments (run-contiguity plus gap splits)
+        segment_records: List[Tuple[int, np.ndarray, bool]] = []  # (orig_label, indices, is_gap_split)
+        for orig_label, idx in segments:
+            # idx is in absolute index order of the run; ensure it is sorted by z for consistent gap checks
+            idx_sorted = idx[np.argsort(redshifts[idx])]
+            parts = _split_by_gap(idx_sorted, redshifts)
+            if len(parts) <= 1:
+                segment_records.append((orig_label, idx_sorted, False))
+            else:
+                for j, part in enumerate(parts):
+                    segment_records.append((orig_label, part, True))
+
+        if segment_records:
+            # Rebuild responsibilities with one column per final segment
+            n_segments = len(segment_records)
             new_gamma = np.zeros((len(type_matches), n_segments), dtype=float)
-            for j, (orig_label, idx) in enumerate(segments):
+            for j, (orig_label, idx, _is_gap) in enumerate(segment_records):
                 new_gamma[idx, j] = gamma[idx, orig_label]
             gamma = new_gamma
 
-            # Build clusters from contiguous segments
-            for new_id, (orig_label, idx) in enumerate(segments):
+            # Build clusters from final segments
+            for new_id, (orig_label, idx, is_gap) in enumerate(segment_records):
                 cluster_redshifts = redshifts[idx]
                 cluster_rlaps = rlaps[idx]
                 cluster_metric_values = metric_values[idx]
@@ -617,13 +678,17 @@ def _perform_direct_gmm_clustering(
                     'top_5_mean': 0.0,
                     'penalty_factor': 1.0,
                     'penalized_score': 0.0,
-                    'composite_score': 0.0
+                    'composite_score': 0.0,
+                    # New annotations used by tests/plots
+                    'segment_id': new_id,
+                    'gap_split': bool(is_gap),
+                    'indices': [int(v) for v in idx.tolist()],
                 })
 
                 if verbose:
                     _LOGGER.info(f"  Segment {new_id} (from label {orig_label}): {redshift_quality} (z-span={redshift_span:.4f})")
 
-            # Replace optimal cluster count with the number of contiguous segments
+            # Replace optimal cluster count with the number of final segments
             optimal_n_clusters = len(final_clusters)
         else:
             # Create cluster info from original labels (already contiguous)
@@ -674,7 +739,11 @@ def _perform_direct_gmm_clustering(
                     'top_5_mean': 0.0,
                     'penalty_factor': 1.0,
                     'penalized_score': 0.0,
-                    'composite_score': 0.0
+                    'composite_score': 0.0,
+                    # Consistent annotations for UI/tests even when no gap split applied
+                    'segment_id': cluster_id,
+                    'gap_split': False,
+                    'indices': [int(v) for v in cluster_indices.tolist()],
                 }
                 final_clusters.append(cluster_info)
 
@@ -692,7 +761,9 @@ def _perform_direct_gmm_clustering(
             'gamma': gamma,
             'type_matches': type_matches,  # Store the original matches used for gamma matrix
             'quality_threshold': quality_threshold,
-            'contiguity_split_applied': bool(split_applied)
+            'contiguity_split_applied': True if final_clusters else bool(split_applied),
+            # Debug extras
+            'weights': weights.tolist() if isinstance(weights, np.ndarray) else []
         }
                 
     except Exception as e:

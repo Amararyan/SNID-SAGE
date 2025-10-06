@@ -339,6 +339,7 @@ VolumeLimited/
 SIMULATIONS/
 RESULTS_IA/
 TESTING_TEMPLATES/
+TESTING_TEMPLATES_NEW/
 
 # ===== MARKDOWN FILES =====
 # Track markdown files (remove previous global ignore). No entries here on purpose.
