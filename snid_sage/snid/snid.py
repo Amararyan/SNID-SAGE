@@ -1,5 +1,5 @@
 """
-SNID: Supernova Identification
+SNID-SAGE: Supernova Identification
 ------------------------------
 
 Core SNID pipeline implementing template matching using cross-correlation techniques
@@ -17,6 +17,9 @@ from typing import Dict, Any, List, Tuple, Optional, Callable
 import math  # Added for batch processing
 
 import numpy as np
+
+# Global scaling for redshift uncertainties (empirical). Use 3/8 for Tonry & Davis.
+Z_K = 0.5
 import matplotlib.pyplot as plt
 import os
 from scipy.signal import find_peaks, peak_prominences
@@ -649,12 +652,11 @@ def _process_template_peaks(
                 if rlap < rlapmin:
                     continue
                 
-                # Calculate formal redshift error using canonical SNID formula
-                zk = 3.0/8.0  # Canonical factor from original SNID (0.375)
+                # Calculate formal redshift error with global scaling Z_K
                 if r_value > 0 and lap > 0:
-                    formal_z_error = zk * z_width / (1.0 + r_value)
+                    formal_z_error = Z_K * z_width / (1.0 + r_value)
                 else:
-                    formal_z_error = z_width if z_width > 0 else 0.0
+                    formal_z_error = Z_K * z_width if z_width > 0 else 0.0
 
                 # Prepare spectra data for plotting (required by GUI plotting system)
                 # Use the same approach as the original working code - global spectrum edges
@@ -1136,6 +1138,7 @@ def _process_forced_redshift_match(
         # Calculate width for uncertainty estimation
         width = 0.0
         z_width = 0.0
+        fwhm_pixels = 0.0
         
         # Half-maximum width estimate
         try:
@@ -1157,14 +1160,15 @@ def _process_forced_redshift_match(
                 if right_idx > left_idx:
                     fwhm_pixels = float(right_idx - left_idx)
                     width = fwhm_pixels / 2.35
-                    z_width = np.exp(width * DWLOG_grid) - 1.0
+                    # Use same small-angle mapping as main path: w_z ≈ FWHM_pix * DWLOG_grid
+                    z_width = fwhm_pixels * DWLOG_grid
         except:
             pass
         
-        # Conservative fallback estimate
+        # Conservative fallback estimate (assume a modest FWHM in pixel units)
         if width == 0.0:
-            width = 2.0
-            z_width = np.exp(width * DWLOG_grid) - 1.0
+            fwhm_pixels = 2.0 * 2.35
+            z_width = fwhm_pixels * DWLOG_grid
         
         # Calculate R value and final rlap
         arms_raw, _ = aspart(cross_power_peak, k1, k2, k3, k4, 0)
@@ -1179,10 +1183,9 @@ def _process_forced_redshift_match(
 
         # Store results if they pass quality criteria
         if rlap >= rlapmin and lap >= lapmin:
-            # Calculate formal redshift error using canonical SNID formula
-            zk = 3.0/8.0
+            # Calculate formal redshift error (SAGE no 3/8): z_width / (1 + r)
             if z_width > 0 and r_value > 0:
-                formal_z_error = zk * z_width / (1.0 + r_value)
+                formal_z_error = z_width / (1.0 + r_value)
             else:
                 formal_z_error = z_width if z_width > 0 else 0.0
             
@@ -1263,7 +1266,9 @@ def run_snid_analysis(
     save_plots: bool = False,
     plot_dir: Optional[str | Path] = None,
     # Progress callback
-    progress_callback: Optional[Callable[[str, float], None]] = None
+    progress_callback: Optional[Callable[[str, float], None]] = None,
+    # Hidden/advanced: toggle weighted GMM (default False; surfaced via CLI flags)
+    use_weighted_gmm: bool = False
 ) -> Tuple[SNIDResult, Dict[str, Any]]:
     """
     Run SNID correlation analysis on preprocessed spectrum.
@@ -1907,8 +1912,8 @@ def run_snid_analysis(
                 max_clusters_per_type=10,
                 top_percentage=0.10,  # Top 10% of matches
                 verbose=verbose,
-                use_rlap_cos=True,  # NEW: Use RLAP-Cos instead of RLAP
-                rlap_ccc_threshold=rlap_ccc_threshold  # NEW: RLAP-CCC threshold
+                rlap_ccc_threshold=rlap_ccc_threshold,  # RLAP-CCC threshold
+                use_weighted_gmm=bool(use_weighted_gmm)
             )
             
             if clustering_results['success'] and clustering_results['best_cluster']:
@@ -1986,7 +1991,7 @@ def run_snid_analysis(
         
         # Extract weighted redshift from the best cluster
         weighted_redshift = best_cluster.get('enhanced_redshift', result.initial_redshift)
-        weighted_uncertainty = best_cluster.get('weighted_redshift_uncertainty', 0.01)
+        weighted_uncertainty = best_cluster.get('weighted_redshift_sd', 0.01)
         
         if 'gamma' in type_data:
             # Use new cluster-aware subtype determination
@@ -2046,7 +2051,7 @@ def run_snid_analysis(
             # Ensure weighted redshift variables are available for fallback case too
             if 'weighted_redshift' not in locals():
                 weighted_redshift = best_cluster.get('enhanced_redshift', result.initial_redshift)
-                weighted_uncertainty = best_cluster.get('weighted_redshift_uncertainty', 0.01)
+                weighted_uncertainty = best_cluster.get('weighted_redshift_sd', 0.01)
             
             type_determination = {
                 'success': True,
@@ -2108,12 +2113,18 @@ def run_snid_analysis(
             # Use proper statistical redshift calculations instead of simple mean
             redshifts = [m['redshift'] for m in filtered_matches]
             if redshifts:
-                from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
-                # Use RLAP values as weights (assuming filtered_matches has rlap values)
-                weights = [m.get('rlap', 1.0) for m in filtered_matches]
-                weighted_redshift, weighted_uncertainty = calculate_weighted_redshift(
-                    redshifts, weights
+                # Use balanced weighting with best metric (RLAP-CCC if available) and per-match σ
+                from snid_sage.shared.utils.math_utils import (
+                    estimate_weighted_redshift,
+                    get_best_metric_value,
                 )
+                rlap_ccc_values = [get_best_metric_value(m) for m in filtered_matches]
+                redshift_errors = [m.get('redshift_error', 0.0) for m in filtered_matches]
+                weighted_redshift = estimate_weighted_redshift(
+                    redshifts, redshift_errors, rlap_ccc_values
+                )
+                # For simple path, report cluster scatter via SD if needed later; here keep as z_hybrid_uncertainty
+                weighted_uncertainty = 0.01
             else:
                 weighted_redshift = result.initial_redshift
                 weighted_uncertainty = 0.0
@@ -2604,7 +2615,7 @@ def run_snid(
     """
     
     _LOG.info("="*80)
-    _LOG.info("                      SNID: SUPERNOVA IDENTIFICATION")
+    _LOG.info("                      SNID-SAGE: SUPERNOVA IDENTIFICATION")
     _LOG.info("="*80)
     _LOG.info(f"Input spectrum: {spectrum_path}")
     _LOG.info(f"Templates directory: {templates_dir}")
@@ -2830,7 +2841,7 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
-    parser = argparse.ArgumentParser(description="SNID: Supernova Identification")
+    parser = argparse.ArgumentParser(description="SNID-SAGE: Supernova Identification")
     
     # Required arguments
     parser.add_argument("spectrum_path", help="Path to the input spectrum file")

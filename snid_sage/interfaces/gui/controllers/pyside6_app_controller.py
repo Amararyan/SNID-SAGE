@@ -506,7 +506,7 @@ class PySide6AppController(QtCore.QObject):
                         self.main_window, 
                         "SNID-SAGE Analysis Progress"
                     )
-                    self.main_window.progress_dialog.add_progress_line("Initializing SNID analysis...", "info")
+                    self.main_window.progress_dialog.add_progress_line("Initializing SNID-SAGE analysis...", "info")
                     _LOGGER.info("Progress dialog created for analysis")
                 elif self.main_window and self.main_window.progress_dialog:
                     # Reuse existing progress dialog, ensuring it is visible
@@ -525,7 +525,7 @@ class PySide6AppController(QtCore.QObject):
                                 dlg.activateWindow()
                             except Exception:
                                 pass
-                        dlg.add_progress_line("Initializing SNID analysis...", "info")
+                        dlg.add_progress_line("Initializing SNID-SAGE analysis...", "info")
                         _LOGGER.info("Using existing progress dialog for analysis")
                     except Exception:
                         # If reusing fails for any reason, create a fresh dialog
@@ -533,7 +533,7 @@ class PySide6AppController(QtCore.QObject):
                             self.main_window,
                             "SNID-SAGE Analysis Progress"
                         )
-                        self.main_window.progress_dialog.add_progress_line("Initializing SNID analysis...", "info")
+                        self.main_window.progress_dialog.add_progress_line("Initializing SNID-SAGE analysis...", "info")
                         _LOGGER.info("Progress dialog recreated for analysis")
                 else:
                     _LOGGER.warning("Main window not available for progress dialog")
@@ -592,7 +592,7 @@ class PySide6AppController(QtCore.QObject):
             True if successful, False otherwise
         """
         try:
-            _LOGGER.info(f"Starting SNID analysis with configuration: {config_params}")
+            _LOGGER.info(f"Starting SNID-SAGE analysis with configuration: {config_params}")
             
             # Set current parameters on main GUI for parsing methods to access
             if hasattr(self, 'main_window'):
@@ -1383,8 +1383,8 @@ class PySide6AppController(QtCore.QObject):
                     result.rlap = best_cluster_match.get('rlap', 0.0)
                     
                     # Update RLAP-CCC if available
-                    if 'rlap_cos' in best_cluster_match:
-                        result.rlap_cos = best_cluster_match.get('rlap_cos', 0.0)
+                    if 'rlap_ccc' in best_cluster_match:
+                        result.rlap_ccc = best_cluster_match.get('rlap_ccc', 0.0)
                     
                     _LOGGER.info(f"🎯 Updated result properties: {result.template_name} ({result.consensus_type}) "
                                 f"z={result.redshift:.6f}, RLAP={result.rlap:.2f}")

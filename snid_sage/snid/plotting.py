@@ -463,7 +463,7 @@ def plot_comparison(result: Any, figsize: Tuple[int, int] = (12, 9),
     ax_info.axis('off')
     
     # Enhanced result information using comprehensive statistics
-    info_text = f"SNID Result Summary\n"
+    info_text = f"SNID-SAGE Result Summary\n"
     info_text += f"Match source: {match_source} matches\n\n"
     
     # Basic results
@@ -1138,10 +1138,10 @@ def plot_redshift_age(result: Any, figsize: Tuple[int, int] = (8, 6),
         sn_subtype = template.get('subtype', 'Unknown') if isinstance(template, dict) else 'Unknown'
         if not sn_subtype or sn_subtype.strip() == '':
             sn_subtype = 'Unknown'
-        # Use RLAP-cos for point size if available; fallback to RLAP
+        # Use RLAP-CCC for point size if available; fallback to RLAP
         rlap_value = float(match.get('rlap', 0))
-        rlap_cos_value = match.get('rlap_cos', None)
-        size_metric = float(rlap_cos_value) if rlap_cos_value is not None else rlap_value
+        rlap_ccc_value = match.get('rlap_ccc', None)
+        size_metric = float(rlap_ccc_value) if rlap_ccc_value is not None else rlap_value
         data.append({
             'z': float(z),
             'age': float(age),
@@ -1350,7 +1350,7 @@ def plot_flux_comparison(match: Dict[str, Any], result: Any,
     template_age = template.get('age', 0)
     z_template = match.get('redshift', 0)
     # Prefer RLAP-cos like GUI overlay info
-    rlap_cos_value = match.get('rlap_cos', None)
+    rlap_ccc_value = match.get('rlap_ccc', None)
     rlap_value = match.get('rlap', 0)
     redshift_error = match.get('redshift_error', 0)
     
@@ -1624,7 +1624,7 @@ def plot_flat_comparison(match: Dict[str, Any], result: Any,
     template_subtype = template.get('subtype', '')
     template_age = template.get('age', 0)
     z_template = match.get('redshift', 0)
-    rlap_cos_value = match.get('rlap_cos', None)
+    rlap_ccc_value = match.get('rlap_ccc', None)
     rlap_value = match.get('rlap', 0)
     redshift_error = match.get('redshift_error', 0)
     
@@ -2250,9 +2250,9 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
             
             # Calculate average RLAP-cos for this subtype
             from snid_sage.shared.utils.math_utils import get_best_metric_value
-            subtype_rlap_cos_values = [get_best_metric_value(m) for m in cluster_matches 
-                                     if m.get('template', {}).get('subtype', 'Unknown') == subtype]
-            avg_rlap_cos = np.mean(subtype_rlap_cos_values) if subtype_rlap_cos_values else 0
+            subtype_metric_values = [get_best_metric_value(m) for m in cluster_matches 
+                                         if m.get('template', {}).get('subtype', 'Unknown') == subtype]
+            avg_metric = np.mean(subtype_metric_values) if subtype_metric_values else 0
             
             # Use RLAP-cos weighted redshift for subtypes if enough data
             if len(subtype_redshifts[subtype]) > 1:
@@ -2284,7 +2284,7 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
                 subtype[:8],  # Truncate long subtype names
                 str(count),
                 f"{percentage:.1f}",
-                f"{avg_rlap_cos:.1f}",
+                f"{avg_metric:.1f}",
                 f"{avg_z:.4f}",
                 f"{avg_age:.1f}" if avg_age is not None and np.isfinite(avg_age) else "N/A"
             ])
@@ -2310,17 +2310,17 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
     if cluster_matches and len(set(subtype_counts.keys())) > 1:
         # Find RLAP-cos range
         from snid_sage.shared.utils.math_utils import get_best_metric_value
-        all_rlap_cos = [get_best_metric_value(m) for m in cluster_matches]
-        max_rlap_cos = max(all_rlap_cos)
-        min_rlap_cos = min(5.0, min(all_rlap_cos))  # Start from 5.0 or lower if needed
+        all_metric_values = [get_best_metric_value(m) for m in cluster_matches]
+        max_metric = max(all_metric_values)
+        min_metric = min(5.0, min(all_metric_values))  # Start from 5.0 or lower if needed
         
         # Create RLAP-cos thresholds
-        rlap_cos_thresholds = np.linspace(min_rlap_cos, min(max_rlap_cos, 30), 12)
+        metric_thresholds = np.linspace(min_metric, min(max_metric, 30), 12)
         
         subtype_proportions_by_rlap = {subtype: [] for subtype in subtype_counts.keys()}
         
         # Calculate proportions at each threshold
-        for threshold in rlap_cos_thresholds:
+        for threshold in metric_thresholds:
             qualified_matches = [match for match in cluster_matches 
                                if get_best_metric_value(match) >= threshold]
             
@@ -2346,7 +2346,7 @@ def plot_cluster_subtype_proportions(result: Any, selected_cluster: Dict[str, An
             if any(p > 0 for p in proportions):  # Only plot if subtype has non-zero proportions
                 # Use the same color mapping as the pie chart for consistency
                 color = subtype_color_map.get(subtype, 'gray')
-                ax3.plot(rlap_cos_thresholds, proportions, 'o-', label=subtype, 
+                ax3.plot(metric_thresholds, proportions, 'o-', label=subtype, 
                         color=color, linewidth=2, markersize=6)
         
         ax3.set_xlabel('RLAP-cos Threshold', fontsize=PLOT_AXIS_LABEL_FONTSIZE)

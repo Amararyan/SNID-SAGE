@@ -106,21 +106,29 @@ def calculate_joint_redshift_age_from_cluster(
     if not cluster_matches:
         return np.nan, np.nan, np.nan, np.nan, np.nan
     
-    from snid_sage.shared.utils.math_utils import get_best_metric_value, calculate_weighted_redshift_balanced, calculate_weighted_age, apply_exponential_weighting
+    from snid_sage.shared.utils.math_utils import (
+        get_best_metric_value,
+        compute_cluster_weights,
+        estimate_weighted_redshift,
+        estimate_weighted_epoch,
+        weighted_redshift_sd,
+        weighted_epoch_sd,
+    )
     
     # Separate collection for redshift (with errors) and age (without errors)
     redshifts_for_estimation = []
     redshift_errors_for_estimation = []
-    rlap_cos_for_redshift = []
+    metric_values_for_redshift = []
     
     ages_for_estimation = []
-    rlap_cos_for_age = []
+    metric_values_for_age = []
+    age_redshift_errors_for_estimation = []
     
     for match in cluster_matches:
         if 'redshift' in match:
             template = match.get('template', {})
             age = template.get('age', 0.0)
-            rlap_cos = get_best_metric_value(match)
+            metric_val = get_best_metric_value(match)
             
             # Collect redshift data (uncertainties always available)
             z = match.get('redshift')
@@ -128,36 +136,51 @@ def calculate_joint_redshift_age_from_cluster(
             if z is not None and np.isfinite(z) and z_err > 0:
                 redshifts_for_estimation.append(z)
                 redshift_errors_for_estimation.append(z_err)
-                rlap_cos_for_redshift.append(rlap_cos)
+                metric_values_for_redshift.append(metric_val)
             
-            # Separately collect age data (no uncertainties available)
+            # Collect age data using the SAME reliability weights as redshift
+            # Include only when a valid redshift uncertainty exists
             # Note: Negative ages are acceptable (pre-maximum light)
-            if np.isfinite(age):
+            if np.isfinite(age) and z_err > 0:
                 ages_for_estimation.append(age)
-                rlap_cos_for_age.append(rlap_cos)
+                metric_values_for_age.append(metric_val)
+                age_redshift_errors_for_estimation.append(z_err)
     
-    # Calculate balanced redshift estimate
+    # Calculate weighted means and weighted cluster SDs
     if redshifts_for_estimation:
-        z_mean, z_uncertainty = calculate_weighted_redshift_balanced(
-            redshifts_for_estimation, redshift_errors_for_estimation, rlap_cos_for_redshift
+        z_mean = estimate_weighted_redshift(
+            redshifts_for_estimation,
+            redshift_errors_for_estimation,
+            metric_values_for_redshift
+        )
+        z_sd = weighted_redshift_sd(
+            redshifts_for_estimation,
+            redshift_errors_for_estimation,
+            metric_values_for_redshift
         )
     else:
         _LOGGER.warning("No valid redshift data found in cluster matches")
-        z_mean, z_uncertainty = np.nan, np.nan
-    
-    # Calculate age estimate with uncertainty
-    if ages_for_estimation:
-        # Apply exponential weighting to RLAP-cos values for age calculation
-        age_weights = apply_exponential_weighting(np.array(rlap_cos_for_age))
-        t_mean, t_uncertainty = calculate_weighted_age(ages_for_estimation, age_weights)
+        z_mean, z_sd = np.nan, np.nan
+
+    if ages_for_estimation and redshift_errors_for_estimation:
+        t_mean = estimate_weighted_epoch(
+            ages_for_estimation,
+            age_redshift_errors_for_estimation,
+            metric_values_for_age
+        )
+        t_sd = weighted_epoch_sd(
+            ages_for_estimation,
+            age_redshift_errors_for_estimation,
+            metric_values_for_age
+        )
     else:
         _LOGGER.warning("No valid age data found in cluster matches")
-        t_mean, t_uncertainty = np.nan, 0.0
-    
+        t_mean, t_sd = np.nan, np.nan
+
     # No covariance since we estimate separately
     zt_covariance = 0.0
-    
-    return z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance
+
+    return z_mean, t_mean, z_sd, t_sd, zt_covariance
 
 
 def perform_direct_gmm_clustering(
@@ -167,8 +190,8 @@ def perform_direct_gmm_clustering(
     max_clusters_per_type: int = 10,
     top_percentage: float = 0.10,
     verbose: bool = False,
-    use_rlap_cos: bool = True,  # DEPRECATED: Now uses get_best_metric_value() automatically
-    rlap_ccc_threshold: float = 1.8  # NEW: RLAP-CCC threshold for clustering
+    rlap_ccc_threshold: float = 1.8,  # NEW: RLAP-CCC threshold for clustering
+    use_weighted_gmm: Optional[bool] = None  # Hidden option: when True, use weighted GMM + weighted BIC
 ) -> Dict[str, Any]:
     """
     Direct GMM clustering on redshift values with automatic best metric selection.
@@ -193,17 +216,32 @@ def perform_direct_gmm_clustering(
         Percentage of top matches to consider (0.10 = top 10%)
     verbose : bool, optional
         Enable detailed logging
-    use_rlap_cos : bool, optional
-        DEPRECATED: Now automatically uses best available metric via get_best_metric_value()
     rlap_ccc_threshold : float, optional
         Minimum RLAP-CCC value required for matches to be considered for clustering
         
+    Hidden Options
+    --------------
+    use_weighted_gmm : bool, optional
+        When True, enables sample-weighted GMM fitting and weighted-BIC selection
+        using combined weights (metric^2 / sigma_z^2). By default (None/False),
+        the method uses standard unweighted GMM and unweighted BIC. If None, the
+        value is read from environment variable 'SNID_SAGE_WEIGHTED_GMM' (1/true/on).
+
     Returns
     -------
     Dict containing clustering results
     """
     
     start_time = time.time()
+    
+    # Resolve hidden option: default to unweighted unless explicitly enabled
+    if use_weighted_gmm is None:
+        try:
+            import os
+            env_val = str(os.getenv("SNID_SAGE_WEIGHTED_GMM", "0")).strip().lower()
+            use_weighted_gmm = env_val in ("1", "true", "yes", "on")
+        except Exception:
+            use_weighted_gmm = False
     
     # Determine which metric to use - now using get_best_metric_value()
     # This automatically prioritizes RLAP-CCC > RLAP
@@ -264,7 +302,8 @@ def perform_direct_gmm_clustering(
     for sn_type, type_matches in filtered_type_groups.items():
         type_result = _perform_direct_gmm_clustering(
             type_matches, sn_type, max_clusters_per_type, 
-            quality_threshold, verbose, "best_metric"  # Parameter is deprecated
+            quality_threshold, verbose, "best_metric",  # Parameter is deprecated
+            use_weighted_gmm=use_weighted_gmm
         )
         
         clustering_results[sn_type] = type_result
@@ -339,7 +378,7 @@ def perform_direct_gmm_clustering(
                             )
                         
                         # Calculate joint estimates for the full cluster as well
-                        cluster_redshift, cluster_age, cluster_redshift_error, cluster_age_error, cluster_redshift_age_covariance = calculate_joint_redshift_age_from_cluster(
+                        cluster_redshift, cluster_age, cluster_redshift_sd, cluster_age_sd, cluster_redshift_age_covariance = calculate_joint_redshift_age_from_cluster(
                             cluster_candidate['matches']
                         )
                         
@@ -361,9 +400,9 @@ def perform_direct_gmm_clustering(
                             'subtype_age_template_count': subtype_age_template_count,
                             # Add full cluster joint estimates (update the enhanced_redshift from weighted_mean_redshift)
                             'enhanced_redshift': cluster_redshift,
-                            'weighted_redshift_uncertainty': cluster_redshift_error,
+                            'weighted_redshift_sd': cluster_redshift_sd,
                             'cluster_age': cluster_age,
-                            'cluster_age_error': cluster_age_error,
+                            'cluster_age_sd': cluster_age_sd,
                             'cluster_redshift_age_covariance': cluster_redshift_age_covariance
                         })
                         
@@ -388,7 +427,7 @@ def perform_direct_gmm_clustering(
                     # If subtype calculation fails, add default values
                     # Still calculate full cluster joint estimates
                     try:
-                        cluster_redshift, cluster_age, cluster_redshift_error, cluster_age_error, cluster_redshift_age_covariance = calculate_joint_redshift_age_from_cluster(
+                        cluster_redshift, cluster_age, cluster_redshift_sd, cluster_age_sd, cluster_redshift_age_covariance = calculate_joint_redshift_age_from_cluster(
                             cluster_candidate['matches']
                         )
                     except:
@@ -411,9 +450,9 @@ def perform_direct_gmm_clustering(
                         'subtype_age_template_count': 0,
                         # Add full cluster joint estimates (fallback)
                         'enhanced_redshift': cluster_redshift,
-                        'weighted_redshift_uncertainty': cluster_redshift_error,
+                        'weighted_redshift_sd': cluster_redshift_sd,
                         'cluster_age': cluster_age,
-                        'cluster_age_error': cluster_age_error,
+                        'cluster_age_sd': cluster_age_sd,
                         'cluster_redshift_age_covariance': cluster_redshift_age_covariance
                     })
                     if verbose:
@@ -428,8 +467,7 @@ def perform_direct_gmm_clustering(
     
     # Use the new top-5 method for cluster selection
     best_cluster, quality_assessment = find_winning_cluster_top5_method(
-        all_cluster_candidates, 
-        use_rlap_cos=True,  # Parameter is deprecated but kept for compatibility
+        all_cluster_candidates,
         verbose=verbose
     )
     
@@ -440,7 +478,7 @@ def perform_direct_gmm_clustering(
     # Update the best cluster with new quality metrics
     best_cluster['quality_assessment'] = quality_assessment['quality_assessment']
     best_cluster['confidence_assessment'] = quality_assessment['confidence_assessment']
-    best_cluster['selection_method'] = 'top5_rlap_cos'
+    best_cluster['selection_method'] = 'top5_rlap_ccc'
     
     total_time = time.time() - start_time
     
@@ -460,8 +498,7 @@ def perform_direct_gmm_clustering(
         'success': True,
         'method': 'direct_gmm',
         'metric_used': metric_name,  # NEW: Which metric was used
-        'use_rlap_cos': use_rlap_cos,  # NEW: Flag for metric selection
-        'selection_method': 'top5_rlap_cos',  # NEW: Selection method used
+        'selection_method': 'top5_rlap_ccc',  # NEW: Selection method used
         'type_clustering_results': clustering_results,
         'best_cluster': best_cluster,
         'all_candidates': all_cluster_candidates,
@@ -469,6 +506,7 @@ def perform_direct_gmm_clustering(
         'quality_threshold': quality_threshold,
         'total_computation_time': total_time,
         'n_types_clustered': len(clustering_results),
+        'use_weighted_gmm': bool(use_weighted_gmm),
         'total_candidates': len(all_cluster_candidates)
     }
 
@@ -479,7 +517,9 @@ def _perform_direct_gmm_clustering(
     max_clusters: int,
     quality_threshold: float,
     verbose: bool,
-    metric_key: str = 'best_metric'  # DEPRECATED: Now uses get_best_metric_value() automatically
+    metric_key: str = 'best_metric',  # DEPRECATED: Now uses get_best_metric_value() automatically
+    *,
+    use_weighted_gmm: bool = False
 ) -> Dict[str, Any]:
     """
     Perform GMM clustering directly on redshift values using the same approach
@@ -499,7 +539,7 @@ def _perform_direct_gmm_clustering(
         from sklearn.exceptions import ConvergenceWarning
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
         
-        # Step 1: Build double weights and find optimal number of clusters using weighted BIC
+        # Step 1: Optionally build double weights and select model with weighted or unweighted BIC
         n_matches = len(type_matches)
         max_clusters_actual = min(max_clusters, n_matches // 2 + 1)
         
@@ -510,16 +550,18 @@ def _perform_direct_gmm_clustering(
                 type_matches, sn_type, redshifts, rlaps, quality_threshold, "best_metric"
             )
         
-        # Double weights: exp(sqrt(metric)) / sigma^2
-        # Use existing utility and then normalize to preserve BIC scale comparability
-        # calculate_combined_weights expects uncertainties (sigma), matches our sigmas
-        raw_weights = calculate_combined_weights(metric_values, sigmas)
-        # Guard against degenerate sums
-        sum_w = float(np.sum(raw_weights)) if raw_weights.size else 0.0
-        if sum_w > 0:
-            weights = raw_weights * (len(raw_weights) / sum_w)
+        # Build weights only when requested; default to unweighted GMM
+        if use_weighted_gmm:
+            # Double weights: (metric)^2 / sigma^2
+            raw_weights = calculate_combined_weights(metric_values, sigmas)
+            # Guard against degenerate sums
+            sum_w = float(np.sum(raw_weights)) if raw_weights.size else 0.0
+            if sum_w > 0:
+                weights = raw_weights * (len(raw_weights) / sum_w)
+            else:
+                weights = np.ones_like(metric_values, dtype=float)
         else:
-            weights = np.ones_like(metric_values, dtype=float)
+            weights = None
 
         bic_scores = []
         models = []
@@ -536,28 +578,33 @@ def _perform_direct_gmm_clustering(
             # Cluster directly on redshift values (no transformation)
             features = redshifts.reshape(-1, 1)
 
-            # Weighted fit and weighted BIC; fallback to resampling if needed
-            d = features.shape[1]
-            try:
-                gmm.fit(features, sample_weight=weights)
-                logprob = gmm.score_samples(features)
-                # Parameter count for full covariance
-                p = (n_clusters - 1) + n_clusters * d + n_clusters * d * (d + 1) / 2.0
-                bic = -2.0 * float(np.sum(weights * logprob)) + float(p) * np.log(float(np.sum(weights)))
-            except TypeError:
-                # Resampling fallback
-                rng = np.random.RandomState(42)
-                # Target size similar to test script bounds
-                target = int(min(max(len(features) * 5, 300), 5000)) if len(features) > 0 else 0
-                if target > 0:
-                    p_norm = weights / float(np.sum(weights)) if np.sum(weights) > 0 else np.full_like(weights, 1.0 / len(weights))
-                    idx = rng.choice(np.arange(len(features)), size=target, replace=True, p=p_norm)
-                    features_rs = features[idx]
-                    gmm.fit(features_rs)
-                    bic = float(gmm.bic(features_rs))
-                else:
-                    gmm.fit(features)
-                    bic = float(gmm.bic(features))
+            if use_weighted_gmm and weights is not None:
+                # Weighted fit and weighted BIC; fallback to resampling if needed
+                d = features.shape[1]
+                try:
+                    gmm.fit(features, sample_weight=weights)
+                    logprob = gmm.score_samples(features)
+                    # Parameter count for full covariance
+                    p = (n_clusters - 1) + n_clusters * d + n_clusters * d * (d + 1) / 2.0
+                    bic = -2.0 * float(np.sum(weights * logprob)) + float(p) * np.log(float(np.sum(weights)))
+                except TypeError:
+                    # Resampling fallback
+                    rng = np.random.RandomState(42)
+                    # Target size similar to test script bounds
+                    target = int(min(max(len(features) * 5, 300), 5000)) if len(features) > 0 else 0
+                    if target > 0:
+                        p_norm = weights / float(np.sum(weights)) if np.sum(weights) > 0 else np.full_like(weights, 1.0 / len(weights))
+                        idx = rng.choice(np.arange(len(features)), size=target, replace=True, p=p_norm)
+                        features_rs = features[idx]
+                        gmm.fit(features_rs)
+                        bic = float(gmm.bic(features_rs))
+                    else:
+                        gmm.fit(features)
+                        bic = float(gmm.bic(features))
+            else:
+                # Unweighted default path
+                gmm.fit(features)
+                bic = float(gmm.bic(features))
 
             bic_scores.append(bic)
             models.append(gmm)
@@ -653,7 +700,7 @@ def _perform_direct_gmm_clustering(
                 else:
                     redshift_quality = 'very_loose'
 
-                weighted_mean_redshift, _, weighted_redshift_uncertainty, _, _ = calculate_joint_redshift_age_from_cluster(
+                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(
                     cluster_matches
                 )
 
@@ -667,7 +714,7 @@ def _perform_direct_gmm_clustering(
                     'std_metric': float(np.std(cluster_metric_values)) if len(cluster_metric_values) > 1 else 0.0,
                     'metric_key': metric_key,
                     'weighted_mean_redshift': float(weighted_mean_redshift) if np.isfinite(weighted_mean_redshift) else np.nan,
-                    'weighted_redshift_uncertainty': float(weighted_redshift_uncertainty) if np.isfinite(weighted_redshift_uncertainty) else np.nan,
+                    'weighted_redshift_sd': float(weighted_redshift_sd) if np.isfinite(weighted_redshift_sd) else np.nan,
                     'redshift_span': redshift_span,
                     'redshift_quality': redshift_quality,
                     'cluster_method': 'direct_gmm_contiguous',
@@ -714,7 +761,7 @@ def _perform_direct_gmm_clustering(
                 else:
                     redshift_quality = 'very_loose'
 
-                weighted_mean_redshift, _, weighted_redshift_uncertainty, _, _ = calculate_joint_redshift_age_from_cluster(
+                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(
                     cluster_matches
                 )
 
@@ -728,7 +775,7 @@ def _perform_direct_gmm_clustering(
                     'std_metric': np.std(cluster_metric_values) if len(cluster_metric_values) > 1 else 0.0,
                     'metric_key': metric_key,
                     'weighted_mean_redshift': weighted_mean_redshift,
-                    'weighted_redshift_uncertainty': weighted_redshift_uncertainty,
+                    'weighted_redshift_sd': weighted_redshift_sd,
                     'redshift_span': redshift_span,
                     'redshift_quality': redshift_quality,
                     'cluster_method': 'direct_gmm',
@@ -796,7 +843,7 @@ def _create_single_cluster_result(
         redshift_quality = 'loose'
     
     # Calculate enhanced redshift statistics using joint estimation (just extract redshift)
-    weighted_mean_redshift, _, weighted_redshift_uncertainty, _, _ = calculate_joint_redshift_age_from_cluster(
+    weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(
         type_matches
     )
     
@@ -811,7 +858,7 @@ def _create_single_cluster_result(
         'metric_key': metric_key,  # NEW: Which metric was used
                     # Enhanced redshift statistics
         'weighted_mean_redshift': weighted_mean_redshift,
-        'weighted_redshift_uncertainty': weighted_redshift_uncertainty,
+        'weighted_redshift_sd': weighted_redshift_sd,
         'redshift_span': redshift_span,
         'redshift_quality': redshift_quality,
         'cluster_method': 'single_cluster',
@@ -1025,7 +1072,6 @@ def create_3d_visualization_data(clustering_results: Dict[str, Any]) -> Dict[str
 
 def find_winning_cluster_top5_method(
     all_cluster_candidates: List[Dict[str, Any]], 
-    use_rlap_cos: bool = True,  # DEPRECATED: Now uses get_best_metric_value() automatically
     verbose: bool = False
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
@@ -1043,8 +1089,6 @@ def find_winning_cluster_top5_method(
     ----------
     all_cluster_candidates : List[Dict[str, Any]]
         List of all cluster candidates from GMM clustering
-    use_rlap_cos : bool, optional
-        DEPRECATED: Now automatically uses best available metric
     verbose : bool, optional
         Enable detailed logging
         
@@ -1141,7 +1185,7 @@ def find_winning_cluster_top5_method(
         'confidence_assessment': confidence_assessment,
         'quality_assessment': quality_assessment,
         'metric_used': metric_name,
-        'selection_method': 'top5_rlap_cos'
+        'selection_method': 'top5_rlap_ccc'
     }
     
     if verbose:

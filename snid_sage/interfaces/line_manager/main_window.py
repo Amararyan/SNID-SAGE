@@ -100,7 +100,7 @@ class SNIDLineManagerGUI(QtWidgets.QMainWindow):
             return None, None
 
     def _build_ui(self) -> None:
-        self.setWindowTitle("SNID Line Manager")
+        self.setWindowTitle("SNID-SAGE Line Manager")
         try:
             icon_path = get_logo_manager().get_icon_path()
             if icon_path:

@@ -26,9 +26,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResult
 from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
 from snid_sage.shared.utils.math_utils import (
-    calculate_weighted_redshift_balanced,
-    calculate_weighted_age,
-    apply_exponential_weighting,
+    estimate_weighted_redshift,
+    estimate_weighted_epoch,
+    weighted_redshift_sd,
+    weighted_epoch_sd,
     get_best_metric_value
 )
 from snid_sage.shared.utils.results_formatter import clean_template_name
@@ -391,7 +392,8 @@ def process_single_spectrum_optimized(
             forced_redshift=used_forced_redshift,
             verbose=False,
             show_plots=False,
-            save_plots=False
+            save_plots=False,
+            use_weighted_gmm=getattr(args, 'weighted_gmm', False)
         )
         
         # STEP 4: Generate outputs if requested
@@ -626,11 +628,11 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
             # Collect redshift data with uncertainties for balanced estimation
             redshifts_with_errors = []
             redshift_errors = []
-            rlap_cos_values = []
+            metric_values = []
             
             # Collect age data for separate age estimation
             ages_for_estimation = []
-            age_rlap_cos_values = []
+            age_metric_values = []
             
             for m in cluster_matches:
                 template = m.get('template', {})
@@ -638,47 +640,39 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                 # Always collect redshift data (uncertainties are always available)
                 z = m.get('redshift')
                 z_err = m.get('redshift_error', 0.0)
-                rlap_cos = get_best_metric_value(m)
+                metric_val = get_best_metric_value(m)
                 
                 if z is not None and np.isfinite(z) and z_err > 0:
                     redshifts_with_errors.append(z)
                     redshift_errors.append(z_err)
-                    rlap_cos_values.append(rlap_cos)
+                    metric_values.append(metric_val)
                 
                 # Separately collect age data (no uncertainties available)
                 age = template.get('age', 0.0) if template else 0.0
                 if age is not None and np.isfinite(age):
                     ages_for_estimation.append(age)
-                    age_rlap_cos_values.append(rlap_cos)
+                    age_metric_values.append(metric_val)
             
-            # Balanced redshift estimation (always use this when data available)
+            # Weighted redshift mean and SD (cluster scatter) using canonical weights
             if redshifts_with_errors:
-                z_final, z_final_err = calculate_weighted_redshift_balanced(
-                    redshifts_with_errors, redshift_errors, rlap_cos_values
-                )
+                z_final = estimate_weighted_redshift(redshifts_with_errors, redshift_errors, metric_values)
+                z_sd = weighted_redshift_sd(redshifts_with_errors, redshift_errors, metric_values)
                 summary['cluster_redshift_weighted'] = z_final
-                summary['cluster_redshift_weighted_uncertainty'] = z_final_err
-                summary['cluster_redshift_scatter'] = 0.0  # Properly handled in balanced estimation
+                summary['cluster_redshift_sd_weighted'] = z_sd
             else:
-                # No valid redshift data
                 summary['cluster_redshift_weighted'] = np.nan
-                summary['cluster_redshift_weighted_uncertainty'] = np.nan
-                summary['cluster_redshift_scatter'] = 0.0
-            
-            # Age estimation with proper uncertainty calculation
-            if ages_for_estimation:
-                # Apply exponential weighting to RLAP-cos values for age calculation
-                age_weights = apply_exponential_weighting(np.array(age_rlap_cos_values))
-                age_final, age_uncertainty = calculate_weighted_age(ages_for_estimation, age_weights)
+                summary['cluster_redshift_sd_weighted'] = np.nan
+
+            # Weighted epoch mean and SD using the same canonical weights
+            if ages_for_estimation and redshift_errors:
+                age_final = estimate_weighted_epoch(ages_for_estimation, redshift_errors, age_metric_values)
+                age_sd = weighted_epoch_sd(ages_for_estimation, redshift_errors, age_metric_values)
                 summary['cluster_age_weighted'] = age_final
-                summary['cluster_age_uncertainty'] = age_uncertainty
-                summary['cluster_age_scatter'] = 0.0  # Handled in uncertainty calculation
-                summary['redshift_age_covariance'] = 0.0  # Separate estimation, no covariance
+                summary['cluster_age_sd_weighted'] = age_sd
+                summary['redshift_age_covariance'] = 0.0
             else:
-                # No valid age data
                 summary['cluster_age_weighted'] = np.nan
-                summary['cluster_age_uncertainty'] = 0.0
-                summary['cluster_age_scatter'] = 0.0
+                summary['cluster_age_sd_weighted'] = np.nan
                 summary['redshift_age_covariance'] = 0.0
             
             summary['cluster_rlap_mean'] = np.mean(rlaps)
@@ -1026,6 +1020,12 @@ Examples:
         help="Force analysis to this specific redshift for all spectra"
     )
     analysis_group.add_argument(
+        "--weighted-gmm",
+        dest="weighted_gmm",
+        action="store_true",
+        help=argparse.SUPPRESS  # Internal toggle for using weighted GMM + weighted BIC
+    )
+    analysis_group.add_argument(
         "--type-filter", 
         nargs="+", 
         help="Only use templates of these types"
@@ -1187,13 +1187,13 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace, wall
             
             # Use best available metric (RLAP-CCC if available, otherwise RLAP)
             from snid_sage.shared.utils.math_utils import get_best_metric_value
-            rlap_cos = f"{get_best_metric_value(summary):.1f}"
+            best_metric_str = f"{get_best_metric_value(summary):.1f}"
             status_marker = "✓"
             zfixed = "Y" if summary.get('redshift_fixed') else "N"
             
             row = (
                 f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
-                f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {zfixed:<6} {status_marker}"
+                f"{redshift:<8} {redshift_err:<10} {age_str:<6} {best_metric_str:<10} {quality:<8} {zfixed:<6} {status_marker}"
             )
             report.append(row)
 
@@ -1208,11 +1208,11 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace, wall
                 redshift = 'N/A'
                 redshift_err = 'N/A'
                 age_str = 'N/A'
-                rlap_cos = 'N/A'
+                best_metric_str = 'N/A'
                 status_marker = 'x'
                 row = (
                     f"{spectrum:<16} {cons_type:<7} {cons_subtype:<9} {template:<18} "
-                    f"{redshift:<8} {redshift_err:<10} {age_str:<6} {rlap_cos:<10} {quality:<8} {'N':<6} {status_marker}"
+                    f"{redshift:<8} {redshift_err:<10} {age_str:<6} {best_metric_str:<10} {quality:<8} {'N':<6} {status_marker}"
                 )
                 report.append(row)
         
@@ -1246,7 +1246,9 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace, wall
                         report.append(f"      Second Best Cluster Type: {summary['cluster_second_best_type']}")
                 
                 if 'cluster_redshift_weighted' in summary:
-                    report.append(f"      RLAP-Weighted Redshift: {summary['cluster_redshift_weighted']:.6f} ± {summary.get('cluster_redshift_weighted_uncertainty', 0):.6f}")
+                    sd_val = summary.get('cluster_redshift_sd_weighted', float('nan'))
+                    sd_txt = f" (SD={sd_val:.6f})" if isinstance(sd_val, (int, float)) and np.isfinite(sd_val) else ""
+                    report.append(f"      Weighted Redshift: {summary['cluster_redshift_weighted']:.6f}{sd_txt}")
                     report.append(f"      Cluster RLAP: {summary.get('cluster_rlap_mean', 0):.2f}")
                 
                 report.append(f"   Best Match Redshift: {summary.get('redshift', 0):.6f} ± {summary.get('redshift_error', 0):.6f}")
@@ -1441,7 +1443,8 @@ def _export_results_table(results: List[Tuple], output_dir: Path) -> Optional[Pa
             pred_z_err = None
             if summary.get('has_clustering') and ('cluster_redshift_weighted' in summary):
                 pred_z = summary.get('cluster_redshift_weighted')
-                pred_z_err = summary.get('cluster_redshift_weighted_uncertainty')
+                # Store SD as the reported dispersion
+                pred_z_err = summary.get('cluster_redshift_sd_weighted')
             if pred_z is None or (isinstance(pred_z, float) and np.isnan(pred_z)):
                 pred_z = summary.get('redshift')
                 pred_z_err = summary.get('redshift_error')
@@ -1452,7 +1455,7 @@ def _export_results_table(results: List[Tuple], output_dir: Path) -> Optional[Pa
             if pred_age is None or (isinstance(pred_age, float) and np.isnan(pred_age)):
                 pred_age = summary.get('age')
             row['pred_age'] = pred_age
-            row['pred_age_err'] = summary.get('cluster_age_uncertainty') if 'cluster_age_uncertainty' in summary else None
+            row['pred_age_err'] = summary.get('cluster_age_sd_weighted') if 'cluster_age_sd_weighted' in summary else None
 
             # Best match (top template) parameters
             row['best_match_redshift'] = summary.get('redshift')
@@ -1650,7 +1653,7 @@ def main(args: argparse.Namespace) -> int:
         
         # Simple startup message (after resolving output_dir)
         if not is_quiet and not brief_mode:
-            print("SNID Batch Analysis - Cluster-aware & optimized")
+            print("SNID-SAGE Batch Analysis - Cluster-aware & optimized")
             print(f"   Files: {len(input_files)} spectra")
             print(f"   Mode: {mode}")
             print(f"   Analysis: GUI-style cluster-aware (winning cluster)")

@@ -545,7 +545,7 @@ class PySide6EventHandlers(QtCore.QObject):
                     return
                 
                 # Update status
-                self.main_window.status_label.setText("Running SNID analysis with configured settings...")
+                self.main_window.status_label.setText("Running SNID-SAGE analysis with configured settings...")
                 
                 # Apply configuration and run analysis
                 if hasattr(self.app_controller, 'current_config'):
@@ -558,13 +558,13 @@ class PySide6EventHandlers(QtCore.QObject):
 
                 if started:
                     # Do not prematurely mark success; wait for completion signal
-                    self.main_window.status_label.setText("Running SNID analysis...")
-                    _LOGGER.info("SNID analysis started (waiting for completion)")
+                    self.main_window.status_label.setText("Running SNID-SAGE analysis...")
+                    _LOGGER.info("SNID-SAGE analysis started (waiting for completion)")
                 else:
                     QtWidgets.QMessageBox.critical(
                         self.main_window,
                         "Analysis Error",
-                        "Failed to start SNID analysis with configured parameters"
+                        "Failed to start SNID-SAGE analysis with configured parameters"
                     )
                     
             except ImportError as e:

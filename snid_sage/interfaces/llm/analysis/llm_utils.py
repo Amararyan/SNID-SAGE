@@ -103,7 +103,7 @@ def build_enhanced_context(snid_results: Union[Dict[str, Any], Any],
                     cluster_matches = getattr(best_cluster, 'matches', [])
                 
                 context['clustering_analysis'] = {
-                    'method': 'top5_rlap_cos_gmm',
+                    'method': 'top5_rlap_ccc_gmm',
                     'success': True,
                     'winning_cluster': {
                         'type': cluster_type,
@@ -115,7 +115,7 @@ def build_enhanced_context(snid_results: Union[Dict[str, Any], Any],
                     },
                     'n_types_clustered': n_types_clustered,
                     'total_candidates': total_candidates,
-                    'clustering_method': 'Type-specific GMM with top-5 RLAP-Cos selection'
+                    'clustering_method': 'Type-specific GMM with top-5 RLAP-CCC selection'
                 }
                 
                 # Add subtype composition within cluster
@@ -411,7 +411,9 @@ def _check_redshift_consistency(templates: List[Dict]) -> Dict[str, Any]:
         # If we have meaningful weights (not all 1.0), use weighted calculation
         if any(w != 1.0 for w in weights):
             from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
-            z_mean, _ = calculate_weighted_redshift(redshifts, weights)
+            from snid_sage.shared.utils.math_utils import estimate_weighted_redshift
+            # Use dummy unit errors when only weights are given: sigma=1 → weights proportional to metric^2
+            z_mean = estimate_weighted_redshift(redshifts, [1.0]*len(weights), weights)
         else:
             # No meaningful weights available, use simple mean
             z_mean = np.mean(redshifts)
@@ -428,7 +430,7 @@ def _check_redshift_consistency(templates: List[Dict]) -> Dict[str, Any]:
     }
 
 def _assess_analysis_quality(snid_results: Dict) -> Dict[str, Any]:
-    """Assess overall quality of the SNID analysis."""
+    """Assess overall quality of the SNID-SAGE analysis."""
     quality = {
         'template_database_coverage': 'good',  # Assume good coverage
         'correlation_quality': 'unknown',

@@ -7,6 +7,9 @@ over template-by-template processing.
 """
 
 import numpy as np
+
+# Global scaling for redshift uncertainties (empirical). Use 3/8 for Tonry & Davis.
+Z_K = 0.5
 from typing import List, Dict, Tuple, Any, Optional
 from scipy.signal import find_peaks
 import logging
@@ -365,12 +368,11 @@ class VectorizedPeakFinder:
             if rlap < rlapmin:
                 return None
             
-            # Calculate formal redshift error using canonical SNID formula
-            zk = 3.0/8.0  # Canonical factor from original SNID
+            # Calculate formal redshift error with global scaling Z_K
             if r_value > 0 and lap > 0:
-                formal_z_error = zk * z_width / (1.0 + r_value)
+                formal_z_error = Z_K * z_width / (1.0 + r_value)
             else:
-                formal_z_error = z_width if z_width > 0 else 0.0
+                formal_z_error = Z_K * z_width if z_width > 0 else 0.0
             
             # Prepare spectra data for plotting
             plot_wave = log_wave[left_edge:right_edge+1]

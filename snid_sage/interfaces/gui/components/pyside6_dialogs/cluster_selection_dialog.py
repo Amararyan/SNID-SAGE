@@ -768,15 +768,16 @@ class PySide6ClusterSelectionDialog(QtWidgets.QDialog):
                 except Exception as e:
                     _LOGGER.debug(f"Error plotting template match {idx+1}: {e}")
                 
-                # Simplified title (matching tkinter)
+                # Simplified title showing subtype instead of metric (matching tkinter)
                 template_name = clean_template_name(match.get('name', 'Unknown'))
-                # Use best available metric (RLAP-CCC if available, otherwise RLAP)
-                if MATH_UTILS_AVAILABLE:
-                    best_metric_value = get_best_metric_value(match)
-                    metric_name = get_metric_name_for_match(match)
-                    title_text = f"#{idx+1}: {template_name} ({metric_name}: {best_metric_value:.1f})"
-                else:
-                    title_text = f"#{idx+1}: {template_name} (RLAP: {match.get('rlap', 0):.1f})"
+                template_info = match.get('template', {}) if isinstance(match.get('template', {}), dict) else {}
+                subtype = (
+                    template_info.get('subtype') or
+                    match.get('subtype') or
+                    match.get('type') or
+                    'Unknown'
+                )
+                title_text = f"#{idx+1}: {template_name} ({subtype})"
                 ax.set_title(title_text, fontsize=10, color='#000000', 
                            fontweight='bold', pad=5)
                 

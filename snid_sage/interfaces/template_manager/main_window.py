@@ -1,8 +1,8 @@
 """
-SNID Template Manager - Main Window
-==================================
+SNID-SAGE Template Manager - Main Window
+=======================================
 
-Main window for the SNID Template Manager GUI.
+Main window for the SNID-SAGE Template Manager GUI.
 """
 
 import sys
@@ -43,7 +43,7 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         
     def setup_window(self):
         """Setup main window properties"""
-        self.setWindowTitle("SNID Template Manager")
+        self.setWindowTitle("SNID-SAGE Template Manager")
         
         # Try to use centralized logo manager icon if available
         try:
@@ -179,7 +179,7 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         self.template_count_label = QtWidgets.QLabel("Templates: Loading...")
         status_bar.addWidget(self.template_count_label)
         
-        status_bar.addPermanentWidget(QtWidgets.QLabel("SNID Template Manager v1.0"))
+        status_bar.addPermanentWidget(QtWidgets.QLabel("SNID-SAGE Template Manager v1.0"))
         
         # Update template count
         QtCore.QTimer.singleShot(1000, self.update_template_count)
@@ -225,9 +225,9 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         """Show about dialog"""
         QtWidgets.QMessageBox.about(
             self,
-            "About SNID Template Manager",
-            "SNID Template Manager v1.0\n\n"
-            "A comprehensive GUI for managing SNID templates.\n\n"
+            "About SNID-SAGE Template Manager",
+            "SNID-SAGE Template Manager v1.0\n\n"
+            "A comprehensive GUI for managing SNID-SAGE templates.\n\n"
             "Features:\n"
             "• Browse and visualize templates\n"
             "• Create new templates\n"

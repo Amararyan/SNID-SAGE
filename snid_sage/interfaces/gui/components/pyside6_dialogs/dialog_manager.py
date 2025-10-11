@@ -72,6 +72,68 @@ class DialogManager:
     def open_redshift_dialog(self):
         """Open redshift selection dialog with validation and result handling"""
         try:
+            # If an analysis has already been run, warn that opening Host Redshift
+            # will reset the tool back to just-after-load (same UX as preprocessing)
+            try:
+                analysis_present = bool(getattr(self.app_controller, 'snid_results', None))
+            except Exception:
+                analysis_present = False
+
+            if analysis_present:
+                reply = QtWidgets.QMessageBox.question(
+                    self.main_window,
+                    "Reset to Post-Load?",
+                    (
+                        "You have already run an analysis.\n\n"
+                        "Opening Host Redshift will clear previous preprocessing, analysis results, overlays, and advanced views.\n"
+                        "The loaded spectrum will be kept, and the GUI will return to the state just after loading the spectrum.\n\n"
+                        "Do you want to continue?"
+                    ),
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No
+                )
+                if reply != QtWidgets.QMessageBox.Yes:
+                    return
+                # Reset to FILE_LOADED while preserving spectrum and refresh UI accordingly
+                try:
+                    if hasattr(self.app_controller, 'reset_to_file_loaded_state'):
+                        self.app_controller.reset_to_file_loaded_state()
+                except Exception:
+                    pass
+                # Update labels and plot to flux without overlays, mirroring preprocessing reset
+                try:
+                    if hasattr(self.main_window, 'preprocess_status_label'):
+                        self.main_window.preprocess_status_label.setText("Preprocessing not run")
+                        self.main_window.preprocess_status_label.setStyleSheet(
+                            "font-style: italic; color: #475569; font-size: 10px !important; "
+                            "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                            "line-height: 1.0 !important;"
+                        )
+                    # Reset configuration/analysis status label so it does not show 'Analysis Complete'
+                    if hasattr(self.main_window, 'config_status_label'):
+                        self.main_window.config_status_label.setText("Default SNID parameters loaded")
+                        self.main_window.config_status_label.setStyleSheet(
+                            "font-style: italic; color: #475569; font-size: 10px !important; "
+                            "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                            "line-height: 1.0 !important;"
+                        )
+                    if hasattr(self.main_window, 'redshift_status_label'):
+                        self.main_window.redshift_status_label.setText("Redshift not set (optional)")
+                        self.main_window.redshift_status_label.setStyleSheet(
+                            "font-style: italic; color: #475569; font-size: 10px !important; "
+                            "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                            "line-height: 1.0 !important;"
+                        )
+                    if hasattr(self.main_window, 'status_label'):
+                        self.main_window.status_label.setText("Spectrum loaded - ready to preprocess")
+                    # Ensure spectrum plot without overlays in Flux view
+                    if hasattr(self.main_window, 'event_handlers'):
+                        self.main_window.event_handlers.on_view_change('flux')
+                    if hasattr(self.main_window, 'plot_manager'):
+                        self.main_window.plot_manager.plot_spectrum('flux')
+                except Exception:
+                    pass
+
             # Check if spectrum is loaded
             wave, flux = self._validate_spectrum_loaded("redshift selection")
             if wave is None:
@@ -250,13 +312,13 @@ class DialogManager:
             _LOGGER.error(f"Error opening AI Assistant dialog: {e}")
     
     def open_configuration_dialog(self):
-        """Open SNID configuration dialog"""
+        """Open SNID-SAGE configuration dialog"""
         try:
             success = self._try_open_dialog(
                 dialog_import="snid_sage.interfaces.gui.components.pyside6_dialogs.configuration_dialog",
                 dialog_class="PySide6ConfigurationDialog",
                 dialog_args=[self.main_window],
-                dialog_name="SNID Configuration",
+                dialog_name="SNID-SAGE Configuration",
                 success_callback=self._handle_configuration_success,
                 fallback_callback=lambda: None
             )
@@ -434,8 +496,8 @@ class DialogManager:
     
     def _handle_configuration_success(self, dialog):
         """Handle successful configuration dialog completion"""
-        self.main_window.status_label.setText("SNID configuration updated")
-        _LOGGER.info("SNID configuration updated successfully")
+        self.main_window.status_label.setText("SNID-SAGE configuration updated")
+        _LOGGER.info("SNID-SAGE configuration updated successfully")
     
     def _handle_mask_manager_success(self, dialog):
         """Handle successful mask manager dialog completion"""

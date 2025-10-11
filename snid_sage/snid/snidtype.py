@@ -354,7 +354,9 @@ def weighted_mean(vals: np.ndarray, w: np.ndarray) -> Tuple[float, float]:
         from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
         # Use uniform weights since this is legacy compatibility
         weights = np.ones_like(vals)
-        result_mean, result_uncertainty = calculate_weighted_redshift(vals, weights)
+        from snid_sage.shared.utils.math_utils import estimate_weighted_redshift
+        result_mean = estimate_weighted_redshift(vals, [1.0]*len(weights), weights)
+        result_uncertainty = 0.0
         return result_mean, result_uncertainty
     except ImportError:
         # Ultimate fallback

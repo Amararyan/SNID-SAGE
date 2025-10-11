@@ -1,7 +1,7 @@
 """
 Statistically rigorous weighted calculations for redshift and age estimation in SNID SAGE.
 
-This module implements RLAP-Cos weighted estimation methods for optimal redshift 
+This module implements best-metric weighted estimation methods (preferring RLAP-CCC) for optimal redshift 
 and age estimation with full covariance analysis.
 """
 
@@ -13,46 +13,186 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def compute_cluster_weights(
+    rlap_ccc_values: Union[np.ndarray, List[float]],
+    redshift_errors: Union[np.ndarray, List[float]]
+) -> np.ndarray:
+    """
+    Compute canonical cluster weights: w_i = (rlapccc_i)^2 / sigma_z_i^2.
+
+    This is a thin wrapper around calculate_combined_weights for clarity.
+    """
+    return calculate_combined_weights(rlap_ccc_values, redshift_errors)
+
+
+def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
+    """Compute weighted mean with basic validation; returns NaN if no valid data."""
+    if values.size == 0 or weights.size == 0:
+        return float('nan')
+    sum_w = float(np.sum(weights))
+    if sum_w <= 0 or not np.isfinite(sum_w):
+        return float('nan')
+    return float(np.sum(weights * values) / sum_w)
+
+
+def _weighted_sample_sd(values: np.ndarray, weights: np.ndarray) -> float:
+    """
+    Bias-corrected weighted sample standard deviation over cluster values.
+
+    - Population variance: var_pop = Σ w_i (x_i - μ)^2 / Σ w_i
+    - N_eff = (Σ w_i)^2 / Σ (w_i^2)
+    - Sample variance: var_sample = var_pop × N_eff/(N_eff - 1)
+    - SD = sqrt(var_sample); return NaN if N_eff ≤ 1
+    """
+    if values.size == 0 or weights.size == 0:
+        return float('nan')
+    valid_mask = (np.isfinite(values) & np.isfinite(weights) & (weights > 0))
+    if not np.any(valid_mask):
+        return float('nan')
+    v = values[valid_mask]
+    w = weights[valid_mask]
+    sum_w = float(np.sum(w))
+    if sum_w <= 0 or not np.isfinite(sum_w):
+        return float('nan')
+    mean = float(np.sum(w * v) / sum_w)
+    dev = v - mean
+    var_pop = float(np.sum(w * (dev ** 2)) / sum_w)
+    sum_w_sq = float(np.sum(w ** 2))
+    if sum_w_sq <= 0:
+        return float('nan')
+    n_eff = (sum_w ** 2) / sum_w_sq
+    if n_eff <= 1:
+        return float('nan')
+    var_sample = var_pop * (n_eff / (n_eff - 1.0))
+    return float(np.sqrt(var_sample))
+
+
+def estimate_weighted_redshift(
+    redshifts: Union[np.ndarray, List[float]],
+    redshift_errors: Union[np.ndarray, List[float]],
+    rlap_ccc_values: Union[np.ndarray, List[float]]
+) -> float:
+    """
+    Weighted mean redshift using weights w = (rlapccc)^2 / sigma_z^2.
+    """
+    z = np.asarray(redshifts, dtype=float)
+    sigma = np.asarray(redshift_errors, dtype=float)
+    r = np.asarray(rlap_ccc_values, dtype=float)
+    if not (len(z) == len(sigma) == len(r)):
+        logger.error("Mismatched input lengths for estimate_weighted_redshift")
+        return float('nan')
+    valid = (np.isfinite(z) & np.isfinite(sigma) & np.isfinite(r) & (sigma > 0))
+    if not np.any(valid):
+        return float('nan')
+    w = compute_cluster_weights(r[valid], sigma[valid])
+    return _weighted_mean(z[valid], w)
+
+
+def estimate_weighted_epoch(
+    ages: Union[np.ndarray, List[float]],
+    redshift_errors: Union[np.ndarray, List[float]],
+    rlap_ccc_values: Union[np.ndarray, List[float]]
+) -> float:
+    """
+    Weighted mean epoch (age) using the same cluster weights as redshift:
+    w = (rlapccc)^2 / sigma_z^2.
+    """
+    t = np.asarray(ages, dtype=float)
+    sigma = np.asarray(redshift_errors, dtype=float)
+    r = np.asarray(rlap_ccc_values, dtype=float)
+    if not (len(t) == len(sigma) == len(r)):
+        logger.error("Mismatched input lengths for estimate_weighted_epoch")
+        return float('nan')
+    valid = (np.isfinite(t) & np.isfinite(sigma) & np.isfinite(r) & (sigma > 0))
+    if not np.any(valid):
+        return float('nan')
+    w = compute_cluster_weights(r[valid], sigma[valid])
+    return _weighted_mean(t[valid], w)
+
+
+def weighted_redshift_sd(
+    redshifts: Union[np.ndarray, List[float]],
+    redshift_errors: Union[np.ndarray, List[float]],
+    rlap_ccc_values: Union[np.ndarray, List[float]]
+) -> float:
+    """
+    Weighted sample SD of cluster redshifts using w = (rlapccc)^2 / sigma_z^2.
+    Returns NaN if fewer than 2 effective samples.
+    """
+    z = np.asarray(redshifts, dtype=float)
+    sigma = np.asarray(redshift_errors, dtype=float)
+    r = np.asarray(rlap_ccc_values, dtype=float)
+    if not (len(z) == len(sigma) == len(r)):
+        logger.error("Mismatched input lengths for weighted_redshift_sd")
+        return float('nan')
+    valid = (np.isfinite(z) & np.isfinite(sigma) & np.isfinite(r) & (sigma > 0))
+    if not np.any(valid):
+        return float('nan')
+    w = compute_cluster_weights(r[valid], sigma[valid])
+    return _weighted_sample_sd(z[valid], w)
+
+
+def weighted_epoch_sd(
+    ages: Union[np.ndarray, List[float]],
+    redshift_errors: Union[np.ndarray, List[float]],
+    rlap_ccc_values: Union[np.ndarray, List[float]]
+) -> float:
+    """
+    Weighted sample SD of cluster ages using w = (rlapccc)^2 / sigma_z^2.
+    Returns NaN if fewer than 2 effective samples.
+    """
+    t = np.asarray(ages, dtype=float)
+    sigma = np.asarray(redshift_errors, dtype=float)
+    r = np.asarray(rlap_ccc_values, dtype=float)
+    if not (len(t) == len(sigma) == len(r)):
+        logger.error("Mismatched input lengths for weighted_epoch_sd")
+        return float('nan')
+    valid = (np.isfinite(t) & np.isfinite(sigma) & np.isfinite(r) & (sigma > 0))
+    if not np.any(valid):
+        return float('nan')
+    w = compute_cluster_weights(r[valid], sigma[valid])
+    return _weighted_sample_sd(t[valid], w)
+
 def calculate_combined_weights(
-    rlap_cos_values: Union[np.ndarray, List[float]],
+    rlap_ccc_values: Union[np.ndarray, List[float]],
     uncertainties: Union[np.ndarray, List[float]]
 ) -> np.ndarray:
     """
-    Calculate combined weights using both RLAP-Cos quality and individual uncertainties.
+    Calculate combined weights using both best-metric quality and individual uncertainties.
     
     This implements the statistically correct approach for weighted averaging when
-    both quality indicators (RLAP-Cos) and individual uncertainties are available.
+    both quality indicators (best metric) and individual uncertainties are available.
     
     Parameters
     ----------
-    rlap_cos_values : array-like
-        RLAP-Cos quality scores for each template
+    rlap_ccc_values : array-like
+        Best metric quality scores (prefer RLAP-CCC; fallback to RLAP)
     uncertainties : array-like
         Individual uncertainty estimates for each template (e.g., redshift errors)
         
     Returns
     -------
     np.ndarray
-        Combined weights = exp(sqrt(rlap_cos)) / σ²
+        Combined weights = (metric)² / σ²
         
     Notes
     -----
     Statistical Formulation:
-    - Quality weight: q_i = exp(sqrt(rlap_cos_i)) 
+    - Quality weight: q_i = (metric_i)²
     - Precision weight: p_i = 1/σ²_i
-    - Combined weight: w_i = q_i × p_i = exp(sqrt(rlap_cos_i)) / σ²_i
+    - Combined weight: w_i = q_i × p_i = (metric_i)² / σ²_i
     
     This gives high-quality templates with low uncertainty the highest influence,
     which is statistically optimal for uncertainty propagation.
     """
-    rlap_cos_values = np.asarray(rlap_cos_values, dtype=float)
+    rlap_ccc_values = np.asarray(rlap_ccc_values, dtype=float)
     uncertainties = np.asarray(uncertainties, dtype=float)
     
     # Validate inputs
-    if len(rlap_cos_values) != len(uncertainties):
-        raise ValueError("RLAP-Cos values and uncertainties must have same length")
+    if len(rlap_ccc_values) != len(uncertainties):
+        raise ValueError("Metric values and uncertainties must have same length")
     
-    if len(rlap_cos_values) == 0:
+    if len(rlap_ccc_values) == 0:
         return np.array([])
     
     # Handle zero uncertainties (perfect measurements) by using a small floor value
@@ -61,57 +201,51 @@ def calculate_combined_weights(
     uncertainty_floor = min_uncertainty * 0.1
     safe_uncertainties = np.maximum(uncertainties, uncertainty_floor)
     
-    # Calculate combined weights
-    # Use tempered exponential to avoid explosive growth for high RLAP values
-    quality_weights = np.exp(np.sqrt(rlap_cos_values))  # Exponential of sqrt(RLAP-Cos)
+    # Calculate combined weights using squared best-metric values (RLAP-CCC preferred)
+    quality_weights = rlap_ccc_values ** 2
     precision_weights = 1.0 / (safe_uncertainties ** 2)  # Inverse variance weighting
     combined_weights = quality_weights * precision_weights
     
-    logger.debug(f"Combined weighting: RLAP-Cos [{rlap_cos_values.min():.2f}, {rlap_cos_values.max():.2f}], "
+    logger.debug(f"Combined weighting: Best-metric [{rlap_ccc_values.min():.2f}, {rlap_ccc_values.max():.2f}], "
                 f"uncertainties [{uncertainties.min():.4f}, {uncertainties.max():.4f}], "
                 f"weights [{combined_weights.min():.2e}, {combined_weights.max():.2e}]")
     
     return combined_weights
 
 
-def apply_exponential_weighting(rlap_cos_values: Union[np.ndarray, List[float]]) -> np.ndarray:
+def apply_exponential_weighting(rlap_ccc_values: Union[np.ndarray, List[float]]) -> np.ndarray:
     """
-    Apply exponential weighting to RLAP-Cos values for enhanced template prioritization.
+    Apply squared-metric weighting to RLAP-CCC/RLAP values for template prioritization.
     
-    Based on analysis of different weighting functions, exponential weighting provides
-    optimal balance between template quality discrimination and statistical robustness.
+    This helper now implements w = (metric)² to match the main pipeline's
+    weighting policy when per-template σ is unavailable (quality-only case).
     
     Parameters
     ----------
-    rlap_cos_values : array-like
-        Raw RLAP-Cos values from template matching
+    rlap_ccc_values : array-like
+        Raw best-metric values from template matching
         
     Returns
     -------
     np.ndarray
-        Exponentially weighted values with sqrt tempering
+        Squared metric weights
         
     Notes
     -----
-    Transformation: w_exp = exp(sqrt(rlap_cos))
-    
-    This tempers growth to avoid domination by a single very high score while still
-    maintaining the relative ordering and statistical properties needed for
-    robust weighted estimation.
+    Transformation: w = (metric)²
     """
-    rlap_cos_values = np.asarray(rlap_cos_values, dtype=float)
+    rlap_ccc_values = np.asarray(rlap_ccc_values, dtype=float)
     
     # Handle empty input
-    if len(rlap_cos_values) == 0:
+    if len(rlap_ccc_values) == 0:
         return np.array([])
     
-    # Apply tempered exponential weighting: exp(sqrt(x))
-    # Use base e (natural exponential)
-    exponential_weights = np.exp(np.sqrt(rlap_cos_values))
+    # Apply squared weighting: w = x^2
+    exponential_weights = rlap_ccc_values ** 2
     
     # Log the transformation for debugging
-    if len(rlap_cos_values) > 0:
-        logger.debug(f"Exponential weighting: RLAP-Cos range [{rlap_cos_values.min():.2f}, {rlap_cos_values.max():.2f}] "
+    if len(rlap_ccc_values) > 0:
+        logger.debug(f"Squared weighting: Best-metric range [{rlap_ccc_values.min():.2f}, {rlap_ccc_values.max():.2f}] "
                     f"→ weight range [{exponential_weights.min():.2e}, {exponential_weights.max():.2e}]")
     
     return exponential_weights
@@ -120,13 +254,13 @@ def apply_exponential_weighting(rlap_cos_values: Union[np.ndarray, List[float]])
 def calculate_weighted_redshift_balanced(
     redshifts: Union[np.ndarray, List[float]], 
     redshift_errors: Union[np.ndarray, List[float]],
-    rlap_cos_values: Union[np.ndarray, List[float]]
+    rlap_ccc_values: Union[np.ndarray, List[float]]
 ) -> Tuple[float, float]:
     """
     Calculate weighted redshift estimate with balanced uncertainty propagation.
     
     This function implements a statistically sound approach that balances:
-    1. Template quality weighting (exponential RLAP-Cos)
+    1. Template quality weighting ((RLAP-CCC)²)
     2. Precision weighting (inverse variance) 
     3. Proper uncertainty propagation
     
@@ -136,8 +270,8 @@ def calculate_weighted_redshift_balanced(
         Redshift values from templates
     redshift_errors : array-like
         Individual redshift uncertainties for each template
-    rlap_cos_values : array-like
-        RLAP-Cos quality scores for each template
+    rlap_ccc_values : array-like
+        Best metric quality scores (prefer RLAP-CCC; fallback to RLAP)
         
     Returns
     -------
@@ -147,7 +281,7 @@ def calculate_weighted_redshift_balanced(
     Notes
     -----
     Statistical Method:
-    - Combined weights: w_i = exp(sqrt(rlap_cos_i)) / σ²_i
+    - Combined weights: w_i = (metric_i)² / σ²_i
     - Weighted mean: z = Σ(w_i * z_i) / Σ(w_i)  
     - Final uncertainty: σ_final = √(Σ(w_i * σ_i²)) / Σ(w_i)
     
@@ -156,27 +290,27 @@ def calculate_weighted_redshift_balanced(
     """
     redshifts = np.asarray(redshifts, dtype=float)
     redshift_errors = np.asarray(redshift_errors, dtype=float)
-    rlap_cos_values = np.asarray(rlap_cos_values, dtype=float)
+    rlap_ccc_values = np.asarray(rlap_ccc_values, dtype=float)
     
     # Validate inputs
     if len(redshifts) == 0:
         return np.nan, np.nan
         
-    if not (len(redshifts) == len(redshift_errors) == len(rlap_cos_values)):
+    if not (len(redshifts) == len(redshift_errors) == len(rlap_ccc_values)):
         logger.error("Mismatched input lengths for balanced redshift estimation")
         return np.nan, np.nan
     
     # Remove invalid data points
     valid_mask = (np.isfinite(redshifts) & np.isfinite(redshift_errors) & 
-                  np.isfinite(rlap_cos_values) & (redshift_errors > 0))
+                  np.isfinite(rlap_ccc_values) & (redshift_errors > 0))
     
     if not np.any(valid_mask):
-        logger.warning("No valid (redshift, error, rlap_cos) triplets found")
+        logger.warning("No valid (redshift, error, metric) triplets found")
         return np.nan, np.nan
         
     valid_z = redshifts[valid_mask]
     valid_sigma = redshift_errors[valid_mask]
-    valid_rlap = rlap_cos_values[valid_mask]
+    valid_rlap = rlap_ccc_values[valid_mask]
     N = len(valid_z)
     
     if N == 1:
@@ -189,10 +323,11 @@ def calculate_weighted_redshift_balanced(
     sum_w = np.sum(combined_weights)
     z_weighted = np.sum(combined_weights * valid_z) / sum_w
 
-    # Conservative RMS-style uncertainty propagation:
-    # σ_final = sqrt( Σ w_i σ_i^2 / Σ w_i )
-    weighted_var = float(np.sum(combined_weights * (valid_sigma ** 2)) / sum_w)
-    sigma_final = float(np.sqrt(weighted_var))
+    # Correct standard error of a weighted mean with arbitrary weights:
+    # σ_final = sqrt( Σ w_i^2 σ_i^2 ) / Σ w_i
+    sigma_final = float(
+        np.sqrt(np.sum((combined_weights ** 2) * (valid_sigma ** 2))) / sum_w
+    )
     
     logger.info(f"Balanced redshift (RMS): {z_weighted:.6f}±{sigma_final:.6f}, N={N}")
     
@@ -201,20 +336,20 @@ def calculate_weighted_redshift_balanced(
 
 def calculate_weighted_age_estimate(
     ages: Union[np.ndarray, List[float]],
-    rlap_cos_values: Union[np.ndarray, List[float]]
+    rlap_ccc_values: Union[np.ndarray, List[float]]
 ) -> float:
     """
-    Calculate weighted age estimate using exponential RLAP-Cos weighting.
+    Calculate weighted age estimate using squared RLAP-CCC/RLAP weighting.
     
     Ages typically don't have well-defined individual uncertainties, so this
-    function uses simple exponential quality weighting without uncertainty propagation.
+    function uses simple squared quality weighting without uncertainty propagation.
     
     Parameters
     ----------
     ages : array-like
         Age values from templates (in days)
-    rlap_cos_values : array-like
-        RLAP-Cos quality scores for each template
+    rlap_ccc_values : array-like
+        Best metric quality scores (prefer RLAP-CCC; fallback to RLAP)
         
     Returns
     -------
@@ -224,39 +359,39 @@ def calculate_weighted_age_estimate(
     Notes
     -----
     Statistical Method:
-    - Weights: w_i = exp(sqrt(rlap_cos_i))
+    - Weights: w_i = (metric_i)²
     - Weighted mean: age = Σ(w_i * age_i) / Σ(w_i)
     
     No uncertainty is computed since individual age uncertainties are 
     typically not available or well-defined in template libraries.
     """
     ages = np.asarray(ages, dtype=float)
-    rlap_cos_values = np.asarray(rlap_cos_values, dtype=float)
+    rlap_ccc_values = np.asarray(rlap_ccc_values, dtype=float)
     
     # Validate inputs
     if len(ages) == 0:
         return np.nan
         
-    if len(ages) != len(rlap_cos_values):
+    if len(ages) != len(rlap_ccc_values):
         logger.error("Mismatched input lengths for age estimation")
         return np.nan
     
     # Remove invalid data points
     # Note: Ages can be negative (before peak), so no age > 0 filter
-    valid_mask = (np.isfinite(ages) & np.isfinite(rlap_cos_values))
+    valid_mask = (np.isfinite(ages) & np.isfinite(rlap_ccc_values))
     
     if not np.any(valid_mask):
-        logger.warning("No valid (age, rlap_cos) pairs found")
+        logger.warning("No valid (age, metric) pairs found")
         return np.nan
         
     valid_ages = ages[valid_mask]
-    valid_rlap = rlap_cos_values[valid_mask]
+    valid_rlap = rlap_ccc_values[valid_mask]
     N = len(valid_ages)
     
     if N == 1:
         return float(valid_ages[0])
     
-    # Calculate exponential weights
+    # Calculate squared-quality weights
     weights = apply_exponential_weighting(valid_rlap)
     
     # Weighted mean
@@ -268,186 +403,6 @@ def calculate_weighted_age_estimate(
     return float(age_weighted)
 
 
-def calculate_uncertainty_aware_estimates(
-    redshifts: Union[np.ndarray, List[float]], 
-    redshift_errors: Union[np.ndarray, List[float]],
-    rlap_cos_values: Union[np.ndarray, List[float]]
-) -> Tuple[float, float]:
-    """
-    Calculate weighted redshift estimate with proper uncertainty propagation.
-    
-    This function implements the statistically correct approach for combining
-    measurements with individual uncertainties and quality weights.
-    
-    Parameters
-    ----------
-    redshifts : array-like
-        Redshift values from templates
-    redshift_errors : array-like
-        Individual redshift uncertainties for each template
-    rlap_cos_values : array-like
-        RLAP-Cos quality scores for each template
-        
-    Returns
-    -------
-    Tuple[float, float]
-        (weighted_redshift, final_uncertainty)
-        
-    Notes
-    -----
-    Statistical Method (Inverse Variance Weighting with Quality):
-    - Combined weights: w_i = exp(sqrt(rlap_cos_i)) / σ²_i
-    - Weighted mean: z = Σ(w_i * z_i) / Σ(w_i)  
-    - Final uncertainty: σ_final = 1 / √(Σ(w_i))
-    
-    This properly propagates individual template uncertainties while 
-    prioritizing high-quality templates exponentially.
-    """
-    redshifts = np.asarray(redshifts, dtype=float)
-    redshift_errors = np.asarray(redshift_errors, dtype=float)
-    rlap_cos_values = np.asarray(rlap_cos_values, dtype=float)
-    
-    # Validate inputs
-    if len(redshifts) == 0:
-        return np.nan, np.nan
-        
-    if not (len(redshifts) == len(redshift_errors) == len(rlap_cos_values)):
-        logger.error("Mismatched input lengths for uncertainty-aware estimation")
-        return np.nan, np.nan
-    
-    # Remove invalid data points
-    valid_mask = (np.isfinite(redshifts) & np.isfinite(redshift_errors) & 
-                  np.isfinite(rlap_cos_values) & (redshift_errors > 0))
-    
-    if not np.any(valid_mask):
-        logger.warning("No valid (redshift, error, rlap_cos) triplets found")
-        return np.nan, np.nan
-        
-    valid_z = redshifts[valid_mask]
-    valid_sigma = redshift_errors[valid_mask]
-    valid_rlap = rlap_cos_values[valid_mask]
-    N = len(valid_z)
-    
-    if N == 1:
-        return float(valid_z[0]), float(valid_sigma[0])
-    
-    # Calculate combined weights (quality × precision)
-    combined_weights = calculate_combined_weights(valid_rlap, valid_sigma)
-    
-    # Weighted mean
-    sum_w = np.sum(combined_weights)
-    z_weighted = np.sum(combined_weights * valid_z) / sum_w
-    
-    # Final uncertainty (inverse variance formula)
-    sigma_final = 1.0 / np.sqrt(sum_w)
-    
-    logger.info(f"Uncertainty-aware redshift: {z_weighted:.6f}±{sigma_final:.6f}, N={N}")
-    
-    return float(z_weighted), float(sigma_final)
-
-
-def calculate_joint_uncertainty_aware_estimates(
-    redshifts: Union[np.ndarray, List[float]], 
-    redshift_errors: Union[np.ndarray, List[float]],
-    ages: Union[np.ndarray, List[float]],
-    age_errors: Union[np.ndarray, List[float]],
-    rlap_cos_values: Union[np.ndarray, List[float]]
-) -> Tuple[float, float, float, float, float]:
-    """
-    Calculate joint weighted estimates for redshift and age with proper uncertainty propagation.
-    
-    This function implements the statistically correct approach for combining
-    measurements with individual uncertainties and quality weights for both
-    redshift and age simultaneously.
-    
-    Parameters
-    ----------
-    redshifts : array-like
-        Redshift values from templates
-    redshift_errors : array-like
-        Individual redshift uncertainties for each template
-    ages : array-like
-        Age values from templates (in days)
-    age_errors : array-like
-        Individual age uncertainties for each template
-    rlap_cos_values : array-like
-        RLAP-Cos quality scores for each template
-        
-    Returns
-    -------
-    Tuple[float, float, float, float, float]
-        (weighted_redshift, weighted_age, redshift_uncertainty, age_uncertainty, covariance)
-        
-    Notes
-    -----
-    Statistical Method:
-    For simplicity, this uses separate inverse variance weighting for each parameter.
-    The covariance is estimated from the scatter in the weighted residuals.
-    
-    Future Enhancement: Could implement full 2D inverse covariance weighting
-    if template covariances between redshift and age become available.
-    """
-    # Convert to arrays
-    redshifts = np.asarray(redshifts, dtype=float)
-    redshift_errors = np.asarray(redshift_errors, dtype=float)
-    ages = np.asarray(ages, dtype=float)
-    age_errors = np.asarray(age_errors, dtype=float)
-    rlap_cos_values = np.asarray(rlap_cos_values, dtype=float)
-    
-    # Validate inputs
-    if len(redshifts) == 0:
-        return np.nan, np.nan, np.nan, np.nan, np.nan
-        
-    lengths = [len(redshifts), len(redshift_errors), len(ages), len(age_errors), len(rlap_cos_values)]
-    if not all(l == lengths[0] for l in lengths):
-        logger.error("Mismatched input lengths for joint uncertainty-aware estimation")
-        return np.nan, np.nan, np.nan, np.nan, np.nan
-    
-    # Remove invalid data points (need valid data for both redshift and age)
-    valid_mask = (np.isfinite(redshifts) & np.isfinite(redshift_errors) & 
-                  np.isfinite(ages) & np.isfinite(age_errors) &
-                  np.isfinite(rlap_cos_values) & 
-                  (redshift_errors > 0) & (age_errors > 0))
-    
-    if not np.any(valid_mask):
-        logger.warning("No valid (redshift, age, errors, rlap_cos) quintuplets found")
-        return np.nan, np.nan, np.nan, np.nan, np.nan
-        
-    valid_z = redshifts[valid_mask]
-    valid_z_err = redshift_errors[valid_mask]
-    valid_t = ages[valid_mask]
-    valid_t_err = age_errors[valid_mask]
-    valid_rlap = rlap_cos_values[valid_mask]
-    N = len(valid_z)
-    
-    if N == 1:
-        return float(valid_z[0]), float(valid_t[0]), float(valid_z_err[0]), float(valid_t_err[0]), 0.0
-    
-    # Calculate separate combined weights for redshift and age
-    z_weights = calculate_combined_weights(valid_rlap, valid_z_err)
-    t_weights = calculate_combined_weights(valid_rlap, valid_t_err)
-    
-    # Weighted means
-    z_weighted = np.sum(z_weights * valid_z) / np.sum(z_weights)
-    t_weighted = np.sum(t_weights * valid_t) / np.sum(t_weights)
-    
-    # Final uncertainties (inverse variance formula)
-    z_uncertainty = 1.0 / np.sqrt(np.sum(z_weights))
-    t_uncertainty = 1.0 / np.sqrt(np.sum(t_weights))
-    
-    # Estimate covariance from weighted residuals
-    # This is approximate - proper implementation would need template covariances
-    z_residuals = valid_z - z_weighted
-    t_residuals = valid_t - t_weighted
-    # Use geometric mean of weights for covariance estimation
-    cov_weights = np.sqrt(z_weights * t_weights)
-    covariance = np.sum(cov_weights * z_residuals * t_residuals) / np.sum(cov_weights) if np.sum(cov_weights) > 0 else 0.0
-    
-    logger.info(f"Joint uncertainty-aware estimates: "
-                f"z={z_weighted:.6f}±{z_uncertainty:.6f}, age={t_weighted:.1f}±{t_uncertainty:.1f} days, "
-                f"cov={covariance:.8f}, N={N}")
-    
-    return float(z_weighted), float(t_weighted), float(z_uncertainty), float(t_uncertainty), float(covariance)
 
 
 def calculate_joint_weighted_estimates(
@@ -459,7 +414,7 @@ def calculate_joint_weighted_estimates(
     Calculate joint weighted estimates for redshift and age with full covariance.
     
     This implements a statistically robust joint estimation approach that:
-    1. Uses exponentially-weighted RLAP-Cos values as quality-based weights
+    1. Uses squared RLAP-CCC/RLAP values as quality-based weights
     2. Computes weighted centroids in (redshift, age) space  
     3. Estimates the full 2×2 weighted covariance matrix
     4. Extracts marginal uncertainties and correlation from the covariance matrix
@@ -487,8 +442,8 @@ def calculate_joint_weighted_estimates(
     - Standard errors: σ_x = √(Var(x)/N_eff), σ_y = √(Var(y)/N_eff)
     
     Weight Transformation:
-    - For optimal results, weights should be exponentially transformed: w = exp(sqrt(rlap_cos))
-    - Use apply_exponential_weighting() function before calling this function
+    - For optimal results, quality-only weights should be transformed as w = (metric)²
+    - Use apply_exponential_weighting() (now squared) before calling this function
     """
     redshifts = np.asarray(redshifts, dtype=float)
     ages = np.asarray(ages, dtype=float)
@@ -871,10 +826,13 @@ def validate_weighted_calculation(
 __all__ = [
     'calculate_combined_weights',
     'apply_exponential_weighting',
+    'compute_cluster_weights',
+    'estimate_weighted_redshift',
+    'estimate_weighted_epoch',
+    'weighted_redshift_sd',
+    'weighted_epoch_sd',
     'calculate_weighted_redshift_balanced', 
     'calculate_weighted_age_estimate',      
-    'calculate_uncertainty_aware_estimates',
-    'calculate_joint_uncertainty_aware_estimates', 
     'calculate_joint_weighted_estimates',
     'calculate_weighted_redshift', 
     'calculate_weighted_age',

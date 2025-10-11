@@ -135,7 +135,7 @@ Measurements:
 Template matches:
 A ranked list of best matching templates showing:
 - Template name and type
-- RLAP-Cos score (correlation quality)
+- RLAP-CCC score (final metric)
 - Individual redshift and age estimates
 
 ![Redshift vs Age](../images/7.RedshiftVsAge.png)
@@ -200,7 +200,7 @@ Measurements:
 
 Template matches:
 - Ranked list of best matching templates
-- RLAP-Cos scores and individual estimates
+- RLAP-CCC scores and individual estimates
 
 ### CLI Options
 

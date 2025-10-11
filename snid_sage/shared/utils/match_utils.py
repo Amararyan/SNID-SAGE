@@ -12,6 +12,9 @@ from typing import Any, Dict
 
 import numpy as np
 
+# Global scaling for redshift uncertainties (empirical). Use 3/8 for Tonry & Davis.
+Z_K = 0.5
+
 
 def extract_redshift_sigma(match: Dict[str, Any]) -> float:
     """
@@ -40,12 +43,12 @@ def extract_redshift_sigma(match: Dict[str, Any]) -> float:
 
         m = float(get_best_metric_value(match))
         if np.isfinite(m) and m > 0:
-            return float(0.02 / np.sqrt(1.0 + m))
+            return float(Z_K * 0.02 / np.sqrt(1.0 + m))
     except Exception:
         pass
 
     # Final conservative fallback
-    return 0.02
+    return 0.02 * Z_K
 
 
 __all__ = ["extract_redshift_sigma"]

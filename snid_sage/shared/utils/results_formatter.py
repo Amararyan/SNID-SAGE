@@ -78,12 +78,9 @@ class UnifiedResultsFormatter:
             self.spectrum_name = getattr(result, 'spectrum_name', 'Unknown')
         
         # Determine which metric is being used
-        self.use_rlap_cos = False
-        # Default to RLAP-CCC when any enhanced metric is available on best match; fallback to RLAP
         self.metric_name = "RLAP"
         if hasattr(result, 'clustering_results') and result.clustering_results:
-            self.use_rlap_cos = result.clustering_results.get('use_rlap_cos', False)
-            self.metric_name = result.clustering_results.get('metric_used', 'RLAP-CCC' if self.use_rlap_cos else 'RLAP')
+            self.metric_name = result.clustering_results.get('metric_used', 'RLAP-CCC')
         else:
             try:
                 # Inspect best match to decide metric label
@@ -196,7 +193,7 @@ class UnifiedResultsFormatter:
             
             # Get full cluster joint estimates
             full_cluster_redshift = winning_cluster.get('enhanced_redshift', result.consensus_redshift)
-            full_cluster_redshift_error = winning_cluster.get('weighted_redshift_uncertainty', result.consensus_redshift_error)
+            full_cluster_redshift_error = winning_cluster.get('weighted_redshift_sd', result.consensus_redshift_error)
             full_cluster_age = winning_cluster.get('cluster_age', enhanced_age)
             full_cluster_age_error = winning_cluster.get('cluster_age_error', enhanced_age_error)
             full_cluster_redshift_age_covariance = winning_cluster.get('cluster_redshift_age_covariance', np.nan)
@@ -221,7 +218,7 @@ class UnifiedResultsFormatter:
             else:
                 # Calculate enhanced age from ALL cluster matches (fallback behavior)
                 try:
-                    from snid_sage.shared.utils.math_utils import calculate_weighted_age
+                    from snid_sage.shared.utils.math_utils import calculate_weighted_age, calculate_combined_weights
                     ages = []
                     age_rlaps = []
                     for m in cluster_matches:
@@ -236,14 +233,38 @@ class UnifiedResultsFormatter:
                     
                     if ages:
                         ages = np.array(ages)
-                        # Use RLAP-cos instead of RLAP for age weighting
-                        from snid_sage.shared.utils.math_utils import get_best_metric_value
-                        age_rlaps = np.array([get_best_metric_value(m) for m in cluster_matches 
-                                             if m.get('template', {}).get('age', 0.0) is not None and 
-                                             np.isfinite(m.get('template', {}).get('age', 0.0))])
-                        age_mean, age_total_error = calculate_weighted_age(
-                            ages, age_rlaps
-                        )
+                        # Use same reliability weights as redshift for age: (metric)^2 / sigma_z^2
+                        # Build arrays aligned with ages list
+                        rlap_values = []
+                        z_errors = []
+                        for m in cluster_matches:
+                            template = m.get('template', {})
+                            age_val = template.get('age', 0.0) if template else 0.0
+                            if age_val is not None and np.isfinite(age_val):
+                                from snid_sage.shared.utils.math_utils import get_best_metric_value
+                                rlap_values.append(get_best_metric_value(m))
+                                z_errors.append(m.get('redshift_error', 0.0))
+                        if len(rlap_values) == len(ages) and any(e > 0 for e in z_errors):
+                            weights = calculate_combined_weights(np.array(rlap_values, dtype=float), np.array(z_errors, dtype=float))
+                            # Use canonical weights for age via redshift errors if available (fallback to quality-only)
+                            try:
+                                from snid_sage.shared.utils.math_utils import estimate_weighted_epoch, weighted_epoch_sd
+                                # If we don't have redshift errors aligned, keep previous behavior minimally
+                                age_mean = estimate_weighted_epoch(ages, [1.0]*len(ages), rlap_values)
+                                age_total_error = weighted_epoch_sd(ages, [1.0]*len(ages), rlap_values)
+                            except Exception:
+                                age_mean = float(np.mean(ages)) if len(ages) else float('nan')
+                                age_total_error = float('nan')
+                        else:
+                            # Fallback to quality-only if no valid z errors
+                            from snid_sage.shared.utils.math_utils import apply_exponential_weighting
+                            try:
+                                from snid_sage.shared.utils.math_utils import estimate_weighted_epoch, weighted_epoch_sd
+                                age_mean = estimate_weighted_epoch(ages, [1.0]*len(ages), rlap_values)
+                                age_total_error = weighted_epoch_sd(ages, [1.0]*len(ages), rlap_values)
+                            except Exception:
+                                age_mean = float(np.mean(ages)) if len(ages) else float('nan')
+                                age_total_error = float('nan')
                         full_cluster_age = age_mean
                         full_cluster_age_error = age_total_error
                         enhanced_age = age_mean
@@ -472,11 +493,11 @@ class UnifiedResultsFormatter:
             }
             
             # Add RLAP-CCC specific fields if available
-            if 'rlap_cos' in metric_values:
+            if 'rlap_ccc' in match:
                 formatted_match.update({
-                    'rlap_cos': metric_values['rlap_cos'],
-                    'cosine_similarity': metric_values['cosine_similarity'],
-                    'cosine_similarity_capped': metric_values['cosine_similarity_capped']
+                    'rlap_ccc': match.get('rlap_ccc', 0.0),
+                    'ccc_similarity': match.get('ccc_similarity', None),
+                    'ccc_similarity_capped': match.get('ccc_similarity_capped', None)
                 })
             
             formatted_matches.append(formatted_match)

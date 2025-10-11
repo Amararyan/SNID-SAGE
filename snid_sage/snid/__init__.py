@@ -1,5 +1,5 @@
 """
-SNID – SuperNova IDentification (Python port)
+SNID-SAGE – SuperNova IDentification (Python port)
 """
 
 from .io              import (read_spectrum, read_template,

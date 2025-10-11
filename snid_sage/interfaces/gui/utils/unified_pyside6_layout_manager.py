@@ -764,7 +764,7 @@ class UnifiedPySide6LayoutManager:
         _LOGGER.info("✅ Emission line button created and connected")
         
         # Emission lines status label - add with reduced spacing
-        gui_instance.emission_status_label = QtWidgets.QLabel("Load spectrum to enable")
+        gui_instance.emission_status_label = QtWidgets.QLabel("Run analysis to enable")
         gui_instance.emission_status_label.setObjectName("unified_emission_status_label")
         gui_instance.emission_status_label.setWordWrap(True)
         gui_instance.emission_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important; margin-top: 0px;")

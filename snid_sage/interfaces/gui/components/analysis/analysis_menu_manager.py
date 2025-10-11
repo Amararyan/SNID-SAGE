@@ -130,7 +130,7 @@ class AnalysisMenuManager:
     def _add_games_action(self, menu):
         """Add games integration action to menu"""
         games_action = QtGui.QAction("🎮 Play Games While Analyzing", self.main_window)
-        games_action.setToolTip("Play Space Debris Cleanup game while SNID analysis runs")
+        games_action.setToolTip("Play Space Debris Cleanup game while SNID-SAGE analysis runs")
         games_action.triggered.connect(self.main_window.start_games_menu)
         menu.addAction(games_action)
         
@@ -163,7 +163,7 @@ class AnalysisMenuManager:
             menu.addAction(no_gmm_action)
     
     def run_quick_analysis(self):
-        """Run SNID analysis immediately with default settings"""
+        """Run SNID-SAGE analysis immediately with default settings"""
         try:
             wave, flux = self.app_controller.get_spectrum_data()
             if wave is None or flux is None:
@@ -262,7 +262,7 @@ class AnalysisMenuManager:
                 from snid_sage.interfaces.gui.components.pyside6_dialogs.analysis_progress_dialog import show_analysis_progress_dialog
                 self.main_window.progress_dialog = show_analysis_progress_dialog(
                     self.main_window, 
-                    "Quick SNID Analysis"
+                    "Quick SNID-SAGE Analysis"
                 )
                 # Route via sequenced emitter
                 if hasattr(self.main_window, 'app_controller') and hasattr(self.main_window.app_controller, 'post_progress'):
@@ -274,8 +274,8 @@ class AnalysisMenuManager:
                 self.main_window.progress_dialog = None
             
             # Run analysis with default parameters immediately
-            _LOGGER.info("Running quick SNID analysis with default settings...")
-            self.main_window.status_label.setText("Running quick SNID analysis...")
+            _LOGGER.info("Running quick SNID-SAGE analysis with default settings...")
+            self.main_window.status_label.setText("Running quick SNID-SAGE analysis...")
             
             # Run analysis via app controller with default parameters
             # Respect configured max_output_templates if available
@@ -293,7 +293,7 @@ class AnalysisMenuManager:
                 zmax=1.0,
                 age_range=None,
                 lapmin=0.3,
-                rlapmin=5.0,
+                rlapmin=4.0,
                 max_output_templates=configured_max,
                 verbose=False,
                 show_plots=False,
@@ -524,6 +524,14 @@ class AnalysisMenuManager:
             # Enable advanced features
             self.main_window.emission_line_overlay_btn.setEnabled(True)
             self.main_window.ai_assistant_btn.setEnabled(True)
+            # Update Spectral Lines and AI labels exactly when analysis is complete
+            try:
+                if hasattr(self.main_window, 'emission_status_label'):
+                    self.main_window.emission_status_label.setText("Available")
+                if hasattr(self.main_window, 'ai_status_label'):
+                    self.main_window.ai_status_label.setText("Available")
+            except Exception:
+                pass
             
             # Update status indicators
             self.main_window.config_status_label.setText("Analysis Complete")
@@ -672,8 +680,8 @@ class AnalysisMenuManager:
                             snid_results.rlap = best_cluster_match.get('rlap', 0.0)
                             
                             # Update RLAP-CCC if available
-                            if 'rlap_cos' in best_cluster_match:
-                                snid_results.rlap_cos = best_cluster_match.get('rlap_cos', 0.0)
+                            if 'rlap_ccc' in best_cluster_match:
+                                snid_results.rlap_ccc = best_cluster_match.get('rlap_ccc', 0.0)
                             
                             _LOGGER.info(f"🎯 Updated result properties: {snid_results.template_name} ({snid_results.consensus_type}) "
                                         f"z={snid_results.redshift:.6f}, RLAP={snid_results.rlap:.2f}")

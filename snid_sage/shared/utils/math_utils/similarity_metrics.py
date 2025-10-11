@@ -1,13 +1,9 @@
 """
-Spectral Similarity Metrics for SNID Analysis
-=============================================
+Similarity and composite metric utilities for SNID SAGE.
 
-This module contains spectral similarity metrics used in SNID analysis,
-particularly for enhancing GMM clustering with additional similarity measures.
-
-The primary metrics implemented here are cosine similarity and concordance correlation 
-coefficient (CCC), which are used to create RLAP-Cos and RLAP-CCC composite metrics 
-for improved template discrimination. CCC is preferred when available.
+The primary metric used is the concordance correlation coefficient (CCC),
+which is combined with RLAP to form the RLAP-CCC composite metric for improved
+template discrimination. CCC/RLAP-CCC is preferred when available.
 """
 
 from __future__ import annotations

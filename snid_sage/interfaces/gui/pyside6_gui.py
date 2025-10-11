@@ -1192,9 +1192,9 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     elif type_conf < 0.30:
                         self.status_label.setText("Analysis weak – only low-quality matches above threshold")
                     else:
-                        self.status_label.setText("SNID analysis completed")
+                        self.status_label.setText("SNID-SAGE analysis completed")
                 else:
-                    self.status_label.setText("SNID analysis completed")
+                    self.status_label.setText("SNID-SAGE analysis completed")
                 
                 # Enable analysis plot/navigation buttons only when we have reliable matches
                 reliable = bool(getattr(results, 'clustering_results', None) and results.clustering_results.get('success')) or bool(fm)
@@ -1294,7 +1294,7 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     )
                 else:
                     # Hard failure
-                    self.status_label.setText("SNID analysis failed")
+                    self.status_label.setText("SNID-SAGE analysis failed")
                     self.config_status_label.setText("Analysis Failed")
                     self.config_status_label.setStyleSheet("font-style: italic; color: #ef4444;")
 

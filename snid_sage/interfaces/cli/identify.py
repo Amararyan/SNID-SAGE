@@ -20,9 +20,10 @@ from snid_sage.snid.snid import preprocess_spectrum, run_snid_analysis, SNIDResu
 from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
 from snid_sage.snid.io import read_spectrum
 from snid_sage.shared.utils.math_utils import (
-    calculate_weighted_redshift_balanced,
-    calculate_weighted_age,
-    apply_exponential_weighting,
+    estimate_weighted_redshift,
+    estimate_weighted_epoch,
+    weighted_redshift_sd,
+    weighted_epoch_sd,
     get_best_metric_value
 )
 
@@ -361,6 +362,12 @@ Examples:
         default=10, 
         help="Maximum number of templates to output"
     )
+    advanced_group.add_argument(
+        "--weighted-gmm",
+        dest="weighted_gmm",
+        action="store_true",
+        help=argparse.SUPPRESS  # Internal toggle for using weighted GMM + weighted BIC
+    )
 
     # Display options
     display_group = parser.add_argument_group("Display Options")
@@ -490,11 +497,11 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
             # Collect redshift data with uncertainties for balanced estimation
             redshifts_with_errors = []
             redshift_errors = []
-            rlap_cos_values = []
+            metric_values = []
             
             # Collect age data for separate age estimation
             ages_for_estimation = []
-            age_rlap_cos_values = []
+            age_metric_values = []
             
             for m in cluster_matches:
                 template = m.get('template', {})
@@ -502,47 +509,39 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                 # Always collect redshift data (uncertainties are always available)
                 z = m.get('redshift')
                 z_err = m.get('redshift_error', 0.0)
-                rlap_cos = get_best_metric_value(m)
+                metric_val = get_best_metric_value(m)
                 
                 if z is not None and np.isfinite(z) and z_err > 0:
                     redshifts_with_errors.append(z)
                     redshift_errors.append(z_err)
-                    rlap_cos_values.append(rlap_cos)
+                    metric_values.append(metric_val)
                 
                 # Separately collect age data (no uncertainties available)
                 age = template.get('age', 0.0) if template else 0.0
                 if age is not None and np.isfinite(age):
                     ages_for_estimation.append(age)
-                    age_rlap_cos_values.append(rlap_cos)
+                    age_metric_values.append(metric_val)
             
-            # Balanced redshift estimation (always use this when data available)
+            # Weighted redshift mean and SD (cluster scatter)
             if redshifts_with_errors:
-                z_final, z_final_err = calculate_weighted_redshift_balanced(
-                    redshifts_with_errors, redshift_errors, rlap_cos_values
-                )
+                z_final = estimate_weighted_redshift(redshifts_with_errors, redshift_errors, metric_values)
+                z_sd = weighted_redshift_sd(redshifts_with_errors, redshift_errors, metric_values)
                 summary['cluster_redshift_weighted'] = z_final
-                summary['cluster_redshift_weighted_uncertainty'] = z_final_err
-                summary['cluster_redshift_scatter'] = 0.0  # Properly handled in balanced estimation
+                summary['cluster_redshift_sd_weighted'] = z_sd
             else:
-                # No valid redshift data
                 summary['cluster_redshift_weighted'] = np.nan
-                summary['cluster_redshift_weighted_uncertainty'] = np.nan
-                summary['cluster_redshift_scatter'] = 0.0
-            
-            # Age estimation with proper uncertainty calculation
-            if ages_for_estimation:
-                # Apply exponential weighting to RLAP-cos values for age calculation
-                age_weights = apply_exponential_weighting(np.array(age_rlap_cos_values))
-                age_final, age_uncertainty = calculate_weighted_age(ages_for_estimation, age_weights)
+                summary['cluster_redshift_sd_weighted'] = np.nan
+
+            # Weighted epoch mean and SD using the same canonical weights
+            if ages_for_estimation and redshift_errors:
+                age_final = estimate_weighted_epoch(ages_for_estimation, redshift_errors, age_metric_values)
+                age_sd = weighted_epoch_sd(ages_for_estimation, redshift_errors, age_metric_values)
                 summary['cluster_age_weighted'] = age_final
-                summary['cluster_age_uncertainty'] = age_uncertainty
-                summary['cluster_age_scatter'] = 0.0  # Handled in uncertainty calculation
-                summary['redshift_age_covariance'] = 0.0  # Separate estimation, no covariance
+                summary['cluster_age_sd_weighted'] = age_sd
+                summary['redshift_age_covariance'] = 0.0
             else:
-                # No valid age data
                 summary['cluster_age_weighted'] = np.nan
-                summary['cluster_age_uncertainty'] = 0.0
-                summary['cluster_age_scatter'] = 0.0
+                summary['cluster_age_sd_weighted'] = np.nan
                 summary['redshift_age_covariance'] = 0.0
             
             summary['cluster_rlap_mean'] = np.mean(rlaps)
@@ -842,7 +841,7 @@ def main(args: argparse.Namespace) -> int:
             logging.getLogger('snid_sage.snid.optimization_integration').setLevel(logging.WARNING)
         
         if args.verbose:
-            logger.info(f"Starting SNID analysis for: {args.spectrum_path}")
+            logger.info(f"Starting SNID-SAGE analysis for: {args.spectrum_path}")
             logger.info(f"Templates directory: {args.templates_dir}")
             logger.info(f"Redshift range: {args.zmin} to {args.zmax}")
             logger.info(f"RLAP threshold: {args.rlapmin}")
@@ -954,7 +953,8 @@ def main(args: argparse.Namespace) -> int:
             show_plots=False,  # CLI mode - no interactive plots
             save_plots=False,  # Avoid internal saving to prevent duplicates; CLI handles all plots
             plot_dir=None,
-            progress_callback=progress_callback  # Add progress callback
+            progress_callback=progress_callback,  # Add progress callback
+            use_weighted_gmm=getattr(args, 'weighted_gmm', False)
         )
         
         # Finish progress indicator
