@@ -8,7 +8,7 @@ template matching analysis without any transformations.
 Key features:
 1. Direct GMM clustering on redshift values (no transformations)
 2. Type-specific clustering with BIC-based model selection
-3. Top 10% RLAP-based cluster selection
+3. Cluster selection and scoring (top-5 within-cluster)
 4. Weighted subtype determination within winning clusters
 5. Statistical confidence assessment for subtype classification
 
@@ -188,7 +188,6 @@ def perform_direct_gmm_clustering(
     min_matches_per_type: int = 2,
     quality_threshold: float = 0.02,  # Direct redshift threshold
     max_clusters_per_type: int = 10,
-    top_percentage: float = 0.10,
     verbose: bool = False,
     rlap_ccc_threshold: float = 1.8,  # NEW: RLAP-CCC threshold for clustering
     use_weighted_gmm: Optional[bool] = None  # Hidden option: when True, use weighted GMM + weighted BIC
@@ -212,8 +211,6 @@ def perform_direct_gmm_clustering(
         Redshift span threshold for cluster quality assessment
     max_clusters_per_type : int, optional
         Maximum clusters for GMM
-    top_percentage : float, optional
-        Percentage of top matches to consider (0.10 = top 10%)
     verbose : bool, optional
         Enable detailed logging
     rlap_ccc_threshold : float, optional
@@ -250,7 +247,7 @@ def perform_direct_gmm_clustering(
     metric_name = "RLAP-CCC"
     metric_key = "best_metric"  # Not actually used anymore, see get_best_metric_value() calls
     
-    _LOGGER.info(f"🔄 Starting direct GMM top-{top_percentage*100:.0f}% {metric_name} clustering")
+    _LOGGER.info(f"🔄 Starting direct GMM {metric_name} clustering")
     _LOGGER.info(f"📐 Quality threshold: {quality_threshold:.3f} in redshift space")
     _LOGGER.info(f"🎯 RLAP-CCC threshold: {rlap_ccc_threshold:.1f} (matches below this are excluded from clustering)")
     

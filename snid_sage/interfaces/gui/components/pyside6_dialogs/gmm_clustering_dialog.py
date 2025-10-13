@@ -467,7 +467,6 @@ class PySide6GMMClusteringDialog(QtWidgets.QDialog):
                     min_matches_per_type=1,  # Accept any type with at least 1 match
                     quality_threshold=0.02,
                     max_clusters_per_type=10,
-                    top_percentage=0.10,
                     verbose=True,
                     rlap_ccc_threshold=1.8  # Default RLAP-CCC threshold
                 )

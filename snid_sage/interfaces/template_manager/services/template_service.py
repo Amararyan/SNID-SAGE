@@ -5,7 +5,8 @@ Template Service (HDF5-only)
 Centralized service for HDF5-only template storage and index management.
 
 Responsibilities:
-- Manage a user-writable template library under `snid_sage/templates/User_templates/`
+- Manage a user-writable template library in the user's config directory
+  (e.g., `<config_dir>/templates/User_templates/`)
 - Append templates to per-type HDF5 files (rebinned to the standard grid)
 - Maintain a user index (`template_index.user.json`) and merge with built-in index
 - Provide a small API for the GUI (creator, browser, manager)
@@ -140,6 +141,45 @@ class TemplateService:
             "by_type": by_type,
         }
 
+    def get_builtin_index(self) -> Dict[str, Any]:
+        """Return only the built-in index (no user templates)."""
+        data = self._read_json(_BUILTIN_INDEX) or {
+            "version": "2.0",
+            "template_count": 0,
+            "templates": {},
+            "by_type": {},
+        }
+        # Ensure counts if missing
+        if "by_type" not in data or not isinstance(data.get("by_type"), dict):
+            data["by_type"] = {}
+        if "templates" not in data or not isinstance(data.get("templates"), dict):
+            data["templates"] = {}
+        if not data.get("template_count"):
+            data["template_count"] = len(data.get("templates", {}))
+        return data
+
+    def get_user_index(self) -> Dict[str, Any]:
+        """Return only the user index (no built-in templates)."""
+        data = self._read_json(_USER_INDEX) or {
+            "version": "2.0",
+            "template_count": 0,
+            "templates": {},
+            "by_type": {},
+        }
+        if "by_type" not in data or not isinstance(data.get("by_type"), dict):
+            data["by_type"] = {}
+        if "templates" not in data or not isinstance(data.get("templates"), dict):
+            data["templates"] = {}
+        if not data.get("template_count"):
+            data["template_count"] = len(data.get("templates", {}))
+        return data
+
+    def has_user_templates(self) -> bool:
+        """Return True if any user templates exist."""
+        data = self._read_json(_USER_INDEX) or {}
+        templates = (data.get("templates") or {})
+        return bool(templates)
+
     def add_template_from_arrays(
         self,
         *,
@@ -162,8 +202,7 @@ class TemplateService:
             return False
         try:
             with self._lock:
-                h5_rel_path = self._ensure_user_h5_for_type(ttype)
-                h5_abs_path = _BUILTIN_DIR / h5_rel_path
+                h5_abs_path = self._ensure_user_h5_for_type(ttype)
 
                 # Rebin to the standard grid
                 rebinned_flux = self._rebin_to_standard_grid(wave, flux)
@@ -198,7 +237,7 @@ class TemplateService:
                     "phase": phase,
                     "epochs": 1,
                     "file_path": "",  # No LNW provenance
-                    "storage_file": str(h5_rel_path).replace("\\", "/"),
+                    "storage_file": str(h5_abs_path).replace("\\", "/"),
                     "rebinned": True,
                 }
 
@@ -219,10 +258,9 @@ class TemplateService:
                 tmpl = (index.get("templates") or {}).get(name)
                 if not tmpl:
                     return False  # only user templates can be edited
-                storage_rel = Path(tmpl["storage_file"]) if tmpl.get("storage_file") else None
-                if not storage_rel:
+                storage_abs = Path(tmpl.get("storage_file", ""))
+                if not storage_abs:
                     return False
-                storage_abs = (_BUILTIN_DIR / storage_rel).resolve()
                 if not storage_abs.exists():
                     return False
                 # Update HDF5 attrs
@@ -258,8 +296,7 @@ class TemplateService:
                 meta = templates.get(name)
                 if not meta:
                     return False
-                storage_rel = Path(meta.get("storage_file", ""))
-                storage_abs = (_BUILTIN_DIR / storage_rel).resolve()
+                storage_abs = Path(meta.get("storage_file", "")).resolve()
                 if not storage_abs.exists():
                     return False
                 with h5py.File(storage_abs, "a") as f:
@@ -281,70 +318,18 @@ class TemplateService:
             return False
 
     def rename(self, old_name: str, new_name: str) -> bool:
-        """Rename a template. Built-in templates are copied into user HDF5 under the new name."""
-        if not new_name or new_name == old_name:
-            return False
-        try:
-            with self._lock:
-                merged = self.get_merged_index()
-                entry = (merged.get("templates") or {}).get(old_name)
-                if not entry:
-                    return False
-                src_rel = Path(entry.get("storage_file", ""))
-                src_abs = (_BUILTIN_DIR / src_rel).resolve()
-                if not src_abs.exists():
-                    return False
-                # Read source datasets
-                with h5py.File(src_abs, "r") as sf:
-                    sg = sf["templates"].get(old_name)
-                    if sg is None:
-                        return False
-                    flux = sg["flux"][:]
-                    fft = (sg["fft_real"][:] + 1j * sg["fft_imag"][:])
-                    attrs = dict(sg.attrs)
-                # Write into user HDF5 (append)
-                h5_rel = self._ensure_user_h5_for_type(attrs.get("type", "Unknown"))
-                self._append_to_h5(_BUILTIN_DIR / h5_rel, new_name,
-                                   attrs.get("type", "Unknown"), attrs.get("subtype", "Unknown"),
-                                   float(attrs.get("age", 0.0)), float(attrs.get("redshift", 0.0)),
-                                   attrs.get("phase", "Unknown"), flux, fft)
-                # Update user index (add new entry, optionally delete old if it was user-owned)
-                user_idx = self._read_json(_USER_INDEX) or {"version": "2.0", "templates": {}, "by_type": {}, "template_count": 0}
-                user_idx["templates"][new_name] = {
-                    "type": attrs.get("type", "Unknown"),
-                    "subtype": attrs.get("subtype", "Unknown"),
-                    "age": float(attrs.get("age", 0.0)),
-                    "redshift": float(attrs.get("redshift", 0.0)),
-                    "phase": attrs.get("phase", "Unknown"),
-                    "epochs": int(attrs.get("epochs", 1)),
-                    "file_path": "",
-                    "storage_file": str(h5_rel).replace("\\", "/"),
-                    "rebinned": True,
-                }
-                # If old was user-owned, remove its index entry and group
-                old_user = (self._read_json(_USER_INDEX) or {}).get("templates", {}).get(old_name)
-                if old_user and Path(old_user.get("storage_file", "")).exists():
-                    try:
-                        self.delete(old_name)
-                    except Exception:
-                        pass
-                user_idx["by_type"] = self._compute_by_type(user_idx.get("templates", {}))
-                user_idx["template_count"] = len(user_idx.get("templates", {}))
-                self._write_json_atomic(_USER_INDEX, user_idx)
-            return True
-        except Exception:
-            return False
+        """Renaming/duplication is disabled for built-in or user templates by policy."""
+        return False
 
     def duplicate(self, name: str, new_name: str) -> bool:
-        """Duplicate a template to user HDF5 under a new name."""
-        return self.rename(name, new_name)
+        """Duplication is disabled by policy."""
+        return False
 
     def rebuild_user_index(self) -> bool:
         """Re-scan user HDF5 files and rebuild the user index from scratch."""
         try:
             templates: Dict[str, Any] = {}
             for h5_path in (_USER_DIR.glob("templates_*.user.hdf5")):
-                rel = h5_path.relative_to(_BUILTIN_DIR)
                 with h5py.File(h5_path, "r") as f:
                     if "templates" not in f:
                         continue
@@ -360,7 +345,7 @@ class TemplateService:
                             "phase": attrs.get("phase", "Unknown"),
                             "epochs": int(attrs.get("epochs", 1)),
                             "file_path": "",
-                            "storage_file": str(rel).replace("\\", "/"),
+                            "storage_file": str(h5_path).replace("\\", "/"),
                             "rebinned": True,
                         }
             index = {
@@ -400,10 +385,9 @@ class TemplateService:
         return rebinned.astype(float, copy=False)
 
     def _ensure_user_h5_for_type(self, ttype: str) -> Path:
-        """Ensure the per-type user HDF5 exists; return path relative to built-in dir."""
+        """Ensure the per-type user HDF5 exists; return absolute path in user config dir."""
         safe_type = ttype.replace("/", "_").replace("-", "_").replace(" ", "_")
-        rel = Path("User_templates") / f"templates_{safe_type}.user.hdf5"
-        abs_path = _BUILTIN_DIR / rel
+        abs_path = _USER_DIR / f"templates_{safe_type}.user.hdf5"
         if not abs_path.exists():
             abs_path.parent.mkdir(parents=True, exist_ok=True)
             with h5py.File(abs_path, "w") as f:
@@ -420,78 +404,7 @@ class TemplateService:
                 meta.attrs["DWLOG"] = grid.dlog
                 meta.create_dataset("standard_wavelength", data=self._standard_wave)
                 f.create_group("templates")
-
-            # NEW: Seed user library with all built-in templates for this type (one-time),
-            # so that per-type override keeps the full set by default.
-            try:
-                builtin_h5 = _BUILTIN_DIR / f"templates_{safe_type}.hdf5"
-                if builtin_h5.exists():
-                    with h5py.File(builtin_h5, "r") as src, h5py.File(abs_path, "a") as dst:
-                        if "templates" in src and "templates" in dst:
-                            src_templates = src["templates"]
-                            dst_templates = dst["templates"]
-                            copied = 0
-                            for name in src_templates.keys():
-                                if name in dst_templates:
-                                    continue
-                                sg = src_templates[name]
-                                dg = dst_templates.create_group(name)
-                                # Copy datasets
-                                dg.create_dataset("flux", data=sg["flux"][:])
-                                dg.create_dataset("fft_real", data=sg["fft_real"][:])
-                                dg.create_dataset("fft_imag", data=sg["fft_imag"][:])
-                                # Copy attributes
-                                for k, v in dict(sg.attrs).items():
-                                    try:
-                                        dg.attrs[k] = v
-                                    except Exception:
-                                        pass
-                                # Ensure flags
-                                dg.attrs["rebinned"] = True
-                                if "epochs" not in dg.attrs:
-                                    dg.attrs["epochs"] = 1
-                                copied += 1
-                            # Update count
-                            try:
-                                meta = dst["metadata"]
-                                meta.attrs["template_count"] = int(meta.attrs.get("template_count", 0)) + int(copied)
-                            except Exception:
-                                pass
-
-                    # Update user index with copied entries
-                    index = self._read_json(_USER_INDEX) or {
-                        "version": "2.0",
-                        "templates": {},
-                        "by_type": {},
-                        "template_count": 0,
-                    }
-                    templates_idx = index.setdefault("templates", {})
-                    # Read back from the destination to ensure attributes
-                    with h5py.File(abs_path, "r") as f:
-                        tg = f["templates"]
-                        for name in tg.keys():
-                            if name in templates_idx:
-                                continue
-                            g = tg[name]
-                            attrs = dict(g.attrs)
-                            templates_idx[name] = {
-                                "type": attrs.get("type", ttype),
-                                "subtype": attrs.get("subtype", "Unknown"),
-                                "age": float(attrs.get("age", 0.0)),
-                                "redshift": float(attrs.get("redshift", 0.0)),
-                                "phase": attrs.get("phase", "Unknown"),
-                                "epochs": int(attrs.get("epochs", 1)),
-                                "file_path": "",
-                                "storage_file": str(rel).replace("\\", "/"),
-                                "rebinned": True,
-                            }
-                    index["by_type"] = self._compute_by_type(templates_idx)
-                    index["template_count"] = len(templates_idx)
-                    self._write_json_atomic(_USER_INDEX, index)
-            except Exception:
-                # Seeding is best-effort; ignore failures
-                pass
-        return rel
+        return abs_path
 
     def _append_to_h5(
         self,

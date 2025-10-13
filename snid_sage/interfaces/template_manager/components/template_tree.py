@@ -30,17 +30,35 @@ class TemplateTreeWidget(QtWidgets.QTreeWidget):
         self.setHeaderLabels(["Template", "Type"])
         self.setSelectionMode(QtWidgets.QTreeWidget.SingleSelection)
         self.itemClicked.connect(self._on_item_clicked)
+        self._source_mode = 'Combined'  # 'Default' | 'User' | 'Combined'
         
         # Load templates on initialization
         self.load_templates()
         
+    def set_source_mode(self, mode: str) -> None:
+        """Set source mode: 'Default', 'User', or 'Combined' and reload."""
+        normalized = (mode or 'Combined').strip().title()
+        if normalized not in {'Default', 'User', 'Combined'}:
+            normalized = 'Combined'
+        if self._source_mode != normalized:
+            self._source_mode = normalized
+            self.load_templates()
+
+    def get_source_mode(self) -> str:
+        return self._source_mode
+
     def load_templates(self):
-        """Load templates from the template index"""
+        """Load templates from the selected source index"""
         try:
-            # Use merged index (built-in + user)
             try:
                 from snid_sage.interfaces.template_manager.services.template_service import get_template_service
-                index_data = get_template_service().get_merged_index()
+                svc = get_template_service()
+                if self._source_mode == 'Default':
+                    index_data = svc.get_builtin_index()
+                elif self._source_mode == 'User':
+                    index_data = svc.get_user_index()
+                else:
+                    index_data = svc.get_merged_index()
             except Exception as e:
                 _LOGGER.warning(f"Falling back to legacy index loading: {e}")
                 template_index_path = self._find_template_index()

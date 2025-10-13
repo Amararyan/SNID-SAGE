@@ -106,6 +106,16 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         search_frame = QtWidgets.QFrame()
         search_layout = QtWidgets.QVBoxLayout(search_frame)
         
+        # Source selector: Default / User / Combined
+        source_row = QtWidgets.QHBoxLayout()
+        source_label = QtWidgets.QLabel("Source:")
+        self.source_filter = QtWidgets.QComboBox()
+        self.source_filter.addItems(["Combined", "Default", "User"])  # default Combined
+        self.source_filter.currentTextChanged.connect(self._on_source_changed)
+        source_row.addWidget(source_label)
+        source_row.addWidget(self.source_filter)
+        search_layout.addLayout(source_row)
+
         self.search_edit = QtWidgets.QLineEdit()
         self.search_edit.setPlaceholderText("Search templates...")
         self.search_edit.textChanged.connect(self._filter_templates)
@@ -145,6 +155,18 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         search_text = self.search_edit.text()
         type_filter = self.type_filter.currentText()
         self.template_tree.filter_templates(search_text, type_filter)
+
+    def _on_source_changed(self, mode: str):
+        """Handle source filter changes and reload tree"""
+        try:
+            self.template_tree.set_source_mode(mode)
+            # After reload, re-apply current text/type filters
+            self._filter_templates()
+            # Refresh Manage tab empty-state
+            if hasattr(self, 'manager_widget'):
+                self.manager_widget.update_empty_state()
+        except Exception as e:
+            _LOGGER.warning(f"Source change failed: {e}")
         
     def create_right_panel(self) -> QtWidgets.QWidget:
         """Create the right panel with tabbed interface"""
@@ -162,6 +184,12 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         # Template Manager tab
         self.manager_widget = TemplateManagerWidget()
         self.tab_widget.addTab(self.manager_widget, "Manage Templates")
+
+        # Initialize Manage tab empty-state
+        try:
+            self.manager_widget.update_empty_state()
+        except Exception:
+            pass
 
         # Apply Twemoji tab icons now that tabs are ready
         try:
@@ -220,6 +248,12 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         """Refresh the template library"""
         self.template_tree.load_templates()
         self.update_template_count()
+        # Refresh Manage tab empty-state after refresh
+        try:
+            if hasattr(self, 'manager_widget'):
+                self.manager_widget.update_empty_state()
+        except Exception:
+            pass
     
     def show_about(self):
         """Show about dialog"""

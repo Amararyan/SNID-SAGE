@@ -66,6 +66,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         
         browse_btn = self.layout_manager.create_action_button("Browse", "📁")
         browse_btn.clicked.connect(self.browse_spectrum_file)
+        self.file_path_edit.textChanged.connect(self._update_actions_enabled)
         
         file_layout.addWidget(self.file_path_edit)
         file_layout.addWidget(browse_btn)
@@ -79,6 +80,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         self.layout_manager.setup_form_layout(metadata_layout)
         
         self.name_edit = QtWidgets.QLineEdit()
+        self.name_edit.textChanged.connect(self._update_actions_enabled)
         self.type_combo = QtWidgets.QComboBox()
         # Populate dynamically from merged index
         try:
@@ -93,9 +95,12 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             self.type_combo.addItems(["Ia", "Ib", "Ic", "II", "AGN", "Galaxy", "Star"])  # fallback
         
         self.subtype_edit = QtWidgets.QLineEdit()
+        self.subtype_edit.textChanged.connect(self._update_actions_enabled)
         self.age_spinbox = create_flexible_double_input(min_val=-999.9, max_val=999.9, suffix=" days", default=0.0)
+        self.age_spinbox.valueChanged.connect(lambda *_: self._update_actions_enabled())
         
         self.redshift_spinbox = create_flexible_double_input(min_val=0.0, max_val=5.0, default=0.0)
+        self.redshift_spinbox.valueChanged.connect(lambda *_: self._update_actions_enabled())
         
         metadata_layout.addRow("Template Name:", self.name_edit)
         metadata_layout.addRow("Type:", self.type_combo)
@@ -122,11 +127,14 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         layout.addWidget(preprocess_group)
         
         # Create template button
-        create_btn = self.layout_manager.create_create_button()
-        create_btn.clicked.connect(self.create_template)
+        self.create_btn = self.layout_manager.create_create_button()
+        self.create_btn.clicked.connect(self.create_template)
         
-        layout.addWidget(create_btn)
+        layout.addWidget(self.create_btn)
         layout.addStretch()
+        
+        # Initial enable state
+        self._update_actions_enabled()
         
     def browse_spectrum_file(self):
         """Browse for a spectrum file"""
@@ -145,6 +153,9 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             
     def open_preprocessing_dialog(self):
         """Open the advanced preprocessing dialog"""
+        if not self._is_ready_for_preprocessing():
+            QtWidgets.QMessageBox.warning(self, "Missing Information", "Please select a spectrum and fill Name, Type, Subtype, Age, and Redshift before preprocessing.")
+            return
         if not MAIN_GUI_AVAILABLE:
             QtWidgets.QMessageBox.warning(self, "Feature Unavailable", "Advanced preprocessing requires main GUI components.")
             return
@@ -157,10 +168,24 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         try:
             # Load spectrum data
             wave, flux = self._load_spectrum(spectrum_file)
+            # Convert to rest frame using user-provided redshift
+            try:
+                z_input = float(self.redshift_spinbox.value())
+            except Exception:
+                z_input = 0.0
+            if z_input != 0.0 and wave.size > 0:
+                wave = wave / (1.0 + z_input)
             
             dialog = PySide6PreprocessingDialog(self, (wave, flux))
             if dialog.exec() == QtWidgets.QDialog.Accepted:
-                self.current_spectrum = dialog.result
+                # Tag as rest-frame so we do not apply de-redshift again on save
+                try:
+                    result = dict(dialog.result)
+                except Exception:
+                    result = dialog.result
+                if isinstance(result, dict):
+                    result['is_rest_frame'] = True
+                self.current_spectrum = result
                 QtWidgets.QMessageBox.information(self, "Success", "Preprocessing completed. You can now create the template.")
                 
         except Exception as e:
@@ -169,6 +194,9 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             
     def run_quick_preprocessing(self):
         """Run quick preprocessing with default parameters"""
+        if not self._is_ready_for_preprocessing():
+            QtWidgets.QMessageBox.warning(self, "Missing Information", "Please select a spectrum and fill Name, Type, Subtype, Age, and Redshift before preprocessing.")
+            return
         spectrum_file = self.file_path_edit.text()
         if not spectrum_file or not os.path.exists(spectrum_file):
             QtWidgets.QMessageBox.warning(self, "No Spectrum", "Please select a valid spectrum file first.")
@@ -179,12 +207,22 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             return
             
         try:
-            # Run quick preprocessing
+            # Load, convert to rest frame, then run quick preprocessing
+            wave, flux = self._load_spectrum(spectrum_file)
+            try:
+                z_input = float(self.redshift_spinbox.value())
+            except Exception:
+                z_input = 0.0
+            if z_input != 0.0 and wave.size > 0:
+                wave = wave / (1.0 + z_input)
             processed_spectrum, trace = preprocess_spectrum(
-                spectrum_path=spectrum_file,
+                input_spectrum=(wave, flux),
                 verbose=True
             )
             
+            # Tag as rest-frame
+            if isinstance(processed_spectrum, dict):
+                processed_spectrum['is_rest_frame'] = True
             self.current_spectrum = processed_spectrum
             QtWidgets.QMessageBox.information(self, "Success", "Quick preprocessing completed. You can now create the template.")
             
@@ -197,6 +235,9 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         # Validate inputs
         if not self.name_edit.text().strip():
             QtWidgets.QMessageBox.warning(self, "Missing Information", "Please enter a template name.")
+            return
+        if not self.subtype_edit.text().strip():
+            QtWidgets.QMessageBox.warning(self, "Missing Information", "Please enter a subtype.")
             return
             
         if not self.file_path_edit.text() or not os.path.exists(self.file_path_edit.text()):
@@ -255,13 +296,20 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             wave = np.asarray(wave, dtype=float)
             flux = np.asarray(flux, dtype=float)
 
-            # De-redshift to rest-frame if needed
+            # De-redshift to rest-frame if needed (skip if already rest frame)
+            already_rest = False
             try:
-                z_input = float(template_info.get('redshift', 0.0) or 0.0)
+                if isinstance(self.current_spectrum, dict) and self.current_spectrum.get('is_rest_frame', False):
+                    already_rest = True
             except Exception:
-                z_input = 0.0
-            if z_input != 0.0 and wave.size > 0:
-                wave = wave / (1.0 + z_input)
+                already_rest = False
+            if not already_rest:
+                try:
+                    z_input = float(template_info.get('redshift', 0.0) or 0.0)
+                except Exception:
+                    z_input = 0.0
+                if z_input != 0.0 and wave.size > 0:
+                    wave = wave / (1.0 + z_input)
 
             # Persist via HDF5-only service
             svc = get_template_service()
@@ -294,6 +342,8 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", f"Error creating template: {str(e)}")
             _LOGGER.error(f"Template creation error: {e}")
+        finally:
+            self._update_actions_enabled()
             
     def _save_template(self, template_info: Dict[str, Any], spectrum_data: Dict[str, np.ndarray]) -> bool:
         """Deprecated: LNW saving removed. Use TemplateService instead."""
@@ -308,6 +358,7 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         self.age_spinbox.setValue(0.0)
         self.redshift_spinbox.setValue(0.0)
         self.current_spectrum = None
+        self._update_actions_enabled()
         
     def _load_spectrum(self, file_path: str) -> Tuple[np.ndarray, np.ndarray]:
         """Load spectrum from file"""
@@ -389,6 +440,8 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         """Validate the current form state"""
         if not self.name_edit.text().strip():
             return False, "Template name is required"
+        if not self.subtype_edit.text().strip():
+            return False, "Subtype is required"
         
         if not self.file_path_edit.text():
             return False, "Spectrum file is required"
@@ -397,3 +450,34 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             return False, "Spectrum file does not exist"
         
         return True, "Form is valid"
+
+    # ---- helpers ----
+    def _is_ready_for_preprocessing(self) -> bool:
+        """Check that required fields are filled before preprocessing."""
+        if not (self.file_path_edit.text() and os.path.exists(self.file_path_edit.text())):
+            return False
+        if not self.name_edit.text().strip():
+            return False
+        if not self.subtype_edit.text().strip():
+            return False
+        # type combo always has a selection; ensure text is not empty
+        if not self.type_combo.currentText().strip():
+            return False
+        # age/redshift are numeric; just ensure widgets exist
+        try:
+            _ = float(self.age_spinbox.value())
+            _ = float(self.redshift_spinbox.value())
+        except Exception:
+            return False
+        return True
+
+    def _update_actions_enabled(self) -> None:
+        """Enable/disable preprocessing and create buttons based on form state."""
+        ready = self._is_ready_for_preprocessing()
+        try:
+            self.preprocess_btn.setEnabled(ready)
+            self.quick_preprocess_btn.setEnabled(ready)
+            # Allow create when ready as well
+            self.create_btn.setEnabled(ready)
+        except Exception:
+            pass

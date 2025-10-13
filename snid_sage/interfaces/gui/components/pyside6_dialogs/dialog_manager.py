@@ -454,6 +454,21 @@ class DialogManager:
             self.app_controller.redshift_mode_config = result  # Store full config
             
             _LOGGER.info(f"Manual redshift configured: {description}")
+            # Immediately update the main plot's rest-axis to reflect the new redshift
+            try:
+                if hasattr(self.main_window, 'plot_manager') and self.main_window.plot_manager is not None:
+                    pm = self.main_window.plot_manager
+                    if hasattr(pm, '_ensure_rest_axis') and hasattr(pm, '_set_rest_axis_redshift'):
+                        pm._ensure_rest_axis()
+                        pm._set_rest_axis_redshift(float(redshift_value or 0.0))
+                        try:
+                            if hasattr(pm, 'plot_widget') and pm.plot_widget is not None:
+                                pm.plot_widget.update()
+                                pm.plot_widget.repaint()
+                        except Exception:
+                            pass
+            except Exception:
+                pass
         else:
             # Old format (backward compatibility)
             redshift_value = float(result)
@@ -461,6 +476,21 @@ class DialogManager:
             self._update_status("redshift", None, success_style=True)
             self.app_controller.manual_redshift = redshift_value
             _LOGGER.info(f"Manual redshift determined: z = {redshift_value:.6f}")
+            # Immediately update the main plot's rest-axis to reflect the new redshift
+            try:
+                if hasattr(self.main_window, 'plot_manager') and self.main_window.plot_manager is not None:
+                    pm = self.main_window.plot_manager
+                    if hasattr(pm, '_ensure_rest_axis') and hasattr(pm, '_set_rest_axis_redshift'):
+                        pm._ensure_rest_axis()
+                        pm._set_rest_axis_redshift(float(redshift_value or 0.0))
+                        try:
+                            if hasattr(pm, 'plot_widget') and pm.plot_widget is not None:
+                                pm.plot_widget.update()
+                                pm.plot_widget.repaint()
+                        except Exception:
+                            pass
+            except Exception:
+                pass
     
     def _show_redshift_fallback(self, current_redshift):
         """Show fallback redshift input dialog"""

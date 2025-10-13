@@ -304,6 +304,14 @@ class PySide6EventHandlers(QtCore.QObject):
                 # Reset preprocessing status for new file
                 self.main_window.preprocess_status_label.setText("Preprocessing not run")
                 self.main_window.preprocess_status_label.setStyleSheet("font-style: italic; color: #475569; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
+                # Reset redshift status for new file (clear any previous forced/search text)
+                if hasattr(self.main_window, 'redshift_status_label'):
+                    self.main_window.redshift_status_label.setText("Redshift not set (optional)")
+                    self.main_window.redshift_status_label.setStyleSheet(
+                        "font-style: italic; color: #475569; font-size: 10px !important; "
+                        "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                        "line-height: 1.0 !important;"
+                    )
                 # Ensure FILE_LOADED state is processed immediately
                 from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
                 self.main_window._update_workflow_state(WorkflowState.FILE_LOADED)

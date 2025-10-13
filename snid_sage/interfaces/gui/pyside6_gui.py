@@ -1104,9 +1104,9 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     except Exception:
                         pass
                 # Update GUI state
-                self.status_label.setText("🔴 Analysis cancelled")
+                self.status_label.setText("Analysis cancelled")
                 self.config_status_label.setText("Analysis Cancelled")
-                self.config_status_label.setStyleSheet("font-style: italic; color: #dc2626;")
+                self.config_status_label.setStyleSheet("font-style: italic; color: #dc2626; font-size: 10px !important; font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; line-height: 1.0 !important;")
                 # Ensure buttons are re-enabled
                 for btn in self.analysis_plot_buttons:
                     btn.setEnabled(False)

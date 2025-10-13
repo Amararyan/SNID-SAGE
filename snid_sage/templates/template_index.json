@@ -1497,7 +1497,7 @@
     },
     "sn1995ac": {
       "type": "Ia",
-      "subtype": "Ia-norm",
+      "subtype": "Ia-91T",
       "age": -5.5,
       "redshift": 0.0,
       "phase": "Unknown",

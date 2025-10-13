@@ -1887,7 +1887,7 @@ def run_snid_analysis(
                     match['ccc_similarity_capped'] = 0.0
 
     # ============================================================================
-    # IMPROVED TOP-10% RLAP-CCC GMM CLUSTERING (NOW DEFAULT)
+    # IMPROVED RLAP-CCC GMM CLUSTERING (DEFAULT)
     # ============================================================================
     
     clustering_results = None
@@ -1910,7 +1910,6 @@ def run_snid_analysis(
                 min_matches_per_type=1,  # Accept any type with at least 1 match
                 quality_threshold=0.05,  # Fixed threshold in z space
                 max_clusters_per_type=10,
-                top_percentage=0.10,  # Top 10% of matches
                 verbose=verbose,
                 rlap_ccc_threshold=rlap_ccc_threshold,  # RLAP-CCC threshold
                 use_weighted_gmm=bool(use_weighted_gmm)
@@ -1951,7 +1950,7 @@ def run_snid_analysis(
             result.clustering_failure_reason = 'exception'
             result.clustering_results = None
         except Exception as e:
-            _LOG.error(f"Top-10% RLAP clustering failed: {e}")
+            _LOG.error(f"GMM clustering failed: {e}")
             filtered_matches = matches
             result.clustering_method = 'none'
             result.clustering_results = None

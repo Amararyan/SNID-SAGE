@@ -297,18 +297,13 @@ class TemplateFFTStorage:
         return stats
     
     def _load_index(self):
-        """Load the template index file with optional user override support.
+        """Load the template index file and union-merge with user index from config dir.
 
         Behavior:
         - Load the base index from `template_index.json` (required for built-in templates)
-        - If a user index exists at `User_templates/template_index.user.json`, merge it
-          with the following rule:
-            • For any type that has a user HDF5 storage file present (templates_<Type>.user.hdf5),
-              perform a type-level override: only user templates for that type are used and the
-              storage_file points to the user HDF5 file. All built-in templates for that type are
-              excluded.
-            • For types without a user storage file, keep the built-in index entries as-is.
-        This enables per-type user customization while keeping other types from the base library.
+        - If a user index exists in the user config directory, merge templates by union:
+          add/override templates by name from user index and recompute by_type counts.
+        - Absolute `storage_file` paths in user entries are respected.
         """
         base_index: Optional[Dict[str, Any]] = None
         user_index: Optional[Dict[str, Any]] = None
@@ -322,8 +317,24 @@ class TemplateFFTStorage:
                 _LOG.warning(f"Failed to load index file: {e}")
                 base_index = None
 
-        # 2) Load user index if present
-        user_dir = self.template_dir / 'User_templates'
+        # 2) Compute user directory via configuration manager (fallbacks to template_dir/User_templates)
+        def _compute_user_dir_fallback() -> Path:
+            try:
+                from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
+                cfg = ConfigurationManager()
+                p = Path(cfg.config_dir) / 'templates' / 'User_templates'
+                p.mkdir(parents=True, exist_ok=True)
+                return p
+            except Exception:
+                pass
+            candidate = self.template_dir / 'User_templates'
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+            return candidate
+
+        user_dir = _compute_user_dir_fallback()
         user_index_path = user_dir / 'template_index.user.json'
         if user_index_path.exists():
             try:
@@ -338,13 +349,6 @@ class TemplateFFTStorage:
             self._index = None
             return
 
-        # Helper to build safe type filename suffix
-        def _safe_type_name(type_name: str) -> str:
-            return (
-                type_name.replace('/', '_').replace('-', '_').replace(' ', '_')
-                if isinstance(type_name, str) else 'Unknown'
-            )
-
         # Start from base index (or an empty structure if missing)
         merged = base_index or {
             'version': '2.0',
@@ -356,81 +360,27 @@ class TemplateFFTStorage:
             'by_type': {}
         }
 
-        # Nothing to merge if no user index
-        if not user_index:
-            self._index = merged
-            return
-
-        # Determine which types have a user storage file present; these types will be overridden
-        overridden_types = set()
-        for ttype, bucket in (user_index.get('by_type') or {}).items():
-            safe = _safe_type_name(ttype)
-            user_storage = user_dir / f"templates_{safe}.user.hdf5"
-            if user_storage.exists():
-                overridden_types.add(ttype)
-
-        if not overridden_types:
-            # No user storage present; keep base index and simply add any user templates
-            # that reference a user storage file path (best-effort enrich)
-            user_templates = user_index.get('templates', {})
+        # Union-merge with user index if present
+        if user_index:
             merged_templates = merged.setdefault('templates', {})
-            for name, meta in user_templates.items():
-                merged_templates[name] = meta
-            # Recompute by_type counts conservatively (prefer existing by_type storage_file)
+            for name, meta in (user_index.get('templates') or {}).items():
+                # Shallow copy to avoid mutating original
+                merged_templates[name] = dict(meta)
+            # Recompute by_type summary from merged templates
             by_type: Dict[str, Any] = {}
             for name, meta in merged_templates.items():
-                ttype = meta.get('type', 'Unknown')
-                bucket = by_type.setdefault(ttype, {"count": 0, "storage_file": meta.get("storage_file", ""), "template_names": []})
+                ttype = (meta or {}).get('type', 'Unknown')
+                bucket = by_type.setdefault(ttype, { 'count': 0, 'storage_file': (meta or {}).get('storage_file', ''), 'template_names': [] })
                 bucket['count'] += 1
                 bucket['template_names'].append(name)
-                if not bucket.get('storage_file') and meta.get('storage_file'):
-                    bucket['storage_file'] = meta['storage_file']
+                if not bucket.get('storage_file') and (meta or {}).get('storage_file'):
+                    bucket['storage_file'] = (meta or {}).get('storage_file')
             merged['by_type'] = by_type
             merged['template_count'] = len(merged_templates)
-            self._index = merged
-            return
+            # Prefer user index version if present
+            if user_index.get('version'):
+                merged['version'] = user_index.get('version')
 
-        # Perform type-level override for types with user storage files
-        base_templates = merged.get('templates', {})
-        user_templates = user_index.get('templates', {})
-
-        # Remove base templates for overridden types
-        names_to_remove = [
-            name for name, meta in base_templates.items()
-            if meta.get('type') in overridden_types
-        ]
-        for name in names_to_remove:
-            base_templates.pop(name, None)
-
-        # Add user templates for overridden types
-        for name, meta in user_templates.items():
-            if meta.get('type') in overridden_types:
-                # Ensure storage_file points to user path (normalize to forward slashes)
-                ttype = meta.get('type', 'Unknown')
-                safe = _safe_type_name(ttype)
-                meta = dict(meta)
-                meta['storage_file'] = str(Path('User_templates') / f"templates_{safe}.user.hdf5").replace('\\', '/')
-                base_templates[name] = meta
-
-        # Rebuild by_type with storage_file pointing to user file for overridden types
-        new_by_type: Dict[str, Any] = {}
-        for name, meta in base_templates.items():
-            ttype = meta.get('type', 'Unknown')
-            bucket = new_by_type.setdefault(ttype, {"count": 0, "storage_file": meta.get("storage_file", ""), "template_names": []})
-            bucket['count'] += 1
-            bucket['template_names'].append(name)
-            # For overridden types, force storage_file to the user file
-            if ttype in overridden_types:
-                safe = _safe_type_name(ttype)
-                bucket['storage_file'] = str(Path('User_templates') / f"templates_{safe}.user.hdf5").replace('\\', '/')
-            else:
-                # Otherwise, keep any existing storage_file (first non-empty wins)
-                if not bucket.get('storage_file') and meta.get('storage_file'):
-                    bucket['storage_file'] = meta['storage_file']
-
-        merged['templates'] = base_templates
-        merged['by_type'] = new_by_type
-        merged['template_count'] = len(base_templates)
         self._index = merged
     
     def _load_all_templates_with_rebinning(self) -> List[TemplateEntry]:
