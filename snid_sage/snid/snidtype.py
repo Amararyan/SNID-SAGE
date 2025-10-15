@@ -20,6 +20,12 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Any, Set, Optional
 from collections import Counter, defaultdict
 import logging
+from snid_sage.shared.utils.math_utils.weighted_statistics import (
+    estimate_weighted_redshift,
+    weighted_redshift_sd,
+    estimate_weighted_epoch,
+    weighted_epoch_sd,
+)
 
 # ----------------------------------------------------------------------
 # 0.  Constants from Fortran SNID.INC
@@ -330,39 +336,6 @@ class SNIDResult:
 # ----------------------------------------------------------------------
 # 2.  Helper functions
 # ----------------------------------------------------------------------
-def weighted_mean(vals: np.ndarray, w: np.ndarray) -> Tuple[float, float]:
-    """
-    LEGACY FUNCTION - DEPRECATED
-    
-    This function is deprecated and should not be used for new code.
-    Use calculate_weighted_redshift or calculate_weighted_age instead.
-    
-    Maintained only for backwards compatibility with legacy template type analysis.
-    """
-    logger = logging.getLogger(__name__)
-    logger.warning("Using deprecated weighted_mean function. Use proper statistical methods instead.")
-    
-    # Simple fallback for legacy compatibility only
-    if len(vals) == 0:
-        return 0.0, 0.0
-    
-    if len(vals) == 1:
-        return float(vals[0]), 0.0
-    
-    # Basic weighted calculation for backwards compatibility only
-    try:
-        from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
-        # Use uniform weights since this is legacy compatibility
-        weights = np.ones_like(vals)
-        from snid_sage.shared.utils.math_utils import estimate_weighted_redshift
-        result_mean = estimate_weighted_redshift(vals, [1.0]*len(weights), weights)
-        result_uncertainty = 0.0
-        return result_mean, result_uncertainty
-    except ImportError:
-        # Ultimate fallback
-        return float(np.mean(vals)), float(np.std(vals) / np.sqrt(len(vals)))
-
-
 def weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
     """Calculate weighted median of a dataset."""
     if len(values) == 0:
@@ -449,29 +422,38 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
         # Type-level statistics
         all_matches = data['_all']
         z_vals = np.array([m['redshift'] for m in all_matches])
+        z_errs = np.array([m.get('redshift_error', 0.0) for m in all_matches])
         # Use RLAP-cos if available, otherwise RLAP
         from snid_sage.shared.utils.math_utils import get_best_metric_value
-        rlap_weights = np.array([get_best_metric_value(m) for m in all_matches])
+        rlap_metrics = np.array([get_best_metric_value(m) for m in all_matches])
         
-        z_median = weighted_median(z_vals, rlap_weights)
-        z_mean, z_std = weighted_mean(z_vals, rlap_weights)
+        z_median = weighted_median(z_vals, rlap_metrics)
+        # Weighted mean and cluster scatter (SD) using canonical weights
+        z_mean = estimate_weighted_redshift(z_vals, z_errs, rlap_metrics)
+        z_std = weighted_redshift_sd(z_vals, z_errs, rlap_metrics)
         
         # Age statistics
         age_vals = []
-        age_weights = []
+        age_rlap_metrics = []
+        age_z_errs = []
         for m in all_matches:
             age = m.get('age', m['template'].get('age', 0.0))
             age_flag = m['template'].get('age_flag', 0)
             if age_flag == 0:
-                age_vals.append(age)
-                # Use RLAP-cos if available, otherwise RLAP
-                age_weights.append(get_best_metric_value(m))
+                z_err = m.get('redshift_error', 0.0)
+                if np.isfinite(age) and np.isfinite(z_err) and z_err > 0:
+                    age_vals.append(age)
+                    # Use RLAP-cos if available, otherwise RLAP
+                    age_rlap_metrics.append(get_best_metric_value(m))
+                    age_z_errs.append(z_err)
         
         if age_vals:
             age_vals = np.array(age_vals)
-            age_weights = np.array(age_weights)
-            age_median = weighted_median(age_vals, age_weights)
-            age_mean, age_std = weighted_mean(age_vals, age_weights)
+            age_rlap_metrics = np.array(age_rlap_metrics)
+            age_z_errs = np.array(age_z_errs)
+            age_median = weighted_median(age_vals, age_rlap_metrics)
+            age_mean = estimate_weighted_epoch(age_vals, age_z_errs, age_rlap_metrics)
+            age_std = weighted_epoch_sd(age_vals, age_z_errs, age_rlap_metrics)
         else:
             age_median = age_mean = age_std = 0.0
         
@@ -487,28 +469,36 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
                 continue
                 
             z_vals = np.array([m['redshift'] for m in sub_matches])
+            z_errs = np.array([m.get('redshift_error', 0.0) for m in sub_matches])
             # Use RLAP-cos if available, otherwise RLAP
-            rlap_weights = np.array([get_best_metric_value(m) for m in sub_matches])
+            rlap_metrics = np.array([get_best_metric_value(m) for m in sub_matches])
             
-            z_median = weighted_median(z_vals, rlap_weights)
-            z_mean, z_std = weighted_mean(z_vals, rlap_weights)
+            z_median = weighted_median(z_vals, rlap_metrics)
+            z_mean = estimate_weighted_redshift(z_vals, z_errs, rlap_metrics)
+            z_std = weighted_redshift_sd(z_vals, z_errs, rlap_metrics)
             
             # Age statistics
             age_vals = []
-            age_weights = []
+            age_rlap_metrics = []
+            age_z_errs = []
             for m in sub_matches:
                 age = m.get('age', m['template'].get('age', 0.0))
                 age_flag = m['template'].get('age_flag', 0)
                 if age_flag == 0:
-                    age_vals.append(age)
-                    # Use RLAP-cos if available, otherwise RLAP
-                    age_weights.append(get_best_metric_value(m))
+                    z_err = m.get('redshift_error', 0.0)
+                    if np.isfinite(age) and np.isfinite(z_err) and z_err > 0:
+                        age_vals.append(age)
+                        # Use RLAP-cos if available, otherwise RLAP
+                        age_rlap_metrics.append(get_best_metric_value(m))
+                        age_z_errs.append(z_err)
             
             if age_vals:
                 age_vals = np.array(age_vals)
-                age_weights = np.array(age_weights)
-                age_median = weighted_median(age_vals, age_weights)
-                age_mean, age_std = weighted_mean(age_vals, age_weights)
+                age_rlap_metrics = np.array(age_rlap_metrics)
+                age_z_errs = np.array(age_z_errs)
+                age_median = weighted_median(age_vals, age_rlap_metrics)
+                age_mean = estimate_weighted_epoch(age_vals, age_z_errs, age_rlap_metrics)
+                age_std = weighted_epoch_sd(age_vals, age_z_errs, age_rlap_metrics)
             else:
                 age_median = age_mean = age_std = 0.0
             
@@ -646,7 +636,7 @@ __all__ = [
     "determine_best_type", "determine_type_security_detailed",
     # Utility functions
     "get_main_type_from_template", "get_type_indices_from_template",
-    "weighted_mean", "weighted_median", "linear_fit_weighted",
+    "weighted_median", "linear_fit_weighted",
     # Constants
     "RLAP_MIN", "MAXRLAP", "EPSRLAP", "EPSFRAC"
 ]

@@ -1353,19 +1353,19 @@ class PySide6AppController(QtCore.QObject):
                                                   reverse=True)
                 
                 # Update best_matches to only contain cluster templates
-                # Preserve the engine-selected number of templates (respects user setting)
+                # Use configured max_output_templates when available; fallback to 10
                 try:
-                    engine_limit = len(getattr(result, 'best_matches', []) or [])
-                    if engine_limit <= 0:
-                        engine_limit = len(getattr(result, 'top_matches', []) or [])
+                    configured_max = (
+                        int(self.current_config.get('analysis', {}).get('max_output_templates', 10))
+                        if hasattr(self, 'current_config') and self.current_config is not None
+                        else 10
+                    )
                 except Exception:
-                    engine_limit = 10
-                if engine_limit <= 0:
-                    engine_limit = 10
-                result.best_matches = cluster_matches_sorted[:engine_limit]
+                    configured_max = 10
+                result.best_matches = cluster_matches_sorted[:configured_max]
                 
                 # Also update top_matches and filtered_matches for consistency
-                result.top_matches = cluster_matches_sorted[:engine_limit]
+                result.top_matches = cluster_matches_sorted[:configured_max]
                 result.filtered_matches = cluster_matches_sorted
                 
                 _LOGGER.info(f"🎯 Filtered templates: {len(cluster_matches)} cluster matches -> "
