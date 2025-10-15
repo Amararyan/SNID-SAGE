@@ -671,11 +671,6 @@ Please check your analysis results and try again.
             ax.legend(fontsize=9, loc='upper right')
             ax.set_ylim(-0.05, 1.05)  # Set y-axis limits like old GUI
             
-            # Add vertical line at common threshold (5.0)
-            if 5.0 >= min_rlap and 5.0 <= max_rlap:
-                ax.axvline(x=5.0, color='red', linestyle='--', alpha=0.7, linewidth=1)
-                ax.text(5.0, 0.9, 'RLAP=5', rotation=90, 
-                       ha='right', va='top', color='red', fontsize=9)
         else:
             ax.text(0.5, 0.5, "Insufficient subtype diversity\nfor threshold analysis", 
                    ha='center', va='center', transform=ax.transAxes)

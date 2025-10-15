@@ -353,11 +353,6 @@ class PySide6AnalysisPlotter:
                 ax.legend(fontsize=9, loc='upper right')
                 ax.set_ylim(-0.05, 1.05)  # Set y-axis limits like old GUI
                 
-                # Add vertical line at common threshold (5.0)
-                if 5.0 >= min_rlap and 5.0 <= max_rlap:
-                    ax.axvline(x=5.0, color='red', linestyle='--', alpha=0.7, linewidth=2)
-                    ax.text(5.0, 0.9, 'RLAP=5', rotation=90, 
-                           ha='right', va='top', color='red', fontsize=9, fontweight='bold')
             else:
                 ax.text(0.5, 0.5, "Insufficient subtype diversity\nfor threshold analysis", 
                        ha='center', va='center', transform=ax.transAxes)
@@ -386,9 +381,14 @@ class PySide6AnalysisPlotter:
             elif hasattr(result, 'best_matches') and result.best_matches:
                 matches = result.best_matches
             
-            # Apply RLAP threshold filtering
-            rlapmin = getattr(result, 'rlapmin', 5.0)
-            filtered_matches = [m for m in matches if m.get('rlap', 0) >= rlapmin]
+            # Apply RLAP threshold filtering only if clustering did not succeed (match CLI behavior)
+            clustering_ok = bool(getattr(result, 'clustering_results', None)) and bool(getattr(result, 'clustering_results', {}).get('success', False))
+            if not clustering_ok:
+                rlapmin = getattr(result, 'min_rlap', getattr(result, 'rlapmin', 5.0))
+                filtered_matches = [m for m in matches if m.get('rlap', 0) >= rlapmin]
+            else:
+                # Respect clustering survivors without additional RLAP filtering
+                filtered_matches = matches
             
             # Extract plot data including subtype information
             plot_data = []

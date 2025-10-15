@@ -9,6 +9,7 @@ Part of the SNID SAGE GUI system.
 """
 
 from typing import Optional, Dict, Any
+import math
 
 # Import the centralized logging system
 try:
@@ -249,10 +250,23 @@ class EmissionLineOverlayController:
                     clustering_results.get('best_cluster')):
                     
                     best_cluster = clustering_results['best_cluster']
-                    if 'weighted_mean_redshift' in best_cluster:
-                        cluster_z = float(best_cluster['weighted_mean_redshift'])
-                        _LOGGER.debug(f"Using best cluster median redshift: z={cluster_z:.6f}")
+                    # Prefer subtype-specific redshift if available and valid
+                    subtype_z = best_cluster.get('subtype_redshift', None)
+                    if isinstance(subtype_z, (int, float)) and not math.isnan(float(subtype_z)) and float(subtype_z) > 0:
+                        cluster_z = float(subtype_z)
+                        _LOGGER.debug(f"Using best subtype redshift for lines: z={cluster_z:.6f}")
                         return cluster_z
+                    # Fallback to enhanced/weighted cluster redshift
+                    if 'enhanced_redshift' in best_cluster and isinstance(best_cluster['enhanced_redshift'], (int, float)):
+                        wz = float(best_cluster['enhanced_redshift'])
+                        if not math.isnan(wz) and wz > 0:
+                            _LOGGER.debug(f"Using enhanced cluster redshift fallback: z={wz:.6f}")
+                            return wz
+                    if 'weighted_mean_redshift' in best_cluster and isinstance(best_cluster['weighted_mean_redshift'], (int, float)):
+                        wz2 = float(best_cluster['weighted_mean_redshift'])
+                        if not math.isnan(wz2) and wz2 > 0:
+                            _LOGGER.debug(f"Using weighted mean cluster redshift fallback: z={wz2:.6f}")
+                            return wz2
             
             # Fallback to galaxy redshift if no clustering data
             galaxy_z = self._get_estimated_redshift()

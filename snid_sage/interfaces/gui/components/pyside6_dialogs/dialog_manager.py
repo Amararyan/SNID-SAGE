@@ -11,6 +11,7 @@ Developed by Fiorenzo Stoppa for SNID SAGE
 """
 
 from typing import Optional, Dict, Any, Callable
+import math
 
 # PySide6 imports
 import PySide6.QtCore as QtCore
@@ -231,7 +232,7 @@ class DialogManager:
                 _LOGGER.info("🔧 Getting redshift estimates...")
                 if hasattr(self.app_controller, 'snid_results') and self.app_controller.snid_results:
                     try:
-                        # Try to get weighted redshift from clustering results first
+                        # Try to get subtype redshift from clustering results first
                         if (hasattr(self.app_controller.snid_results, 'clustering_results') and 
                             self.app_controller.snid_results.clustering_results and
                             self.app_controller.snid_results.clustering_results.get('success')):
@@ -248,14 +249,19 @@ class DialogManager:
                                 _LOGGER.info("📊 Using best cluster for redshift")
                             
                             if winning_cluster:
-                                # Use the enhanced/weighted redshift from the cluster
-                                weighted_z = winning_cluster.get('enhanced_redshift', 
-                                                               winning_cluster.get('weighted_mean_redshift', 0.0))
-                                if weighted_z > 0:
-                                    cluster_median_redshift = weighted_z
-                                    _LOGGER.info(f"📊 Found weighted cluster redshift: {cluster_median_redshift:.6f}")
+                                # Prefer subtype-specific redshift for spectral lines
+                                subtype_z = winning_cluster.get('subtype_redshift', None)
+                                if isinstance(subtype_z, (int, float)) and not math.isnan(float(subtype_z)) and float(subtype_z) > 0:
+                                    cluster_median_redshift = float(subtype_z)
+                                    _LOGGER.info(f"🏷️ Using best subtype redshift: {cluster_median_redshift:.6f}")
                                 else:
-                                    _LOGGER.info("📊 No valid weighted redshift in cluster, falling back to matches")
+                                    # Fall back to enhanced/weighted cluster redshift
+                                    weighted_z = winning_cluster.get('enhanced_redshift', winning_cluster.get('weighted_mean_redshift', 0.0))
+                                    if isinstance(weighted_z, (int, float)) and not math.isnan(float(weighted_z)) and float(weighted_z) > 0:
+                                        cluster_median_redshift = float(weighted_z)
+                                        _LOGGER.info(f"📊 Found weighted cluster redshift (fallback): {cluster_median_redshift:.6f}")
+                                    else:
+                                        _LOGGER.info("📊 No valid subtype or weighted redshift in cluster, falling back to matches")
                         
                         # Fallback: use first match redshift if no weighted redshift available
                         if cluster_median_redshift == 0.0:

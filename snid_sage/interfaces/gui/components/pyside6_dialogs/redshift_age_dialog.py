@@ -282,9 +282,13 @@ class PySide6RedshiftAgeDialog(QtWidgets.QDialog):
             self.all_matches = matches
             self.match_source = match_source
             
-            # Apply RLAP threshold filtering
-            rlapmin = getattr(self.analysis_results, 'rlapmin', 5.0)
-            filtered_matches = [m for m in matches if m.get('rlap', 0) >= rlapmin]
+            # Apply RLAP threshold filtering only if clustering did not succeed (align with CLI)
+            clustering_ok = bool(getattr(self.analysis_results, 'clustering_results', None)) and bool(getattr(self.analysis_results, 'clustering_results', {}).get('success', False))
+            if not clustering_ok:
+                rlapmin = getattr(self.analysis_results, 'min_rlap', getattr(self.analysis_results, 'rlapmin', 5.0))
+                filtered_matches = [m for m in matches if m.get('rlap', 0) >= rlapmin]
+            else:
+                filtered_matches = matches
             
             # Extract plot data
             self.plot_data = []

@@ -922,11 +922,14 @@ def choose_subtype_weighted_voting(
             # Use best available metric (RLAP-CCC if available, otherwise RLAP)
             from snid_sage.shared.utils.math_utils import get_best_metric_value
             metric_value = get_best_metric_value(match)
+            # Pull per-match redshift uncertainty if available
+            sigma_z = match.get('redshift_error', match.get('z_err', match.get('sigma_z', None)))
             
             cluster_members.append({
                 'subtype': subtype,
                 'metric_value': metric_value,
-                'cluster_membership': gamma[i, k_star]
+                'cluster_membership': gamma[i, k_star],
+                'redshift_error': sigma_z
             })
     
     if not cluster_members:
@@ -937,7 +940,7 @@ def choose_subtype_weighted_voting(
     for member in cluster_members:
         subtype_groups[member['subtype']].append(member)
     
-    # Calculate top-5 mean for each subtype
+    # Calculate top-5 weighted mean for each subtype using weights w = metric^2 / sigma_z^2
     subtype_scores = {}
     for subtype, members in subtype_groups.items():
         # Sort by metric value (best available) descending
@@ -946,9 +949,22 @@ def choose_subtype_weighted_voting(
         # Take top 5 (or all if less than 5)
         top_members = sorted_members[:5]
         top_values = [m['metric_value'] for m in top_members]
-        
-        # Calculate mean of top values
-        mean_top = sum(top_values) / len(top_values)
+        # Compute weights using the same scheme as weighted redshift: w = (metric)^2 / sigma_z^2
+        from snid_sage.shared.utils.math_utils import compute_cluster_weights
+        metrics_array = np.asarray([m['metric_value'] for m in top_members], dtype=float)
+        sigmas_array = np.asarray([
+            (m.get('redshift_error') if m.get('redshift_error') is not None else np.nan)
+            for m in top_members
+        ], dtype=float)
+        # Valid where finite and sigma > 0
+        valid_mask = (np.isfinite(metrics_array) & np.isfinite(sigmas_array) & (sigmas_array > 0))
+        if np.any(valid_mask):
+            weights = compute_cluster_weights(metrics_array[valid_mask], sigmas_array[valid_mask])
+            sum_w = np.sum(weights)
+            mean_top = float(np.sum(weights * metrics_array[valid_mask]) / sum_w) if sum_w > 0 else (sum(top_values) / len(top_values))
+        else:
+            # Fallback to unweighted mean if no valid uncertainties
+            mean_top = sum(top_values) / len(top_values)
         
         # Apply penalty if less than 5 templates
         penalty_factor = len(top_values) / 5.0  # 1.0 if 5 templates, 0.8 if 4, etc.
@@ -1110,30 +1126,42 @@ def find_winning_cluster_top5_method(
         if not matches:
             continue
             
-        # Extract metric values and sort in descending order
-        metric_values = []
+        # Extract (metric, sigma_z) pairs and sort descending by metric
+        metric_sigma_pairs = []
         for match in matches:
             # Use get_best_metric_value to automatically prioritize RLAP-CCC
             from snid_sage.shared.utils.math_utils import get_best_metric_value
-            value = get_best_metric_value(match)
-            metric_values.append(value)
+            metric = get_best_metric_value(match)
+            sigma_z = match.get('redshift_error', match.get('z_err', match.get('sigma_z', None)))
+            metric_sigma_pairs.append((float(metric), (float(sigma_z) if sigma_z is not None else np.nan)))
         
-        metric_values.sort(reverse=True)  # Highest first
+        metric_sigma_pairs.sort(key=lambda x: x[0], reverse=True)  # Highest metric first
         
         # Take top 5 (or all if fewer than 5)
-        top_5_values = metric_values[:5]
+        top_5_pairs = metric_sigma_pairs[:5]
+        top_5_values = [m for m, _ in top_5_pairs]
+        sigmas = [s for _, s in top_5_pairs]
         
-        # Calculate mean of top 5
+        # Calculate weighted mean of top 5 using w = metric^2 / sigma_z^2; fallback to unweighted mean
         if top_5_values:
-            top_5_mean = np.mean(top_5_values)
+            from snid_sage.shared.utils.math_utils import compute_cluster_weights
+            metrics_array = np.asarray(top_5_values, dtype=float)
+            sigmas_array = np.asarray(sigmas, dtype=float)
+            valid_mask = (np.isfinite(metrics_array) & np.isfinite(sigmas_array) & (sigmas_array > 0))
+            if np.any(valid_mask):
+                weights = compute_cluster_weights(metrics_array[valid_mask], sigmas_array[valid_mask])
+                sum_w = np.sum(weights)
+                top_5_mean = float(np.sum(weights * metrics_array[valid_mask]) / sum_w) if sum_w > 0 else float(np.mean(metrics_array))
+            else:
+                top_5_mean = float(np.mean(metrics_array))
         else:
             top_5_mean = 0.0
         
         # Apply penalty for clusters with fewer than 5 points
         penalty_factor = 1.0
-        if len(metric_values) < 5:
+        if len(metric_sigma_pairs) < 5:
             # Penalty: reduce score by 5% for each missing match (so clusters with <5 still participate)
-            penalty_factor = 0.95 ** (5 - len(metric_values))
+            penalty_factor = 0.95 ** (5 - len(metric_sigma_pairs))
             
         penalized_score = top_5_mean * penalty_factor  # No hard quality threshold – keep ALL clusters
         
