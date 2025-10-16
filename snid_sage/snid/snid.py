@@ -46,7 +46,6 @@ from .snidtype import (
     determine_best_type, SNIDResult,
     compute_type_fractions,
     compute_subtype_fractions,
-    compute_initial_redshift,
 )
 from .plotting import (
  
@@ -1964,7 +1963,11 @@ def run_snid_analysis(
     result.filtered_matches = filtered_matches
 
     # Statistical analysis and type determination (same as original)
-    result.initial_redshift = compute_initial_redshift(matches)
+    # Initial redshift no longer uses median; fallback to best-match redshift if available
+    try:
+        result.initial_redshift = matches[0]['redshift'] if matches else 0.0
+    except Exception:
+        result.initial_redshift = 0.0
 
     # Only report type classification step when there are reliable matches to classify
     try:
@@ -1990,7 +1993,7 @@ def run_snid_analysis(
         
         # Extract weighted redshift from the best cluster
         weighted_redshift = best_cluster.get('enhanced_redshift', result.initial_redshift)
-        weighted_uncertainty = best_cluster.get('weighted_redshift_sd', 0.01)
+        weighted_uncertainty = best_cluster.get('weighted_redshift_se', 0.01)
         
         if 'gamma' in type_data:
             # Use new cluster-aware subtype determination
@@ -2050,7 +2053,7 @@ def run_snid_analysis(
             # Ensure weighted redshift variables are available for fallback case too
             if 'weighted_redshift' not in locals():
                 weighted_redshift = best_cluster.get('enhanced_redshift', result.initial_redshift)
-                weighted_uncertainty = best_cluster.get('weighted_redshift_sd', 0.01)
+                weighted_uncertainty = best_cluster.get('weighted_redshift_se', 0.01)
             
             type_determination = {
                 'success': True,
@@ -2173,7 +2176,6 @@ def run_snid_analysis(
                     'getzt': {
                         'z_mean': result.initial_redshift, 
                         'z_std': 0.0, 
-                        'z_median': result.initial_redshift,
                         'age_mean': 0.0, 
                         'age_std': 0.0
                     },
@@ -2215,7 +2217,7 @@ def run_snid_analysis(
                 result.consensus_redshift_error = getzt_stats['z_hybrid_uncertainty']
             else:
                 result.consensus_redshift_error = getzt_stats.get('z_std', 0.01)
-        result.consensus_z_median = getzt_stats.get('z_median', result.initial_redshift)
+        result.consensus_z_median = result.consensus_redshift
         result.consensus_age = getzt_stats.get('age_enhanced', 0.0)
         result.consensus_age_error = getzt_stats.get('age_std', 0.0)
         

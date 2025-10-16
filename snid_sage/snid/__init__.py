@@ -15,8 +15,7 @@ from .fft_tools        import (    # <<< was .correlation
 )
 from .snidtype         import (    # <<< was .utils
     compute_type_fractions, compute_subtype_fractions,
-    determine_best_type, SNIDResult,
-    compute_initial_redshift
+    determine_best_type, SNIDResult
 )
 from .plotting         import (
     plot_comparison,

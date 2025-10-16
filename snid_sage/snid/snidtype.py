@@ -22,9 +22,9 @@ from collections import Counter, defaultdict
 import logging
 from snid_sage.shared.utils.math_utils.weighted_statistics import (
     estimate_weighted_redshift,
-    weighted_redshift_sd,
+    weighted_redshift_se,
     estimate_weighted_epoch,
-    weighted_epoch_sd,
+    weighted_epoch_se,
 )
 
 # ----------------------------------------------------------------------
@@ -336,29 +336,7 @@ class SNIDResult:
 # ----------------------------------------------------------------------
 # 2.  Helper functions
 # ----------------------------------------------------------------------
-def weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
-    """Calculate weighted median of a dataset."""
-    if len(values) == 0:
-        return 0.0
-    if len(values) == 1:
-        return float(values[0])
-        
-    # Sort values and weights together
-    idx = np.argsort(values)
-    sorted_values = values[idx]
-    sorted_weights = weights[idx]
-    
-    # Calculate cumulative weight
-    cumw = np.cumsum(sorted_weights)
-    
-    # Find median at half of total weight
-    half = cumw[-1] / 2.0
-    idx = np.searchsorted(cumw, half)
-    
-    if idx >= len(values):  # Safety check
-        return float(sorted_values[-1])
-    
-    return float(sorted_values[idx])
+ 
 
 
 def linear_fit_weighted(x: np.ndarray, y: np.ndarray, w: np.ndarray) -> Tuple[float, float]:
@@ -427,10 +405,9 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
         from snid_sage.shared.utils.math_utils import get_best_metric_value
         rlap_metrics = np.array([get_best_metric_value(m) for m in all_matches])
         
-        z_median = weighted_median(z_vals, rlap_metrics)
-        # Weighted mean and cluster scatter (SD) using canonical weights
+        # Weighted mean and SE using canonical weights
         z_mean = estimate_weighted_redshift(z_vals, z_errs, rlap_metrics)
-        z_std = weighted_redshift_sd(z_vals, z_errs, rlap_metrics)
+        z_std = weighted_redshift_se(z_vals, z_errs, rlap_metrics)
         
         # Age statistics
         age_vals = []
@@ -451,15 +428,14 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
             age_vals = np.array(age_vals)
             age_rlap_metrics = np.array(age_rlap_metrics)
             age_z_errs = np.array(age_z_errs)
-            age_median = weighted_median(age_vals, age_rlap_metrics)
             age_mean = estimate_weighted_epoch(age_vals, age_z_errs, age_rlap_metrics)
-            age_std = weighted_epoch_sd(age_vals, age_z_errs, age_rlap_metrics)
+            age_std = weighted_epoch_se(age_vals, age_z_errs, age_rlap_metrics)
         else:
-            age_median = age_mean = age_std = 0.0
+            age_mean = age_std = 0.0
         
         stats[tp]['_all'] = {
-            'z_median': z_median, 'z_mean': z_mean, 'z_std': z_std,
-            'age_median': age_median, 'age_mean': age_mean, 'age_std': age_std,
+            'z_mean': z_mean, 'z_std': z_std,
+            'age_mean': age_mean, 'age_std': age_std,
             'count': len(all_matches)
         }
         
@@ -473,9 +449,8 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
             # Use RLAP-cos if available, otherwise RLAP
             rlap_metrics = np.array([get_best_metric_value(m) for m in sub_matches])
             
-            z_median = weighted_median(z_vals, rlap_metrics)
             z_mean = estimate_weighted_redshift(z_vals, z_errs, rlap_metrics)
-            z_std = weighted_redshift_sd(z_vals, z_errs, rlap_metrics)
+            z_std = weighted_redshift_se(z_vals, z_errs, rlap_metrics)
             
             # Age statistics
             age_vals = []
@@ -496,15 +471,14 @@ def compute_type_subtype_stats(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
                 age_vals = np.array(age_vals)
                 age_rlap_metrics = np.array(age_rlap_metrics)
                 age_z_errs = np.array(age_z_errs)
-                age_median = weighted_median(age_vals, age_rlap_metrics)
                 age_mean = estimate_weighted_epoch(age_vals, age_z_errs, age_rlap_metrics)
-                age_std = weighted_epoch_sd(age_vals, age_z_errs, age_rlap_metrics)
+                age_std = weighted_epoch_se(age_vals, age_z_errs, age_rlap_metrics)
             else:
-                age_median = age_mean = age_std = 0.0
+                age_mean = age_std = 0.0
             
             stats[tp][sub] = {
-                'z_median': z_median, 'z_mean': z_mean, 'z_std': z_std,
-                'age_median': age_median, 'age_mean': age_mean, 'age_std': age_std,
+                'z_mean': z_mean, 'z_std': z_std,
+                'age_mean': age_mean, 'age_std': age_std,
                 'count': len(sub_matches)
             }
     
@@ -558,34 +532,7 @@ def compute_subtype_fractions(matches: List[Dict[str, Any]],
     return result
 
 
-def compute_initial_redshift(matches: List[Dict[str, Any]]) -> float:
-    """Compute initial redshift estimate using weighted median approach."""
-    if not matches:
-        return 0.0
-        
-    # Create weighted redshift list based on rlap values
-    redshifts = []
-    weights = []
-    
-    for match in matches:
-        rlap = match['rlap']
-        z = match['redshift']
-        
-        # Add multiple copies based on rlap thresholds (like Fortran)
-        if rlap > 4:
-            redshifts.append(z)
-            weights.append(1)
-        if rlap > 5:
-            redshifts.extend([z, z])
-            weights.extend([1, 1])
-        if rlap > 6:
-            redshifts.extend([z, z])
-            weights.extend([1, 1])
-    
-    if not redshifts:
-        return 0.0
-        
-    return weighted_median(np.array(redshifts), np.array(weights))
+ 
 
 
 # ----------------------------------------------------------------------
@@ -631,12 +578,11 @@ def determine_type_security_detailed(matches: List[Dict[str, Any]],
 __all__ = [
     "SNIDResult",
     "compute_type_fractions", "compute_subtype_fractions",
-    "compute_initial_redshift",
     # Legacy functions (simplified)
     "determine_best_type", "determine_type_security_detailed",
     # Utility functions
     "get_main_type_from_template", "get_type_indices_from_template",
-    "weighted_median", "linear_fit_weighted",
+    "linear_fit_weighted",
     # Constants
     "RLAP_MIN", "MAXRLAP", "EPSRLAP", "EPSFRAC"
 ]

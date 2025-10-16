@@ -28,8 +28,8 @@ from snid_sage.shared.exceptions.core_exceptions import SpectrumProcessingError
 from snid_sage.shared.utils.math_utils import (
     estimate_weighted_redshift,
     estimate_weighted_epoch,
-    weighted_redshift_sd,
-    weighted_epoch_sd,
+    weighted_redshift_se,
+    weighted_epoch_se,
     get_best_metric_value
 )
 from snid_sage.shared.utils.results_formatter import clean_template_name
@@ -653,26 +653,26 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                     ages_for_estimation.append(age)
                     age_metric_values.append(metric_val)
             
-            # Weighted redshift mean and SD (cluster scatter) using canonical weights
+            # Weighted redshift mean and SE using canonical weights
             if redshifts_with_errors:
                 z_final = estimate_weighted_redshift(redshifts_with_errors, redshift_errors, metric_values)
-                z_sd = weighted_redshift_sd(redshifts_with_errors, redshift_errors, metric_values)
+                z_se = weighted_redshift_se(redshifts_with_errors, redshift_errors, metric_values)
                 summary['cluster_redshift_weighted'] = z_final
-                summary['cluster_redshift_sd_weighted'] = z_sd
+                summary['cluster_redshift_se_weighted'] = z_se
             else:
                 summary['cluster_redshift_weighted'] = np.nan
-                summary['cluster_redshift_sd_weighted'] = np.nan
+                summary['cluster_redshift_se_weighted'] = np.nan
 
-            # Weighted epoch mean and SD using the same canonical weights
+            # Weighted epoch mean and SE using the same canonical weights
             if ages_for_estimation and redshift_errors:
                 age_final = estimate_weighted_epoch(ages_for_estimation, redshift_errors, age_metric_values)
-                age_sd = weighted_epoch_sd(ages_for_estimation, redshift_errors, age_metric_values)
+                age_se = weighted_epoch_se(ages_for_estimation, redshift_errors, age_metric_values)
                 summary['cluster_age_weighted'] = age_final
-                summary['cluster_age_sd_weighted'] = age_sd
+                summary['cluster_age_se_weighted'] = age_se
                 summary['redshift_age_covariance'] = 0.0
             else:
                 summary['cluster_age_weighted'] = np.nan
-                summary['cluster_age_sd_weighted'] = np.nan
+                summary['cluster_age_se_weighted'] = np.nan
                 summary['redshift_age_covariance'] = 0.0
             
             summary['cluster_rlap_mean'] = np.mean(rlaps)
@@ -1169,7 +1169,7 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace, wall
             use_cluster = summary.get('has_clustering') and ('cluster_redshift_weighted' in summary)
             if use_cluster:
                 redshift = f"{summary.get('cluster_redshift_weighted', float('nan')):.6f}"
-                redshift_err_val = summary.get('cluster_redshift_weighted_uncertainty', None)
+                redshift_err_val = summary.get('cluster_redshift_se_weighted', None)
             else:
                 redshift = f"{summary.get('redshift', 0):.6f}"
                 redshift_err_val = summary.get('redshift_error', None)
@@ -1246,9 +1246,9 @@ def generate_summary_report(results: List[Tuple], args: argparse.Namespace, wall
                         report.append(f"      Second Best Cluster Type: {summary['cluster_second_best_type']}")
                 
                 if 'cluster_redshift_weighted' in summary:
-                    sd_val = summary.get('cluster_redshift_sd_weighted', float('nan'))
-                    sd_txt = f" (SD={sd_val:.6f})" if isinstance(sd_val, (int, float)) and np.isfinite(sd_val) else ""
-                    report.append(f"      Weighted Redshift: {summary['cluster_redshift_weighted']:.6f}{sd_txt}")
+                    se_val = summary.get('cluster_redshift_se_weighted', float('nan'))
+                    se_txt = f" (SE={se_val:.6f})" if isinstance(se_val, (int, float)) and np.isfinite(se_val) else ""
+                    report.append(f"      Weighted Redshift: {summary['cluster_redshift_weighted']:.6f}{se_txt}")
                     report.append(f"      Cluster RLAP: {summary.get('cluster_rlap_mean', 0):.2f}")
                 
                 report.append(f"   Best Match Redshift: {summary.get('redshift', 0):.6f} ± {summary.get('redshift_error', 0):.6f}")
@@ -1444,7 +1444,7 @@ def _export_results_table(results: List[Tuple], output_dir: Path) -> Optional[Pa
             if summary.get('has_clustering') and ('cluster_redshift_weighted' in summary):
                 pred_z = summary.get('cluster_redshift_weighted')
                 # Store SD as the reported dispersion
-                pred_z_err = summary.get('cluster_redshift_sd_weighted')
+                pred_z_err = summary.get('cluster_redshift_se_weighted')
             if pred_z is None or (isinstance(pred_z, float) and np.isnan(pred_z)):
                 pred_z = summary.get('redshift')
                 pred_z_err = summary.get('redshift_error')
@@ -1455,7 +1455,7 @@ def _export_results_table(results: List[Tuple], output_dir: Path) -> Optional[Pa
             if pred_age is None or (isinstance(pred_age, float) and np.isnan(pred_age)):
                 pred_age = summary.get('age')
             row['pred_age'] = pred_age
-            row['pred_age_err'] = summary.get('cluster_age_sd_weighted') if 'cluster_age_sd_weighted' in summary else None
+            row['pred_age_err'] = summary.get('cluster_age_se_weighted')
 
             # Best match (top template) parameters
             row['best_match_redshift'] = summary.get('redshift')

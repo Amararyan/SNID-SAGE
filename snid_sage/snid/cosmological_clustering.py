@@ -111,8 +111,8 @@ def calculate_joint_redshift_age_from_cluster(
         compute_cluster_weights,
         estimate_weighted_redshift,
         estimate_weighted_epoch,
-        weighted_redshift_sd,
-        weighted_epoch_sd,
+        weighted_redshift_se,
+        weighted_epoch_se,
     )
     
     # Separate collection for redshift (with errors) and age (without errors)
@@ -146,21 +146,21 @@ def calculate_joint_redshift_age_from_cluster(
                 metric_values_for_age.append(metric_val)
                 age_redshift_errors_for_estimation.append(z_err)
     
-    # Calculate weighted means and weighted cluster SDs
+    # Calculate weighted means and SEs
     if redshifts_for_estimation:
         z_mean = estimate_weighted_redshift(
             redshifts_for_estimation,
             redshift_errors_for_estimation,
             metric_values_for_redshift
         )
-        z_sd = weighted_redshift_sd(
+        z_se = weighted_redshift_se(
             redshifts_for_estimation,
             redshift_errors_for_estimation,
             metric_values_for_redshift
         )
     else:
         _LOGGER.warning("No valid redshift data found in cluster matches")
-        z_mean, z_sd = np.nan, np.nan
+        z_mean, z_se = np.nan, np.nan
 
     if ages_for_estimation and redshift_errors_for_estimation:
         t_mean = estimate_weighted_epoch(
@@ -168,19 +168,19 @@ def calculate_joint_redshift_age_from_cluster(
             age_redshift_errors_for_estimation,
             metric_values_for_age
         )
-        t_sd = weighted_epoch_sd(
+        t_se = weighted_epoch_se(
             ages_for_estimation,
             age_redshift_errors_for_estimation,
             metric_values_for_age
         )
     else:
         _LOGGER.warning("No valid age data found in cluster matches")
-        t_mean, t_sd = np.nan, np.nan
+        t_mean, t_se = np.nan, np.nan
 
     # No covariance since we estimate separately
     zt_covariance = 0.0
 
-    return z_mean, t_mean, z_sd, t_sd, zt_covariance
+    return z_mean, t_mean, z_se, t_se, zt_covariance
 
 
 def perform_direct_gmm_clustering(
@@ -397,9 +397,9 @@ def perform_direct_gmm_clustering(
                             'subtype_age_template_count': subtype_age_template_count,
                             # Add full cluster joint estimates (update the enhanced_redshift from weighted_mean_redshift)
                             'enhanced_redshift': cluster_redshift,
-                            'weighted_redshift_sd': cluster_redshift_sd,
+                            'weighted_redshift_se': cluster_redshift_sd,
                             'cluster_age': cluster_age,
-                            'cluster_age_sd': cluster_age_sd,
+                            'cluster_age_se': cluster_age_sd,
                             'cluster_redshift_age_covariance': cluster_redshift_age_covariance
                         })
                         
@@ -447,9 +447,9 @@ def perform_direct_gmm_clustering(
                         'subtype_age_template_count': 0,
                         # Add full cluster joint estimates (fallback)
                         'enhanced_redshift': cluster_redshift,
-                        'weighted_redshift_sd': cluster_redshift_sd,
+                        'weighted_redshift_se': cluster_redshift_sd,
                         'cluster_age': cluster_age,
-                        'cluster_age_sd': cluster_age_sd,
+                        'cluster_age_se': cluster_age_sd,
                         'cluster_redshift_age_covariance': cluster_redshift_age_covariance
                     })
                     if verbose:
@@ -697,9 +697,7 @@ def _perform_direct_gmm_clustering(
                 else:
                     redshift_quality = 'very_loose'
 
-                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(
-                    cluster_matches
-                )
+                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(cluster_matches)
 
                 final_clusters.append({
                     'id': new_id,
@@ -711,7 +709,7 @@ def _perform_direct_gmm_clustering(
                     'std_metric': float(np.std(cluster_metric_values)) if len(cluster_metric_values) > 1 else 0.0,
                     'metric_key': metric_key,
                     'weighted_mean_redshift': float(weighted_mean_redshift) if np.isfinite(weighted_mean_redshift) else np.nan,
-                    'weighted_redshift_sd': float(weighted_redshift_sd) if np.isfinite(weighted_redshift_sd) else np.nan,
+                    'weighted_redshift_se': float(weighted_redshift_sd) if np.isfinite(weighted_redshift_sd) else np.nan,
                     'redshift_span': redshift_span,
                     'redshift_quality': redshift_quality,
                     'cluster_method': 'direct_gmm_contiguous',
@@ -758,9 +756,7 @@ def _perform_direct_gmm_clustering(
                 else:
                     redshift_quality = 'very_loose'
 
-                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(
-                    cluster_matches
-                )
+                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(cluster_matches)
 
                 cluster_info = {
                     'id': cluster_id,
@@ -772,7 +768,7 @@ def _perform_direct_gmm_clustering(
                     'std_metric': np.std(cluster_metric_values) if len(cluster_metric_values) > 1 else 0.0,
                     'metric_key': metric_key,
                     'weighted_mean_redshift': weighted_mean_redshift,
-                    'weighted_redshift_sd': weighted_redshift_sd,
+                    'weighted_redshift_se': weighted_redshift_sd,
                     'redshift_span': redshift_span,
                     'redshift_quality': redshift_quality,
                     'cluster_method': 'direct_gmm',
@@ -855,7 +851,7 @@ def _create_single_cluster_result(
         'metric_key': metric_key,  # NEW: Which metric was used
                     # Enhanced redshift statistics
         'weighted_mean_redshift': weighted_mean_redshift,
-        'weighted_redshift_sd': weighted_redshift_sd,
+        'weighted_redshift_se': weighted_redshift_sd,
         'redshift_span': redshift_span,
         'redshift_quality': redshift_quality,
         'cluster_method': 'single_cluster',

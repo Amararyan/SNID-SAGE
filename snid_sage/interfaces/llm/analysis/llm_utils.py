@@ -410,7 +410,6 @@ def _check_redshift_consistency(templates: List[Dict]) -> Dict[str, Any]:
         
         # If we have meaningful weights (not all 1.0), use weighted calculation
         if any(w != 1.0 for w in weights):
-            from snid_sage.shared.utils.math_utils import calculate_weighted_redshift
             from snid_sage.shared.utils.math_utils import estimate_weighted_redshift
             # Use dummy unit errors when only weights are given: sigma=1 → weights proportional to metric^2
             z_mean = estimate_weighted_redshift(redshifts, [1.0]*len(weights), weights)

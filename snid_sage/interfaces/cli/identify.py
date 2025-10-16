@@ -22,8 +22,8 @@ from snid_sage.snid.io import read_spectrum
 from snid_sage.shared.utils.math_utils import (
     estimate_weighted_redshift,
     estimate_weighted_epoch,
-    weighted_redshift_sd,
-    weighted_epoch_sd,
+    weighted_redshift_se,
+    weighted_epoch_se,
     get_best_metric_value
 )
 
@@ -522,26 +522,26 @@ def _create_cluster_aware_summary(result: SNIDResult, spectrum_name: str, spectr
                     ages_for_estimation.append(age)
                     age_metric_values.append(metric_val)
             
-            # Weighted redshift mean and SD (cluster scatter)
+            # Weighted redshift mean and SE
             if redshifts_with_errors:
                 z_final = estimate_weighted_redshift(redshifts_with_errors, redshift_errors, metric_values)
-                z_sd = weighted_redshift_sd(redshifts_with_errors, redshift_errors, metric_values)
+                z_se = weighted_redshift_se(redshifts_with_errors, redshift_errors, metric_values)
                 summary['cluster_redshift_weighted'] = z_final
-                summary['cluster_redshift_sd_weighted'] = z_sd
+                summary['cluster_redshift_se_weighted'] = z_se
             else:
                 summary['cluster_redshift_weighted'] = np.nan
-                summary['cluster_redshift_sd_weighted'] = np.nan
+                summary['cluster_redshift_se_weighted'] = np.nan
 
-            # Weighted epoch mean and SD using the same canonical weights
+            # Weighted epoch mean and SE using the same canonical weights
             if ages_for_estimation and redshift_errors:
                 age_final = estimate_weighted_epoch(ages_for_estimation, redshift_errors, age_metric_values)
-                age_sd = weighted_epoch_sd(ages_for_estimation, redshift_errors, age_metric_values)
+                age_se = weighted_epoch_se(ages_for_estimation, redshift_errors, age_metric_values)
                 summary['cluster_age_weighted'] = age_final
-                summary['cluster_age_sd_weighted'] = age_sd
+                summary['cluster_age_se_weighted'] = age_se
                 summary['redshift_age_covariance'] = 0.0
             else:
                 summary['cluster_age_weighted'] = np.nan
-                summary['cluster_age_sd_weighted'] = np.nan
+                summary['cluster_age_se_weighted'] = np.nan
                 summary['redshift_age_covariance'] = 0.0
             
             summary['cluster_rlap_mean'] = np.mean(rlaps)

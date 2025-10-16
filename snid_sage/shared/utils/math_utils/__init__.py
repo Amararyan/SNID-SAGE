@@ -11,11 +11,8 @@ from .weighted_statistics import (
     compute_cluster_weights,
     estimate_weighted_redshift,
     estimate_weighted_epoch,
-    weighted_redshift_sd,
-    weighted_epoch_sd,
-    calculate_weighted_median,
-    validate_joint_result,
-    validate_weighted_calculation
+    weighted_redshift_se,
+    weighted_epoch_se
 )
 
 from .similarity_metrics import (
@@ -36,11 +33,8 @@ __all__ = [
     'compute_cluster_weights',
     'estimate_weighted_redshift',
     'estimate_weighted_epoch',
-    'weighted_redshift_sd',
-    'weighted_epoch_sd',
-    'calculate_weighted_median',
-    'validate_joint_result',
-    'validate_weighted_calculation',
+    'weighted_redshift_se',
+    'weighted_epoch_se',
     # Similarity metrics
     'concordance_correlation_coefficient',
     'compute_rlap_ccc_metric',

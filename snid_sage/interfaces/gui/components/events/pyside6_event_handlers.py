@@ -312,9 +312,25 @@ class PySide6EventHandlers(QtCore.QObject):
                         "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
                         "line-height: 1.0 !important;"
                     )
+                # Reset analysis/config status label under Run Analysis button
+                if hasattr(self.main_window, 'config_status_label'):
+                    self.main_window.config_status_label.setText("Default SNID parameters loaded")
+                    self.main_window.config_status_label.setStyleSheet(
+                        "font-style: italic; color: #475569; font-size: 10px !important; "
+                        "font-weight: normal !important; font-family: 'Segoe UI', Arial, sans-serif !important; "
+                        "line-height: 1.0 !important;"
+                    )
                 # Ensure FILE_LOADED state is processed immediately
                 from snid_sage.interfaces.gui.controllers.pyside6_app_controller import WorkflowState
                 self.main_window._update_workflow_state(WorkflowState.FILE_LOADED)
+                # Ensure stacked widget shows the spectrum (PyQtGraph) view
+                try:
+                    from snid_sage.interfaces.gui.components.plots.pyside6_plot_manager import PlotMode
+                    if hasattr(self.main_window, 'plot_manager') and self.main_window.plot_manager:
+                        if self.main_window.plot_manager.current_plot_mode != PlotMode.SPECTRUM:
+                            self.main_window.plot_manager.switch_to_plot_mode(PlotMode.SPECTRUM)
+                except Exception:
+                    pass
                 # Plot the loaded spectrum
                 self.main_window.plot_manager.plot_spectrum(self.main_window.current_view)
                 self.main_window.status_label.setText(f"Loaded: {Path(file_path).name}")

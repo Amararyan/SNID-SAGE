@@ -559,10 +559,10 @@ def write_detailed_result(result: Any, filename: str) -> None:
         f.write(f"zuser   {result.initial_redshift:.4f}\n")
         f.write("\n")
         
-        # Overall median redshift/age
-        f.write("### median redshift/age and error ###\n")
-        f.write(f"zmed    {result.consensus_z_median:.4f} {result.consensus_redshift_error:.4f}\n")
-        f.write(f"agem    {result.consensus_age:.2f} {result.consensus_age_error:.2f}\n")
+        # Summary redshift/age (weighted means)
+        f.write("### weighted redshift/age and error ###\n")
+        f.write(f"zmean   {result.consensus_redshift:.4f} {result.consensus_redshift_error:.4f}\n")
+        f.write(f"agemean {result.consensus_age:.2f} {result.consensus_age_error:.2f}\n")
         f.write("\n")
         
         # Type fraction, redshift, and age
@@ -588,7 +588,7 @@ def write_detailed_result(result: Any, filename: str) -> None:
                         slope = result.match_statistics['type_slopes'].get(tp, 0.0)
                     
                     f.write(f"{tp:<10} {count:7d} {fraction:10.2f} {slope:10.4f} "
-                           f"{type_stats.get('z_median', 0.0):10.4f} "
+                           f"{type_stats.get('z_mean', 0.0):10.4f} "
                            f"{type_stats.get('z_std', 0.0):10.4f} "
                            f"{type_stats.get('age_enhanced', 0.0):10.3f} "
                            f"{type_stats.get('age_std', 0.0):10.3f}\n")
@@ -602,7 +602,7 @@ def write_detailed_result(result: Any, filename: str) -> None:
                         fraction = count / total_type if total_type > 0 else 0.0
                         
                         f.write(f"{sub:<10} {count:7d} {fraction:10.2f} {0.0:10.4f} "
-                               f"{sub_stats.get('z_median', 0.0):10.4f} "
+                               f"{sub_stats.get('z_mean', 0.0):10.4f} "
                                f"{sub_stats.get('z_std', 0.0):10.4f} "
                                f"{sub_stats.get('age_enhanced', 0.0):10.3f} "
                                f"{sub_stats.get('age_std', 0.0):10.3f}\n")
