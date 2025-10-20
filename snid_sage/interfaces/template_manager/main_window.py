@@ -142,16 +142,31 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         self.template_tree.template_selected.connect(self.on_template_selected)
         self.layout_manager.setup_template_browser(self.template_tree)
         layout.addWidget(self.template_tree)
+
+        # Open User Folder button
+        try:
+            bottom_row = QtWidgets.QHBoxLayout()
+            open_user_btn = self.layout_manager.create_action_button("Open User Folder", "📂")
+            open_user_btn.clicked.connect(self._open_user_folder)
+            bottom_row.addWidget(open_user_btn)
+            bottom_row.addStretch()
+            layout.addLayout(bottom_row)
+        except Exception:
+            pass
         
-        # Refresh button
-        refresh_btn = self.layout_manager.create_action_button("Refresh", "🔄")
-        refresh_btn.clicked.connect(self.template_tree.load_templates)
-        layout.addWidget(refresh_btn)
+        # Removed explicit Refresh button; switching source auto-refreshes
         
         return panel
         
     def _filter_templates(self):
         """Filter templates based on search text and type"""
+        # Ensure the tree source matches the current selector
+        try:
+            current_source = (self.source_filter.currentText() or "Combined").strip().title()
+            if hasattr(self, 'template_tree') and self.template_tree.get_source_mode() != current_source:
+                self.template_tree.set_source_mode(current_source)
+        except Exception:
+            pass
         search_text = self.search_edit.text()
         type_filter = self.type_filter.currentText()
         self.template_tree.filter_templates(search_text, type_filter)
@@ -161,10 +176,43 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         try:
             self.template_tree.set_source_mode(mode)
             # After reload, re-apply current text/type filters
+            # Repopulate type filter from the selected source
+            try:
+                from .services.template_service import get_template_service
+                svc = get_template_service()
+                if (mode or "").strip().title() == "Default":
+                    idx = svc.get_builtin_index()
+                elif (mode or "").strip().title() == "User":
+                    idx = svc.get_user_index()
+                else:
+                    idx = svc.get_merged_index()
+                types = sorted(list((idx.get('by_type') or {}).keys())) if isinstance(idx, dict) else []
+                # Preserve current selection if possible
+                current = self.type_filter.currentText() if hasattr(self, 'type_filter') else None
+                self.type_filter.blockSignals(True)
+                self.type_filter.clear()
+                self.type_filter.addItem("All Types")
+                for t in types:
+                    self.type_filter.addItem(t)
+                # Restore selection if still valid
+                if current and current in [self.type_filter.itemText(i) for i in range(self.type_filter.count())]:
+                    self.type_filter.setCurrentText(current)
+                else:
+                    self.type_filter.setCurrentText("All Types")
+            finally:
+                try:
+                    self.type_filter.blockSignals(False)
+                except Exception:
+                    pass
             self._filter_templates()
             # Refresh Manage tab empty-state
             if hasattr(self, 'manager_widget'):
                 self.manager_widget.update_empty_state()
+            # Update search placeholder to reflect active source
+            try:
+                self.search_edit.setPlaceholderText(f"Search templates ({(mode or 'Combined').title()})...")
+            except Exception:
+                pass
         except Exception as e:
             _LOGGER.warning(f"Source change failed: {e}")
         
@@ -252,6 +300,16 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         try:
             if hasattr(self, 'manager_widget'):
                 self.manager_widget.update_empty_state()
+        except Exception:
+            pass
+
+    def _open_user_folder(self):
+        """Open the user templates directory in the system file explorer."""
+        try:
+            from .services.template_service import get_template_service
+            p = get_template_service().get_user_templates_dir()
+            if p:
+                QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(p))
         except Exception:
             pass
     

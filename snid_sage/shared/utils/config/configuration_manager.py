@@ -261,7 +261,9 @@ class ConfigurationManager:
                 'templates_dir': default_templates_path,
                 'output_dir': str(Path.cwd() / 'results'),
                 'data_dir': str(Path.cwd() / 'data'),
-                'config_dir': str(self.config_dir)
+                'config_dir': str(self.config_dir),
+                # Optional: explicit user templates dir override
+                'user_templates_dir': None
             },
             'analysis': {
                 'redshift_min': -0.01,

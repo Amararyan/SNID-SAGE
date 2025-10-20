@@ -50,23 +50,59 @@ _BUILTIN_DIR = _compute_builtin_dir()
 
 # Determine a writable user templates directory. Prefer app config dir.
 def _compute_user_dir() -> Path:
-    # Try configuration manager location
+    """Resolve user templates dir with precedence and writable checks.
+
+    Precedence:
+    1) Config 'paths.user_templates_dir' if set and writable
+    2) <templates_dir>/User_templates if writable
+    3) Documents/SNID_SAGE/User_templates
+    4) AppData config_dir/templates/User_templates
+    5) Home fallback ~/.snid_sage/User_templates
+    """
+    from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
+    cfg = ConfigurationManager()
+
+    # 1) User override in config
     try:
-        from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
-        cfg = ConfigurationManager()
-        user_dir = Path(cfg.config_dir) / "templates" / "User_templates"
-        user_dir.mkdir(parents=True, exist_ok=True)
-        return user_dir
+        override = (cfg.get_current_config() or {}).get('paths', {}).get('user_templates_dir')
+        if override:
+            p = Path(override)
+            p.mkdir(parents=True, exist_ok=True)
+            if os.access(p, os.W_OK):
+                return p
     except Exception:
         pass
-    # Fallback to a subdir next to built-ins (may be read-only, so try/except)
-    fallback = _BUILTIN_DIR / "User_templates"
+
+    # 2) Sibling of built-ins
     try:
-        fallback.mkdir(parents=True, exist_ok=True)
+        sibling = _BUILTIN_DIR / "User_templates"
+        sibling.mkdir(parents=True, exist_ok=True)
+        if os.access(sibling, os.W_OK):
+            return sibling
     except Exception:
-        # As a last resort, use home directory
-        fallback = Path.home() / ".snid_sage" / "User_templates"
-        fallback.mkdir(parents=True, exist_ok=True)
+        pass
+
+    # 3) Documents/SNID_SAGE/User_templates
+    try:
+        docs = Path.home() / 'Documents' / 'SNID_SAGE' / 'User_templates'
+        docs.mkdir(parents=True, exist_ok=True)
+        if os.access(docs, os.W_OK):
+            return docs
+    except Exception:
+        pass
+
+    # 4) AppData config_dir/templates/User_templates
+    try:
+        appdata = Path(cfg.config_dir) / 'templates' / 'User_templates'
+        appdata.mkdir(parents=True, exist_ok=True)
+        if os.access(appdata, os.W_OK):
+            return appdata
+    except Exception:
+        pass
+
+    # 5) Home fallback
+    fallback = Path.home() / ".snid_sage" / "User_templates"
+    fallback.mkdir(parents=True, exist_ok=True)
     return fallback
 
 
@@ -113,6 +149,10 @@ class TemplateService:
             "by_type": {},
             "template_count": 0,
         }
+
+    def get_user_templates_dir(self) -> str:
+        """Return absolute path to the active user templates directory."""
+        return str(_USER_DIR)
         user = self._read_json(_USER_INDEX) or {
             "templates": {},
             "by_type": {},
@@ -294,9 +334,21 @@ class TemplateService:
                 index = self._read_json(_USER_INDEX) or {}
                 templates = index.get("templates") or {}
                 meta = templates.get(name)
-                if not meta:
-                    return False
-                storage_abs = Path(meta.get("storage_file", "")).resolve()
+                # If missing in index, try to find and delete from any user H5
+                storage_abs = None
+                if meta:
+                    storage_abs = Path(meta.get("storage_file", "")).resolve()
+                else:
+                    for h5_path in (_USER_DIR.glob("templates_*.user.hdf5")):
+                        try:
+                            with h5py.File(h5_path, "r") as f:
+                                if "templates" in f and name in f["templates"]:
+                                    storage_abs = h5_path.resolve()
+                                    break
+                        except Exception:
+                            continue
+                    if storage_abs is None:
+                        return False
                 if not storage_abs.exists():
                     return False
                 with h5py.File(storage_abs, "a") as f:
@@ -308,14 +360,88 @@ class TemplateService:
                             m.attrs["template_count"] = max(0, int(m.attrs.get("template_count", 1)) - 1)
                         except Exception:
                             pass
+                    # After deletion, if no templates remain, close file and delete it
+                    try:
+                        remaining = len(f["templates"].keys())
+                    except Exception:
+                        remaining = 0
                 # Remove from index
-                templates.pop(name, None)
-                index["by_type"] = self._compute_by_type(templates)
-                index["template_count"] = len(templates)
-                self._write_json_atomic(_USER_INDEX, index)
+                if meta:
+                    templates.pop(name, None)
+                    index["by_type"] = self._compute_by_type(templates)
+                    index["template_count"] = len(templates)
+                    self._write_json_atomic(_USER_INDEX, index)
+                # Delete empty H5 file and rebuild index if needed
+                if storage_abs.exists():
+                    try:
+                        with h5py.File(storage_abs, "r") as fchk:
+                            empty_now = ("templates" in fchk and len(fchk["templates"].keys()) == 0)
+                    except Exception:
+                        empty_now = False
+                    if empty_now:
+                        try:
+                            storage_abs.unlink()
+                        except Exception:
+                            pass
+                        # Rebuild user index to drop references to deleted file
+                        try:
+                            self.rebuild_user_index()
+                        except Exception:
+                            pass
             return True
         except Exception:
             return False
+
+    def cleanup_unused(self, delete_empty_files: bool = True) -> Dict[str, int]:
+        """Remove H5 template groups not referenced in the user index.
+
+        Returns a summary: {"removed_groups": int, "deleted_files": int}
+        """
+        summary = {"removed_groups": 0, "deleted_files": 0}
+        try:
+            with self._lock:
+                index = self._read_json(_USER_INDEX) or {"templates": {}}
+                referenced = set((index.get("templates") or {}).keys())
+                for h5_path in (_USER_DIR.glob("templates_*.user.hdf5")):
+                    removed_here = 0
+                    try:
+                        with h5py.File(h5_path, "a") as f:
+                            if "templates" not in f:
+                                continue
+                            tgroup = f["templates"]
+                            # Collect unreferenced groups
+                            names = list(tgroup.keys())
+                            for nm in names:
+                                if nm not in referenced:
+                                    del tgroup[nm]
+                                    removed_here += 1
+                            if removed_here:
+                                try:
+                                    m = f["metadata"]
+                                    m.attrs["template_count"] = max(0, int(m.attrs.get("template_count", 0)) - removed_here)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        continue
+                    summary["removed_groups"] += removed_here
+                    # Optionally delete file if empty
+                    if delete_empty_files and h5_path.exists():
+                        try:
+                            with h5py.File(h5_path, "r") as fchk:
+                                is_empty = ("templates" in fchk and len(fchk["templates"].keys()) == 0)
+                        except Exception:
+                            is_empty = False
+                        if is_empty:
+                            try:
+                                h5_path.unlink()
+                                summary["deleted_files"] += 1
+                            except Exception:
+                                pass
+                # Rebuild index to reflect cleanup
+                self.rebuild_user_index()
+        except Exception:
+            return summary
+        return summary
 
     def rename(self, old_name: str, new_name: str) -> bool:
         """Renaming/duplication is disabled for built-in or user templates by policy."""

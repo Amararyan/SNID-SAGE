@@ -71,14 +71,34 @@ class TemplateTreeWidget(QtWidgets.QTreeWidget):
                 
             self.clear()
             
-            # Group templates by type
-            for template_type, type_info in index_data.get('by_type', {}).items():
-                type_item = QtWidgets.QTreeWidgetItem(self, [template_type, f"{type_info['count']} templates"])
+            # Group templates by type (defensive against malformed entries)
+            by_type = index_data.get('by_type', {}) if isinstance(index_data, dict) else {}
+            templates_map = index_data.get('templates', {}) if isinstance(index_data, dict) else {}
+
+            # If Combined yields nothing (e.g., empty user index), fall back to Default
+            if self._source_mode == 'Combined' and (not by_type or len(by_type) == 0):
+                try:
+                    from snid_sage.interfaces.template_manager.services.template_service import get_template_service
+                    fallback_idx = get_template_service().get_builtin_index()
+                    if isinstance(fallback_idx, dict):
+                        by_type = fallback_idx.get('by_type', {}) or {}
+                        templates_map = fallback_idx.get('templates', {}) or {}
+                except Exception:
+                    pass
+
+            for template_type, type_info in by_type.items():
+                if not isinstance(type_info, dict):
+                    continue
+                count_display = type_info.get('count', 0)
+                type_item = QtWidgets.QTreeWidgetItem(self, [template_type, f"{count_display} templates"])
                 type_item.setExpanded(True)
                 
                 # Add individual templates
                 for template_name in type_info.get('template_names', []):
-                    template_info = index_data['templates'][template_name]
+                    template_info = templates_map.get(template_name)
+                    if not isinstance(template_info, dict):
+                        # Skip malformed entries
+                        continue
                     
                     subtype = template_info.get('subtype', 'Unknown')
                     

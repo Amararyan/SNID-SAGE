@@ -319,20 +319,49 @@ class TemplateFFTStorage:
 
         # 2) Compute user directory via configuration manager (fallbacks to template_dir/User_templates)
         def _compute_user_dir_fallback() -> Path:
+            """Match TemplateService precedence for user dir resolution."""
             try:
                 from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
                 cfg = ConfigurationManager()
-                p = Path(cfg.config_dir) / 'templates' / 'User_templates'
-                p.mkdir(parents=True, exist_ok=True)
-                return p
+                # 1) Config override
+                ov = (cfg.get_current_config() or {}).get('paths', {}).get('user_templates_dir')
+                if ov:
+                    p = Path(ov)
+                    p.mkdir(parents=True, exist_ok=True)
+                    if os.access(p, os.W_OK):
+                        return p
             except Exception:
                 pass
-            candidate = self.template_dir / 'User_templates'
+            # 2) Sibling next to built-ins (self.template_dir is built-ins dir when installed)
             try:
-                candidate.mkdir(parents=True, exist_ok=True)
+                sib = self.template_dir / 'User_templates'
+                sib.mkdir(parents=True, exist_ok=True)
+                if os.access(sib, os.W_OK):
+                    return sib
             except Exception:
                 pass
-            return candidate
+            # 3) Documents
+            try:
+                docs = Path.home() / 'Documents' / 'SNID_SAGE' / 'User_templates'
+                docs.mkdir(parents=True, exist_ok=True)
+                if os.access(docs, os.W_OK):
+                    return docs
+            except Exception:
+                pass
+            # 4) AppData config
+            try:
+                from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
+                cfg = ConfigurationManager()
+                appdata = Path(cfg.config_dir) / 'templates' / 'User_templates'
+                appdata.mkdir(parents=True, exist_ok=True)
+                if os.access(appdata, os.W_OK):
+                    return appdata
+            except Exception:
+                pass
+            # 5) Home fallback
+            fb = Path.home() / '.snid_sage' / 'User_templates'
+            fb.mkdir(parents=True, exist_ok=True)
+            return fb
 
         user_dir = _compute_user_dir_fallback()
         user_index_path = user_dir / 'template_index.user.json'
