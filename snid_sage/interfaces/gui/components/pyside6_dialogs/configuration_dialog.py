@@ -588,33 +588,6 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         
         layout.addWidget(general_group)
         
-        # Plot Options
-        plot_group = QtWidgets.QGroupBox("📈 Plot Options")
-        plot_layout = QtWidgets.QVBoxLayout(plot_group)
-        
-        self.widgets['show_plots'] = QtWidgets.QCheckBox("Show plots during analysis")
-        self.widgets['show_plots'].setToolTip("Display plots as analysis progresses")
-        plot_layout.addWidget(self.widgets['show_plots'])
-        
-        self.widgets['save_plots'] = QtWidgets.QCheckBox("Save plots to files")
-        self.widgets['save_plots'].setToolTip("Save analysis plots to image files")
-        plot_layout.addWidget(self.widgets['save_plots'])
-        
-        # Output directory selection
-        output_dir_layout = QtWidgets.QHBoxLayout()
-        output_dir_layout.addWidget(QtWidgets.QLabel("Output Directory:"))
-        
-        self.widgets['output_dir'] = QtWidgets.QLineEdit()
-        self.widgets['output_dir'].setToolTip("Directory for saving plots and results")
-        output_dir_layout.addWidget(self.widgets['output_dir'])
-        
-        browse_btn = QtWidgets.QPushButton("Browse...")
-        browse_btn.clicked.connect(self._browse_output_dir)
-        output_dir_layout.addWidget(browse_btn)
-        
-        plot_layout.addLayout(output_dir_layout)
-        layout.addWidget(plot_group)
-        
         # Output Limits (moved from Template Filtering tab)
         limits_group = QtWidgets.QGroupBox("📊 Output Limits")
         limits_layout = QtWidgets.QFormLayout(limits_group)
@@ -792,20 +765,7 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
         except Exception as e:
             _LOGGER.error(f"Error removing all templates: {e}")
     
-    def _browse_output_dir(self):
-        """Browse for output directory"""
-        try:
-            directory = QtWidgets.QFileDialog.getExistingDirectory(
-                self,
-                "Select Output Directory",
-                self.widgets['output_dir'].text() or os.path.expanduser("~")
-            )
-            
-            if directory:
-                self.widgets['output_dir'].setText(directory)
-                
-        except Exception as e:
-            _LOGGER.error(f"Error browsing output directory: {e}")
+    
     
     def _on_type_toggled(self, type_name: str, checked: bool):
         """Handle type checkbox toggle"""
@@ -899,13 +859,11 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             self.widgets['age_max'].setValue(9999)  # Shows "No maximum"
         
         # Load checkboxes
-        for key in ['verbose', 'show_plots', 'save_plots']:
+        for key in ['verbose']:
             if key in params and key in self.widgets:
                 self.widgets[key].setChecked(bool(params[key]))
         
-        # Load output directory
-        if 'output_dir' in params and params['output_dir']:
-            self.widgets['output_dir'].setText(str(params['output_dir']))
+        # Removed output directory UI; no longer loading this field here
         
         # Load type selection
         if 'type_filter' in params and params['type_filter']:
@@ -980,13 +938,8 @@ class PySide6ConfigurationDialog(QtWidgets.QDialog):
             
             # Options
             result['verbose'] = self.widgets['verbose'].isChecked()
-            result['show_plots'] = self.widgets['show_plots'].isChecked()
-            result['save_plots'] = self.widgets['save_plots'].isChecked()
             
-            # Output directory
-            output_dir = self.widgets['output_dir'].text().strip()
-            if output_dir:
-                result['output_dir'] = output_dir
+            # Removed output directory UI; no longer collecting this field here
             
             # Validate parameters
             if result['zmin'] >= result['zmax']:

@@ -123,6 +123,9 @@ class PySide6AppController(QtCore.QObject):
         self._progress_seq_counter = 0
         self._next_expected_seq = 1
         self._pending_progress_by_seq = {}
+
+        # Remember params used for the last analysis run (e.g., max_output_templates)
+        self.last_analysis_kwargs = {}
         
         # Initialize configuration
         self._init_configuration()
@@ -556,6 +559,12 @@ class PySide6AppController(QtCore.QObject):
             self.cancel_event.clear()
             self.analysis_cancelled = False
 
+            # Remember last-used analysis parameters for downstream UI logic (e.g., cluster trimming)
+            try:
+                self.last_analysis_kwargs = dict(kwargs) if kwargs is not None else {}
+            except Exception:
+                self.last_analysis_kwargs = {}
+
             # Run analysis in separate thread
             # Set running flag early to avoid race conditions from rapid clicks
             self.analysis_running = True
@@ -612,6 +621,13 @@ class PySide6AppController(QtCore.QObject):
         """Run SNID analysis in background thread"""
         try:
             self.analysis_running = True
+
+            # Ensure last_analysis_kwargs is available even if run_analysis wasn't the entrypoint
+            try:
+                if not getattr(self, 'last_analysis_kwargs', None):
+                    self.last_analysis_kwargs = dict(analysis_kwargs) if analysis_kwargs is not None else {}
+            except Exception:
+                pass
             
             # Use PyQtGraph for all plotting needs to prevent OpenGL context issues
             
@@ -1353,13 +1369,16 @@ class PySide6AppController(QtCore.QObject):
                                                   reverse=True)
                 
                 # Update best_matches to only contain cluster templates
-                # Use configured max_output_templates when available; fallback to 10
+                # Prefer the max_output_templates from the current run params; fallback to saved config then 10
                 try:
-                    configured_max = (
-                        int(self.current_config.get('analysis', {}).get('max_output_templates', 10))
-                        if hasattr(self, 'current_config') and self.current_config is not None
-                        else 10
-                    )
+                    if hasattr(self, 'last_analysis_kwargs') and self.last_analysis_kwargs is not None and 'max_output_templates' in self.last_analysis_kwargs:
+                        configured_max = int(self.last_analysis_kwargs.get('max_output_templates', 10) or 10)
+                    else:
+                        configured_max = (
+                            int(self.current_config.get('analysis', {}).get('max_output_templates', 10))
+                            if hasattr(self, 'current_config') and self.current_config is not None
+                            else 10
+                        )
                 except Exception:
                     configured_max = 10
                 result.best_matches = cluster_matches_sorted[:configured_max]

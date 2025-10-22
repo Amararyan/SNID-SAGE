@@ -79,8 +79,19 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         metadata_layout = QtWidgets.QFormLayout(metadata_group)
         self.layout_manager.setup_form_layout(metadata_layout)
         
+        # Name row with picker
+        name_row_widget = QtWidgets.QWidget()
+        name_row_layout = QtWidgets.QHBoxLayout(name_row_widget)
+        name_row_layout.setContentsMargins(0, 0, 0, 0)
         self.name_edit = QtWidgets.QLineEdit()
+        self.name_edit.setPlaceholderText("Enter template name or pick existing")
         self.name_edit.textChanged.connect(self._update_actions_enabled)
+        self.name_edit.textChanged.connect(self._on_name_changed)
+        pick_existing_btn = self.layout_manager.create_action_button("Pick Existing", "📋")
+        pick_existing_btn.setToolTip("Select an existing user template to add a new epoch")
+        pick_existing_btn.clicked.connect(self._pick_existing_template)
+        name_row_layout.addWidget(self.name_edit)
+        name_row_layout.addWidget(pick_existing_btn)
         self.type_combo = QtWidgets.QComboBox()
         self.type_combo.setEditable(True)
         # Populate dynamically from merged index
@@ -152,11 +163,17 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
         self.redshift_spinbox = create_flexible_double_input(min_val=0.0, max_val=5.0, default=0.0)
         self.redshift_spinbox.valueChanged.connect(lambda *_: self._update_actions_enabled())
         
-        metadata_layout.addRow("Template Name:", self.name_edit)
+        metadata_layout.addRow("Template Name:", name_row_widget)
         metadata_layout.addRow("Type:", self.type_combo)
         metadata_layout.addRow("Subtype:", self.subtype_combo)
-        metadata_layout.addRow("Age [days]:", self.age_spinbox)
+
+        # Notice shown when adding to existing template
+        self.existing_notice = QtWidgets.QLabel("Adding epoch to existing template")
+        self.existing_notice.setStyleSheet("color: #2563eb; font-style: italic; padding-left: 4px;")
+        self.existing_notice.setVisible(False)
+        metadata_layout.addRow("", self.existing_notice)
         metadata_layout.addRow("Redshift:", self.redshift_spinbox)
+        metadata_layout.addRow("Age [days]:", self.age_spinbox)
         
         layout.addWidget(metadata_group)
         
@@ -286,6 +303,19 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             
     def create_template(self):
         """Create the template with current settings"""
+        # Ensure user templates folder is configured; prompt if not
+        try:
+            from snid_sage.shared.utils.paths.user_templates import get_user_templates_dir
+            if get_user_templates_dir(strict=True) is None:
+                from ..dialogs.user_templates_folder_dialog import UserTemplatesFolderDialog
+                dlg = UserTemplatesFolderDialog(self)
+                if dlg.exec() != QtWidgets.QDialog.Accepted:
+                    QtWidgets.QMessageBox.information(self, "User Folder Required", "Set a User Templates folder to create templates.")
+                    return
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Error", f"Unable to validate user folder: {e}")
+            return
+
         # Validate inputs
         if not self.name_edit.text().strip():
             QtWidgets.QMessageBox.warning(self, "Missing Information", "Please enter a template name.")
@@ -305,7 +335,6 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             'subtype': self.subtype_combo.currentText().strip() or 'Unknown',
             'age': self.age_spinbox.value(),
             'redshift': self.redshift_spinbox.value(),
-            'phase': 'Unknown',
             'epochs': 1
         }
         
@@ -332,26 +361,22 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
                         'flat': flux / np.median(flux)
                     }
             
-            # Extract wave/flux arrays (support keys from SNID preprocess and dialog)
-            wave = (
-                spectrum_data.get('log_wave')
-                if isinstance(spectrum_data, dict) else None
-            )
-            if wave is None and isinstance(spectrum_data, dict):
-                wave = spectrum_data.get('processed_wave') or spectrum_data.get('wave') or spectrum_data.get('wavelength')
-
-            flux = (
-                spectrum_data.get('tapered_flux')
-                if isinstance(spectrum_data, dict) else None
-            )
-            if flux is None and isinstance(spectrum_data, dict):
-                flux = (
-                    spectrum_data.get('flat_flux')
-                    or spectrum_data.get('log_flux')
-                    or spectrum_data.get('processed_flux')
-                    or spectrum_data.get('flat')
-                    or spectrum_data.get('flux')
-                )
+            # Extract wave/flux arrays (support keys from SNID preprocess and dialog) without using boolean-or on arrays
+            wave = None
+            flux = None
+            if isinstance(spectrum_data, dict):
+                for key in ['log_wave', 'processed_wave', 'wave', 'wavelength']:
+                    v = spectrum_data.get(key)
+                    if v is not None:
+                        wave = v
+                        break
+                for key in ['tapered_flux', 'flat_flux', 'log_flux', 'processed_flux', 'flat', 'flux']:
+                    v = spectrum_data.get(key)
+                    if v is not None:
+                        flux = v
+                        break
+            elif isinstance(spectrum_data, (list, tuple)) and len(spectrum_data) >= 2:
+                wave, flux = spectrum_data[0], spectrum_data[1]
             if wave is None or flux is None:
                 raise ValueError("No valid wave/flux in spectrum data")
 
@@ -381,7 +406,6 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
                 subtype=template_info['subtype'],
                 age=float(template_info['age']),
                 redshift=float(template_info['redshift']),
-                phase=template_info['phase'],
                 wave=wave,
                 flux=flux,
             )
@@ -552,6 +576,82 @@ class TemplateCreatorWidget(QtWidgets.QWidget):
             self.quick_preprocess_btn.setEnabled(ready)
             # Allow create when ready as well
             self.create_btn.setEnabled(ready)
+        except Exception:
+            pass
+
+    def _pick_existing_template(self):
+        """Open a dialog to select an existing user template to add an epoch to."""
+        try:
+            from ..services.template_service import get_template_service
+            svc = get_template_service()
+            user_idx = svc.get_user_index() or {}
+            names = sorted(list((user_idx.get('templates') or {}).keys()))
+        except Exception:
+            names = []
+        if not names:
+            QtWidgets.QMessageBox.information(self, "No User Templates", "There are no user templates to add an epoch to.")
+            return
+        item, ok = QtWidgets.QInputDialog.getItem(self, "Select Template", "Choose user template:", names, 0, False)
+        if ok and item:
+            self.name_edit.setText(item)
+            # Lock type/subtype based on existing entry
+            try:
+                meta = (user_idx.get('templates') or {}).get(item, {})
+                ttype = meta.get('type', '')
+                stype = meta.get('subtype', '')
+                # Set and lock
+                self.type_combo.setEditText(ttype)
+                self.type_combo.setEnabled(False)
+                self.subtype_combo.setEditText(stype)
+                self.subtype_combo.setEnabled(False)
+                # Also set and lock redshift to existing template's redshift
+                try:
+                    rz = float(meta.get('redshift', 0.0) or 0.0)
+                except Exception:
+                    rz = 0.0
+                self.redshift_spinbox.setValue(rz)
+                self.redshift_spinbox.setEnabled(False)
+                self.existing_notice.setVisible(True)
+            except Exception:
+                pass
+
+    def _on_name_changed(self, text: str):
+        """When name changes, if it matches an existing user template, lock type/subtype; else unlock."""
+        name = (text or "").strip()
+        if not name:
+            # Unlock fields when name cleared
+            try:
+                self.type_combo.setEnabled(True)
+                self.subtype_combo.setEnabled(True)
+                self.redshift_spinbox.setEnabled(True)
+                self.existing_notice.setVisible(False)
+            except Exception:
+                pass
+            return
+        try:
+            from ..services.template_service import get_template_service
+            svc = get_template_service()
+            meta = (svc.get_user_index().get('templates') or {}).get(name)
+            if isinstance(meta, dict):
+                # Existing: lock to stored type/subtype
+                self.type_combo.setEditText(meta.get('type', ''))
+                self.type_combo.setEnabled(False)
+                self.subtype_combo.setEditText(meta.get('subtype', ''))
+                self.subtype_combo.setEnabled(False)
+                # Also set and lock redshift
+                try:
+                    rz = float(meta.get('redshift', 0.0) or 0.0)
+                except Exception:
+                    rz = 0.0
+                self.redshift_spinbox.setValue(rz)
+                self.redshift_spinbox.setEnabled(False)
+                self.existing_notice.setVisible(True)
+            else:
+                # New: unlock and reset subtype choices for current type
+                self.type_combo.setEnabled(True)
+                self.subtype_combo.setEnabled(True)
+                self.redshift_spinbox.setEnabled(True)
+                self.existing_notice.setVisible(False)
         except Exception:
             pass
 

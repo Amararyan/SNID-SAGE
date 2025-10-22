@@ -196,7 +196,8 @@ class UnifiedResultsFormatter:
             # Accept both keys; prefer new _se
             full_cluster_redshift_error = winning_cluster.get('weighted_redshift_se', result.consensus_redshift_error)
             full_cluster_age = winning_cluster.get('cluster_age', enhanced_age)
-            full_cluster_age_error = winning_cluster.get('cluster_age_error', enhanced_age_error)
+            # Prefer new key; fallback to legacy name if present
+            full_cluster_age_error = winning_cluster.get('cluster_age_se', winning_cluster.get('cluster_age_error', enhanced_age_error))
             full_cluster_redshift_age_covariance = winning_cluster.get('cluster_redshift_age_covariance', np.nan)
             
             # Use subtype redshift as primary if available and valid, otherwise fall back to cluster redshift

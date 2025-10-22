@@ -117,8 +117,23 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             
             # Setup labels and grid
             self.plot_item.setLabel('left', 'Flux')
-            self.plot_item.setLabel('bottom', 'Wavelength', units='Å')
+            # Use explicit full label to match main GUI style and avoid SI prefixes
+            self.plot_item.setLabel('bottom', 'Rest Wavelength (Å)')
             self.plot_item.showGrid(x=True, y=True, alpha=0.3)
+
+            # Remove inner frame: hide axis border lines while keeping labels/ticks
+            try:
+                for axis_name in ('left', 'bottom', 'right', 'top'):
+                    ax = self.plot_item.getAxis(axis_name)
+                    if ax is not None:
+                        # Keep text visible but make the axis line fully transparent
+                        try:
+                            ax.setTextPen(pg.mkPen(color='black'))
+                        except Exception:
+                            pass
+                        ax.setPen(pg.mkPen(color=(0, 0, 0, 0)))
+            except Exception:
+                pass
             
             # Apply theme colors
             self._apply_pyqtgraph_theme()
@@ -144,11 +159,14 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             # Set background and foreground colors
             self.plot_item.getViewBox().setBackgroundColor('#ffffff')
             
-            # Set axis colors
+            # Keep axis text visible but hide axis border lines to avoid inner square
             for axis in ['left', 'bottom']:
                 ax = self.plot_item.getAxis(axis)
-                ax.setPen(pg.mkPen(color='black', width=1))
                 ax.setTextPen(pg.mkPen(color='black'))
+                try:
+                    ax.setPen(pg.mkPen(color=(0, 0, 0, 0)))
+                except Exception:
+                    pass
                 
         except Exception as e:
             _LOGGER.warning(f"Could not apply PyQtGraph theme: {e}")
@@ -175,10 +193,8 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         
         # Info labels removed - template information now shown only in plot title
         
-        # Update epoch selector
-        epochs = template_info.get('epochs', 1)
-        # Use setRange instead of setMaximum for FlexibleNumberInput
-        self.epoch_selector.setRange(1, epochs)
+        # Initialize epoch selector; actual max will be set after data load
+        self.epoch_selector.setRange(1, 1)
         
         # Load template data
         self._load_template_data()
@@ -210,6 +226,13 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
                 # Create template data with mock data
                 self.template_data = TemplateData(self.current_template['name'], template_info)
                 self.template_data._create_mock_data()
+            
+            # After loading data, update epoch selector based on actual epochs count
+            try:
+                epochs_count = max(1, len(self.template_data.epochs) if self.template_data else 1)
+                self.epoch_selector.setRange(1, epochs_count)
+            except Exception:
+                pass
                     
         except Exception as e:
             _LOGGER.error(f"Error loading template data: {e}")
@@ -305,14 +328,19 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             type_info += f"/{subtype_info}"
         title_parts.append(f"Type: {type_info}")
         
-        # Add age
-        age = template_info.get('age', 'Unknown')
-        title_parts.append(f"Age: {age} days")
-        
-        # Add epoch info if multiple epochs
-        epochs = template_info.get('epochs', 1)
-        if epochs > 1:
-            title_parts.append(f"Epochs: {epochs}")
+        # Add age/epochs info from loaded HDF5 data
+        try:
+            if self.template_data and self.template_data.epochs:
+                age_min, age_max = self.template_data.get_age_range()
+                if age_min == age_max:
+                    title_parts.append(f"Age: {age_min:.1f} d")
+                else:
+                    title_parts.append(f"Ages: {age_min:.1f}…{age_max:.1f} d")
+                epochs_count = len(self.template_data.epochs)
+                if epochs_count > 1:
+                    title_parts.append(f"Epochs: {epochs_count}")
+        except Exception:
+            pass
         
         title = " | ".join(title_parts)
         self.plot_item.setTitle(title)

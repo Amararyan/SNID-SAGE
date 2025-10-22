@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import json
 import threading
 from importlib import resources
+import os
 
 import numpy as np
 import h5py
@@ -47,67 +48,13 @@ def _compute_builtin_dir() -> Path:
 
 
 _BUILTIN_DIR = _compute_builtin_dir()
+from snid_sage.shared.utils.paths.user_templates import get_user_templates_dir
 
-# Determine a writable user templates directory. Prefer app config dir.
-def _compute_user_dir() -> Path:
-    """Resolve user templates dir with precedence and writable checks.
+def _user_index_path() -> Optional[Path]:
+    p = get_user_templates_dir(strict=True)
+    return (p / "template_index.user.json") if p else None
 
-    Precedence:
-    1) Config 'paths.user_templates_dir' if set and writable
-    2) <templates_dir>/User_templates if writable
-    3) Documents/SNID_SAGE/User_templates
-    4) AppData config_dir/templates/User_templates
-    5) Home fallback ~/.snid_sage/User_templates
-    """
-    from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
-    cfg = ConfigurationManager()
-
-    # 1) User override in config
-    try:
-        override = (cfg.get_current_config() or {}).get('paths', {}).get('user_templates_dir')
-        if override:
-            p = Path(override)
-            p.mkdir(parents=True, exist_ok=True)
-            if os.access(p, os.W_OK):
-                return p
-    except Exception:
-        pass
-
-    # 2) Sibling of built-ins
-    try:
-        sibling = _BUILTIN_DIR / "User_templates"
-        sibling.mkdir(parents=True, exist_ok=True)
-        if os.access(sibling, os.W_OK):
-            return sibling
-    except Exception:
-        pass
-
-    # 3) Documents/SNID_SAGE/User_templates
-    try:
-        docs = Path.home() / 'Documents' / 'SNID_SAGE' / 'User_templates'
-        docs.mkdir(parents=True, exist_ok=True)
-        if os.access(docs, os.W_OK):
-            return docs
-    except Exception:
-        pass
-
-    # 4) AppData config_dir/templates/User_templates
-    try:
-        appdata = Path(cfg.config_dir) / 'templates' / 'User_templates'
-        appdata.mkdir(parents=True, exist_ok=True)
-        if os.access(appdata, os.W_OK):
-            return appdata
-    except Exception:
-        pass
-
-    # 5) Home fallback
-    fallback = Path.home() / ".snid_sage" / "User_templates"
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback
-
-
-_USER_DIR = _compute_user_dir()
-_USER_INDEX = _USER_DIR / "template_index.user.json"
+_USER_INDEX = _user_index_path()
 _BUILTIN_INDEX = _BUILTIN_DIR / "template_index.json"
 
 
@@ -136,7 +83,12 @@ class TemplateService:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        _USER_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            p = get_user_templates_dir(strict=True)
+            if p is not None:
+                p.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         # Lazy cache
         self._standard_grid = StandardGrid()
         self._standard_wave = self._standard_grid.wavelength()
@@ -149,11 +101,8 @@ class TemplateService:
             "by_type": {},
             "template_count": 0,
         }
-
-    def get_user_templates_dir(self) -> str:
-        """Return absolute path to the active user templates directory."""
-        return str(_USER_DIR)
-        user = self._read_json(_USER_INDEX) or {
+        idx_path = _user_index_path()
+        user = self._read_json(idx_path) or {
             "templates": {},
             "by_type": {},
             "template_count": 0,
@@ -181,6 +130,11 @@ class TemplateService:
             "by_type": by_type,
         }
 
+    def get_user_templates_dir(self) -> Optional[str]:
+        """Return absolute path to the active user templates directory or None if unset."""
+        p = get_user_templates_dir(strict=True)
+        return str(p) if p else None
+
     def get_builtin_index(self) -> Dict[str, Any]:
         """Return only the built-in index (no user templates)."""
         data = self._read_json(_BUILTIN_INDEX) or {
@@ -200,7 +154,8 @@ class TemplateService:
 
     def get_user_index(self) -> Dict[str, Any]:
         """Return only the user index (no built-in templates)."""
-        data = self._read_json(_USER_INDEX) or {
+        idx_path = _user_index_path()
+        data = self._read_json(idx_path) or {
             "version": "2.0",
             "template_count": 0,
             "templates": {},
@@ -216,7 +171,8 @@ class TemplateService:
 
     def has_user_templates(self) -> bool:
         """Return True if any user templates exist."""
-        data = self._read_json(_USER_INDEX) or {}
+        idx_path = _user_index_path()
+        data = self._read_json(idx_path) or {}
         templates = (data.get("templates") or {})
         return bool(templates)
 
@@ -228,9 +184,9 @@ class TemplateService:
         subtype: str,
         age: float,
         redshift: float,
-        phase: str,
         wave: np.ndarray,
         flux: np.ndarray,
+        combine_only: bool = False,
     ) -> bool:
         """
         Append a template to the per-type user HDF5 and update the user index.
@@ -248,44 +204,51 @@ class TemplateService:
                 rebinned_flux = self._rebin_to_standard_grid(wave, flux)
                 fft = np.fft.fft(rebinned_flux)
 
-                # Write (append or create) to HDF5
-                self._append_to_h5(
+                # Write (append/combine or create) to HDF5
+                final_name, combined, epochs_count, status = self._append_to_h5(
                     h5_abs_path,
                     name,
                     ttype,
                     subtype,
                     age,
                     redshift,
-                    phase,
                     rebinned_flux,
                     fft,
+                    allow_suffix=(not combine_only),
                 )
+                if combine_only and not combined:
+                    # Do not create a suffixed template when explicitly adding to existing
+                    return False
 
-                # Update user index
-                index = self._read_json(_USER_INDEX) or {
+                # Update user index (omit non-essential fields like phase/age/rebinned)
+                idx_path = _user_index_path()
+                index = self._read_json(idx_path) or {
                     "version": "2.0",
                     "templates": {},
                     "by_type": {},
                     "template_count": 0,
                 }
                 index_templates = index.setdefault("templates", {})
-                index_templates[name] = {
-                    "type": ttype,
-                    "subtype": subtype,
-                    "age": float(age),
-                    "redshift": float(redshift),
-                    "phase": phase,
-                    "epochs": 1,
-                    "file_path": "",  # No LNW provenance
-                    "storage_file": str(h5_abs_path).replace("\\", "/"),
-                    "rebinned": True,
-                }
+                if combined and final_name in index_templates:
+                    # Update epochs count; preserve existing metadata, enforce storage_file
+                    entry = index_templates[final_name]
+                    entry["epochs"] = int(epochs_count)
+                    entry["storage_file"] = str(h5_abs_path).replace("\\", "/")
+                else:
+                    index_templates[final_name] = {
+                        "type": ttype,
+                        "subtype": subtype,
+                        "redshift": float(redshift),
+                        "epochs": 1 if not combined else int(epochs_count),
+                        "storage_file": str(h5_abs_path).replace("\\", "/"),
+                    }
 
                 # Recompute by_type summary
                 index["by_type"] = self._compute_by_type(index_templates)
                 index["template_count"] = len(index_templates)
 
-                self._write_json_atomic(_USER_INDEX, index)
+                if idx_path is not None:
+                    self._write_json_atomic(idx_path, index)
             return True
         except Exception:
             return False
@@ -294,7 +257,8 @@ class TemplateService:
         """Update metadata attributes for a user template and its index entry."""
         try:
             with self._lock:
-                index = self._read_json(_USER_INDEX) or {}
+                idx_path = _user_index_path()
+                index = self._read_json(idx_path) or {}
                 tmpl = (index.get("templates") or {}).get(name)
                 if not tmpl:
                     return False  # only user templates can be edited
@@ -309,20 +273,21 @@ class TemplateService:
                     if g is None:
                         return False
                     for k, v in changes.items():
-                        if k in {"type", "subtype", "phase"} and isinstance(v, str):
+                        if k in {"type", "subtype"} and isinstance(v, str):
                             g.attrs[k] = v
                         elif k in {"age", "redshift"}:
                             try:
                                 g.attrs[k] = float(v)
                             except Exception:
                                 pass
-                # Update index entry
-                for k in ["type", "subtype", "phase", "age", "redshift"]:
+                # Update index entry (omit phase/age which are HDF5-only)
+                for k in ["type", "subtype", "redshift"]:
                     if k in changes:
                         tmpl[k] = changes[k]
                 # Write back
                 index["by_type"] = self._compute_by_type(index.get("templates", {}))
-                self._write_json_atomic(_USER_INDEX, index)
+                if idx_path is not None:
+                    self._write_json_atomic(idx_path, index)
             return True
         except Exception:
             return False
@@ -331,7 +296,8 @@ class TemplateService:
         """Delete a user template group and its index entry."""
         try:
             with self._lock:
-                index = self._read_json(_USER_INDEX) or {}
+                idx_path = _user_index_path()
+                index = self._read_json(idx_path) or {}
                 templates = index.get("templates") or {}
                 meta = templates.get(name)
                 # If missing in index, try to find and delete from any user H5
@@ -339,7 +305,10 @@ class TemplateService:
                 if meta:
                     storage_abs = Path(meta.get("storage_file", "")).resolve()
                 else:
-                    for h5_path in (_USER_DIR.glob("templates_*.user.hdf5")):
+                    user_dir = get_user_templates_dir(strict=True)
+                    if not user_dir:
+                        return False
+                    for h5_path in (user_dir.glob("templates_*.user.hdf5")):
                         try:
                             with h5py.File(h5_path, "r") as f:
                                 if "templates" in f and name in f["templates"]:
@@ -370,7 +339,8 @@ class TemplateService:
                     templates.pop(name, None)
                     index["by_type"] = self._compute_by_type(templates)
                     index["template_count"] = len(templates)
-                    self._write_json_atomic(_USER_INDEX, index)
+                    if idx_path is not None:
+                        self._write_json_atomic(idx_path, index)
                 # Delete empty H5 file and rebuild index if needed
                 if storage_abs.exists():
                     try:
@@ -400,9 +370,13 @@ class TemplateService:
         summary = {"removed_groups": 0, "deleted_files": 0}
         try:
             with self._lock:
-                index = self._read_json(_USER_INDEX) or {"templates": {}}
+                idx_path = _user_index_path()
+                index = self._read_json(idx_path) or {"templates": {}}
                 referenced = set((index.get("templates") or {}).keys())
-                for h5_path in (_USER_DIR.glob("templates_*.user.hdf5")):
+                user_dir = get_user_templates_dir(strict=True)
+                if not user_dir:
+                    return summary
+                for h5_path in (user_dir.glob("templates_*.user.hdf5")):
                     removed_here = 0
                     try:
                         with h5py.File(h5_path, "a") as f:
@@ -443,6 +417,8 @@ class TemplateService:
             return summary
         return summary
 
+    # Cleanup helpers were removed after one-time migration
+
     def rename(self, old_name: str, new_name: str) -> bool:
         """Renaming/duplication is disabled for built-in or user templates by policy."""
         return False
@@ -455,7 +431,10 @@ class TemplateService:
         """Re-scan user HDF5 files and rebuild the user index from scratch."""
         try:
             templates: Dict[str, Any] = {}
-            for h5_path in (_USER_DIR.glob("templates_*.user.hdf5")):
+            user_dir = get_user_templates_dir(strict=True)
+            if not user_dir:
+                return False
+            for h5_path in (user_dir.glob("templates_*.user.hdf5")):
                 with h5py.File(h5_path, "r") as f:
                     if "templates" not in f:
                         continue
@@ -466,13 +445,9 @@ class TemplateService:
                         templates[name] = {
                             "type": attrs.get("type", "Unknown"),
                             "subtype": attrs.get("subtype", "Unknown"),
-                            "age": float(attrs.get("age", 0.0)),
                             "redshift": float(attrs.get("redshift", 0.0)),
-                            "phase": attrs.get("phase", "Unknown"),
                             "epochs": int(attrs.get("epochs", 1)),
-                            "file_path": "",
                             "storage_file": str(h5_path).replace("\\", "/"),
-                            "rebinned": True,
                         }
             index = {
                 "version": "2.0",
@@ -481,7 +456,10 @@ class TemplateService:
                 "template_count": len(templates),
             }
             with self._lock:
-                self._write_json_atomic(_USER_INDEX, index)
+                idx_path = _user_index_path()
+                if idx_path is None:
+                    return False
+                self._write_json_atomic(idx_path, index)
             return True
         except Exception:
             return False
@@ -513,7 +491,10 @@ class TemplateService:
     def _ensure_user_h5_for_type(self, ttype: str) -> Path:
         """Ensure the per-type user HDF5 exists; return absolute path in user config dir."""
         safe_type = ttype.replace("/", "_").replace("-", "_").replace(" ", "_")
-        abs_path = _USER_DIR / f"templates_{safe_type}.user.hdf5"
+        user_dir = get_user_templates_dir(strict=True)
+        if user_dir is None:
+            raise RuntimeError("User templates directory is not set. Please configure it in the GUI settings.")
+        abs_path = user_dir / f"templates_{safe_type}.user.hdf5"
         if not abs_path.exists():
             abs_path.parent.mkdir(parents=True, exist_ok=True)
             with h5py.File(abs_path, "w") as f:
@@ -540,16 +521,91 @@ class TemplateService:
         subtype: str,
         age: float,
         redshift: float,
-        phase: str,
         flux: np.ndarray,
         fft: np.ndarray,
-    ) -> None:
-        # Handle name collision by suffixing
-        final_name = name
+        allow_suffix: bool = True,
+    ) -> tuple[str, bool, int, str]:
+        """Append or combine into an existing template group if same name and redshift.
+
+        Returns (final_name, combined, epochs_count)
+        """
         with h5py.File(h5_path, "a") as f:
             templates_group = f["templates"]
+            # Combine if same name exists and redshift matches
+            if name in templates_group:
+                g = templates_group[name]
+                try:
+                    existing_z = float(g.attrs.get("redshift", float("nan")))
+                except Exception:
+                    existing_z = float("nan")
+                if np.isfinite(existing_z) and abs(existing_z - float(redshift)) < 1e-6:
+                    # Multi-epoch combine (only if no duplicate epoch age)
+                    # Check duplicate ages (tolerance)
+                    age_tol = 1e-3
+                    duplicate_age = False
+                    existing_ages: list[float] = []
+                    try:
+                        if "epochs" in g:
+                            for ek in g["epochs"].keys():
+                                try:
+                                    existing_ages.append(float(g["epochs"][ek].attrs.get("age", float("nan"))))
+                                except Exception:
+                                    continue
+                        else:
+                            existing_ages.append(float(g.attrs.get("age", float("nan"))))
+                    except Exception:
+                        existing_ages = []
+                    try:
+                        for ea in existing_ages:
+                            if np.isfinite(ea) and abs(ea - float(age)) < age_tol:
+                                duplicate_age = True
+                                break
+                    except Exception:
+                        duplicate_age = False
+                    if not duplicate_age:
+                        # Ensure epochs group exists, move current data if needed
+                        if "epochs" not in g:
+                            eg = g.create_group("epochs")
+                            eg0 = eg.create_group("epoch_0")
+                            eg0.create_dataset("flux", data=g["flux"][:])
+                            eg0.create_dataset("fft_real", data=g["fft_real"][:])
+                            eg0.create_dataset("fft_imag", data=g["fft_imag"][:])
+                            eg0.attrs["age"] = float(g.attrs.get("age", 0.0))
+                            eg0.attrs["rebinned"] = True
+                        # Append new epoch
+                        eg = g["epochs"]
+                        new_epoch_idx = len(list(eg.keys()))
+                        egn = eg.create_group(f"epoch_{new_epoch_idx}")
+                        egn.create_dataset("flux", data=flux)
+                        egn.create_dataset("fft_real", data=np.asarray(fft.real))
+                        egn.create_dataset("fft_imag", data=np.asarray(fft.imag))
+                        egn.attrs["age"] = float(age)
+                        egn.attrs["rebinned"] = True
+                        # Update epochs count and latest age
+                        g.attrs["epochs"] = new_epoch_idx + 1
+                        g.attrs["age"] = float(age)
+                        # Keep top-level flux/fft as last epoch for compatibility
+                        try:
+                            del g["flux"]
+                            del g["fft_real"]
+                            del g["fft_imag"]
+                        except Exception:
+                            pass
+                        g.create_dataset("flux", data=flux)
+                        g.create_dataset("fft_real", data=np.asarray(fft.real))
+                        g.create_dataset("fft_imag", data=np.asarray(fft.imag))
+                    return name, True, int(g.attrs.get("epochs", 1)), "combined"
+                    # else: fall through to create a suffixed new template name
+                else:
+                    # z mismatch
+                    if not allow_suffix:
+                        return name, False, 0, "z_mismatch"
+            # Otherwise, create new (handle name collision by suffixing)
+            final_name = name
             suffix = 1
             while final_name in templates_group:
+                if not allow_suffix:
+                    return name, False, 0, "name_taken"
                 final_name = f"{name}_{suffix}"
                 suffix += 1
             g = templates_group.create_group(final_name)
@@ -560,9 +616,7 @@ class TemplateService:
             g.attrs["subtype"] = subtype
             g.attrs["age"] = float(age)
             g.attrs["redshift"] = float(redshift)
-            g.attrs["phase"] = phase
             g.attrs["epochs"] = 1
-            g.attrs["file_path"] = ""  # no provenance .lnw
             g.attrs["rebinned"] = True
             # bump count
             meta = f["metadata"]
@@ -570,6 +624,7 @@ class TemplateService:
                 meta.attrs["template_count"] = int(meta.attrs.get("template_count", 0)) + 1
             except Exception:
                 meta.attrs["template_count"] = 1
+            return final_name, False, 1, "created"
 
     def _compute_by_type(self, templates: Dict[str, Any]) -> Dict[str, Any]:
         by_type: Dict[str, Any] = {}

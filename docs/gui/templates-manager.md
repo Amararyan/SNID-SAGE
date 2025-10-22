@@ -17,8 +17,19 @@ For step-by-step workflows and expanded CLI usage, see the [CLI Reference](../cl
 ### Data source and overrides
 - The browser lists templates using a merged index:
   - Base index: `snid_sage/templates/template_index.json`
-  - User index: `snid_sage/templates/User_templates/template_index.user.json`
-- If a per-type user HDF5 exists (e.g., `User_templates/templates_Ia.user.hdf5`), entries for that type come exclusively from the user file; base entries for the same type are hidden. This prevents duplicates in the UI and reflects user edits immediately.
+  - User index: `<User Templates Folder>/template_index.user.json`
+- If a per-type user HDF5 exists (e.g., `<User Templates Folder>/templates_Ia.user.hdf5`), entries for that type come exclusively from the user file; base entries for the same type are hidden. This prevents duplicates in the UI and reflects user edits immediately.
+
+### User Templates folder (prompt-once + remember)
+- On first use, the Template Manager shows a small banner asking you to set the **User Templates Folder**.
+- You can:
+  - Choose any directory (recommended to keep it under your documents/workspace)
+  - Adopt an existing folder discovered from previous versions
+- The chosen folder is remembered in configuration (`paths.user_templates_dir`).
+- You can change it later via:
+  - Left panel: "Change User Folder"
+  - The banner (when visible)
+  - Settings → Configuration → Paths → User Templates Directory
 
 ### Tasks
 - Browse and preview templates with metadata

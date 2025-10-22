@@ -46,7 +46,6 @@ class TemplateEntry:
     subtype: str
     age: float
     redshift: float
-    phase: str
     flux: np.ndarray  # Already rebinned to standard grid
     fft: np.ndarray   # Pre-computed FFT
     epochs: int = 1
@@ -218,9 +217,9 @@ class TemplateFFTStorage:
 
         # Load templates from storage
         if use_prefetching:
-            return self._load_templates_with_prefetching(candidate_names, progress_callback)
+            return self._load_templates_with_prefetching(candidate_names, progress_callback, age_range)
         else:
-            return self._load_templates_from_storage(candidate_names, progress_callback)
+            return self._load_templates_from_storage(candidate_names, progress_callback, age_range)
     
     def get_template_fft(self, template_name: str) -> Optional[np.ndarray]:
         """
@@ -317,55 +316,14 @@ class TemplateFFTStorage:
                 _LOG.warning(f"Failed to load index file: {e}")
                 base_index = None
 
-        # 2) Compute user directory via configuration manager (fallbacks to template_dir/User_templates)
-        def _compute_user_dir_fallback() -> Path:
-            """Match TemplateService precedence for user dir resolution."""
-            try:
-                from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
-                cfg = ConfigurationManager()
-                # 1) Config override
-                ov = (cfg.get_current_config() or {}).get('paths', {}).get('user_templates_dir')
-                if ov:
-                    p = Path(ov)
-                    p.mkdir(parents=True, exist_ok=True)
-                    if os.access(p, os.W_OK):
-                        return p
-            except Exception:
-                pass
-            # 2) Sibling next to built-ins (self.template_dir is built-ins dir when installed)
-            try:
-                sib = self.template_dir / 'User_templates'
-                sib.mkdir(parents=True, exist_ok=True)
-                if os.access(sib, os.W_OK):
-                    return sib
-            except Exception:
-                pass
-            # 3) Documents
-            try:
-                docs = Path.home() / 'Documents' / 'SNID_SAGE' / 'User_templates'
-                docs.mkdir(parents=True, exist_ok=True)
-                if os.access(docs, os.W_OK):
-                    return docs
-            except Exception:
-                pass
-            # 4) AppData config
-            try:
-                from snid_sage.shared.utils.config.configuration_manager import ConfigurationManager
-                cfg = ConfigurationManager()
-                appdata = Path(cfg.config_dir) / 'templates' / 'User_templates'
-                appdata.mkdir(parents=True, exist_ok=True)
-                if os.access(appdata, os.W_OK):
-                    return appdata
-            except Exception:
-                pass
-            # 5) Home fallback
-            fb = Path.home() / '.snid_sage' / 'User_templates'
-            fb.mkdir(parents=True, exist_ok=True)
-            return fb
-
-        user_dir = _compute_user_dir_fallback()
-        user_index_path = user_dir / 'template_index.user.json'
-        if user_index_path.exists():
+        # Resolve configured user directory via centralized resolver (no silent fallbacks here)
+        try:
+            from snid_sage.shared.utils.paths.user_templates import get_user_templates_dir
+            user_dir = get_user_templates_dir(strict=True)
+        except Exception:
+            user_dir = None
+        user_index_path = (user_dir / 'template_index.user.json') if user_dir is not None else None
+        if user_index_path is not None and user_index_path.exists():
             try:
                 with open(user_index_path, 'r', encoding='utf-8') as f:
                     user_index = json.load(f)
@@ -450,7 +408,6 @@ class TemplateFFTStorage:
                             break
                 
                 redshift = float(template_data.get('redshift', 0))
-                phase = template_data.get('phase', 'Unknown')
                 
                 # Get spectral data
                 wave = template_data.get('wave', np.array([]))
@@ -535,7 +492,6 @@ class TemplateFFTStorage:
                     subtype=subtype,
                     age=age,
                     redshift=redshift,
-                    phase=phase,
                     flux=flux,  # Already rebinned to standard grid
                     fft=fft,
                     epochs=epochs,
@@ -595,9 +551,8 @@ class TemplateFFTStorage:
                 template_group.attrs['subtype'] = template.subtype
                 template_group.attrs['age'] = template.age
                 template_group.attrs['redshift'] = template.redshift
-                template_group.attrs['phase'] = template.phase
                 template_group.attrs['epochs'] = template.epochs
-                template_group.attrs['file_path'] = template.file_path
+                # removed file_path attribute (no LNW provenance in HDF5)
                 template_group.attrs['rebinned'] = True  # Flag for rebinned data
                 
                 # Store epoch data if multi-epoch
@@ -647,13 +602,9 @@ class TemplateFFTStorage:
                 index['templates'][template.name] = {
                     'type': template.type,
                     'subtype': template.subtype,
-                    'age': template.age,
                     'redshift': template.redshift,
-                    'phase': template.phase,
                     'epochs': template.epochs,
-                    'file_path': template.file_path,
                     'storage_file': str(self._get_storage_file_for_type(sn_type)),
-                    'rebinned': True
                 }
                 type_info['template_names'].append(template.name)
             
@@ -691,17 +642,23 @@ class TemplateFFTStorage:
             if subtype_filter and metadata.get('subtype') not in subtype_filter:
                 continue
             
-            # Filter by age range
+            # Filter by age range (tolerate missing age in index)
             if age_range:
-                age = metadata.get('age', 0)
-                if age < age_range[0] or age > age_range[1]:
-                    continue
+                if 'age' in metadata:
+                    age = metadata.get('age')
+                    try:
+                        age_val = float(age)
+                    except Exception:
+                        age_val = None
+                    if age_val is not None and (age_val < age_range[0] or age_val > age_range[1]):
+                        continue
+                # If no age in metadata, do not filter here; allow downstream filtering by epoch ages
             
             candidates.append(name)
         
         return candidates
     
-    def _load_templates_with_prefetching(self, template_names: List[str], progress_callback: Optional[Callable[[str, float], None]] = None) -> List[TemplateEntry]:
+    def _load_templates_with_prefetching(self, template_names: List[str], progress_callback: Optional[Callable[[str, float], None]] = None, age_range: Optional[Tuple[float, float]] = None) -> List[TemplateEntry]:
         """Load templates with prefetching for better performance (with optional progress reporting)."""
         templates = []
         
@@ -745,7 +702,8 @@ class TemplateFFTStorage:
                 self._load_templates_from_single_file, 
                 storage_file_path, 
                 file_template_names,
-                _progress_hook
+                _progress_hook,
+                age_range
             )
             file_futures[storage_file_path] = future
         
@@ -766,7 +724,7 @@ class TemplateFFTStorage:
 
         return templates
     
-    def _load_templates_from_storage(self, template_names: List[str], progress_callback: Optional[Callable[[str, float], None]] = None) -> List[TemplateEntry]:
+    def _load_templates_from_storage(self, template_names: List[str], progress_callback: Optional[Callable[[str, float], None]] = None, age_range: Optional[Tuple[float, float]] = None) -> List[TemplateEntry]:
         """Load specific templates from type-specific HDF5 storage files (NO prefetching)."""
         templates = []
         
@@ -800,7 +758,7 @@ class TemplateFFTStorage:
 
         # Load from each storage file
         for storage_file_path, file_template_names in templates_by_file.items():
-            file_templates = self._load_templates_from_single_file(storage_file_path, file_template_names, _progress_hook)
+            file_templates = self._load_templates_from_single_file(storage_file_path, file_template_names, _progress_hook, age_range)
             templates.extend(file_templates)
         
         # Ensure completion is reported
@@ -812,7 +770,7 @@ class TemplateFFTStorage:
 
         return templates
     
-    def _load_templates_from_single_file(self, storage_file_path: str, template_names: List[str], progress_hook: Optional[Callable[[int], None]] = None) -> List[TemplateEntry]:
+    def _load_templates_from_single_file(self, storage_file_path: str, template_names: List[str], progress_hook: Optional[Callable[[int], None]] = None, age_range: Optional[Tuple[float, float]] = None) -> List[TemplateEntry]:
         """Load templates from a single HDF5 file (optionally invoking a progress hook per template)."""
         templates = []
         
@@ -867,8 +825,32 @@ class TemplateFFTStorage:
                                 'fft': epoch_fft,
                                 'age': epoch_group.attrs.get('age', 0)
                             }
-                            epoch_data.append(epoch_info)
+                            # Apply age_range filtering at epoch level if provided
+                            if age_range is not None:
+                                try:
+                                    a = float(epoch_info['age'])
+                                    if age_range[0] <= a <= age_range[1]:
+                                        epoch_data.append(epoch_info)
+                                except Exception:
+                                    # If age not a number, keep it (conservative)
+                                    epoch_data.append(epoch_info)
+                            else:
+                                epoch_data.append(epoch_info)
                     
+                    # If multi-epoch and age_range provided, skip template if no epochs remain
+                    if age_range is not None and attrs.get('epochs', 1) > 1 and len(epoch_data) == 0:
+                        continue
+
+                    # For single-epoch, if age_range provided, check top-level age
+                    if age_range is not None and not ('epochs' in group and attrs.get('epochs', 1) > 1):
+                        try:
+                            a0 = float(attrs.get('age', 0))
+                            if a0 < age_range[0] or a0 > age_range[1]:
+                                continue
+                        except Exception:
+                            # If invalid age, do not filter it out
+                            pass
+
                     # Create template entry (flux is already rebinned)
                     template = TemplateEntry(
                         name=name,
@@ -876,12 +858,11 @@ class TemplateFFTStorage:
                         subtype=attrs.get('subtype', 'Unknown'),
                         age=attrs.get('age', 0),
                         redshift=attrs.get('redshift', 0),
-                        phase=attrs.get('phase', 'Unknown'),
                         flux=flux,  # Already rebinned to standard grid
                         fft=fft,
                         epochs=attrs.get('epochs', 1),
                         epoch_data=epoch_data,
-                        file_path=attrs.get('file_path', '')
+                        file_path=""
                     )
                     
                     templates.append(template)

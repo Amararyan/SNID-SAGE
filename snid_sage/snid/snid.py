@@ -1911,7 +1911,11 @@ def run_snid_analysis(
                 max_clusters_per_type=10,
                 verbose=verbose,
                 rlap_ccc_threshold=rlap_ccc_threshold,  # RLAP-CCC threshold
-                use_weighted_gmm=bool(use_weighted_gmm)
+                use_weighted_gmm=bool(use_weighted_gmm),
+                # Wire progress so GUI can show incremental updates in Results & Clustering
+                progress_callback=(progress_callback if 'progress_callback' in locals() else None),
+                progress_min=90.0,
+                progress_max=98.0
             )
             
             if clustering_results['success'] and clustering_results['best_cluster']:

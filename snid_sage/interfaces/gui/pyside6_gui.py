@@ -1393,7 +1393,8 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                     self._current_progress_stage = stage
 
                 # Always update percentage with the stable stage label
-                self.progress_dialog.set_stage(self._current_progress_stage, int(progress))
+                display_progress = 100 if stage == "Complete" else int(progress)
+                self.progress_dialog.set_stage(self._current_progress_stage, display_progress)
 
                 # Still show the raw progress message in the log panel (when non-empty)
                 if message and message.strip():

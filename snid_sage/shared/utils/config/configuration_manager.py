@@ -411,7 +411,7 @@ class ConfigurationManager:
             self._current_config = config
             return True
             
-        except (OSError, json.JSONEncodeError) as e:
+        except (OSError, TypeError, ValueError) as e:
             raise ConfigurationError(f"Failed to save configuration: {e}")
     
     def validate_config(self, config: Dict[str, Any]) -> 'ValidationResult':
@@ -439,12 +439,35 @@ class ConfigurationManager:
                 
                 value = category_config[param_name]
                 
-                # Check min/max values
-                if rule.min_value is not None and value < rule.min_value:
-                    errors.append(f"{category}.{param_name}: {rule.error_message}")
+                # Treat None as "unset": skip min/max/allowed checks; run custom validator if present
+                if value is None:
+                    if rule.custom_validator is not None:
+                        try:
+                            if not rule.custom_validator(value):
+                                errors.append(f"{category}.{param_name}: {rule.error_message}")
+                        except Exception as e:
+                            errors.append(f"{category}.{param_name}: Validation error - {e}")
                     continue
-                
-                if rule.max_value is not None and value > rule.max_value:
+
+                # Check min/max values
+                try:
+                    if rule.min_value is not None and value < rule.min_value:
+                        errors.append(f"{category}.{param_name}: {rule.error_message}")
+                        continue
+                    
+                    if rule.max_value is not None and value > rule.max_value:
+                        errors.append(f"{category}.{param_name}: {rule.error_message}")
+                        continue
+                except TypeError:
+                    # Incompatible types (e.g., string vs number); defer to custom validator if provided
+                    if rule.custom_validator is not None:
+                        try:
+                            if not rule.custom_validator(value):
+                                errors.append(f"{category}.{param_name}: {rule.error_message}")
+                        except Exception as e:
+                            errors.append(f"{category}.{param_name}: Validation error - {e}")
+                        continue
+                    # Otherwise, treat as invalid type
                     errors.append(f"{category}.{param_name}: {rule.error_message}")
                     continue
                 
@@ -461,15 +484,24 @@ class ConfigurationManager:
                     except Exception as e:
                         errors.append(f"{category}.{param_name}: Validation error - {e}")
         
-        # Additional cross-parameter validation
+        # Additional cross-parameter validation (robust to None/non-numeric)
         if 'analysis' in config:
             analysis = config['analysis']
-            if ('redshift_min' in analysis and 'redshift_max' in analysis and 
-                analysis['redshift_min'] >= analysis['redshift_max']):
+
+            def _to_float(val):
+                try:
+                    return float(val)
+                except Exception:
+                    return None
+
+            zmin = _to_float(analysis.get('redshift_min')) if 'redshift_min' in analysis else None
+            zmax = _to_float(analysis.get('redshift_max')) if 'redshift_max' in analysis else None
+            if zmin is not None and zmax is not None and zmin >= zmax:
                 errors.append("analysis.redshift_min must be less than redshift_max")
-            
-            if ('age_min' in analysis and 'age_max' in analysis and 
-                analysis['age_min'] >= analysis['age_max']):
+
+            amin = _to_float(analysis.get('age_min')) if 'age_min' in analysis else None
+            amax = _to_float(analysis.get('age_max')) if 'age_max' in analysis else None
+            if amin is not None and amax is not None and amin >= amax:
                 errors.append("analysis.age_min must be less than age_max")
         
         return ValidationResult(

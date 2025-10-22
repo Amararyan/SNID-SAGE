@@ -422,7 +422,7 @@ def load_templates_unified(template_dir: str,
                     'subtype': entry.subtype,
                     'age': epoch_data['age'],
                     'redshift': entry.redshift,
-                    'phase': entry.phase,
+                    # phase removed
                     'wave': standard_wave,              # Standard grid wavelength
                     'flux': epoch_data['flux'],         # Already rebinned flux
                     'file_path': entry.file_path,
@@ -439,7 +439,7 @@ def load_templates_unified(template_dir: str,
                 'subtype': entry.subtype,
                 'age': entry.age,
                 'redshift': entry.redshift,
-                'phase': entry.phase,
+                # phase removed
                 'wave': standard_wave,              # Standard grid wavelength
                 'flux': entry.flux,                 # Already rebinned flux
                 'file_path': entry.file_path,

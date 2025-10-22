@@ -43,7 +43,10 @@ Once loaded, your spectrum appears in the main plot area. The interface shows:
 - **File information** in the status bar
 - **Available actions** become enabled
 
-### Step 3: Preprocess Your Data
+### Step 3: Set User Templates Folder (first use)
+If prompted in the Template Manager, choose your User Templates Folder (you can adopt an existing one or pick a new directory). This is required to create and manage your own templates.
+
+### Step 4: Preprocess Your Data
 1. Click **"Preprocessing"** button (amber - now enabled)
 2. **Right-click** for **"Quick SNID Preprocessing"** (automatic)
 3. **Left-click** for **"Advanced Manual Preprocessing"** (custom settings)
@@ -63,7 +66,7 @@ The preprocessing dialog shows your spectrum with preprocessing options:
 
 You can switch to the flux view by clicking the **Flux** button in the top-left corner.
 
-### Step 4: Run Analysis
+### Step 5: Run Analysis
 1. Click **"SNID Analysis"** button (magenta - now enabled)
 2. **Right-click** for **default quick analysis**
 3. **Left-click** for **specific analysis settings**
@@ -79,7 +82,7 @@ The analysis dialog shows:
 
 5. Results appear automatically
 
-### Step 5: Choose Your Cluster (If Available)
+### Step 6: Choose Your Cluster (If Available)
 If SNID SAGE finds multiple viable clusters, a **Cluster Selection Dialog** will appear:
 
 ![Clustering](../images/4.Clustering.png)

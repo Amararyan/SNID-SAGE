@@ -88,8 +88,6 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         right_panel = self.create_right_panel()
         splitter.addWidget(right_panel)
         
-        # Create status bar
-        self.create_status_bar()
         
     def create_left_panel(self) -> QtWidgets.QWidget:
         """Create the left panel with template browser"""
@@ -102,6 +100,22 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         header.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
         layout.addWidget(header)
         
+        # User folder banner (shown until user folder is configured)
+        banner = QtWidgets.QFrame()
+        banner.setObjectName("userFolderBanner")
+        banner_layout = QtWidgets.QHBoxLayout(banner)
+        banner_layout.setContentsMargins(8, 6, 8, 6)
+        banner_label = QtWidgets.QLabel("Set a User Templates folder to create and manage your own templates.")
+        banner_label.setStyleSheet("color: #1f2937;")
+        set_btn = QtWidgets.QPushButton("Set Folder…")
+        set_btn.clicked.connect(self._prompt_set_user_folder)
+        banner_layout.addWidget(banner_label)
+        banner_layout.addStretch(1)
+        banner_layout.addWidget(set_btn)
+        banner.setStyleSheet("#userFolderBanner { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; }")
+        self._user_folder_banner = banner
+        layout.addWidget(banner)
+
         # Search and filters
         search_frame = QtWidgets.QFrame()
         search_layout = QtWidgets.QVBoxLayout(search_frame)
@@ -148,7 +162,10 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
             bottom_row = QtWidgets.QHBoxLayout()
             open_user_btn = self.layout_manager.create_action_button("Open User Folder", "📂")
             open_user_btn.clicked.connect(self._open_user_folder)
+            change_user_btn = self.layout_manager.create_action_button("Change User Folder", "🛠")
+            change_user_btn.clicked.connect(self._prompt_set_user_folder)
             bottom_row.addWidget(open_user_btn)
+            bottom_row.addWidget(change_user_btn)
             bottom_row.addStretch()
             layout.addLayout(bottom_row)
         except Exception:
@@ -216,6 +233,40 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         except Exception as e:
             _LOGGER.warning(f"Source change failed: {e}")
         
+    def _on_tab_changed(self, index: int) -> None:
+        """When switching tabs, force the library to 'User' for Create/Manage."""
+        try:
+            if not hasattr(self, 'tab_widget'):
+                return
+            tab_text = self.tab_widget.tabText(index) if index is not None else ""
+            is_editing_tab = tab_text in {"Create Template", "Manage Templates"}
+            if is_editing_tab:
+                # Force source selector to 'User' and disable it
+                try:
+                    if hasattr(self, 'source_filter'):
+                        if (self.source_filter.currentText() or "").strip().title() != 'User':
+                            self.source_filter.setCurrentText('User')
+                        self.source_filter.setEnabled(False)
+                except Exception:
+                    pass
+                # Ensure the tree is in User mode
+                try:
+                    if hasattr(self, 'template_tree'):
+                        self.template_tree.set_source_mode('User')
+                        # Re-apply current filters
+                        self._filter_templates()
+                except Exception:
+                    pass
+            else:
+                # Re-enable the source selector when leaving editing tabs
+                try:
+                    if hasattr(self, 'source_filter'):
+                        self.source_filter.setEnabled(True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
     def create_right_panel(self) -> QtWidgets.QWidget:
         """Create the right panel with tabbed interface"""
         self.tab_widget = QtWidgets.QTabWidget()
@@ -245,6 +296,19 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         except Exception:
             pass
         
+        # Enforce 'User' source when switching to Create/Manage tabs
+        try:
+            self.tab_widget.currentChanged.connect(self._on_tab_changed)
+            # Apply once for the initial tab
+            try:
+                self._on_tab_changed(self.tab_widget.currentIndex())
+            except Exception:
+                pass
+        except Exception:
+            pass
+        
+        # Update banner visibility once UI is built
+        QtCore.QTimer.singleShot(0, self._update_user_folder_banner)
         return self.tab_widget
         
     def create_status_bar(self):
@@ -272,21 +336,19 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
     @QtCore.Slot(str, dict)
     def on_template_selected(self, template_name: str, template_info: Dict[str, Any]):
         """Handle template selection from tree"""
-        # Switch to viewer tab and update display
-        self.tab_widget.setCurrentIndex(0)
-        self.viewer_widget.set_template(template_name, template_info)
+        # Do not force-switch tabs; just update widgets so they're ready if user navigates
+        try:
+            self.viewer_widget.set_template(template_name, template_info)
+        except Exception:
+            pass
         
         # Update manager widget with selected template
-        self.manager_widget.set_template_for_editing(template_name, template_info)
+        try:
+            self.manager_widget.set_template_for_editing(template_name, template_info)
+        except Exception:
+            pass
         
-        # Update status bar
-        template_type = template_info.get('type', 'Unknown')
-        subtype = template_info.get('subtype', 'Unknown')
-        epochs = template_info.get('epochs', 1)
-        # Clean template name to remove _epoch_X suffix
-        from snid_sage.shared.utils import clean_template_name
-        clean_name = clean_template_name(template_name)
-        self.statusBar().showMessage(f"Selected: {clean_name} ({template_type}/{subtype}, {epochs} epochs)")
+        
     
     def get_current_template(self) -> Optional[tuple]:
         """Get the currently selected template"""
@@ -295,7 +357,6 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
     def refresh_template_library(self):
         """Refresh the template library"""
         self.template_tree.load_templates()
-        self.update_template_count()
         # Refresh Manage tab empty-state after refresh
         try:
             if hasattr(self, 'manager_widget'):
@@ -310,6 +371,35 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
             p = get_template_service().get_user_templates_dir()
             if p:
                 QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(p))
+        except Exception:
+            pass
+
+    def _update_user_folder_banner(self) -> None:
+        try:
+            from snid_sage.shared.utils.paths.user_templates import get_user_templates_dir
+            is_set = get_user_templates_dir(strict=True) is not None
+            if hasattr(self, '_user_folder_banner'):
+                self._user_folder_banner.setVisible(not is_set)
+        except Exception:
+            if hasattr(self, '_user_folder_banner'):
+                self._user_folder_banner.setVisible(True)
+
+    def _prompt_set_user_folder(self) -> None:
+        try:
+            from .dialogs.user_templates_folder_dialog import UserTemplatesFolderDialog
+            dlg = UserTemplatesFolderDialog(self)
+            dlg.folder_selected.connect(lambda _: self._after_user_folder_set())
+            dlg.exec()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Error", f"Unable to open folder selection dialog: {e}")
+
+    def _after_user_folder_set(self) -> None:
+        try:
+            self._update_user_folder_banner()
+            # Reload tree and manage tab empty-state
+            self.template_tree.load_templates()
+            if hasattr(self, 'manager_widget'):
+                self.manager_widget.update_empty_state()
         except Exception:
             pass
     

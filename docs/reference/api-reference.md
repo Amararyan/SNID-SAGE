@@ -585,7 +585,7 @@ def get_template_info(library_path: str) -> Dict
 
 #### Merged index and user overrides (HDF5)
 
-`get_template_info()` reads the unified storage index from `template_index.json` and, if present, merges it with the user index `User_templates/template_index.user.json`. If a per-type user HDF5 file exists (e.g., `User_templates/templates_Ia.user.hdf5`), templates for that type are taken exclusively from the user file and base entries for that type are ignored. This ensures that any user edits (add/rename/delete) for a type immediately take precedence across CLI and GUI without duplications.
+`get_template_info()` reads the unified storage index from `template_index.json` and, if present, merges it with the user index `<User Templates Folder>/template_index.user.json`. If a per-type user HDF5 file exists (e.g., `<User Templates Folder>/templates_Ia.user.hdf5`), templates for that type are taken exclusively from the user file and base entries for that type are ignored. This ensures that any user edits (add/rename/delete) for a type immediately take precedence across CLI and GUI without duplications.
 
 ---
 

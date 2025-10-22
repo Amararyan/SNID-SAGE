@@ -73,13 +73,15 @@ class TemplateData:
                         for epoch_name in sorted(epochs_group.keys()):
                             epoch_group = epochs_group[epoch_name]
                             flux_data = epoch_group['flux'][:]
-                            age = epoch_group.attrs.get('age', 0.0)
-                            phase = epoch_group.attrs.get('phase', 'Unknown')
-                            
+                            # Prefer HDF5 attr; default to NaN if missing/unparseable
+                            try:
+                                age_attr = epoch_group.attrs.get('age', np.nan)
+                                age = float(age_attr)
+                            except Exception:
+                                age = float('nan')
                             epoch_info = {
                                 'age': age,
-                                'flux': flux_data,
-                                'phase': phase
+                                'flux': flux_data
                             }
                             self.epochs.append(epoch_info)
                             _LOGGER.debug(f"Loaded epoch {epoch_name} with age {age} and {len(flux_data)} flux points")
@@ -89,14 +91,18 @@ class TemplateData:
                             self.flux_data = self.epochs[0]['flux']
                         
                     elif 'flux' in template_group:
-                        # Single epoch template
+                        # Single epoch template (pre-epochs layout)
                         flux_data = template_group['flux'][:]
-                        # Get age from template info if available
-                        age = self.info.get('age', 0.0)
+                        # Prefer age from HDF5 attrs; default to NaN if missing
+                        try:
+                            age_attr = template_group.attrs.get('age', np.nan)
+                            age = float(age_attr)
+                        except Exception:
+                            age = float('nan')
+                        # Phase stored as attr when present; otherwise Unknown
                         epoch_info = {
                             'age': age,
-                            'flux': flux_data,
-                            'phase': self.info.get('phase', 'Unknown')
+                            'flux': flux_data
                         }
                         self.epochs.append(epoch_info)
                         _LOGGER.info(f"Loaded single epoch with age {age} and {len(flux_data)} flux points")
@@ -163,13 +169,21 @@ class TemplateData:
     def get_age_range(self) -> tuple:
         """Get the age range of available epochs"""
         if not self.epochs:
-            return (0.0, 0.0)
+            return (float('nan'), float('nan'))
         
-        ages = [epoch['age'] for epoch in self.epochs if epoch['age'] != -999.0]
-        if not ages:
-            return (0.0, 0.0)
+        # Consider only finite ages
+        finite_ages = []
+        for epoch in self.epochs:
+            try:
+                a = float(epoch.get('age', float('nan')))
+                if np.isfinite(a):
+                    finite_ages.append(a)
+            except Exception:
+                continue
+        if not finite_ages:
+            return (float('nan'), float('nan'))
         
-        return (min(ages), max(ages))
+        return (min(finite_ages), max(finite_ages))
     
     def get_flux_range(self) -> tuple:
         """Get the flux range across all epochs"""

@@ -155,6 +155,26 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         self.edit_type.setCurrentText(template_info.get('type', 'Other'))
         self.edit_subtype.setText(template_info.get('subtype', ''))
         self.edit_age.setValue(template_info.get('age', 0.0))
+        # Disable editing controls if this is a built-in template (not in user index)
+        try:
+            svc = get_template_service()
+            user_templates = (svc.get_user_index().get('templates') or {})
+            is_user = template_name in user_templates
+        except Exception:
+            is_user = False
+        # Enable/disable inputs and buttons accordingly
+        try:
+            editable_widgets = [self.edit_type, self.edit_subtype, self.edit_age]
+            for w in editable_widgets:
+                w.setEnabled(is_user)
+            # Find buttons in the action frame by walking children
+            for btn in self.findChildren(QtWidgets.QPushButton):
+                if btn.text().strip().lower().startswith('save'):
+                    btn.setEnabled(is_user)
+                if btn.text().strip().lower().startswith('delete'):
+                    btn.setEnabled(is_user)
+        except Exception:
+            pass
     
     def _clear_form(self):
         """Clear the editing form"""

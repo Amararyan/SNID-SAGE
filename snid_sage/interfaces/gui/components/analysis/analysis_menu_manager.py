@@ -650,13 +650,16 @@ class AnalysisMenuManager:
                                                           reverse=True)
                         
                         # Update best_matches to only contain cluster templates
-                        # Use configured max_output_templates when available; fallback to 10
+                        # Prefer last run's max_output_templates from controller if present; fallback to config then 10
                         try:
-                            configured_max = (
-                                int(self.app_controller.current_config.get('analysis', {}).get('max_output_templates', 10))
-                                if hasattr(self.app_controller, 'current_config') and self.app_controller.current_config is not None
-                                else 10
-                            )
+                            if hasattr(self.app_controller, 'last_analysis_kwargs') and self.app_controller.last_analysis_kwargs and 'max_output_templates' in self.app_controller.last_analysis_kwargs:
+                                configured_max = int(self.app_controller.last_analysis_kwargs.get('max_output_templates', 10) or 10)
+                            else:
+                                configured_max = (
+                                    int(self.app_controller.current_config.get('analysis', {}).get('max_output_templates', 10))
+                                    if hasattr(self.app_controller, 'current_config') and self.app_controller.current_config is not None
+                                    else 10
+                                )
                         except Exception:
                             configured_max = 10
                         snid_results.best_matches = cluster_matches_sorted[:configured_max]

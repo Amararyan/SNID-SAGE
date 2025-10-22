@@ -17,7 +17,7 @@ as the transformation_comparison_test.py reference implementation.
 """
 
 import numpy as np
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Callable
 from sklearn.mixture import GaussianMixture
 import logging
 import time
@@ -79,74 +79,111 @@ def calculate_joint_subtype_estimates_from_cluster(
         _LOGGER.warning(f"No matches with valid (redshift, age) pairs found for subtype '{target_subtype}' in cluster")
         return np.nan, np.nan, np.nan, np.nan, np.nan, total_subtype_count, 0
     
-    # Use joint estimation for the subtype
-    z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance = calculate_joint_redshift_age_from_cluster(subtype_matches)
-    
-    age_template_count = len(subtype_matches)
-    
-    return z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance, total_subtype_count, age_template_count
-
-
-def calculate_joint_redshift_age_from_cluster(
-    cluster_matches: List[Dict[str, Any]]
-) -> Tuple[float, float, float, float, float]:
-    """
-    Calculate joint weighted redshift and age estimates with full covariance.
-    
-    Parameters
-    ----------
-    cluster_matches : List[Dict]
-        List of template match dictionaries from a cluster
-        
-    Returns
-    -------
-    Tuple[float, float, float, float, float]
-        (weighted_redshift, weighted_age, redshift_uncertainty, age_uncertainty, redshift_age_covariance)
-    """
-    if not cluster_matches:
-        return np.nan, np.nan, np.nan, np.nan, np.nan
-    
+    # Use weighted estimators directly for the subtype
     from snid_sage.shared.utils.math_utils import (
         get_best_metric_value,
-        compute_cluster_weights,
         estimate_weighted_redshift,
         estimate_weighted_epoch,
         weighted_redshift_se,
         weighted_epoch_se,
     )
-    
-    # Separate collection for redshift (with errors) and age (without errors)
+
     redshifts_for_estimation = []
     redshift_errors_for_estimation = []
     metric_values_for_redshift = []
-    
     ages_for_estimation = []
     metric_values_for_age = []
     age_redshift_errors_for_estimation = []
-    
-    for match in cluster_matches:
+
+    for match in subtype_matches:
         if 'redshift' in match:
             template = match.get('template', {})
             age = template.get('age', 0.0)
             metric_val = get_best_metric_value(match)
-            
-            # Collect redshift data (uncertainties always available)
             z = match.get('redshift')
             z_err = match.get('redshift_error', 0.0)
             if z is not None and np.isfinite(z) and z_err > 0:
                 redshifts_for_estimation.append(z)
                 redshift_errors_for_estimation.append(z_err)
                 metric_values_for_redshift.append(metric_val)
-            
-            # Collect age data using the SAME reliability weights as redshift
-            # Include only when a valid redshift uncertainty exists
-            # Note: Negative ages are acceptable (pre-maximum light)
             if np.isfinite(age) and z_err > 0:
                 ages_for_estimation.append(age)
                 metric_values_for_age.append(metric_val)
                 age_redshift_errors_for_estimation.append(z_err)
+
+    if redshifts_for_estimation:
+        z_mean = estimate_weighted_redshift(
+            redshifts_for_estimation,
+            redshift_errors_for_estimation,
+            metric_values_for_redshift
+        )
+        z_uncertainty = weighted_redshift_se(
+            redshifts_for_estimation,
+            redshift_errors_for_estimation,
+            metric_values_for_redshift
+        )
+    else:
+        _LOGGER.warning("No valid redshift data found in cluster matches")
+        z_mean, z_uncertainty = np.nan, np.nan
+
+    if ages_for_estimation and redshift_errors_for_estimation:
+        t_mean = estimate_weighted_epoch(
+            ages_for_estimation,
+            age_redshift_errors_for_estimation,
+            metric_values_for_age
+        )
+        t_uncertainty = weighted_epoch_se(
+            ages_for_estimation,
+            age_redshift_errors_for_estimation,
+            metric_values_for_age
+        )
+    else:
+        _LOGGER.warning("No valid age data found in cluster matches")
+        t_mean, t_uncertainty = np.nan, np.nan
+
+    zt_covariance = 0.0
     
-    # Calculate weighted means and SEs
+    age_template_count = len(subtype_matches)
+    
+    return z_mean, t_mean, z_uncertainty, t_uncertainty, zt_covariance, total_subtype_count, age_template_count
+
+
+def _compute_weighted_cluster_stats(
+    cluster_matches: List[Dict[str, Any]]
+) -> Tuple[float, float, float, float, float]:
+    """Compute weighted redshift/age and their SE for a set of matches.
+    Returns (z_mean, t_mean, z_se, t_se, zt_covariance)."""
+    from snid_sage.shared.utils.math_utils import (
+        get_best_metric_value,
+        estimate_weighted_redshift,
+        estimate_weighted_epoch,
+        weighted_redshift_se,
+        weighted_epoch_se,
+    )
+
+    redshifts_for_estimation = []
+    redshift_errors_for_estimation = []
+    metric_values_for_redshift = []
+    ages_for_estimation = []
+    metric_values_for_age = []
+    age_redshift_errors_for_estimation = []
+
+    for match in cluster_matches:
+        if 'redshift' in match:
+            template = match.get('template', {})
+            age = template.get('age', 0.0)
+            metric_val = get_best_metric_value(match)
+            z = match.get('redshift')
+            z_err = match.get('redshift_error', 0.0)
+            if z is not None and np.isfinite(z) and z_err > 0:
+                redshifts_for_estimation.append(z)
+                redshift_errors_for_estimation.append(z_err)
+                metric_values_for_redshift.append(metric_val)
+            if np.isfinite(age) and z_err > 0:
+                ages_for_estimation.append(age)
+                metric_values_for_age.append(metric_val)
+                age_redshift_errors_for_estimation.append(z_err)
+
     if redshifts_for_estimation:
         z_mean = estimate_weighted_redshift(
             redshifts_for_estimation,
@@ -177,10 +214,11 @@ def calculate_joint_redshift_age_from_cluster(
         _LOGGER.warning("No valid age data found in cluster matches")
         t_mean, t_se = np.nan, np.nan
 
-    # No covariance since we estimate separately
     zt_covariance = 0.0
 
     return z_mean, t_mean, z_se, t_se, zt_covariance
+
+    
 
 
 def perform_direct_gmm_clustering(
@@ -190,7 +228,11 @@ def perform_direct_gmm_clustering(
     max_clusters_per_type: int = 10,
     verbose: bool = False,
     rlap_ccc_threshold: float = 1.8,  # NEW: RLAP-CCC threshold for clustering
-    use_weighted_gmm: Optional[bool] = None  # Hidden option: when True, use weighted GMM + weighted BIC
+    use_weighted_gmm: Optional[bool] = None,  # Hidden option: when True, use weighted GMM + weighted BIC
+    # Optional progress reporting (message, percent). If provided, emit per-type updates.
+    progress_callback: Optional[Callable[[str, float], None]] = None,
+    progress_min: float = 90.0,
+    progress_max: float = 98.0
 ) -> Dict[str, Any]:
     """
     Direct GMM clustering on redshift values with automatic best metric selection.
@@ -290,13 +332,25 @@ def perform_direct_gmm_clustering(
         _LOGGER.info("No types have any matches for clustering")
         return {'success': False, 'reason': 'no_matches'}
     
-    _LOGGER.info(f"📊 Processing {len(filtered_type_groups)} types: {list(filtered_type_groups.keys())}")
+    n_types = len(filtered_type_groups)
+    _LOGGER.info(f"📊 Processing {n_types} types: {list(filtered_type_groups.keys())}")
+    # Emit an initial clustering progress update if requested
+    try:
+        if progress_callback is not None and n_types > 0:
+            progress_callback(
+                f"Clustering: processing {n_types} type(s)",
+                float(progress_min)
+            )
+    except Exception:
+        pass
     
     # Perform GMM clustering for each type
     all_cluster_candidates = []
     clustering_results = {}
     
-    for sn_type, type_matches in filtered_type_groups.items():
+    # Iterate deterministically for stable UX
+    for idx, sn_type in enumerate(sorted(filtered_type_groups.keys())):
+        type_matches = filtered_type_groups[sn_type]
         type_result = _perform_direct_gmm_clustering(
             type_matches, sn_type, max_clusters_per_type, 
             quality_threshold, verbose, "best_metric",  # Parameter is deprecated
@@ -374,8 +428,8 @@ def perform_direct_gmm_clustering(
                                 cluster_candidate['matches'], best_subtype
                             )
                         
-                        # Calculate joint estimates for the full cluster as well
-                        cluster_redshift, cluster_age, cluster_redshift_sd, cluster_age_sd, cluster_redshift_age_covariance = calculate_joint_redshift_age_from_cluster(
+                        # Calculate weighted estimates for the full cluster as well
+                        cluster_redshift, cluster_age, cluster_redshift_se, cluster_age_se, cluster_redshift_age_covariance = _compute_weighted_cluster_stats(
                             cluster_candidate['matches']
                         )
                         
@@ -397,9 +451,9 @@ def perform_direct_gmm_clustering(
                             'subtype_age_template_count': subtype_age_template_count,
                             # Add full cluster joint estimates (update the enhanced_redshift from weighted_mean_redshift)
                             'enhanced_redshift': cluster_redshift,
-                            'weighted_redshift_se': cluster_redshift_sd,
+                            'weighted_redshift_se': cluster_redshift_se,
                             'cluster_age': cluster_age,
-                            'cluster_age_se': cluster_age_sd,
+                            'cluster_age_se': cluster_age_se,
                             'cluster_redshift_age_covariance': cluster_redshift_age_covariance
                         })
                         
@@ -418,17 +472,17 @@ def perform_direct_gmm_clustering(
                                 _LOGGER.warning(f"  Could not calculate joint estimates for subtype {best_subtype}")
                             
                             if not np.isnan(cluster_redshift) and not np.isnan(cluster_age):
-                                _LOGGER.info(f"  Full cluster joint estimates: z={cluster_redshift:.6f}±{cluster_redshift_error:.6f}, "
-                                           f"age={cluster_age:.1f}±{cluster_age_error:.1f} days, cov={cluster_redshift_age_covariance:.8f}")
+                                _LOGGER.info(f"  Full cluster joint estimates: z={cluster_redshift:.6f}±{cluster_redshift_se:.6f}, "
+                                           f"age={cluster_age:.1f}±{cluster_age_se:.1f} days, cov={cluster_redshift_age_covariance:.8f}")
                 except Exception as e:
                     # If subtype calculation fails, add default values
-                    # Still calculate full cluster joint estimates
+                    # Still calculate full cluster weighted estimates
                     try:
-                        cluster_redshift, cluster_age, cluster_redshift_sd, cluster_age_sd, cluster_redshift_age_covariance = calculate_joint_redshift_age_from_cluster(
+                        cluster_redshift, cluster_age, cluster_redshift_se, cluster_age_se, cluster_redshift_age_covariance = _compute_weighted_cluster_stats(
                             cluster_candidate['matches']
                         )
                     except:
-                        cluster_redshift = cluster_age = cluster_redshift_error = cluster_age_error = cluster_redshift_age_covariance = np.nan
+                        cluster_redshift = cluster_age = cluster_redshift_se = cluster_age_se = cluster_redshift_age_covariance = np.nan
                     
                     cluster_candidate.update({
                         'subtype_info': {
@@ -447,15 +501,24 @@ def perform_direct_gmm_clustering(
                         'subtype_age_template_count': 0,
                         # Add full cluster joint estimates (fallback)
                         'enhanced_redshift': cluster_redshift,
-                        'weighted_redshift_se': cluster_redshift_sd,
+                        'weighted_redshift_se': cluster_redshift_se,
                         'cluster_age': cluster_age,
-                        'cluster_age_se': cluster_age_sd,
+                        'cluster_age_se': cluster_age_se,
                         'cluster_redshift_age_covariance': cluster_redshift_age_covariance
                     })
                     if verbose:
                         _LOGGER.warning(f"  Failed to calculate subtypes for cluster {cluster_id}: {e}")
                 
                 all_cluster_candidates.append(cluster_candidate)
+
+        # Per-type progress update
+        try:
+            if progress_callback is not None and n_types > 0:
+                frac = (idx + 1) / float(n_types)
+                pct = float(progress_min + (progress_max - progress_min) * frac)
+                progress_callback(f"Clustering type {sn_type} ({idx + 1}/{n_types})", pct)
+        except Exception:
+            pass
     
     # Select best cluster using the new top-5 best metric method
     if not all_cluster_candidates:
@@ -697,7 +760,7 @@ def _perform_direct_gmm_clustering(
                 else:
                     redshift_quality = 'very_loose'
 
-                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(cluster_matches)
+                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = _compute_weighted_cluster_stats(cluster_matches)
 
                 final_clusters.append({
                     'id': new_id,
@@ -756,7 +819,7 @@ def _perform_direct_gmm_clustering(
                 else:
                     redshift_quality = 'very_loose'
 
-                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(cluster_matches)
+                weighted_mean_redshift, _, weighted_redshift_sd, _, _ = _compute_weighted_cluster_stats(cluster_matches)
 
                 cluster_info = {
                     'id': cluster_id,
@@ -836,9 +899,7 @@ def _create_single_cluster_result(
         redshift_quality = 'loose'
     
     # Calculate enhanced redshift statistics using joint estimation (just extract redshift)
-    weighted_mean_redshift, _, weighted_redshift_sd, _, _ = calculate_joint_redshift_age_from_cluster(
-        type_matches
-    )
+    weighted_mean_redshift, _, weighted_redshift_sd, _, _ = _compute_weighted_cluster_stats(type_matches)
     
     cluster_info = {
         'id': 0,
