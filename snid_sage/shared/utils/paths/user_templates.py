@@ -23,9 +23,8 @@ from snid_sage.shared.utils.config.configuration_manager import ConfigurationMan
 
 def _is_writable_dir(path: Path) -> bool:
     try:
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
-        return os.access(path, os.W_OK)
+        # Do not create directories implicitly; only validate existing paths
+        return path.exists() and os.access(path, os.W_OK)
     except Exception:
         return False
 

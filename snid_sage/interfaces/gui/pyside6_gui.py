@@ -1392,13 +1392,48 @@ class PySide6SNIDSageGUI(QtWidgets.QMainWindow):
                 if stage != self._current_progress_stage:
                     self._current_progress_stage = stage
 
-                # Always update percentage with the stable stage label
-                display_progress = 100 if stage == "Complete" else int(progress)
+                # Compute display percentage, restarting from 0 for clustering stage
+                display_progress = 0
+                if stage == "Results & Clustering":
+                    # On first entry to clustering, ensure we start from 0
+                    # Reset happens implicitly when changing stage; no separate bar used
+                    # Prefer exact i/n parsing from message
+                    pct_local = None
+                    try:
+                        if "clustering type" in normalized and "(" in (message or "") and "/" in (message or "") and ")" in (message or ""):
+                            import re
+                            m = re.search(r"\((\d+)\s*/\s*(\d+)\)", message)
+                            if m:
+                                i = int(m.group(1))
+                                n = max(1, int(m.group(2)))
+                                pct_local = int(round((i / n) * 100))
+                    except Exception:
+                        pct_local = None
+
+                    # Fallback: map overall progress window (e.g., 90-98%) to 0-100%
+                    if pct_local is None:
+                        try:
+                            cluster_min = 90.0
+                            cluster_max = 98.0
+                            base = max(cluster_min, min(cluster_max, float(progress)))
+                            pct_local = int(round(((base - cluster_min) / max(1.0, (cluster_max - cluster_min))) * 100))
+                        except Exception:
+                            pct_local = 0
+
+                    display_progress = max(0, min(100, pct_local))
+                elif stage == "Complete":
+                    display_progress = 100
+                else:
+                    display_progress = int(progress)
+
                 self.progress_dialog.set_stage(self._current_progress_stage, display_progress)
 
                 # Still show the raw progress message in the log panel (when non-empty)
                 if message and message.strip():
                     self.progress_dialog.add_progress_line(message, "info")
+
+                # Track last stage (used implicitly for future logic if needed)
+                self._last_stage = stage
         except Exception as e:
             _LOGGER.error(f"Error handling progress update: {e}")
 

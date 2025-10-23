@@ -174,6 +174,7 @@ sage templates <command> [options]
 | `search <query>` | Search templates |
 | `validate` | Validate template library |
 | `update` | Update template library |
+| `import-csv <file>` | Import templates from CSV/TSV (multi-epoch) |
 
 #### Examples
 ```powershell
@@ -188,6 +189,9 @@ sage templates info "SN1994D"
 
 # Validate template library
 sage templates validate
+
+# Import templates from CSV/TSV
+sage templates import-csv data\list.csv --dest C:\\User_templates --name-column object_name --path-column spectrum_file_path --age-column age --redshift-column redshift --type-column type --subtype-column subtype --sim-flag-column sim_flag
 ```
 
 ## Troubleshooting

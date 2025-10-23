@@ -343,3 +343,5 @@ TESTING_TEMPLATES_NEW/
 
 # ===== MARKDOWN FILES =====
 # Track markdown files (remove previous global ignore). No entries here on purpose.
+# Development planning documents
+PlanOnirBuild.md

@@ -59,6 +59,27 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         # Control panel
         control_panel = QtWidgets.QGroupBox("Visualization Controls")
         self.layout_manager.setup_group_box(control_panel)
+        # Match panel border thickness and radius
+        control_panel.setStyleSheet(
+            """
+            QGroupBox {
+                font-weight: bold;
+                font-size: 10pt;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                margin-top: 8px;
+                padding-top: 10px;
+                background: #ffffff;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 8px 0 8px;
+                color: #000000;
+                background: #ffffff;
+            }
+            """
+        )
         control_layout = QtWidgets.QHBoxLayout(control_panel)
         
         self.view_mode_combo = QtWidgets.QComboBox()
@@ -76,10 +97,19 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         
         layout.addWidget(control_panel)
         
-        # Plot area
-        self.plot_widget = QtWidgets.QWidget()
+        # Plot area (rounded white panel with light grey contour, matching main GUI)
+        self.plot_widget = QtWidgets.QFrame()
+        self.plot_widget.setObjectName("template_plot_container")
         self.layout_manager.setup_template_viewer(self.plot_widget)
-        self.plot_widget.setStyleSheet("background-color: white; border: 1px solid gray;")
+        self.plot_widget.setStyleSheet(
+            """
+            QFrame#template_plot_container {
+                background-color: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+            }
+            """
+        )
         layout.addWidget(self.plot_widget)
         
         # Initialize PyQtGraph plotting
@@ -108,30 +138,50 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
             # Create enhanced PyQtGraph plot widget with save functionality
             self.plot_widget_pg = EnhancedPlotWidget()
             
-            # Add to widget layout
+            # Add to widget layout with inner margins to avoid clipping rounded corners
             plot_layout = QtWidgets.QVBoxLayout(self.plot_widget)
+            try:
+                plot_layout.setContentsMargins(8, 8, 8, 8)
+                plot_layout.setSpacing(0)
+            except Exception:
+                pass
             plot_layout.addWidget(self.plot_widget_pg)
             
             # Get plot item for customization
             self.plot_item = self.plot_widget_pg.getPlotItem()
             
-            # Setup labels and grid
+            # Setup labels and grid (match main GUI vibe: subtle grid)
             self.plot_item.setLabel('left', 'Flux')
-            # Use explicit full label to match main GUI style and avoid SI prefixes
             self.plot_item.setLabel('bottom', 'Rest Wavelength (Å)')
-            self.plot_item.showGrid(x=True, y=True, alpha=0.3)
+            self.plot_item.showGrid(x=True, y=True, alpha=0.08)
 
-            # Remove inner frame: hide axis border lines while keeping labels/ticks
+            # Add slight content margins and view padding like main GUI
             try:
+                self.plot_item.setContentsMargins(6, 10, 6, 6)
+                self.plot_item.getViewBox().setDefaultPadding(0.08)
+            except Exception:
+                pass
+
+            # Show borders on all sides; hide tick labels on top/right to match main GUI
+            try:
+                # Ensure top/right axes are visible
+                try:
+                    self.plot_item.showAxis('right')
+                    self.plot_item.showAxis('top')
+                except Exception:
+                    pass
                 for axis_name in ('left', 'bottom', 'right', 'top'):
                     ax = self.plot_item.getAxis(axis_name)
                     if ax is not None:
-                        # Keep text visible but make the axis line fully transparent
                         try:
                             ax.setTextPen(pg.mkPen(color='black'))
                         except Exception:
                             pass
-                        ax.setPen(pg.mkPen(color=(0, 0, 0, 0)))
+                        # Draw axis line as border
+                        ax.setPen(pg.mkPen(color='black', width=1))
+                        # Hide values on top/right for a clean frame
+                        if hasattr(ax, 'setStyle') and axis_name in ('top', 'right'):
+                            ax.setStyle(showValues=False)
             except Exception:
                 pass
             
@@ -158,13 +208,17 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         try:
             # Set background and foreground colors
             self.plot_item.getViewBox().setBackgroundColor('#ffffff')
-            
-            # Keep axis text visible but hide axis border lines to avoid inner square
-            for axis in ['left', 'bottom']:
-                ax = self.plot_item.getAxis(axis)
+
+            # Draw borders on all sides; hide tick labels on top/right
+            for axis_name in ('left', 'bottom', 'right', 'top'):
+                ax = self.plot_item.getAxis(axis_name)
+                if ax is None:
+                    continue
                 ax.setTextPen(pg.mkPen(color='black'))
                 try:
-                    ax.setPen(pg.mkPen(color=(0, 0, 0, 0)))
+                    ax.setPen(pg.mkPen(color='black', width=1))
+                    if hasattr(ax, 'setStyle') and axis_name in ('top', 'right'):
+                        ax.setStyle(showValues=False)
                 except Exception:
                     pass
                 
@@ -344,6 +398,13 @@ class TemplateVisualizationWidget(QtWidgets.QWidget):
         
         title = " | ".join(title_parts)
         self.plot_item.setTitle(title)
+
+        # Show save button once actual content is plotted
+        try:
+            if hasattr(self, 'plot_widget_pg') and self.plot_widget_pg is not None:
+                self.plot_widget_pg.show_save_button()
+        except Exception:
+            pass
         
     def _plot_all_epochs_pg(self):
         """Plot all epochs with vertical offset using PyQtGraph"""

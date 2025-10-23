@@ -42,7 +42,18 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         self.layout_manager.apply_panel_layout(self, layout)
         
-        # Batch operations removed
+        # Batch import operations
+        try:
+            batch_group = QtWidgets.QGroupBox("Batch Operations")
+            self.layout_manager.setup_group_box(batch_group)
+            batch_layout = QtWidgets.QHBoxLayout(batch_group)
+            batch_btn = self.layout_manager.create_action_button("Batch Import…")
+            batch_btn.clicked.connect(self.open_batch_import_dialog)
+            batch_layout.addWidget(batch_btn)
+            batch_layout.addStretch()
+            layout.addWidget(batch_group)
+        except Exception:
+            pass
         
         # Template editing
         edit_group = QtWidgets.QGroupBox("Template Editing")
@@ -103,6 +114,19 @@ class TemplateManagerWidget(QtWidgets.QWidget):
         layout.addStretch()
         
     # Batch operations and related dialogs removed
+    def open_batch_import_dialog(self) -> None:
+        """Open the batch import dialog for creating templates from CSV/TSV."""
+        try:
+            from .batch_import_dialog import BatchImportDialog
+            dlg = BatchImportDialog(self)
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                # After import, refresh views if available
+                try:
+                    self._emit_refresh()
+                except Exception:
+                    pass
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Error", f"Unable to open Batch Import: {e}")
         
     def save_template_changes(self):
         """Save changes to template metadata"""

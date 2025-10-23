@@ -83,12 +83,7 @@ class TemplateService:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        try:
-            p = get_user_templates_dir(strict=True)
-            if p is not None:
-                p.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
+        # Do not auto-create user template directories; user must select a valid folder
         # Lazy cache
         self._standard_grid = StandardGrid()
         self._standard_wave = self._standard_grid.wavelength()
@@ -187,6 +182,8 @@ class TemplateService:
         wave: np.ndarray,
         flux: np.ndarray,
         combine_only: bool = False,
+        target_dir: Optional[Path] = None,
+        sim_flag: Optional[int] = None,
     ) -> bool:
         """
         Append a template to the per-type user HDF5 and update the user index.
@@ -198,7 +195,7 @@ class TemplateService:
             return False
         try:
             with self._lock:
-                h5_abs_path = self._ensure_user_h5_for_type(ttype)
+                h5_abs_path = self._ensure_user_h5_for_type(ttype, target_dir=target_dir)
 
                 # Rebin to the standard grid
                 rebinned_flux = self._rebin_to_standard_grid(wave, flux)
@@ -215,13 +212,15 @@ class TemplateService:
                     rebinned_flux,
                     fft,
                     allow_suffix=(not combine_only),
+                    sim_flag=(int(sim_flag) if sim_flag is not None else None),
                 )
                 if combine_only and not combined:
                     # Do not create a suffixed template when explicitly adding to existing
                     return False
 
                 # Update user index (omit non-essential fields like phase/age/rebinned)
-                idx_path = _user_index_path()
+                # Determine index path (override when target_dir provided)
+                idx_path = self._index_path_for_target(target_dir)
                 index = self._read_json(idx_path) or {
                     "version": "2.0",
                     "templates": {},
@@ -234,6 +233,8 @@ class TemplateService:
                     entry = index_templates[final_name]
                     entry["epochs"] = int(epochs_count)
                     entry["storage_file"] = str(h5_abs_path).replace("\\", "/")
+                    if sim_flag is not None:
+                        entry["sim_flag"] = int(sim_flag)
                 else:
                     index_templates[final_name] = {
                         "type": ttype,
@@ -242,6 +243,8 @@ class TemplateService:
                         "epochs": 1 if not combined else int(epochs_count),
                         "storage_file": str(h5_abs_path).replace("\\", "/"),
                     }
+                    if sim_flag is not None:
+                        index_templates[final_name]["sim_flag"] = int(sim_flag)
 
                 # Recompute by_type summary
                 index["by_type"] = self._compute_by_type(index_templates)
@@ -488,13 +491,17 @@ class TemplateService:
             rebinned = rebinned / med
         return rebinned.astype(float, copy=False)
 
-    def _ensure_user_h5_for_type(self, ttype: str) -> Path:
-        """Ensure the per-type user HDF5 exists; return absolute path in user config dir."""
+    def _ensure_user_h5_for_type(self, ttype: str, *, target_dir: Optional[Path] = None) -> Path:
+        """Ensure the per-type HDF5 exists in the selected target or user config dir; return absolute path."""
         safe_type = ttype.replace("/", "_").replace("-", "_").replace(" ", "_")
-        user_dir = get_user_templates_dir(strict=True)
-        if user_dir is None:
-            raise RuntimeError("User templates directory is not set. Please configure it in the GUI settings.")
-        abs_path = user_dir / f"templates_{safe_type}.user.hdf5"
+        base_dir: Optional[Path] = None
+        if target_dir is not None:
+            base_dir = Path(target_dir)
+        else:
+            base_dir = get_user_templates_dir(strict=True)
+        if base_dir is None:
+            raise RuntimeError("Templates destination is not set. Configure a User Templates folder or select a destination.")
+        abs_path = Path(base_dir) / f"templates_{safe_type}.user.hdf5"
         if not abs_path.exists():
             abs_path.parent.mkdir(parents=True, exist_ok=True)
             with h5py.File(abs_path, "w") as f:
@@ -524,6 +531,7 @@ class TemplateService:
         flux: np.ndarray,
         fft: np.ndarray,
         allow_suffix: bool = True,
+        sim_flag: Optional[int] = None,
     ) -> tuple[str, bool, int, str]:
         """Append or combine into an existing template group if same name and redshift.
 
@@ -581,9 +589,19 @@ class TemplateService:
                         egn.create_dataset("fft_imag", data=np.asarray(fft.imag))
                         egn.attrs["age"] = float(age)
                         egn.attrs["rebinned"] = True
+                        if sim_flag is not None:
+                            try:
+                                egn.attrs["sim_flag"] = int(sim_flag)
+                            except Exception:
+                                pass
                         # Update epochs count and latest age
                         g.attrs["epochs"] = new_epoch_idx + 1
                         g.attrs["age"] = float(age)
+                        if sim_flag is not None:
+                            try:
+                                g.attrs["sim_flag"] = int(sim_flag)
+                            except Exception:
+                                pass
                         # Keep top-level flux/fft as last epoch for compatibility
                         try:
                             del g["flux"]
@@ -618,6 +636,11 @@ class TemplateService:
             g.attrs["redshift"] = float(redshift)
             g.attrs["epochs"] = 1
             g.attrs["rebinned"] = True
+            if sim_flag is not None:
+                try:
+                    g.attrs["sim_flag"] = int(sim_flag)
+                except Exception:
+                    pass
             # bump count
             meta = f["metadata"]
             try:
@@ -625,6 +648,16 @@ class TemplateService:
             except Exception:
                 meta.attrs["template_count"] = 1
             return final_name, False, 1, "created"
+
+    def _index_path_for_target(self, target_dir: Optional[Path]) -> Optional[Path]:
+        """Return the index path for the selected destination or the configured user folder."""
+        if target_dir is not None:
+            try:
+                base = Path(target_dir)
+                return base / "template_index.user.json"
+            except Exception:
+                return _user_index_path()
+        return _user_index_path()
 
     def _compute_by_type(self, templates: Dict[str, Any]) -> Dict[str, Any]:
         by_type: Dict[str, Any] = {}

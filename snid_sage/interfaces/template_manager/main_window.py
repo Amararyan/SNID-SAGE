@@ -91,9 +91,26 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         
     def create_left_panel(self) -> QtWidgets.QWidget:
         """Create the left panel with template browser"""
-        panel = QtWidgets.QWidget()
+        panel = QtWidgets.QFrame()
+        panel.setObjectName("template_left_panel")
         layout = QtWidgets.QVBoxLayout(panel)
         self.layout_manager.apply_panel_layout(panel, layout)
+        try:
+            # Add rounded light-grey contour consistent with main GUI
+            panel.setStyleSheet(
+                """
+                QFrame#template_left_panel {
+                    background-color: white;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 8px;
+                    margin: 2px;
+                }
+                """
+            )
+            # Slightly reduce inner spacing to better fit within rounded frame
+            layout.setContentsMargins(8, 8, 8, 8)
+        except Exception:
+            pass
         
         # Header
         header = QtWidgets.QLabel("Template Library")
@@ -116,9 +133,25 @@ class SNIDTemplateManagerGUI(QtWidgets.QMainWindow):
         self._user_folder_banner = banner
         layout.addWidget(banner)
 
-        # Search and filters
+        # Search and filters (rounded white subpanel with light grey contour)
         search_frame = QtWidgets.QFrame()
+        search_frame.setObjectName("template_search_panel")
         search_layout = QtWidgets.QVBoxLayout(search_frame)
+        try:
+            search_frame.setStyleSheet(
+                """
+                QFrame#template_search_panel {
+                    background-color: white;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 8px;
+                    margin: 2px;
+                }
+                """
+            )
+            search_layout.setContentsMargins(8, 8, 8, 8)
+            search_layout.setSpacing(6)
+        except Exception:
+            pass
         
         # Source selector: Default / User / Combined
         source_row = QtWidgets.QHBoxLayout()

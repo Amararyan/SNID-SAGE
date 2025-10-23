@@ -61,19 +61,10 @@ class ConfigurationManager:
         
     def _get_config_directory(self) -> Path:
         """Get platform-appropriate configuration directory"""
-        try:
-            # Use Qt's QStandardPaths for cross-platform config directories
-            from PySide6.QtCore import QStandardPaths
-            config_path = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
-            return Path(config_path) / 'SNID_SAGE'
-        except ImportError:
-            # Fallback to legacy OS detection
-            if os.name == 'nt':  # Windows
-                config_dir = Path(os.environ.get('APPDATA', Path.home())) / 'SNID_SAGE'
-            else:  # Unix-like systems
-                config_dir = Path.home() / '.config' / 'snid_sage'
-            
-            return config_dir
+        # Use a single home-scoped directory so all tools share config and avoid AppData
+        # Windows: C:\Users\<user>\.snid_sage
+        # Linux/macOS: ~/.snid_sage
+        return Path.home() / '.snid_sage'
     
     def _create_validation_rules(self) -> Dict[str, Dict[str, ConfigValidationRule]]:
         """Create validation rules for all configuration categories"""
@@ -82,6 +73,10 @@ class ConfigurationManager:
                 'templates_dir': ConfigValidationRule(
                     custom_validator=lambda x: not x or Path(x).exists() if x else True,
                     error_message="Templates directory must exist or be empty"
+                ),
+                'user_templates_dir': ConfigValidationRule(
+                    custom_validator=lambda x: self._validate_writable_directory(x),
+                    error_message="User templates directory must be writable"
                 ),
                 'output_dir': ConfigValidationRule(
                     custom_validator=lambda x: self._validate_writable_directory(x),
@@ -349,7 +344,58 @@ class ConfigurationManager:
                 self._current_config = merged_config
                 return merged_config
             else:
-                # Attempt legacy import from old CLI config (~/.config/snid/config.json)
+                # Attempt migration from previous locations → ~/.snid_sage
+                # 1) Qt AppDataLocation-based path
+                try:
+                    from PySide6.QtCore import QStandardPaths
+                    legacy_qt_dir = Path(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)) / 'SNID_SAGE'
+                    legacy_qt_file = legacy_qt_dir / 'snid_sage_config.json'
+                except Exception:
+                    legacy_qt_file = None
+
+                if legacy_qt_file is not None and legacy_qt_file.exists():
+                    try:
+                        with open(legacy_qt_file, 'r', encoding='utf-8') as f:
+                            legacy_cfg = json.load(f)
+                        merged = self._deep_merge_configs(self.get_default_config(), legacy_cfg)
+                        # Save migrated as new default for future runs
+                        self.save_config(merged, self.default_config_file)
+                        self._current_config = merged
+                        return merged
+                    except Exception:
+                        pass
+
+                # 2) Old Windows AppData path (pre-change default)
+                try:
+                    legacy_appdata_dir = Path(os.environ.get('APPDATA', str(Path.home()))) / 'SNID_SAGE'
+                    legacy_appdata_file = legacy_appdata_dir / 'snid_sage_config.json'
+                except Exception:
+                    legacy_appdata_file = None
+                if legacy_appdata_file is not None and legacy_appdata_file.exists():
+                    try:
+                        with open(legacy_appdata_file, 'r', encoding='utf-8') as f:
+                            legacy_cfg = json.load(f)
+                        merged = self._deep_merge_configs(self.get_default_config(), legacy_cfg)
+                        self.save_config(merged, self.default_config_file)
+                        self._current_config = merged
+                        return merged
+                    except Exception:
+                        pass
+
+                # 3) Old XDG config (~/.config/snid_sage)
+                legacy_xdg_file = (Path.home() / '.config' / 'snid_sage' / 'snid_sage_config.json')
+                if legacy_xdg_file.exists():
+                    try:
+                        with open(legacy_xdg_file, 'r', encoding='utf-8') as f:
+                            legacy_cfg = json.load(f)
+                        merged = self._deep_merge_configs(self.get_default_config(), legacy_cfg)
+                        self.save_config(merged, self.default_config_file)
+                        self._current_config = merged
+                        return merged
+                    except Exception:
+                        pass
+
+                # 4) Very old CLI config (~/.config/snid/config.json)
                 legacy_path = Path.home() / '.config' / 'snid' / 'config.json'
                 if legacy_path.exists():
                     try:

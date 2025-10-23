@@ -1212,9 +1212,9 @@ class PySide6AppController(QtCore.QObject):
             if not clustering_results.get('success', False):
                 return False
                 
-            # Check if we have multiple clusters to choose from
+            # Check if we have at least one cluster (show dialog even with a single cluster)
             all_candidates = clustering_results.get('all_candidates', [])
-            if len(all_candidates) <= 1:
+            if len(all_candidates) == 0:
                 return False
                 
             # Verify clusters have required data
